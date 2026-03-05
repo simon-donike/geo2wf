@@ -13,11 +13,19 @@ class PairedImageDataset(Dataset):
         self,
         x_data: Optional[list[torch.Tensor]] = None,
         y_data: Optional[list[torch.Tensor]] = None,
+        length: int = 1,
+        x_channels: int = 3,
+        y_channels: int = 3,
+        image_size: int = 64,
         transform_x: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         transform_y: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
     ) -> None:
         self.x_data = x_data or []
         self.y_data = y_data or []
+        self.length = max(1, int(length))
+        self.x_channels = int(x_channels)
+        self.y_channels = int(y_channels)
+        self.image_size = int(image_size)
         self.transform_x = transform_x
         self.transform_y = transform_y
 
@@ -25,13 +33,13 @@ class PairedImageDataset(Dataset):
             raise ValueError("x_data and y_data must have the same length.")
 
     def __len__(self) -> int:
-        return len(self.x_data)
+        return len(self.x_data) if self.x_data else self.length
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         if len(self.x_data) == 0:
             # Placeholder sample so the interface works before real data is wired.
-            x = torch.zeros(3, 64, 64)
-            y = torch.zeros(3, 64, 64)
+            x = torch.zeros(self.x_channels, self.image_size, self.image_size)
+            y = torch.zeros(self.y_channels, self.image_size, self.image_size)
             return x, y
 
         x = self.x_data[idx]
