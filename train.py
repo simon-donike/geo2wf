@@ -2,6 +2,15 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import warnings
+
+# PL 1.9.x emits this warning with newer PyTorch treespec internals; silence this
+# one specific deprecation message to keep training logs clean.
+warnings.filterwarnings(
+    "ignore",
+    message=r".*isinstance\(treespec, LeafSpec\).*deprecated.*TreeSpec.*is_leaf.*",
+    category=DeprecationWarning,
+)
 
 import pytorch_lightning as pl
 import yaml

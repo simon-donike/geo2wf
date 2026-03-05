@@ -1,8 +1,8 @@
 import pytorch_lightning as pl
-import kornia
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 from .DenoisingDiffusionProcess import *
 
@@ -121,8 +121,27 @@ class PixelDiffusionConditional(pl.LightningModule):
         target = target_batch.detach().float().clamp(0, 1)
 
         l1 = F.l1_loss(pred, target)
-        psnr = kornia.metrics.psnr(pred, target, max_val=1.0)
-        ssim = kornia.metrics.ssim(pred, target, window_size=11, max_val=1.0).mean()
+
+        pred_np = pred.cpu().numpy()
+        target_np = target.cpu().numpy()
+
+        psnr_vals = []
+        ssim_vals = []
+        for i in range(pred_np.shape[0]):
+            p = pred_np[i]
+            t = target_np[i]
+            psnr_vals.append(peak_signal_noise_ratio(t, p, data_range=1.0))
+            ssim_vals.append(
+                structural_similarity(
+                    t,
+                    p,
+                    data_range=1.0,
+                    channel_axis=0,
+                )
+            )
+
+        psnr = torch.tensor(psnr_vals, device=pred.device, dtype=pred.dtype).mean()
+        ssim = torch.tensor(ssim_vals, device=pred.device, dtype=pred.dtype).mean()
 
         return psnr, ssim, l1
 
