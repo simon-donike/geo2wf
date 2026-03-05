@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import yaml
+from pytorch_lightning.loggers import WandbLogger
 
 from data import PairedDataModule
 from src.PixelDiffusion import PixelDiffusionConditional
@@ -32,6 +33,7 @@ def main() -> None:
     lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
     loader_cfg = config.get("data", {}).get("loader", {})
     unet_cfg = model_cfg.get("unet", {})
+    wandb_cfg = config.get("logging", {}).get("wandb", {})
 
     model = PixelDiffusionConditional(
         train_dataset=train_ds,
@@ -51,6 +53,12 @@ def main() -> None:
     )
 
     trainer_cfg = config.get("trainer", {})
+    wandb_logger = WandbLogger(
+        project=wandb_cfg.get("project", "dif_img_rec"),
+        name=wandb_cfg.get("name"),
+        save_dir=wandb_cfg.get("save_dir", "logs"),
+        log_model=wandb_cfg.get("log_model", False),
+    )
     trainer = pl.Trainer(
         max_epochs=trainer_cfg.get("max_epochs", 1),
         accelerator=trainer_cfg.get("accelerator", "auto"),
@@ -58,6 +66,7 @@ def main() -> None:
         precision=trainer_cfg.get("precision", 32),
         log_every_n_steps=trainer_cfg.get("log_every_n_steps", 10),
         enable_checkpointing=trainer_cfg.get("enable_checkpointing", False),
+        logger=wandb_logger,
     )
 
     trainer.fit(model)
