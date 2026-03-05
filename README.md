@@ -101,6 +101,8 @@ Notes:
 - `unet.channels` should usually be `in_channels + out_channels` for conditional concat input.
 - `unet.out_dim` should match `out_channels`.
 - Smaller model: reduce `unet.dim` (for example `48` instead of `64`).
+- Current downsized setup reduces the UNet from about `55M` to about `32M` parameters
+  (mainly by lowering base width via `unet.dim` and using the configured channel sizes).
 
 ### Optimization and scheduler
 
