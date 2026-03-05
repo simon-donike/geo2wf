@@ -23,7 +23,7 @@ def main() -> None:
     1. Build data module (encapsulates DataLoaders).
     2. Build LightningModule (`PixelDiffusionConditional`).
     3. Build `pl.Trainer` with runtime options.
-    4. Call `trainer.fit(model)` to start the full train/val loop.
+    4. Call `trainer.fit(model, datamodule=datamodule)` to start the full train/val loop.
     """
     parser = argparse.ArgumentParser()
     # Path to the YAML config used for all runtime settings.
@@ -38,22 +38,15 @@ def main() -> None:
 
     # DataModule centralizes loader construction and setup for Lightning.
     datamodule = PairedDataModule.from_config(config)
-    datamodule.setup("fit")
-    train_ds = datamodule.train_dataset
-    val_ds = datamodule.val_dataset
-
     # Split config sections for clarity.
     model_cfg = config.get("model", {})
     opt_cfg = config.get("optimization", {})
     lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
-    loader_cfg = config.get("data", {}).get("loader", {})
     unet_cfg = model_cfg.get("unet", {})
     wandb_cfg = config.get("logging", {}).get("wandb", {})
 
     # This is the Lightning model used for training and validation.
     model = PixelDiffusionConditional(
-        train_dataset=train_ds,
-        valid_dataset=val_ds,
         condition_channels=model_cfg.get("in_channels", 2),
         generated_channels=model_cfg.get("out_channels", 2),
         num_timesteps=model_cfg.get("num_timesteps", 1000),
@@ -62,7 +55,6 @@ def main() -> None:
         model_dim_mults=tuple(unet_cfg.get("dim_mults", [1, 2, 4, 8])),
         model_channels=unet_cfg.get("channels"),
         model_out_dim=unet_cfg.get("out_dim"),
-        batch_size=loader_cfg.get("batch_size", 4),
         lr=opt_cfg.get("lr", 1e-3),
         lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
         lr_scheduler_patience=lr_sched_cfg.get("patience", 10),
@@ -95,7 +87,7 @@ def main() -> None:
     )
 
     # Starts the training/validation loop.
-    trainer.fit(model)
+    trainer.fit(model, datamodule=datamodule)
 
 
 if __name__ == "__main__":
