@@ -1,98 +1,12 @@
 import pytorch_lightning as pl
+import kornia
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.data import DataLoader
 
 from .DenoisingDiffusionProcess import *
 
-class PixelDiffusion(pl.LightningModule):
-    """Base Lightning diffusion module.
-
-    This class defines the standard Lightning hooks:
-    - `training_step`: computes train loss for one batch
-    - `validation_step`: computes validation loss for one batch
-    - `configure_optimizers`: creates optimizer + scheduler
-    - `train_dataloader` / `val_dataloader`: return DataLoaders
-    """
-    def __init__(self,
-                 train_dataset,
-                 valid_dataset=None,
-                 num_timesteps=1000,
-                 batch_size=1,
-                 lr=1e-3,
-                 lr_scheduler_factor=0.5,
-                 lr_scheduler_patience=10):
-        super().__init__()
-        self.train_dataset = train_dataset
-        self.valid_dataset = valid_dataset
-        self.lr = lr
-        self.batch_size=batch_size
-        self.lr_scheduler_factor=lr_scheduler_factor
-        self.lr_scheduler_patience=lr_scheduler_patience
-        
-        # Core diffusion process (unconditional variant for base class).
-        self.model=DenoisingDiffusionProcess(num_timesteps=num_timesteps)
-
-    @torch.no_grad()
-    def forward(self,*args,**kwargs):
-        """Lightning inference helper; returns output mapped back to [0, 1]."""
-        return self.output_T(self.model(*args,**kwargs))
-    
-    def input_T(self, input):
-        # Model internally expects values in [-1, 1].
-        return (input.clip(0,1).mul_(2)).sub_(1)
-    
-    def output_T(self, input):
-        # Inverse mapping from [-1, 1] back to [0, 1] for visualization/metrics.
-        return (input.add_(1)).div_(2)
-    
-    def training_step(self, batch, batch_idx):   
-        """Lightning train hook: returns one scalar loss tensor."""
-        images=batch
-        loss = self.model.p_loss(self.input_T(images))
-        
-        self.log('train_loss',loss,on_step=True,on_epoch=True,prog_bar=True,logger=True)
-        
-        return loss
-            
-    def validation_step(self, batch, batch_idx):     
-        """Lightning validation hook: logs validation loss."""
-        images=batch
-        loss = self.model.p_loss(self.input_T(images))
-        
-        self.log('val_loss',loss,on_step=False,on_epoch=True,prog_bar=True,logger=True)
-        
-        return loss
-        
-    def train_dataloader(self):
-        return DataLoader(self.train_dataset,
-                          batch_size=self.batch_size,
-                          shuffle=True,
-                          num_workers=4)
-    
-    def val_dataloader(self):
-        if self.valid_dataset is not None:
-            return DataLoader(self.valid_dataset,
-                              batch_size=self.batch_size,
-                              shuffle=False,
-                              num_workers=4)
-        else:
-            return None
-    
-    def configure_optimizers(self):
-        """Create optimizer and ReduceLROnPlateau scheduler monitored on `val_loss`."""
-        optimizer=torch.optim.AdamW(list(filter(lambda p: p.requires_grad, self.model.parameters())), lr=self.lr)
-        scheduler=ReduceLROnPlateau(optimizer,
-                                    mode='min',
-                                    factor=self.lr_scheduler_factor,
-                                    patience=self.lr_scheduler_patience)
-        return {"optimizer": optimizer,
-                "lr_scheduler": {"scheduler": scheduler,
-                                 "monitor": "val_loss"}}
-    
-class PixelDiffusionConditional(PixelDiffusion):
+class PixelDiffusionConditional(pl.LightningModule):
     """Conditional pixel-space diffusion Lightning module.
 
     Expects each batch to be `(x, y)` where:
@@ -100,8 +14,6 @@ class PixelDiffusionConditional(PixelDiffusion):
     - `y`: target tensor to reconstruct/generate
     """
     def __init__(self,
-                 train_dataset,
-                 valid_dataset=None,
                  condition_channels=3,
                  generated_channels=3,
                  num_timesteps=1000,
@@ -110,15 +22,11 @@ class PixelDiffusionConditional(PixelDiffusion):
                  model_dim_mults=(1,2,4,8),
                  model_channels=None,
                  model_out_dim=None,
-                 batch_size=1,
                  lr=1e-3,
                  lr_scheduler_factor=0.5,
                  lr_scheduler_patience=10):
-        pl.LightningModule.__init__(self)
-        self.train_dataset = train_dataset
-        self.valid_dataset = valid_dataset
+        super().__init__()
         self.lr = lr
-        self.batch_size=batch_size
         self.lr_scheduler_factor=lr_scheduler_factor
         self.lr_scheduler_patience=lr_scheduler_patience
         
@@ -131,6 +39,19 @@ class PixelDiffusionConditional(PixelDiffusion):
                                                         model_dim_mults=model_dim_mults,
                                                         model_channels=model_channels,
                                                         model_out_dim=model_out_dim)
+
+    @torch.no_grad()
+    def forward(self, *args, **kwargs):
+        """Lightning inference helper; returns output mapped back to [0, 1]."""
+        return self.output_T(self.model(*args, **kwargs))
+
+    def input_T(self, input):
+        # Model internally expects values in [-1, 1].
+        return (input.clip(0, 1).mul_(2)).sub_(1)
+
+    def output_T(self, input):
+        # Inverse mapping from [-1, 1] back to [0, 1] for visualization/metrics.
+        return (input.add_(1)).div_(2)
     
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""
@@ -173,6 +94,20 @@ class PixelDiffusionConditional(PixelDiffusion):
         pred = self.model(self.input_T(input))
         return self.output_T(pred)
 
+    def configure_optimizers(self):
+        """Create optimizer and ReduceLROnPlateau scheduler monitored on `val_loss`."""
+        optimizer = torch.optim.AdamW(
+            list(filter(lambda p: p.requires_grad, self.model.parameters())),
+            lr=self.lr,
+        )
+        scheduler = ReduceLROnPlateau(optimizer,
+                                      mode='min',
+                                      factor=self.lr_scheduler_factor,
+                                      patience=self.lr_scheduler_patience)
+        return {"optimizer": optimizer,
+                "lr_scheduler": {"scheduler": scheduler,
+                                 "monitor": "val_loss"}}
+
     def _to_plot_image(self, tensor):
         """Convert CHW tensor to a matplotlib-friendly image array."""
         image = tensor.detach().float().cpu().clamp(0, 1)
@@ -186,21 +121,8 @@ class PixelDiffusionConditional(PixelDiffusion):
         target = target_batch.detach().float().clamp(0, 1)
 
         l1 = F.l1_loss(pred, target)
-
-        mse = F.mse_loss(pred, target)
-        psnr = 10.0 * torch.log10(1.0 / torch.clamp(mse, min=1e-12))
-
-        c1 = 0.01 ** 2
-        c2 = 0.03 ** 2
-        mu_x = F.avg_pool2d(pred, kernel_size=3, stride=1, padding=1)
-        mu_y = F.avg_pool2d(target, kernel_size=3, stride=1, padding=1)
-        sigma_x = F.avg_pool2d(pred * pred, kernel_size=3, stride=1, padding=1) - mu_x * mu_x
-        sigma_y = F.avg_pool2d(target * target, kernel_size=3, stride=1, padding=1) - mu_y * mu_y
-        sigma_xy = F.avg_pool2d(pred * target, kernel_size=3, stride=1, padding=1) - mu_x * mu_y
-        ssim_map = ((2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)) / (
-            (mu_x * mu_x + mu_y * mu_y + c1) * (sigma_x + sigma_y + c2)
-        )
-        ssim = ssim_map.mean()
+        psnr = kornia.metrics.psnr(pred, target, max_val=1.0)
+        ssim = kornia.metrics.ssim(pred, target, window_size=11, max_val=1.0).mean()
 
         return psnr, ssim, l1
 
