@@ -19,7 +19,11 @@ class DenoisingDiffusionProcess(nn.Module):
                  loss_fn=F.mse_loss,
                  schedule='linear',
                  num_timesteps=1000,
-                 sampler=None
+                 sampler=None,
+                 model_dim=64,
+                 model_dim_mults=(1,2,4,8),
+                 model_channels=None,
+                 model_out_dim=None
                 ):
         super().__init__()
         
@@ -31,10 +35,14 @@ class DenoisingDiffusionProcess(nn.Module):
         # Forward Process Used for Training
         self.forward_process=GaussianForwardProcess(num_timesteps=self.num_timesteps,
                                                     schedule=schedule)
-        self.model=UnetConvNextBlock(dim=64,
-                                     dim_mults=(1,2,4,8),
-                                     channels=self.generated_channels,
-                                     out_dim=self.generated_channels,
+        if model_channels is None:
+            model_channels=self.generated_channels
+        if model_out_dim is None:
+            model_out_dim=self.generated_channels
+        self.model=UnetConvNextBlock(dim=model_dim,
+                                     dim_mults=model_dim_mults,
+                                     channels=model_channels,
+                                     out_dim=model_out_dim,
                                      with_time_emb=True)
                
         
@@ -106,7 +114,11 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
                  loss_fn=F.mse_loss,
                  schedule='linear',
                  num_timesteps=1000,
-                 sampler=None
+                 sampler=None,
+                 model_dim=64,
+                 model_dim_mults=(1,2,4,8),
+                 model_channels=None,
+                 model_out_dim=None
                 ):
         super().__init__()
         
@@ -121,10 +133,14 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
                                                     schedule=schedule)
         
         # Neural Network Backbone
-        self.model=UnetConvNextBlock(dim=64,
-                                     dim_mults = (1,2,4,8),
-                                     channels=self.generated_channels + condition_channels,
-                                     out_dim=self.generated_channels,
+        if model_channels is None:
+            model_channels=self.generated_channels + condition_channels
+        if model_out_dim is None:
+            model_out_dim=self.generated_channels
+        self.model=UnetConvNextBlock(dim=model_dim,
+                                     dim_mults=model_dim_mults,
+                                     channels=model_channels,
+                                     out_dim=model_out_dim,
                                      with_time_emb=True)
         
         # defaults to a DDPM sampler if None is provided

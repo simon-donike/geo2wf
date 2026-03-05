@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from .DenoisingDiffusionProcess import *
@@ -12,12 +13,16 @@ class PixelDiffusion(pl.LightningModule):
                  valid_dataset=None,
                  num_timesteps=1000,
                  batch_size=1,
-                 lr=1e-3):
+                 lr=1e-3,
+                 lr_scheduler_factor=0.5,
+                 lr_scheduler_patience=10):
         super().__init__()
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
         self.lr = lr
         self.batch_size=batch_size
+        self.lr_scheduler_factor=lr_scheduler_factor
+        self.lr_scheduler_patience=lr_scheduler_patience
         
         self.model=DenoisingDiffusionProcess(num_timesteps=num_timesteps)
 
@@ -65,22 +70,47 @@ class PixelDiffusion(pl.LightningModule):
             return None
     
     def configure_optimizers(self):
-        return  torch.optim.AdamW(list(filter(lambda p: p.requires_grad, self.model.parameters())), lr=self.lr)
+        optimizer=torch.optim.AdamW(list(filter(lambda p: p.requires_grad, self.model.parameters())), lr=self.lr)
+        scheduler=ReduceLROnPlateau(optimizer,
+                                    mode='min',
+                                    factor=self.lr_scheduler_factor,
+                                    patience=self.lr_scheduler_patience)
+        return {"optimizer": optimizer,
+                "lr_scheduler": {"scheduler": scheduler,
+                                 "monitor": "val_loss"}}
     
 class PixelDiffusionConditional(PixelDiffusion):
     def __init__(self,
                  train_dataset,
                  valid_dataset=None,
                  condition_channels=3,
+                 generated_channels=3,
+                 num_timesteps=1000,
+                 schedule='linear',
+                 model_dim=64,
+                 model_dim_mults=(1,2,4,8),
+                 model_channels=None,
+                 model_out_dim=None,
                  batch_size=1,
-                 lr=1e-3):
+                 lr=1e-3,
+                 lr_scheduler_factor=0.5,
+                 lr_scheduler_patience=10):
         pl.LightningModule.__init__(self)
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
         self.lr = lr
         self.batch_size=batch_size
+        self.lr_scheduler_factor=lr_scheduler_factor
+        self.lr_scheduler_patience=lr_scheduler_patience
         
-        self.model=DenoisingDiffusionConditionalProcess(condition_channels=condition_channels)
+        self.model=DenoisingDiffusionConditionalProcess(generated_channels=generated_channels,
+                                                        condition_channels=condition_channels,
+                                                        schedule=schedule,
+                                                        num_timesteps=num_timesteps,
+                                                        model_dim=model_dim,
+                                                        model_dim_mults=model_dim_mults,
+                                                        model_channels=model_channels,
+                                                        model_out_dim=model_out_dim)
     
     def training_step(self, batch, batch_idx):   
         input,output=batch
