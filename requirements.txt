@@ -13,3 +13,4 @@ matplotlib>=3.6,<3.9
 imageio>=2.25,<3.0
 scikit-image>=0.20,<0.23
 kornia>=0.7,<0.8
+wandb>=0.24.0

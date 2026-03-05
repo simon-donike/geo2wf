@@ -42,7 +42,7 @@ class PixelDiffusion(pl.LightningModule):
         images=batch
         loss = self.model.p_loss(self.input_T(images))
         
-        self.log('train_loss',loss)
+        self.log('train_loss',loss,on_step=True,on_epoch=True,prog_bar=True,logger=True)
         
         return loss
             
@@ -50,7 +50,7 @@ class PixelDiffusion(pl.LightningModule):
         images=batch
         loss = self.model.p_loss(self.input_T(images))
         
-        self.log('val_loss',loss)
+        self.log('val_loss',loss,on_step=False,on_epoch=True,prog_bar=True,logger=True)
         
         return loss
         
@@ -116,7 +116,7 @@ class PixelDiffusionConditional(PixelDiffusion):
         input,output=batch
         loss = self.model.p_loss(self.input_T(output),self.input_T(input))
         
-        self.log('train_loss',loss)
+        self.log('train_loss',loss,on_step=True,on_epoch=True,prog_bar=True,logger=True)
         
         return loss
             
@@ -124,6 +124,81 @@ class PixelDiffusionConditional(PixelDiffusion):
         input,output=batch
         loss = self.model.p_loss(self.input_T(output),self.input_T(input))
         
-        self.log('val_loss',loss)
+        self.log('val_loss',loss,on_step=False,on_epoch=True,prog_bar=True,logger=True)
+
+        if batch_idx == 0:
+            pred_batch = self.predict_step(batch, batch_idx)
+            psnr, ssim, l1 = self._compute_reconstruction_metrics(pred_batch, output)
+            self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self._log_val_reconstruction(input, pred_batch, output)
         
         return loss
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        del batch_idx, dataloader_idx
+        input,_ = batch
+        pred = self.model(self.input_T(input))
+        return self.output_T(pred)
+
+    def _to_plot_image(self, tensor):
+        image = tensor.detach().float().cpu().clamp(0, 1)
+        if image.shape[0] >= 3:
+            return image[:3].permute(1, 2, 0).numpy(), None
+        return image[0].numpy(), 'gray'
+
+    def _compute_reconstruction_metrics(self, pred_batch, target_batch):
+        pred = pred_batch.detach().float().clamp(0, 1)
+        target = target_batch.detach().float().clamp(0, 1)
+
+        l1 = F.l1_loss(pred, target)
+
+        mse = F.mse_loss(pred, target)
+        psnr = 10.0 * torch.log10(1.0 / torch.clamp(mse, min=1e-12))
+
+        c1 = 0.01 ** 2
+        c2 = 0.03 ** 2
+        mu_x = F.avg_pool2d(pred, kernel_size=3, stride=1, padding=1)
+        mu_y = F.avg_pool2d(target, kernel_size=3, stride=1, padding=1)
+        sigma_x = F.avg_pool2d(pred * pred, kernel_size=3, stride=1, padding=1) - mu_x * mu_x
+        sigma_y = F.avg_pool2d(target * target, kernel_size=3, stride=1, padding=1) - mu_y * mu_y
+        sigma_xy = F.avg_pool2d(pred * target, kernel_size=3, stride=1, padding=1) - mu_x * mu_y
+        ssim_map = ((2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)) / (
+            (mu_x * mu_x + mu_y * mu_y + c1) * (sigma_x + sigma_y + c2)
+        )
+        ssim = ssim_map.mean()
+
+        return psnr, ssim, l1
+
+    def _log_val_reconstruction(self, input_batch, pred_batch, target_batch):
+        if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
+            return
+
+        try:
+            import matplotlib.pyplot as plt
+            import wandb
+        except ImportError:
+            return
+
+        x_img, x_cmap = self._to_plot_image(input_batch[0])
+        pred_img, pred_cmap = self._to_plot_image(pred_batch[0])
+        y_img, y_cmap = self._to_plot_image(target_batch[0])
+
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        axes[0].imshow(x_img, cmap=x_cmap)
+        axes[0].set_title('x')
+        axes[0].axis('off')
+        axes[1].imshow(pred_img, cmap=pred_cmap)
+        axes[1].set_title('pred')
+        axes[1].axis('off')
+        axes[2].imshow(y_img, cmap=y_cmap)
+        axes[2].set_title('y')
+        axes[2].axis('off')
+        fig.tight_layout()
+
+        self.logger.experiment.log(
+            {"val/reconstruction": wandb.Image(fig)},
+            step=self.global_step,
+        )
+        plt.close(fig)

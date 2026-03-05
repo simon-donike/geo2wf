@@ -12,7 +12,7 @@ model:
   num_timesteps: 1000
   schedule: linear
   unet:
-    dim: 64
+    dim: 48
     dim_mults: [1, 2, 4, 8]
     channels: 4 #  in_channels * 2 
     out_dim: 2 # == out_channels
@@ -30,3 +30,10 @@ trainer:
   precision: 32
   log_every_n_steps: 10
   enable_checkpointing: false
+
+logging:
+  wandb:
+    project: dif_img_rec
+    name: null
+    save_dir: logs
+    log_model: false
