@@ -12,22 +12,37 @@ from src.PixelDiffusion import PixelDiffusionConditional
 
 
 def load_config(config_path: str) -> dict:
+    """Load the YAML config file used to build data, model, and trainer."""
     with Path(config_path).open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
 
 def main() -> None:
+    """Entry point for training with PyTorch Lightning.
+
+    Lightning flow in this script:
+    1. Build data module (encapsulates DataLoaders).
+    2. Build LightningModule (`PixelDiffusionConditional`).
+    3. Build `pl.Trainer` with runtime options.
+    4. Call `trainer.fit(model)` to start the full train/val loop.
+    """
     parser = argparse.ArgumentParser()
+    # Path to the YAML config used for all runtime settings.
     parser.add_argument("--config", type=str, default="configs/config.yaml")
+    # Optional override for Lightning's validation batch fraction/count.
+    parser.add_argument("--limit-val-batches", type=float, default=None)
     args = parser.parse_args()
 
     config = load_config(args.config)
+    # Ensures deterministic random behavior where possible.
     pl.seed_everything(config.get("seed", 42), workers=True)
 
+    # DataModule centralizes loader construction and setup for Lightning.
     datamodule = PairedDataModule.from_config(config)
     datamodule.setup("fit")
     train_ds = datamodule.train_dataset
     val_ds = datamodule.val_dataset
 
+    # Split config sections for clarity.
     model_cfg = config.get("model", {})
     opt_cfg = config.get("optimization", {})
     lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
@@ -35,6 +50,7 @@ def main() -> None:
     unet_cfg = model_cfg.get("unet", {})
     wandb_cfg = config.get("logging", {}).get("wandb", {})
 
+    # This is the Lightning model used for training and validation.
     model = PixelDiffusionConditional(
         train_dataset=train_ds,
         valid_dataset=val_ds,
@@ -53,12 +69,20 @@ def main() -> None:
     )
 
     trainer_cfg = config.get("trainer", {})
+    # CLI override has priority over config file value.
+    limit_val_batches = (
+        args.limit_val_batches
+        if args.limit_val_batches is not None
+        else trainer_cfg.get("limit_val_batches", 1.0)
+    )
+    # Lightning logger wrapper for Weights & Biases.
     wandb_logger = WandbLogger(
         project=wandb_cfg.get("project", "dif_img_rec"),
         name=wandb_cfg.get("name"),
         save_dir=wandb_cfg.get("save_dir", "logs"),
         log_model=wandb_cfg.get("log_model", False),
     )
+    # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer = pl.Trainer(
         max_epochs=trainer_cfg.get("max_epochs", 1),
         accelerator=trainer_cfg.get("accelerator", "auto"),
@@ -66,9 +90,11 @@ def main() -> None:
         precision=trainer_cfg.get("precision", 32),
         log_every_n_steps=trainer_cfg.get("log_every_n_steps", 10),
         enable_checkpointing=trainer_cfg.get("enable_checkpointing", False),
+        limit_val_batches=limit_val_batches,
         logger=wandb_logger,
     )
 
+    # Starts the training/validation loop.
     trainer.fit(model)
 
 
