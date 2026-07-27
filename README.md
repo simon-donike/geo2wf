@@ -70,7 +70,7 @@ What is already wired:
   diffusion process.
 - `src/DenoisingDiffusionProcess/`: DDPM/DDIM sampling, beta schedules, and UNet
   backbone.
-- validation logging: `val_loss`, PSNR, SSIM, L1, and a single `x | pred | y`
+- validation logging: `val/loss`, PSNR, SSIM, L1, and a single `x | pred | y`
   reconstruction panel through W&B.
 
 What is still deliberately minimal:
