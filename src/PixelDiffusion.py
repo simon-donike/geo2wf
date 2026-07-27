@@ -67,7 +67,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         input, output, target_mask = self._unpack_batch(batch)
         loss = self.model.p_loss(
             self.input_T(output),
-            self.input_T(input),
+            self._prepare_condition(input, batch),
             mask=target_mask,
         )
         
@@ -84,7 +84,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         input, output, target_mask = self._unpack_batch(batch)
         loss = self.model.p_loss(
             self.input_T(output),
-            self.input_T(input),
+            self._prepare_condition(input, batch),
             mask=target_mask,
         )
         
@@ -98,7 +98,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self._log_val_reconstruction(input, pred_batch, output)
+            self._log_val_reconstruction(batch, pred_batch)
         
         return loss
 
@@ -107,7 +107,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         input, output, target_mask = self._unpack_batch(batch)
         loss = self.model.p_loss(
             self.input_T(output),
-            self.input_T(input),
+            self._prepare_condition(input, batch),
             mask=target_mask,
         )
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
@@ -129,7 +129,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         """
         del batch_idx, dataloader_idx
         input, _, _ = self._unpack_batch(batch)
-        pred = self.model(self.input_T(input))
+        pred = self.model(self._prepare_condition(input, batch))
         return self.output_T(pred)
 
     def configure_optimizers(self):
@@ -211,6 +211,21 @@ class PixelDiffusionConditional(pl.LightningModule):
         input, output = batch
         return input, output, None
 
+    def _prepare_condition(self, condition, batch):
+        """Normalize GEO bands and append a binary valid-pixel channel."""
+        condition = self.input_T(condition)
+        if not isinstance(batch, dict) or batch.get("condition_mask") is None:
+            return condition
+        condition_mask = batch["condition_mask"].to(
+            device=condition.device, dtype=condition.dtype
+        )
+        if condition_mask.ndim == 3:
+            condition_mask = condition_mask.unsqueeze(1)
+        if condition_mask.shape[1] != 1:
+            condition_mask = condition_mask.all(dim=1, keepdim=True)
+        return torch.cat([condition, condition_mask], dim=1)
+
+
     def _prepare_target_mask(self, target_mask, reference):
         """Broadcast a target-validity mask to match a BCHW target tensor."""
         mask = target_mask.detach().to(device=reference.device, dtype=reference.dtype)
@@ -243,35 +258,83 @@ class PixelDiffusionConditional(pl.LightningModule):
             ssim_vals.append(float(ssim_image[valid].mean()))
         return ssim_vals or [0.0]
 
-    def _log_val_reconstruction(self, input_batch, pred_batch, target_batch):
-        """Log one full condition, full prediction, and observed target panel to W&B."""
+    def _log_val_reconstruction(self, batch, pred_batch):
+        """Log up to five stretched, georeferenced reconstructions with no-data masks."""
         if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
             return
-
         try:
             import matplotlib.pyplot as plt
             import wandb
+            from utils.plotting import plot_validation_reconstruction_batch
         except ImportError:
             return
 
-        x_img, x_cmap = self._to_plot_image(input_batch[0])
-        pred_img, pred_cmap = self._to_plot_image(pred_batch[0])
-        y_img, y_cmap = self._to_plot_image(target_batch[0])
-
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-        axes[0].imshow(x_img, cmap=x_cmap)
-        axes[0].set_title('x')
-        axes[0].axis('off')
-        axes[1].imshow(pred_img, cmap=pred_cmap)
-        axes[1].set_title('pred')
-        axes[1].axis('off')
-        axes[2].imshow(y_img, cmap=y_cmap)
-        axes[2].set_title('y')
-        axes[2].axis('off')
-        fig.tight_layout()
-
+        sample_count = min(int(pred_batch.shape[0]), 5)
+        samples = []
+        if not isinstance(batch, dict):
+            input_batch, target_batch, _ = self._unpack_batch(batch)
+            for index in range(sample_count):
+                samples.append({
+                    "condition": input_batch[index],
+                    "prediction": pred_batch[index],
+                    "target": target_batch[index],
+                })
+        else:
+            meta = batch.get("meta", {})
+            for index in range(sample_count):
+                label = " · ".join(value for value in (
+                    self._batch_value(meta.get("storm_id"), index),
+                    self._batch_value(batch.get("sample_id"), index),
+                ) if value)
+                samples.append({
+                    "condition": batch["condition"][index],
+                    "prediction": pred_batch[index],
+                    "target": batch["target"][index],
+                    "condition_mask": self._batch_item(batch.get("condition_mask"), index),
+                    "target_mask": self._batch_item(batch.get("target_mask"), index),
+                    "condition_channels": self._channel_names(
+                        meta.get("condition_channels"), index
+                    ),
+                    "condition_bounds": self._batch_item(
+                        batch.get("condition_bounds"), index
+                    ),
+                    "target_bounds": self._batch_item(batch.get("target_bounds"), index),
+                    "center": self._finite_pair(batch.get("center"), index),
+                    "sample_label": label,
+                })
+        fig = plot_validation_reconstruction_batch(samples)
         self.logger.experiment.log(
-            {"val/reconstruction": wandb.Image(fig)},
-            step=self.global_step,
+            {"val/reconstruction": wandb.Image(fig)}, step=self.global_step,
         )
         plt.close(fig)
+
+    @staticmethod
+    def _batch_item(value, index):
+        return None if value is None else value[index]
+
+    @staticmethod
+    def _batch_value(value, index):
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple)):
+            return str(value[index]) if index < len(value) else ""
+        return str(value)
+
+    @staticmethod
+    def _channel_names(value, index):
+        if not isinstance(value, (list, tuple)):
+            return None
+        # Default collation transposes each sample's channel list by band.
+        return [
+            str(item[index] if isinstance(item, (list, tuple)) else item)
+            for item in value
+        ]
+
+    @staticmethod
+    def _finite_pair(value, index):
+        if value is None:
+            return None
+        pair = value[index].detach().double().cpu()
+        if pair.numel() != 2 or not torch.isfinite(pair).all():
+            return None
+        return float(pair[0]), float(pair[1])

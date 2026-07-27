@@ -239,34 +239,62 @@ def _plot_image(
 
 
 def plot_validation_reconstruction(
-    condition: Any, prediction: Any, target: Any, *,
-    condition_mask: Any | None = None, target_mask: Any | None = None,
-    condition_channels: list[str] | tuple[str, ...] | None = None,
-    condition_bounds: Any | None = None, target_bounds: Any | None = None,
-    center: tuple[float, float] | None = None, sample_label: str = "",
+    condition: Any, prediction: Any, target: Any, **kwargs: Any,
 ) -> Figure:
-    """Build a stretched, georeferenced validation figure for W&B."""
-    condition_array = _as_chw_numpy(condition)
-    prediction_array = _as_chw_numpy(prediction)
-    target_array = _as_chw_numpy(target)
-    condition_valid = _as_2d_mask(condition_mask, condition_array.shape[1:])
-    target_valid = _as_2d_mask(target_mask, target_array.shape[1:])
-    condition_image, condition_cmap, band_name = _condition_plot_view(
-        condition_array, condition_valid, condition_channels
+    """Build one stretched, georeferenced validation row."""
+    return plot_validation_reconstruction_batch([
+        {"condition": condition, "prediction": prediction, "target": target, **kwargs}
+    ])
+
+
+def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figure:
+    """Stack up to five validation samples as identically styled figure rows."""
+    if not samples:
+        raise ValueError("At least one validation sample is required")
+    samples = samples[:5]
+    has_map = all(
+        sample.get("condition_bounds") is not None
+        and sample.get("target_bounds") is not None
+        for sample in samples
     )
-    prediction_image, prediction_cmap = _output_plot_view(prediction_array, target_valid)
-    target_image, target_cmap = _output_plot_view(target_array, target_valid)
-    condition_extent = _bounds_extent(condition_bounds, condition_array.shape[1:])
-    target_extent = _bounds_extent(target_bounds, target_array.shape[1:])
-    has_map = condition_bounds is not None and target_bounds is not None
     panel_count = 4 if has_map else 3
-    fig, axes = plt.subplots(1, panel_count, figsize=(4.1 * panel_count, 4), constrained_layout=True)
-    axes = np.asarray(axes, dtype=object).reshape(-1)
+    fig, axes = plt.subplots(
+        len(samples), panel_count,
+        figsize=(4.1 * panel_count, 4 * len(samples)),
+        constrained_layout=True,
+        squeeze=False,
+    )
+    for row, sample in enumerate(samples):
+        _draw_validation_row(axes[row], sample, has_map=has_map)
+    return fig
+
+
+def _draw_validation_row(axes, sample, *, has_map):
+    condition_array = _as_chw_numpy(sample["condition"])
+    prediction_array = _as_chw_numpy(sample["prediction"])
+    target_array = _as_chw_numpy(sample["target"])
+    condition_valid = _as_2d_mask(
+        sample.get("condition_mask"), condition_array.shape[1:]
+    )
+    target_valid = _as_2d_mask(sample.get("target_mask"), target_array.shape[1:])
+    condition_image, condition_cmap, band_name = _condition_plot_view(
+        condition_array, condition_valid, sample.get("condition_channels")
+    )
+    prediction_image, prediction_cmap = _output_plot_view(
+        prediction_array, target_valid
+    )
+    target_image, target_cmap = _output_plot_view(target_array, target_valid)
+    condition_extent = _bounds_extent(
+        sample.get("condition_bounds"), condition_array.shape[1:]
+    )
+    target_extent = _bounds_extent(sample.get("target_bounds"), target_array.shape[1:])
     panels = (
-        (condition_image, condition_cmap, condition_valid, condition_extent, f"Condition ({band_name})"),
+        (condition_image, condition_cmap, condition_valid, condition_extent,
+         f"Condition ({band_name})"),
         (prediction_image, prediction_cmap, target_valid, target_extent, "Prediction"),
         (target_image, target_cmap, target_valid, target_extent, "Target"),
     )
+    center = sample.get("center")
     for ax, (image, cmap, valid, extent, title) in zip(axes, panels):
         ax.imshow(image, extent=extent, origin="upper", cmap=cmap)
         _overlay_nodata(ax, valid, extent)
@@ -276,13 +304,14 @@ def plot_validation_reconstruction(
         ax.set_ylabel("Latitude")
         ax.set_aspect("equal", adjustable="box")
     if has_map:
-        geo = {"bounds": _coerce_bounds(condition_bounds)}
-        output = {"bounds": _coerce_bounds(target_bounds)}
+        geo = {"bounds": _coerce_bounds(sample["condition_bounds"])}
+        output = {"bounds": _coerce_bounds(sample["target_bounds"])}
         _plot_footprint_map(axes[3], geo, output, center, title="Footprints")
-    if sample_label:
-        fig.suptitle(sample_label, fontsize=11)
-    return fig
-
+    if sample.get("sample_label"):
+        axes[0].annotate(
+            sample["sample_label"], xy=(0, 1.13), xycoords="axes fraction",
+            ha="left", va="bottom", fontsize=11, annotation_clip=False,
+        )
 
 def _condition_plot_view(array, mask, channels):
     names = [str(name) for name in channels] if channels else []
@@ -359,7 +388,8 @@ def _coerce_bounds(bounds):
     if values.size != 4:
         raise ValueError("Bounds must contain left, right, bottom, top")
     from rasterio.coords import BoundingBox
-    return BoundingBox(*values)
+    left, right, bottom, top = values
+    return BoundingBox(left=left, bottom=bottom, right=right, top=top)
 
 def _plot_footprint_map(
     ax: Axes,
