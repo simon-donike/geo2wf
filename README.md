@@ -20,6 +20,17 @@ The goal is to make the geostationary-to-SAR wind-field task easy to reason
 about before reintroducing the complexity of multi-source observations,
 multi-temporal windows, masking policies, and full tropical-cyclone metadata.
 
+## Data Visualization
+
+![Random GEO-SAR training pairs](resources/geo_sar_random_pairs.png)
+
+Each row shows one random GEO-SAR training pair from the exported GeoTIFF
+dataset. The left panel is the geostationary conditioning image, the middle
+panel is the paired SAR wind-speed target, and the red `x` marks the storm
+center used for the crop. The right panel places the GEO and SAR footprints on a
+simple ocean/land mask, making the core problem visible: learn a SAR-like wind
+field from a colocated geostationary view of the same tropical cyclone.
+
 ## Scope
 
 This repo is for paired image-to-image diffusion:
