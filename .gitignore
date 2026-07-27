@@ -3,6 +3,7 @@
 external/
 .codex
 .agents
+.local.env
 .uv-cache/
 data/geotiff/
 data/processed/

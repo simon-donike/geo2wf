@@ -4,6 +4,10 @@ import argparse
 import os
 from pathlib import Path
 
+from scripts.local_env import load_local_env
+
+load_local_env()
+
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -85,7 +89,9 @@ def main() -> None:
     wandb_enabled = wandb_cfg.get("enabled", True) and not wandb_disabled
     wandb_logger = (
         WandbLogger(
-            project=wandb_cfg.get("project", "dif_img_rec"),
+            project=os.environ.get(
+                "WANDB_PROJECT", wandb_cfg.get("project", "dif_img_rec")
+            ),
             name=wandb_cfg.get("name"),
             save_dir=wandb_cfg.get("save_dir", "logs"),
             log_model=wandb_cfg.get("log_model", False),

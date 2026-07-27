@@ -7,7 +7,20 @@
 
 set -euo pipefail
 
-REPO_DIR="/lustre/scratch/1054/tropical_cyclone_dynamics/code/dif_img_rec"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR_DEFAULT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [[ -f "${REPO_DIR_DEFAULT}/.local.env" ]]; then
+  set -a
+  source "${REPO_DIR_DEFAULT}/.local.env"
+  set +a
+elif [[ -f "${REPO_DIR_DEFAULT}/.local.example.env" ]]; then
+  set -a
+  source "${REPO_DIR_DEFAULT}/.local.example.env"
+  set +a
+fi
+
+REPO_DIR="${GEO2WF_REPO_DIR:-${REPO_DIR_DEFAULT}}"
 CONFIG_FILE="${CONFIG_FILE:-${REPO_DIR}/configs/config_pretrain_geo_pmw.yaml}"
 EXPORT_LIMIT="${EXPORT_LIMIT:-}"
 EXPORT_SPLITS="${EXPORT_SPLITS:-train val test}"
@@ -38,5 +51,8 @@ fi
 uv run --offline --no-sync --project "${REPO_DIR}" \
   python scripts/export_geo_pmw_geotiffs.py \
     --config "${CONFIG_FILE}" \
+    --data-root "${TCD_DATA_ROOT}" \
+    --manifest-file "${TCD_DATA_ROOT}/index-files/observation_manifest_v5.csv" \
+    --output-root "${GEO_PMW_OUTPUT_ROOT}" \
     --splits ${EXPORT_SPLITS} \
     "${limit_args[@]}"

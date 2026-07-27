@@ -13,6 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from local_env import load_local_env
+
+load_local_env()
+
 # Keep numerical libraries polite on HPC login nodes.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -29,11 +33,16 @@ from scipy.spatial import cKDTree
 from tqdm.auto import tqdm
 
 EPSG_4326 = "EPSG:4326"
-DEFAULT_DATA_ROOT = Path("/lustre/scratch/1054/tropical_cyclone_dynamics/data")
+DEFAULT_DATA_ROOT = Path(
+    os.environ.get(
+        "TCD_DATA_ROOT",
+        "/lustre/scratch/1054/tropical_cyclone_dynamics/data",
+    )
+)
 DEFAULT_MANIFEST_FILE = (
     DEFAULT_DATA_ROOT / "index-files" / "observation_manifest_v5.csv"
 )
-DEFAULT_OUTPUT_ROOT = Path("data/geotiff/geo_sar")
+DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/geo_sar"))
 DEFAULT_GRID_SIZE = 256
 DEFAULT_GRID_RESOLUTION = 0.027
 DEFAULT_CLOSEST_MATCH_HOURS = 0.5
@@ -142,6 +151,12 @@ def _parse_args() -> argparse.Namespace:
     config_parser.add_argument("--config", type=Path, default=None)
     known, _ = config_parser.parse_known_args()
     config = _load_export_config(known.config)
+    data_root = Path(os.environ.get("TCD_DATA_ROOT", config.get("data_root", DEFAULT_DATA_ROOT)))
+    manifest_file = Path(
+        config.get("manifest_file", data_root / "index-files" / "observation_manifest_v5.csv")
+    )
+    if "TCD_DATA_ROOT" in os.environ:
+        manifest_file = data_root / "index-files" / "observation_manifest_v5.csv"
 
     parser = argparse.ArgumentParser(
         description="Export SAR-anchored GEO/SAR pairs as raw-value GeoTIFFs."
@@ -150,17 +165,22 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path(config.get("data_root", DEFAULT_DATA_ROOT)),
+        default=data_root,
     )
     parser.add_argument(
         "--manifest-file",
         type=Path,
-        default=Path(config.get("manifest_file", DEFAULT_MANIFEST_FILE)),
+        default=manifest_file,
     )
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(config.get("output_root", DEFAULT_OUTPUT_ROOT)),
+        default=Path(
+            os.environ.get(
+                "GEO_SAR_OUTPUT_ROOT",
+                config.get("output_root", DEFAULT_OUTPUT_ROOT),
+            )
+        ),
     )
     parser.add_argument(
         "--splits",
