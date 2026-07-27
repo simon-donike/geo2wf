@@ -132,10 +132,10 @@ Important channel settings:
 
 ```yaml
 model:
-  in_channels: 4
+  in_channels: 5
   out_channels: 1
   unet:
-    channels: 5
+    channels: 6
     out_dim: 1
 ```
 

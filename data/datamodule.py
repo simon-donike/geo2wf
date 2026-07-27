@@ -11,7 +11,8 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
+from pytorch_lightning.utilities.rank_zero import rank_zero_info
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 
 from .dataset import PairedImageDataset
 
@@ -32,6 +33,7 @@ class PairedDataModule(pl.LightningDataModule):
         test_split: str = "test",
         target_size: tuple[int, int] = (256, 256),
         random_flips: bool = True,
+        include_test_in_train: bool = False,
     ) -> None:
         super().__init__()
         self.root = Path(root).expanduser()
@@ -45,8 +47,10 @@ class PairedDataModule(pl.LightningDataModule):
         self.test_split = test_split
         self.target_size = target_size
         self.random_flips = random_flips
+        self.include_test_in_train = include_test_in_train
+        self._include_test_logged = False
 
-        self.train_dataset: Optional[PairedImageDataset] = None
+        self.train_dataset: Optional[Dataset] = None
         self.val_dataset: Optional[PairedImageDataset] = None
         self.test_dataset: Optional[PairedImageDataset] = None
 
@@ -68,6 +72,7 @@ class PairedDataModule(pl.LightningDataModule):
             test_split=data_cfg.get("test_split", "test"),
             target_size=tuple(data_cfg.get("target_size", [256, 256])),
             random_flips=data_cfg.get("random_flips", True),
+            include_test_in_train=data_cfg.get("include_test_in_train", False),
         )
 
     def prepare_data(self) -> None:
@@ -79,6 +84,24 @@ class PairedDataModule(pl.LightningDataModule):
             self.train_dataset = self._make_dataset(
                 self.train_split, augment=self.random_flips
             )
+            if self.include_test_in_train:
+                test_train_dataset = self._make_dataset(
+                    self.test_split, augment=self.random_flips
+                )
+                train_count = len(self.train_dataset)
+                test_count = len(test_train_dataset)
+                self.train_dataset = ConcatDataset(
+                    [self.train_dataset, test_train_dataset]
+                )
+                if not self._include_test_logged:
+                    rank_zero_info(
+                        "include_test_in_train is active: adding %d test samples "
+                        "to %d train samples (%d combined); validation remains separate.",
+                        test_count,
+                        train_count,
+                        len(self.train_dataset),
+                    )
+                    self._include_test_logged = True
             self.val_dataset = self._make_dataset(self.val_split)
 
         if stage in (None, "test"):
@@ -102,7 +125,7 @@ class PairedDataModule(pl.LightningDataModule):
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
-            shuffle=False,
+            shuffle=True,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
