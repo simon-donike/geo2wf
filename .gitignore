@@ -6,6 +6,7 @@ external/
 .uv-cache/
 data/geotiff/
 data/processed/
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
