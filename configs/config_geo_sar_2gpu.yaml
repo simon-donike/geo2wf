@@ -1,0 +1,50 @@
+seed: 42
+
+data:
+  root: data/geotiff/geo_sar
+  stats_file: data/geotiff/geo_sar/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  loader:
+    # This is per GPU: effective global batch size is 8 on two GPUs.
+    batch_size: 4
+    num_workers: 8
+    pin_memory: true
+    persistent_workers: true
+
+model:
+  in_channels: 4
+  out_channels: 1
+  num_timesteps: 1000
+  schedule: linear
+  unet:
+    dim: 48
+    dim_mults: [1, 2, 4, 8]
+    channels: 5
+    out_dim: 1
+
+optimization:
+  lr: 0.0001
+  reduce_lr_on_plateau:
+    factor: 0.5
+    patience: 10
+
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: 2
+  strategy: ddp_find_unused_parameters_false
+  precision: 16
+  default_root_dir: logs/checkpoints/geo_sar_2gpu
+  log_every_n_steps: 10
+  enable_checkpointing: true
+  limit_val_batches: 50
+
+logging:
+  wandb:
+    enabled: true
+    project: geo2wf
+    name: geo-sar-2gpu
+    save_dir: logs
+    log_model: false

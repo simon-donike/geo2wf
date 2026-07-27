@@ -173,6 +173,17 @@ uv run python train.py --config configs/config_pretrain_geo_pmw.yaml
 uv run python train.py --config configs/config.yaml
 ```
 
+For the prepared local two-GPU GEO-to-SAR run:
+
+```bash
+uv sync --frozen
+uv run python train.py --config configs/config_geo_sar_2gpu.yaml
+```
+
+The two-GPU config uses DDP without unused-parameter scans, 16-bit mixed precision, a per-GPU batch size of
+four (global batch size eight), and writes checkpoints below
+`logs/checkpoints/geo_sar_2gpu/`.
+
 For full exports on the cluster, submit the CPU PBS scripts instead of running
 long jobs on a login node:
 

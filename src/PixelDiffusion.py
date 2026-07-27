@@ -71,7 +71,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             mask=target_mask,
         )
         
-        self.log('train_loss',loss,on_step=True,on_epoch=True,prog_bar=True,logger=True)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         
         return loss
             
@@ -88,16 +88,16 @@ class PixelDiffusionConditional(pl.LightningModule):
             mask=target_mask,
         )
         
-        self.log('val_loss',loss,on_step=False,on_epoch=True,prog_bar=True,logger=True)
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
         if batch_idx == 0:
             pred_batch = self.predict_step(batch, batch_idx)
             psnr, ssim, l1 = self._compute_reconstruction_metrics(
                 pred_batch, output, target_mask
             )
-            self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-            self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-            self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self._log_val_reconstruction(input, pred_batch, output)
         
         return loss
