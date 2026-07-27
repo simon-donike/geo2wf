@@ -71,7 +71,7 @@ def main() -> None:
         model_out_dim=unet_cfg.get("out_dim"),
         lr=opt_cfg.get("lr", 1e-3),
         lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
-        lr_scheduler_patience=lr_sched_cfg.get("patience", 10),
+        lr_scheduler_patience=lr_sched_cfg.get("patience", 25),
     )
 
     trainer_cfg = config.get("trainer", {})

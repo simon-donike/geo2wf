@@ -30,6 +30,8 @@ class PairedDataModule(pl.LightningDataModule):
         train_split: str = "train",
         val_split: str = "val",
         test_split: str = "test",
+        target_size: tuple[int, int] = (256, 256),
+        random_flips: bool = True,
     ) -> None:
         super().__init__()
         self.root = Path(root).expanduser()
@@ -41,6 +43,8 @@ class PairedDataModule(pl.LightningDataModule):
         self.train_split = train_split
         self.val_split = val_split
         self.test_split = test_split
+        self.target_size = target_size
+        self.random_flips = random_flips
 
         self.train_dataset: Optional[PairedImageDataset] = None
         self.val_dataset: Optional[PairedImageDataset] = None
@@ -62,6 +66,8 @@ class PairedDataModule(pl.LightningDataModule):
             train_split=data_cfg.get("train_split", "train"),
             val_split=data_cfg.get("val_split", "val"),
             test_split=data_cfg.get("test_split", "test"),
+            target_size=tuple(data_cfg.get("target_size", [256, 256])),
+            random_flips=data_cfg.get("random_flips", True),
         )
 
     def prepare_data(self) -> None:
@@ -70,7 +76,9 @@ class PairedDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         if stage in (None, "fit"):
-            self.train_dataset = self._make_dataset(self.train_split)
+            self.train_dataset = self._make_dataset(
+                self.train_split, augment=self.random_flips
+            )
             self.val_dataset = self._make_dataset(self.val_split)
 
         if stage in (None, "test"):
@@ -112,11 +120,15 @@ class PairedDataModule(pl.LightningDataModule):
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
 
-    def _make_dataset(self, split: str) -> PairedImageDataset:
+    def _make_dataset(
+        self, split: str, *, augment: bool = False
+    ) -> PairedImageDataset:
         return PairedImageDataset(
             root=self.root,
             split=split,
             stats_file=self.stats_file,
+            target_size=self.target_size,
+            augment=augment,
         )
 
 

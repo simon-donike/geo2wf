@@ -181,7 +181,7 @@ uv run python train.py --config configs/config_geo_sar_2gpu.yaml
 ```
 
 The two-GPU config uses DDP without unused-parameter scans, 16-bit mixed precision, a per-GPU batch size of
-four (global batch size eight), and writes checkpoints below
+two (global batch size four), and writes checkpoints below
 `logs/checkpoints/geo_sar_2gpu/`.
 
 For full exports on the cluster, submit the CPU PBS scripts instead of running
