@@ -32,6 +32,14 @@ The right panel places the GEO and SAR footprints on a simple ocean/land mask,
 making the core problem visible: learn a SAR-like wind field from a colocated
 geostationary view of the same tropical cyclone.
 
+## W&B Logging Preview
+
+![Example W&B reconstruction logging](resources/wandb_logging_preview_2.png)
+
+Example reconstruction panels logged during training. W&B records validation
+reconstructions under `val/reconstruction` and training-sample reconstructions
+under `train/reconstruction`.
+
 ## Scope
 
 This repo is for paired image-to-image diffusion:

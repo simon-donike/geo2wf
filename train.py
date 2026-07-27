@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from datetime import datetime
 from pathlib import Path
 
 from scripts.local_env import load_local_env
@@ -13,12 +14,10 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
-os.environ.setdefault("WANDB_DIR", "logs/wandb")
-os.environ.setdefault("WANDB_CACHE_DIR", "logs/wandb/cache")
-os.environ.setdefault("WANDB_CONFIG_DIR", "logs/wandb/config")
 
 import pytorch_lightning as pl
 import yaml
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from data import PairedDataModule
@@ -29,6 +28,23 @@ def load_config(config_path: str) -> dict:
     """Load the YAML config file used to build data, model, and trainer."""
     with Path(config_path).open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
+
+def create_run_directory(config_path: str, parent: str | Path) -> Path:
+    """Create one timestamped run directory before Lightning launches DDP ranks."""
+    inherited = os.environ.get("GEO2WF_RUN_DIR")
+    if inherited:
+        return Path(inherited)
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    config_name = Path(config_path).stem
+    run_dir = (Path(parent) / f"{timestamp}_{config_name}").resolve()
+    run_dir.mkdir(parents=True, exist_ok=False)
+
+    # Lightning local DDP workers inherit this when they re-execute the script,
+    # so every rank reuses the directory without attempting to create it again.
+    os.environ["GEO2WF_RUN_DIR"] = str(run_dir)
+    return run_dir
+
 
 def main() -> None:
     """Entry point for training with PyTorch Lightning.
@@ -47,6 +63,15 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
+    trainer_cfg = config.get("trainer", {})
+    run_dir = create_run_directory(
+        args.config, trainer_cfg.get("default_root_dir", "logs")
+    )
+    wandb_dir = run_dir / "wandb"
+    os.environ["WANDB_DIR"] = str(wandb_dir)
+    os.environ["WANDB_CACHE_DIR"] = str(wandb_dir / "cache")
+    os.environ["WANDB_CONFIG_DIR"] = str(wandb_dir / "config")
+
     # Ensures deterministic random behavior where possible.
     pl.seed_everything(config.get("seed", 42), workers=True)
 
@@ -74,7 +99,6 @@ def main() -> None:
         lr_scheduler_patience=lr_sched_cfg.get("patience", 25),
     )
 
-    trainer_cfg = config.get("trainer", {})
     # CLI override has priority over config file value.
     limit_val_batches = (
         args.limit_val_batches
@@ -93,11 +117,20 @@ def main() -> None:
                 "WANDB_PROJECT", wandb_cfg.get("project", "dif_img_rec")
             ),
             name=wandb_cfg.get("name"),
-            save_dir=wandb_cfg.get("save_dir", "logs"),
+            save_dir=str(run_dir),
             log_model=wandb_cfg.get("log_model", False),
         )
         if wandb_enabled
         else False
+    )
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=run_dir / "checkpoints",
+        filename="epoch={epoch:03d}-val_loss={val_loss:.6f}",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=2,
+        save_last=False,
+        auto_insert_metric_name=False,
     )
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer_kwargs = {
@@ -106,11 +139,12 @@ def main() -> None:
         "devices": trainer_cfg.get("devices", 1),
         "precision": trainer_cfg.get("precision", 32),
         "log_every_n_steps": trainer_cfg.get("log_every_n_steps", 10),
-        "enable_checkpointing": trainer_cfg.get("enable_checkpointing", False),
+        "enable_checkpointing": True,
         "limit_val_batches": limit_val_batches,
         "limit_train_batches": trainer_cfg.get("limit_train_batches", 1.0),
         "logger": wandb_logger,
-        "default_root_dir": trainer_cfg.get("default_root_dir", "logs"),
+        "default_root_dir": str(run_dir),
+        "callbacks": [checkpoint_callback],
     }
     if trainer_cfg.get("strategy") is not None:
         trainer_kwargs["strategy"] = trainer_cfg["strategy"]
