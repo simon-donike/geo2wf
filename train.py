@@ -100,16 +100,22 @@ def main() -> None:
         else False
     )
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
-    trainer = pl.Trainer(
-        max_epochs=trainer_cfg.get("max_epochs", 1),
-        accelerator=trainer_cfg.get("accelerator", "auto"),
-        devices=trainer_cfg.get("devices", 1),
-        precision=trainer_cfg.get("precision", 32),
-        log_every_n_steps=trainer_cfg.get("log_every_n_steps", 10),
-        enable_checkpointing=trainer_cfg.get("enable_checkpointing", False),
-        limit_val_batches=limit_val_batches,
-        logger=wandb_logger,
-    )
+    trainer_kwargs = {
+        "max_epochs": trainer_cfg.get("max_epochs", 1),
+        "accelerator": trainer_cfg.get("accelerator", "auto"),
+        "devices": trainer_cfg.get("devices", 1),
+        "precision": trainer_cfg.get("precision", 32),
+        "log_every_n_steps": trainer_cfg.get("log_every_n_steps", 10),
+        "enable_checkpointing": trainer_cfg.get("enable_checkpointing", False),
+        "limit_val_batches": limit_val_batches,
+        "limit_train_batches": trainer_cfg.get("limit_train_batches", 1.0),
+        "logger": wandb_logger,
+        "default_root_dir": trainer_cfg.get("default_root_dir", "logs"),
+    }
+    if trainer_cfg.get("strategy") is not None:
+        trainer_kwargs["strategy"] = trainer_cfg["strategy"]
+
+    trainer = pl.Trainer(**trainer_kwargs)
 
     # Starts the training/validation loop.
     trainer.fit(model, datamodule=datamodule)
