@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -N geoSarExportCPU
+#PBS -q cpu_std
+#PBS -l walltime=04:00:00
+#PBS -j eo
+#PBS -l select=1:ncpus=16:mem=64gb
+
+set -euo pipefail
+
+REPO_DIR="/lustre/scratch/1054/tropical_cyclone_dynamics/code/dif_img_rec"
+CONFIG_FILE="${CONFIG_FILE:-${REPO_DIR}/configs/config.yaml}"
+EXPORT_LIMIT="${EXPORT_LIMIT:-}"
+EXPORT_SPLITS="${EXPORT_SPLITS:-train val test}"
+EXPORT_UV_SYNC="${EXPORT_UV_SYNC:-false}"
+
+cd "${REPO_DIR}"
+
+export UV_PROJECT="${REPO_DIR}"
+export UV_CACHE_DIR="${REPO_DIR}/.uv-cache"
+export UV_PYTHON=3.11
+export PYTHONUNBUFFERED=1
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/dif-img-rec-matplotlib-${USER:-user}"
+mkdir -p "${UV_CACHE_DIR}" "${MPLCONFIGDIR}"
+
+if [[ "${EXPORT_UV_SYNC}" == "true" ]]; then
+  uv sync --python 3.11
+fi
+
+limit_args=()
+if [[ -n "${EXPORT_LIMIT}" ]]; then
+  limit_args=(--limit "${EXPORT_LIMIT}")
+fi
+
+uv run --offline --no-sync --project "${REPO_DIR}" \
+  python scripts/export_geo_sar_geotiffs.py \
+    --config "${CONFIG_FILE}" \
+    --splits ${EXPORT_SPLITS} \
+    "${limit_args[@]}"

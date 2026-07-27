@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 
 
 class PairedImageDataset(Dataset):
-    """Read exported GEO/SAR GeoTIFF pairs from a split manifest."""
+    """Read exported paired GeoTIFF samples from a split manifest."""
 
     def __init__(
         self,
@@ -41,12 +41,23 @@ class PairedImageDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
         row = self.samples.iloc[idx]
-        geo_channels = _json_list(row["geo_channels"])
-        sar_channels = _json_list(row["sar_channels"])
-        condition, condition_mask = _read_geotiff(self.root / row["geo_path"])
-        target, target_mask = _read_geotiff(self.root / row["sar_path"])
-        condition = _normalize(condition, "geo", geo_channels, self.stats)
-        target = _normalize(target, "sar", sar_channels, self.stats)
+        condition_source_type = _row_value(row, "condition_source_type", "geo")
+        target_source_type = _row_value(row, "target_source_type", "sar")
+        condition_channels = _json_list(
+            _row_value(row, "condition_channels", row.get("geo_channels"))
+        )
+        target_channels = _json_list(
+            _row_value(row, "target_channels", row.get("sar_channels"))
+        )
+        condition_path = _row_value(row, "condition_path", row.get("geo_path"))
+        target_path = _row_value(row, "target_path", row.get("sar_path"))
+
+        condition, condition_mask = _read_geotiff(self.root / condition_path)
+        target, target_mask = _read_geotiff(self.root / target_path)
+        condition = _normalize(
+            condition, condition_source_type, condition_channels, self.stats
+        )
+        target = _normalize(target, target_source_type, target_channels, self.stats)
         condition = torch.nan_to_num(condition, nan=0.0)
         target = torch.nan_to_num(target, nan=0.0)
         condition = condition * condition_mask.to(condition.dtype)
@@ -59,11 +70,17 @@ class PairedImageDataset(Dataset):
             "sample_id": str(row["sample_id"]),
             "meta": {
                 "storm_id": str(row["storm_id"]),
-                "geo_sensor": str(row["geo_sensor"]),
-                "sar_sensor": str(row["sar_sensor"]),
+                "condition_source_type": condition_source_type,
+                "target_source_type": target_source_type,
+                "condition_sensor": _row_value(
+                    row, "condition_sensor", row.get("geo_sensor", "")
+                ),
+                "target_sensor": _row_value(
+                    row, "target_sensor", row.get("sar_sensor", "")
+                ),
                 "dt_minutes": float(row["dt_minutes"]),
-                "geo_channels": geo_channels,
-                "sar_channels": sar_channels,
+                "condition_channels": condition_channels,
+                "target_channels": target_channels,
             },
         }
 
@@ -102,3 +119,9 @@ def _json_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(item) for item in json.loads(str(value))]
+
+
+def _row_value(row: pd.Series, primary: str, fallback: Any = "") -> str:
+    if primary in row.index and str(row[primary]).strip():
+        return str(row[primary])
+    return str(fallback)

@@ -34,7 +34,7 @@ DEFAULT_MANIFEST_FILE = (
     DEFAULT_DATA_ROOT / "index-files" / "observation_manifest_v5.csv"
 )
 DEFAULT_OUTPUT_ROOT = Path("data/geotiff/geo_sar")
-DEFAULT_GRID_SIZE = 128
+DEFAULT_GRID_SIZE = 256
 DEFAULT_GRID_RESOLUTION = 0.027
 DEFAULT_CLOSEST_MATCH_HOURS = 0.5
 DEFAULT_SPLITS = ("train", "val", "test")
@@ -306,6 +306,18 @@ def export_geo_sar_geotiffs(
                 "sample_id": sample_id,
                 "split": split,
                 "storm_id": sar.storm_id,
+                "condition_path": str(geo_path.relative_to(output_root)),
+                "target_path": str(sar_path.relative_to(output_root)),
+                "condition_source_type": "geo",
+                "target_source_type": "sar",
+                "condition_observation_id": geo.observation_id,
+                "target_observation_id": sar.observation_id,
+                "condition_timestamp": geo.timestamp.isoformat(),
+                "target_timestamp": sar.timestamp.isoformat(),
+                "condition_sensor": geo.sensor,
+                "target_sensor": sar.sensor,
+                "condition_channels": json.dumps(sample["geo_channels"]),
+                "target_channels": json.dumps(sample["sar_channels"]),
                 "geo_path": str(geo_path.relative_to(output_root)),
                 "sar_path": str(sar_path.relative_to(output_root)),
                 "geo_observation_id": geo.observation_id,
