@@ -1,186 +1,191 @@
-# Conditional Pixel Diffusion (Minimal Scaffold)
+# geo2wf
 
-This repo is a minimal training scaffold for **conditional pixel-space diffusion** using:
-- `PixelDiffusionConditional` as the Lightning model
-- `DenoisingDiffusionProcess` internals for the diffusion model
-- a placeholder `data/` pipeline that currently returns random tensors
+Minimum-complexity diffusion baseline for predicting tropical-cyclone SAR wind
+fields from geostationary satellite imagery.
 
-It is intentionally not production-ready yet. This README explains what to change to make it fully functional on real data.
+This repository is the lightweight counterpart to the larger
+`2026-ESL-Tropical-Cyclone-Dynamics` project. The large project builds a
+multi-source MOTIF/flow-matching reconstruction system over PMW, IR,
+geostationary, SAR, and optional ERA5 observations, with manifest-backed data
+selection, source metadata, masking policies, Hydra configs, DDP launchers, and
+HPC-oriented training machinery.
+
+`geo2wf` intentionally strips that down to the smallest useful experiment:
+
+```text
+geostationary image tensor x  ->  conditional pixel diffusion  ->  SAR wind-field tensor y
+```
+
+The goal is to make the geostationary-to-SAR wind-field task easy to reason
+about before reintroducing the complexity of multi-source observations,
+multi-temporal windows, masking policies, and full tropical-cyclone metadata.
+
+## Scope
+
+This repo is for paired image-to-image diffusion:
+
+- input `x`: geostationary tropical-cyclone imagery, for example GOES ABI or
+  Himawari AHI channels, already cropped/aligned/resampled into a fixed tensor.
+- target `y`: SAR-derived near-surface wind-field image, for example C-band SAR
+  wind speed or a small multi-channel wind representation, on the same grid as
+  `x`.
+- model: conditional DDPM-style pixel-space diffusion with a UNet backbone.
+- training contract: each dataset item returns a dictionary with `condition`,
+  `target`, and `target_mask` tensors shaped `[C, H, W]`.
+
+This is not the high-complexity MOTIF experiment. It does not currently model a
+set of heterogeneous source occurrences, observation-time offsets, coordinates,
+availability masks, land masks, storm tracks, or per-source characteristic
+vectors. Those belong to the larger project and can be pulled in later only if
+they improve the simple baseline.
 
 ## Current State
 
-What already works:
-- Training loop in [`train.py`](/work/code/dif_img_rec/train.py)
-- Config-driven setup via [`configs/config.yaml`](/work/code/dif_img_rec/configs/config.yaml)
-- Conditional diffusion model wiring
-- Validation logging to W&B:
-  - `train_loss`, `val_loss`
-  - one reconstructed example (`x`, `pred`, `y`) as a matplotlib figure
-  - reconstruction metrics on that prediction: `val_recon_psnr`, `val_recon_ssim`, `val_recon_l1`
+What is already wired:
 
-What is still placeholder:
-- Dataset/data module in [`data/`](/work/code/dif_img_rec/data)
-  - currently returns random `(x, y)` with shape `(2, 128, 128)`
-  - fixed length `1000`
+- `train.py`: PyTorch Lightning training entrypoint.
+- `configs/config.yaml`: single YAML config for data loader, diffusion model,
+  optimizer, trainer, and W&B logging.
+- `src/PixelDiffusion.py`: conditional LightningModule around the denoising
+  diffusion process.
+- `src/DenoisingDiffusionProcess/`: DDPM/DDIM sampling, beta schedules, and UNet
+  backbone.
+- validation logging: `val_loss`, PSNR, SSIM, L1, and a single `x | pred | y`
+  reconstruction panel through W&B.
 
-## 1. Install Requirements
+What is still deliberately minimal:
 
-Use your preferred environment manager and install dependencies from `requirements.txt`:
+- `scripts/export_geo_sar_geotiffs.py` creates one-time local GeoTIFF tensors
+  from the larger cyclone manifest.
+- `data/dataset.py` reads the exported GeoTIFF manifest, normalizes raw values
+  to `[0, 1]`, and returns tensors for training.
+- `data/datamodule.py` is shaped for split-based paired datasets.
 
-```bash
-pip install -r requirements.txt
-```
+## Intended Data Contract
 
-If you do not want W&B, you can still run with offline/disabled mode (see section 5).
-
-## 2. Implement Real Dataset + DataModule
-
-Edit these files:
-- [`data/dataset.py`](/work/code/dif_img_rec/data/dataset.py)
-- [`data/datamodule.py`](/work/code/dif_img_rec/data/datamodule.py)
-
-### What to implement
-
-In `PairedImageDataset`:
-- load your paired samples `(x, y)` from disk
-- return tensors shaped `[C, H, W]`
-- keep `__getitem__` output exactly as:
+`PairedImageDataset` returns:
 
 ```python
-return x, y
+return {
+    "condition": x,
+    "target": y,
+    "target_mask": mask,
+}
 ```
 
-In `PairedDataModule`:
-- replace placeholder dataset construction in `setup()` with your train/val/test datasets
-- keep dataloader settings wired from config (`batch_size`, `num_workers`, `pin_memory`)
+where:
 
-### Important shape/channel rule
+- `x` is the conditioning geostationary image tensor.
+- `y` is the SAR wind-field target tensor.
+- `mask` marks valid SAR target pixels.
+- image tensors are `torch.float32`, fixed shape `[C, H, W]`, and normalized
+  to `[0, 1]` from exported train statistics.
 
-Model input/output channels come from config:
-- `model.in_channels` = channels for `x` (condition)
-- `model.out_channels` = channels for `y` (target)
+The current model maps inputs from `[0, 1]` to `[-1, 1]` before diffusion and
+maps predictions back to `[0, 1]` for visualization and metrics. If the SAR wind
+field is represented in physical units or z-scores, update
+`PixelDiffusionConditional.input_T()` and `output_T()` accordingly.
 
-Your dataset must match this.
+Exported real-data layout:
 
-## 3. Implement/Verify Normalization
+```text
+data/geotiff/geo_sar/
+  stats.json
+  train/
+    manifest.csv
+    AL012023_sar_geo_20230115070023_abcd1234_geo.tif
+    AL012023_sar_geo_20230115070023_abcd1234_sar.tif
+  val/
+    manifest.csv
+  test/
+    manifest.csv
+```
 
-Current model logic in [`src/PixelDiffusion.py`](/work/code/dif_img_rec/src/PixelDiffusion.py):
-- `input_T`: assumes tensors are in `[0, 1]`, then maps to `[-1, 1]`
-- `output_T`: maps model output from `[-1, 1]` back to `[0, 1]`
+The exporter stores raw physical values in GeoTIFFs with internal masks and
+metadata tags. The training dataset handles file-format details and min-max
+normalization.
 
-So your dataset should output `x` and `y` in `[0, 1]`.
+## Model Configuration
 
-If your data uses different scaling (for example z-score), you should adapt `input_T`/`output_T` accordingly.
+The main config is `configs/config.yaml`.
 
-## 4. Edit Config
-
-Main config file: [`configs/config.yaml`](/work/code/dif_img_rec/configs/config.yaml)
-
-### Required fields
+Important channel settings:
 
 ```yaml
-data:
-  loader:
-    batch_size: 4
-    num_workers: 0
-    pin_memory: false
-
 model:
-  in_channels: 2
-  out_channels: 2
-  num_timesteps: 1000
-  schedule: linear
+  in_channels: 4
+  out_channels: 1
+  unet:
+    channels: 5
+    out_dim: 1
+```
+
+For conditional concatenation, `unet.channels` should usually equal
+`model.in_channels + model.out_channels`, and `unet.out_dim` should equal
+`model.out_channels`.
+
+For a first small run, keep the default UNet width modest:
+
+```yaml
+model:
   unet:
     dim: 48
-    dim_mults: [1, 2, 4, 8]
-    channels: 4
-    out_dim: 2
 ```
 
-Notes:
-- `unet.channels` should usually be `in_channels + out_channels` for conditional concat input.
-- `unet.out_dim` should match `out_channels`.
-- Smaller model: reduce `unet.dim` (for example `48` instead of `64`).
-- Current downsized setup reduces the UNet from about `55M` to about `32M` parameters
-  (mainly by lowering base width via `unet.dim` and using the configured channel sizes).
+## Training
 
-### Optimization and scheduler
-
-```yaml
-optimization:
-  lr: 0.0001
-  reduce_lr_on_plateau:
-    factor: 0.5
-    patience: 10
-```
-
-Scheduler monitors `val_loss`.
-
-### Trainer
-
-```yaml
-trainer:
-  max_epochs: 100
-  accelerator: auto
-  devices: 1
-  precision: 32
-  log_every_n_steps: 10
-  enable_checkpointing: false
-```
-
-## 5. Optional W&B Setup
-
-Config section:
-
-```yaml
-logging:
-  wandb:
-    project: dif_img_rec
-    name: null
-    save_dir: logs
-    log_model: false
-```
-
-### Option A: online logging
+Create the local UV environment:
 
 ```bash
-wandb login
-export WANDB_API_KEY=...   # if not already logged in
+uv sync
 ```
 
-### Option B: offline logging
+Export a tiny smoke dataset:
+
+```bash
+uv run python scripts/export_geo_sar_geotiffs.py --config configs/config.yaml --limit 2
+```
+
+Run training:
+
+```bash
+uv run python train.py --config configs/config.yaml
+```
+
+To avoid online W&B logging:
 
 ```bash
 export WANDB_MODE=offline
 ```
 
-### Option C: disable W&B entirely
-
-Set env var before run:
+or:
 
 ```bash
 export WANDB_DISABLED=true
 ```
 
-## 6. Run Training
+## Baseline Development Checklist
 
-```bash
-python3 train.py --config configs/config.yaml
-```
+1. Run the GeoTIFF exporter with `--limit 2` and inspect the split manifests.
+2. Verify dataset tensor shapes: GEO `[4, 128, 128]`, SAR `[1, 128, 128]`.
+3. Overfit a tiny subset before scaling up.
+4. Compare generated SAR wind fields against targets using image metrics and
+   storm-structure diagnostics that matter physically.
 
-## 7. Sanity Checklist Before Real Training
+## Relationship To The Larger Project
 
-- dataset returns `(x, y)` tensors, not file paths
-- tensors are float and normalized consistently
-- channel counts match config
-- first validation batch logs reconstruction image and metrics
-- loss decreases on a small overfit subset
+Use `2026-ESL-Tropical-Cyclone-Dynamics` as the reference for:
 
-## Project Files
+- data provenance and source naming: `goes_east.ABI`, `goes_west.ABI`,
+  `himawari.AHI`, and `sar.cband`.
+- manifest-backed tropical-cyclone observation indexing.
+- source-specific normalization statistics.
+- future integration with PMW, IR, ERA5, track metadata, and multi-temporal
+  context windows.
 
-- Training entrypoint: [`train.py`](/work/code/dif_img_rec/train.py)
-- Config: [`configs/config.yaml`](/work/code/dif_img_rec/configs/config.yaml)
-- Dataset scaffold: [`data/dataset.py`](/work/code/dif_img_rec/data/dataset.py)
-- DataModule scaffold: [`data/datamodule.py`](/work/code/dif_img_rec/data/datamodule.py)
-- Lightning model: [`src/PixelDiffusion.py`](/work/code/dif_img_rec/src/PixelDiffusion.py)
-- Diffusion internals: [`src/DenoisingDiffusionProcess/`](/work/code/dif_img_rec/src/DenoisingDiffusionProcess)
+Use this repo when the question is simpler:
+
+> Given a geostationary image crop of a tropical cyclone, can a conditional
+> diffusion model generate a plausible SAR-like wind field on the same grid?
+
+That is the baseline this repository is meant to answer.

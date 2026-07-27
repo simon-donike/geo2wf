@@ -1,6 +1,11 @@
 # Custom
 *logs/
 external/
+.codex
+.agents
+.uv-cache/
+data/geotiff/
+data/processed/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

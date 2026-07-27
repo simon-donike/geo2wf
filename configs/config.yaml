@@ -1,21 +1,40 @@
 seed: 42  # Global random seed for reproducibility across dataloading and model init.
 
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar
+  splits: [train, val, test]
+  grid_size: 128
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+
 data:
+  root: data/geotiff/geo_sar
+  stats_file: data/geotiff/geo_sar/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
   loader:
     batch_size: 4  # Number of samples per optimization step.
     num_workers: 0  # Number of worker processes used by PyTorch DataLoader.
     pin_memory: false  # Pin CPU memory for faster transfer to GPU (usually true when training on CUDA).
+    persistent_workers: false
 
 model:
-  in_channels: 2  # Channels in the conditional input x.
-  out_channels: 2  # Channels in the reconstruction target y.
+  in_channels: 4  # GEO condition channels: C08/C09/C13/C14 or B08/B09/B13/B14.
+  out_channels: 1  # SAR wind_speed target channel.
   num_timesteps: 1000  # Number of diffusion denoising steps.
   schedule: linear  # Beta schedule variant for the forward process.
   unet:
     dim: 48  # Base UNet width. Previous setting was 64; 48 reduces parameter count to about half (30M instead of 55M).
     dim_mults: [1, 2, 4, 8]  # Width multipliers per UNet level.
-    channels: 4  # Input channels to UNet; for conditional concat this is usually in_channels + out_channels.
-    out_dim: 2  # UNet output channels; should match model.out_channels.
+    channels: 5  # Conditional concat channels: model.in_channels + model.out_channels.
+    out_dim: 1  # UNet output channels; should match model.out_channels.
 
 optimization:
   lr: 0.0001  # AdamW learning rate.
@@ -34,6 +53,7 @@ trainer:
 
 logging:
   wandb:
+    enabled: true  # Set false or export WANDB_DISABLED=true for local smoke tests.
     project: dif_img_rec  # Weights & Biases project name.
     name: null  # Optional run name; null lets W&B auto-generate one.
     save_dir: logs  # Local directory used by W&B for run files.
