@@ -12,6 +12,7 @@ import rasterio
 from global_land_mask import globe
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 
@@ -131,6 +132,7 @@ def _read_raster_view(path: Path, band: int) -> dict[str, Any]:
             raise ValueError(f"{path} has {dataset.count} bands, cannot read band {band}")
         data = dataset.read(band).astype(float)
         mask = dataset.dataset_mask() > 0
+        mask &= np.isfinite(data)
         data[~mask] = np.nan
         bounds = dataset.bounds
         tags = dataset.tags()
@@ -139,6 +141,7 @@ def _read_raster_view(path: Path, band: int) -> dict[str, Any]:
     return {
         "path": path,
         "data": data,
+        "mask": mask,
         "bounds": bounds,
         "tags": tags,
         "band_name": band_name,
@@ -224,25 +227,139 @@ def _plot_image(
     title: str,
     cmap: str | None,
 ) -> None:
-    ax.set_facecolor("0.78")
     image = raster["data"]
-    alpha = raster.get("mask")
-    if alpha is not None and image.ndim == 3:
-        image = np.dstack([image, alpha.astype(float)])
-        alpha = None
-    ax.imshow(
-        image,
-        extent=raster["extent"],
-        origin="upper",
-        cmap=cmap,
-        alpha=alpha,
-    )
+    ax.imshow(image, extent=raster["extent"], origin="upper", cmap=cmap)
+    _overlay_nodata(ax, raster.get("mask"), raster["extent"])
     _plot_center(ax, center)
     ax.set_title(title, fontsize=10)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     ax.set_aspect("equal", adjustable="box")
 
+
+
+def plot_validation_reconstruction(
+    condition: Any, prediction: Any, target: Any, *,
+    condition_mask: Any | None = None, target_mask: Any | None = None,
+    condition_channels: list[str] | tuple[str, ...] | None = None,
+    condition_bounds: Any | None = None, target_bounds: Any | None = None,
+    center: tuple[float, float] | None = None, sample_label: str = "",
+) -> Figure:
+    """Build a stretched, georeferenced validation figure for W&B."""
+    condition_array = _as_chw_numpy(condition)
+    prediction_array = _as_chw_numpy(prediction)
+    target_array = _as_chw_numpy(target)
+    condition_valid = _as_2d_mask(condition_mask, condition_array.shape[1:])
+    target_valid = _as_2d_mask(target_mask, target_array.shape[1:])
+    condition_image, condition_cmap, band_name = _condition_plot_view(
+        condition_array, condition_valid, condition_channels
+    )
+    prediction_image, prediction_cmap = _output_plot_view(prediction_array, target_valid)
+    target_image, target_cmap = _output_plot_view(target_array, target_valid)
+    condition_extent = _bounds_extent(condition_bounds, condition_array.shape[1:])
+    target_extent = _bounds_extent(target_bounds, target_array.shape[1:])
+    has_map = condition_bounds is not None and target_bounds is not None
+    panel_count = 4 if has_map else 3
+    fig, axes = plt.subplots(1, panel_count, figsize=(4.1 * panel_count, 4), constrained_layout=True)
+    axes = np.asarray(axes, dtype=object).reshape(-1)
+    panels = (
+        (condition_image, condition_cmap, condition_valid, condition_extent, f"Condition ({band_name})"),
+        (prediction_image, prediction_cmap, target_valid, target_extent, "Prediction"),
+        (target_image, target_cmap, target_valid, target_extent, "Target"),
+    )
+    for ax, (image, cmap, valid, extent, title) in zip(axes, panels):
+        ax.imshow(image, extent=extent, origin="upper", cmap=cmap)
+        _overlay_nodata(ax, valid, extent)
+        _plot_center(ax, center)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        ax.set_aspect("equal", adjustable="box")
+    if has_map:
+        geo = {"bounds": _coerce_bounds(condition_bounds)}
+        output = {"bounds": _coerce_bounds(target_bounds)}
+        _plot_footprint_map(axes[3], geo, output, center, title="Footprints")
+    if sample_label:
+        fig.suptitle(sample_label, fontsize=11)
+    return fig
+
+
+def _condition_plot_view(array, mask, channels):
+    names = [str(name) for name in channels] if channels else []
+    if array.shape[0] >= 3:
+        indices = list(range(3))
+        if names:
+            try:
+                indices = [_find_band_index(names, band) - 1 for band in ("B13", "B14", "B08")]
+            except ValueError:
+                pass
+        image = np.dstack([_normalize_channel(array[index], mask) for index in indices])
+        band_name = "/".join(names[index] if index < len(names) else f"band {index + 1}" for index in indices)
+        return image, None, band_name
+    return _normalize_channel(array[0], mask), "viridis", names[0] if names else "band 1"
+
+
+def _output_plot_view(array, mask):
+    if array.shape[0] == 1:
+        return _normalize_channel(array[0], mask), "viridis"
+    if array.shape[0] >= 3:
+        return np.dstack([_normalize_channel(array[index], mask) for index in range(3)]), None
+    return _normalize_channel(array[0], mask), "viridis"
+
+
+def _overlay_nodata(ax, valid_mask, extent):
+    """Shade invalid pixels gray and trace their boundary in orange."""
+    if valid_mask is None:
+        return
+    invalid = ~np.asarray(valid_mask, dtype=bool)
+    if not invalid.any():
+        return
+    overlay = np.ma.masked_where(~invalid, invalid.astype(float))
+    ax.imshow(overlay, extent=extent, origin="upper", cmap=ListedColormap(["#8f8f8f"]), alpha=0.68, vmin=0, vmax=1, interpolation="nearest", zorder=3)
+    height, width = invalid.shape
+    x = np.linspace(extent[0], extent[1], width)
+    y = np.linspace(extent[3], extent[2], height)
+    ax.contour(x, y, invalid.astype(float), levels=[0.5], colors=["#ff8c00"], linewidths=0.65, zorder=4)
+
+
+def _as_chw_numpy(value):
+    if hasattr(value, "detach"):
+        value = value.detach().float().cpu().numpy()
+    array = np.asarray(value, dtype=float)
+    if array.ndim == 2:
+        array = array[None, ...]
+    if array.ndim != 3:
+        raise ValueError(f"Expected CHW or HW image, got shape {array.shape}")
+    return array
+
+
+def _as_2d_mask(value, shape):
+    if value is None:
+        return np.ones(shape, dtype=bool)
+    if hasattr(value, "detach"):
+        value = value.detach().cpu().numpy()
+    mask = np.asarray(value).astype(bool).squeeze()
+    if mask.shape != shape:
+        raise ValueError(f"Mask shape {mask.shape} does not match image shape {shape}")
+    return mask
+
+
+def _bounds_extent(bounds, shape):
+    if bounds is None:
+        height, width = shape
+        return 0.0, float(width), 0.0, float(height)
+    bound = _coerce_bounds(bounds)
+    return bound.left, bound.right, bound.bottom, bound.top
+
+
+def _coerce_bounds(bounds):
+    if hasattr(bounds, "left"):
+        return bounds
+    values = np.asarray(bounds, dtype=float).reshape(-1)
+    if values.size != 4:
+        raise ValueError("Bounds must contain left, right, bottom, top")
+    from rasterio.coords import BoundingBox
+    return BoundingBox(*values)
 
 def _plot_footprint_map(
     ax: Axes,

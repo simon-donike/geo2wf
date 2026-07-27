@@ -19,6 +19,8 @@ data:
   train_split: train
   val_split: val
   test_split: test
+  target_size: [256, 256]
+  random_flips: true
   loader:
     batch_size: 4  # Number of samples per optimization step.
     num_workers: 0  # Number of worker processes used by PyTorch DataLoader.
@@ -40,7 +42,7 @@ optimization:
   lr: 0.0001  # AdamW learning rate.
   reduce_lr_on_plateau:
     factor: 0.5  # Multiplicative LR drop factor when metric plateaus.
-    patience: 10  # Number of bad validation epochs before LR is reduced.
+    patience: 25  # Number of bad validation epochs before LR is reduced.
 
 trainer:
   max_epochs: 100  # Total number of training epochs.

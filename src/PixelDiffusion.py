@@ -33,7 +33,7 @@ class PixelDiffusionConditional(pl.LightningModule):
                  model_out_dim=None,
                  lr=1e-3,
                  lr_scheduler_factor=0.5,
-                 lr_scheduler_patience=10):
+                 lr_scheduler_patience=25):
         super().__init__()
         self.lr = lr
         self.lr_scheduler_factor=lr_scheduler_factor
