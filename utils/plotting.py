@@ -280,8 +280,9 @@ def _draw_validation_row(axes, sample, *, has_map):
     condition_image, condition_cmap, band_name = _condition_plot_view(
         condition_array, condition_valid, sample.get("condition_channels")
     )
+    prediction_valid = np.ones(prediction_array.shape[1:], dtype=bool)
     prediction_image, prediction_cmap = _output_plot_view(
-        prediction_array, target_valid
+        prediction_array, prediction_valid
     )
     target_image, target_cmap = _output_plot_view(target_array, target_valid)
     condition_extent = _bounds_extent(
@@ -291,14 +292,14 @@ def _draw_validation_row(axes, sample, *, has_map):
     panels = (
         (condition_image, condition_cmap, condition_valid, condition_extent,
          f"Condition ({band_name})"),
-        (prediction_image, prediction_cmap, target_valid, target_extent, "Prediction"),
+        (prediction_image, prediction_cmap, None, target_extent, "Prediction"),
         (target_image, target_cmap, target_valid, target_extent, "Target"),
     )
     center = sample.get("center")
     for ax, (image, cmap, valid, extent, title) in zip(axes, panels):
         ax.imshow(image, extent=extent, origin="upper", cmap=cmap)
-        if title == "Prediction":
-            _outline_valid_area(ax, valid, extent)
+        if title == "Target":
+            _overlay_nodata(ax, valid, extent, alpha=1.0)
         _plot_center(ax, center)
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("Longitude")
@@ -343,19 +344,25 @@ def _output_plot_view(array, mask):
     return _normalize_channel(array[0], mask), "viridis"
 
 
-def _outline_valid_area(ax, valid_mask, extent):
-    """Trace the valid prediction area without obscuring image pixels."""
+def _overlay_nodata(ax, valid_mask, extent, *, alpha=0.68):
+    """Shade invalid pixels gray and trace their boundary in orange."""
     if valid_mask is None:
         return
-    valid = np.asarray(valid_mask, dtype=bool)
-    if not valid.any() or valid.all():
+    invalid = ~np.asarray(valid_mask, dtype=bool)
+    if not invalid.any():
         return
-    height, width = valid.shape
+    overlay = np.ma.masked_where(~invalid, invalid.astype(float))
+    ax.imshow(
+        overlay, extent=extent, origin="upper",
+        cmap=ListedColormap(["#8f8f8f"]), alpha=alpha, vmin=0, vmax=1,
+        interpolation="nearest", zorder=3,
+    )
+    height, width = invalid.shape
     x = np.linspace(extent[0], extent[1], width)
     y = np.linspace(extent[3], extent[2], height)
     ax.contour(
-        x, y, valid.astype(float), levels=[0.5], colors=["#ff8c00"],
-        linewidths=1.2, zorder=4,
+        x, y, invalid.astype(float), levels=[0.5], colors=["#ff8c00"],
+        linewidths=0.65, zorder=4,
     )
 
 

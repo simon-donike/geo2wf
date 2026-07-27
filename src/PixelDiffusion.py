@@ -38,6 +38,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         self.lr = lr
         self.lr_scheduler_factor=lr_scheduler_factor
         self.lr_scheduler_patience=lr_scheduler_patience
+        self._backward_steps = 0
         
         # Core conditional diffusion process used by training, validation, and prediction.
         self.model=DenoisingDiffusionConditionalProcess(generated_channels=generated_channels,
@@ -71,14 +72,35 @@ class PixelDiffusionConditional(pl.LightningModule):
             mask=target_mask,
         )
         
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         
         return loss
-            
+
+    def on_after_backward(self):
+        """Count and log completed backward passes, including accumulated ones."""
+        self._backward_steps += 1
+        self.log(
+            "train/backward_steps",
+            self._backward_steps,
+            on_step=True,
+            on_epoch=False,
+            prog_bar=False,
+            logger=True,
+            sync_dist=False,
+        )
+
+    def on_save_checkpoint(self, checkpoint):
+        """Persist the backward-pass counter across resumed training runs."""
+        checkpoint["backward_steps"] = self._backward_steps
+
+    def on_load_checkpoint(self, checkpoint):
+        """Restore the counter while remaining compatible with older checkpoints."""
+        self._backward_steps = int(checkpoint.get("backward_steps", 0))
+
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         """Lightning validation hook.
 
-        Logs `val_loss` for scheduler control and, on the first validation batch,
+        Logs `val/loss` for scheduler control and, on the first validation batch,
         computes a full denoising reconstruction plus image/metric logging. The
         second loader contributes only a training-sample reconstruction image.
         """
@@ -86,7 +108,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             if batch_idx == 0:
                 pred_batch = self.predict_step(batch, batch_idx, dataloader_idx)
                 self._log_val_reconstruction(
-                    batch, pred_batch, wandb_key="train/reconstruction"
+                    batch, pred_batch, wandb_key="images/train_reconstruction"
                 )
             return None
         input, output, target_mask = self._unpack_batch(batch)
@@ -97,7 +119,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         )
         
         self.log(
-            'val_loss', loss, on_step=False, on_epoch=True, prog_bar=True,
+            'val/loss', loss, on_step=False, on_epoch=True, prog_bar=True,
             logger=True, sync_dist=True, add_dataloader_idx=False
         )
 
@@ -107,19 +129,19 @@ class PixelDiffusionConditional(pl.LightningModule):
                 pred_batch, output, target_mask
             )
             self.log(
-                'val_recon_psnr', psnr, on_step=False, on_epoch=True,
+                'val/psnr', psnr, on_step=False, on_epoch=True,
                 prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
             )
             self.log(
-                'val_recon_ssim', ssim, on_step=False, on_epoch=True,
+                'val/ssim', ssim, on_step=False, on_epoch=True,
                 prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
             )
             self.log(
-                'val_recon_l1', l1, on_step=False, on_epoch=True,
+                'val/l1', l1, on_step=False, on_epoch=True,
                 prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
             )
             self._log_val_reconstruction(
-                batch, pred_batch, wandb_key="val/reconstruction"
+                batch, pred_batch, wandb_key="images/val_reconstruction"
             )
         
         return loss
@@ -132,15 +154,15 @@ class PixelDiffusionConditional(pl.LightningModule):
             self._prepare_condition(input, batch),
             mask=target_mask,
         )
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test/loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         pred_batch = self.predict_step(batch, batch_idx)
         psnr, ssim, l1 = self._compute_reconstruction_metrics(
             pred_batch, output, target_mask
         )
-        self.log('test_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('test_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('test_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test/psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test/ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test/l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -155,7 +177,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         return self.output_T(pred)
 
     def configure_optimizers(self):
-        """Create optimizer and ReduceLROnPlateau scheduler monitored on `val_loss`."""
+        """Create optimizer and ReduceLROnPlateau scheduler monitored on `val/loss`."""
         optimizer = torch.optim.AdamW(
             list(filter(lambda p: p.requires_grad, self.model.parameters())),
             lr=self.lr,
@@ -166,7 +188,7 @@ class PixelDiffusionConditional(pl.LightningModule):
                                       patience=self.lr_scheduler_patience)
         return {"optimizer": optimizer,
                 "lr_scheduler": {"scheduler": scheduler,
-                                 "monitor": "val_loss"}}
+                                 "monitor": "val/loss"}}
 
     def _to_plot_image(self, tensor):
         """Convert CHW tensor to a matplotlib-friendly image array."""
@@ -281,7 +303,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         return ssim_vals or [0.0]
 
     def _log_val_reconstruction(
-        self, batch, pred_batch, *, wandb_key="val/reconstruction"
+        self, batch, pred_batch, *, wandb_key="images/val_reconstruction"
     ):
         """Log up to five stretched, georeferenced reconstructions with no-data masks."""
         if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
@@ -343,7 +365,12 @@ class PixelDiffusionConditional(pl.LightningModule):
 
     @staticmethod
     def _batch_item(value, index):
-        return None if value is None else value[index]
+        if value is None:
+            return None
+        item = value[index]
+        if torch.is_tensor(item):
+            item = item.detach().cpu()
+        return item
 
     @staticmethod
     def _batch_value(value, index):
