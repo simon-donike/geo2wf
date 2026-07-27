@@ -22,7 +22,7 @@ def plot_random_geo_sar_pairs(
     n: int = 5,
     *,
     seed: int | None = None,
-    geo_band: int = 1,
+    geo_rgb_bands: tuple[str, str, str] = ("B13", "B14", "B08"),
     sar_band: int = 1,
     center_columns: tuple[str, str] = ("center_lat", "center_lon"),
     output_path: str | Path | None = None,
@@ -41,8 +41,13 @@ def plot_random_geo_sar_pairs(
         Number of random pairs to plot.
     seed:
         Optional random seed for reproducible sample selection.
-    geo_band, sar_band:
-        One-based GeoTIFF band indices to display.
+    geo_rgb_bands:
+        Band descriptions to use as red, green, and blue for the GEO false-color
+        panel. Defaults to two IR bands as red/green and water vapor as blue.
+        If a requested ``Bxx`` band is not present, the matching ``Cxx`` band is
+        tried automatically, and vice versa.
+    sar_band:
+        One-based GeoTIFF band index to display for the SAR target.
     center_columns:
         Manifest latitude/longitude columns used for the storm-center marker.
     output_path:
@@ -77,15 +82,15 @@ def plot_random_geo_sar_pairs(
         sar_path = _resolve_pair_path(root, row, "target_path", "sar_path")
         center = _row_center(row, center_columns)
 
-        geo = _read_raster_view(geo_path, geo_band)
+        geo = _read_geo_false_color_view(geo_path, geo_rgb_bands)
         sar = _read_raster_view(sar_path, sar_band)
 
         _plot_image(
             axes_array[row_index, 0],
             geo,
             center,
-            title=_panel_title(row, "GEO", geo["band_name"]),
-            cmap="gray_r",
+            title=_panel_title(row, "GEO false color", geo["band_name"]),
+            cmap=None,
         )
         _plot_image(
             axes_array[row_index, 1],
@@ -141,15 +146,97 @@ def _read_raster_view(path: Path, band: int) -> dict[str, Any]:
     }
 
 
+def _read_geo_false_color_view(
+    path: Path,
+    rgb_bands: tuple[str, str, str],
+) -> dict[str, Any]:
+    with rasterio.open(path) as dataset:
+        descriptions = [
+            description or f"band {index}"
+            for index, description in enumerate(dataset.descriptions, start=1)
+        ]
+        band_indices = [_find_band_index(descriptions, band) for band in rgb_bands]
+        channels = [dataset.read(index).astype(float) for index in band_indices]
+        mask = dataset.dataset_mask() > 0
+        mask &= np.logical_and.reduce([np.isfinite(channel) for channel in channels])
+        mask &= ~np.logical_and.reduce([np.isclose(channel, 0.0) for channel in channels])
+        bounds = dataset.bounds
+        tags = dataset.tags()
+
+    rgb = np.dstack([_normalize_channel(channel, mask) for channel in channels])
+    rgb[~mask] = 0.0
+    band_name = "/".join(
+        descriptions[index - 1] for index in band_indices
+    )
+    return {
+        "path": path,
+        "data": rgb,
+        "mask": mask,
+        "bounds": bounds,
+        "tags": tags,
+        "band_name": band_name,
+        "extent": (bounds.left, bounds.right, bounds.bottom, bounds.top),
+    }
+
+
+def _find_band_index(descriptions: list[str], requested: str) -> int:
+    candidates = [requested]
+    if requested.startswith("B"):
+        candidates.append(f"C{requested[1:]}")
+    elif requested.startswith("C"):
+        candidates.append(f"B{requested[1:]}")
+
+    normalized = {
+        _normalize_band_name(description): index
+        for index, description in enumerate(descriptions, start=1)
+    }
+    for candidate in candidates:
+        index = normalized.get(_normalize_band_name(candidate))
+        if index is not None:
+            return index
+    raise ValueError(
+        f"Could not find GEO band {requested!r}; available bands are {descriptions}"
+    )
+
+
+def _normalize_band_name(name: str) -> str:
+    normalized = name.upper()
+    for prefix in ("CMI_", "ABI_", "AHI_"):
+        normalized = normalized.removeprefix(prefix)
+    return normalized
+
+
+def _normalize_channel(channel: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    valid = channel[np.isfinite(channel) & mask]
+    if valid.size == 0:
+        return np.zeros_like(channel, dtype=float)
+    low = float(np.nanmin(valid))
+    high = float(np.nanmax(valid))
+    scale = max(high - low, 1e-6)
+    return np.clip((channel - low) / scale, 0.0, 1.0)
+
+
 def _plot_image(
     ax: Axes,
     raster: dict[str, Any],
     center: tuple[float, float] | None,
     *,
     title: str,
-    cmap: str,
+    cmap: str | None,
 ) -> None:
-    ax.imshow(raster["data"], extent=raster["extent"], origin="upper", cmap=cmap)
+    ax.set_facecolor("0.78")
+    image = raster["data"]
+    alpha = raster.get("mask")
+    if alpha is not None and image.ndim == 3:
+        image = np.dstack([image, alpha.astype(float)])
+        alpha = None
+    ax.imshow(
+        image,
+        extent=raster["extent"],
+        origin="upper",
+        cmap=cmap,
+        alpha=alpha,
+    )
     _plot_center(ax, center)
     ax.set_title(title, fontsize=10)
     ax.set_xlabel("Longitude")
@@ -252,12 +339,9 @@ def _row_center(
 
 
 def _panel_title(row: pd.Series, label: str, band_name: str | None) -> str:
-    sample_id = str(row["sample_id"]) if _has_value(row, "sample_id") else ""
     storm_id = str(row["storm_id"]) if _has_value(row, "storm_id") else ""
-    parts = [part for part in (storm_id, sample_id) if part]
-    prefix = " | ".join(parts)
     suffix = f" ({band_name})" if band_name else ""
-    return f"{prefix}\n{label}{suffix}" if prefix else f"{label}{suffix}"
+    return f"{storm_id}\n{label}{suffix}" if storm_id else f"{label}{suffix}"
 
 
 def _has_value(row: pd.Series, column: str) -> bool:

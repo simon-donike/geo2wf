@@ -56,11 +56,11 @@ class PixelDiffusionConditional(pl.LightningModule):
 
     def input_T(self, input):
         # Model internally expects values in [-1, 1].
-        return (input.clip(0, 1).mul_(2)).sub_(1)
+        return input.clamp(0, 1).mul(2).sub(1)
 
     def output_T(self, input):
         # Inverse mapping from [-1, 1] back to [0, 1] for visualization/metrics.
-        return (input.add_(1)).div_(2)
+        return input.add(1).div(2)
     
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""
@@ -100,6 +100,25 @@ class PixelDiffusionConditional(pl.LightningModule):
             self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self._log_val_reconstruction(input, pred_batch, output)
         
+        return loss
+
+    def test_step(self, batch, batch_idx):
+        """Evaluate held-out reconstructions on observed target pixels only."""
+        input, output, target_mask = self._unpack_batch(batch)
+        loss = self.model.p_loss(
+            self.input_T(output),
+            self.input_T(input),
+            mask=target_mask,
+        )
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
+        pred_batch = self.predict_step(batch, batch_idx)
+        psnr, ssim, l1 = self._compute_reconstruction_metrics(
+            pred_batch, output, target_mask
+        )
+        self.log('test_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -144,45 +163,35 @@ class PixelDiffusionConditional(pl.LightningModule):
         pred = pred_batch.detach().float().clamp(0, 1)
         target = target_batch.detach().float().clamp(0, 1)
 
-        mask = None
-        if target_mask is not None:
-            mask = target_mask.detach().to(device=pred.device, dtype=pred.dtype)
-            if mask.ndim == 3:
-                mask = mask.unsqueeze(1)
-            if mask.shape[1] == 1 and pred.shape[1] != 1:
-                mask = mask.expand_as(pred)
+        mask = self._prepare_target_mask(target_mask, pred) if target_mask is not None else None
+        psnr_vals = []
+        ssim_vals = []
 
         if mask is None:
             l1 = F.l1_loss(pred, target)
             mse = F.mse_loss(pred, target)
-            pred_for_image_metrics = pred
-            target_for_image_metrics = target
+            pred_np = pred.cpu().numpy()
+            target_np = target.cpu().numpy()
+            for i in range(pred_np.shape[0]):
+                psnr_vals.append(
+                    peak_signal_noise_ratio(target_np[i], pred_np[i], data_range=1.0)
+                )
+                ssim_vals.append(
+                    structural_similarity(
+                        target_np[i],
+                        pred_np[i],
+                        data_range=1.0,
+                        channel_axis=0,
+                    )
+                )
         else:
             valid = mask.sum().clamp_min(1.0)
             l1 = ((pred - target).abs() * mask).sum() / valid
             mse = ((pred - target).pow(2) * mask).sum() / valid
-            pred_for_image_metrics = pred * mask
-            target_for_image_metrics = target * mask
-
-        pred_np = pred_for_image_metrics.cpu().numpy()
-        target_np = target_for_image_metrics.cpu().numpy()
-
-        psnr_vals = []
-        ssim_vals = []
-        for i in range(pred_np.shape[0]):
-            p = pred_np[i]
-            t = target_np[i]
             psnr_vals.append(
-                peak_signal_noise_ratio(t, p, data_range=1.0)
+                10.0 * torch.log10(1.0 / mse.clamp_min(1e-12)).detach().cpu().item()
             )
-            ssim_vals.append(
-                structural_similarity(
-                    t,
-                    p,
-                    data_range=1.0,
-                    channel_axis=0,
-                )
-            )
+            ssim_vals = self._masked_ssim_values(pred, target, mask)
 
         psnr = torch.tensor(psnr_vals, device=pred.device, dtype=pred.dtype).mean()
         if not torch.isfinite(psnr):
@@ -202,8 +211,40 @@ class PixelDiffusionConditional(pl.LightningModule):
         input, output = batch
         return input, output, None
 
+    def _prepare_target_mask(self, target_mask, reference):
+        """Broadcast a target-validity mask to match a BCHW target tensor."""
+        mask = target_mask.detach().to(device=reference.device, dtype=reference.dtype)
+        if mask.ndim == 3:
+            mask = mask.unsqueeze(1)
+        if mask.shape[1] == 1 and reference.shape[1] != 1:
+            mask = mask.expand_as(reference)
+        return mask
+
+    def _masked_ssim_values(self, pred, target, mask):
+        """Compute SSIM from the observed SAR pixels only."""
+        pred_np = pred.detach().cpu().numpy()
+        target_np = target.detach().cpu().numpy()
+        mask_np = mask.detach().cpu().numpy().astype(bool)
+        ssim_vals = []
+        for i in range(pred_np.shape[0]):
+            valid = mask_np[i]
+            if not valid.any():
+                continue
+            p = pred_np[i].copy()
+            t = target_np[i]
+            p[~valid] = t[~valid]
+            _, ssim_image = structural_similarity(
+                t,
+                p,
+                data_range=1.0,
+                channel_axis=0,
+                full=True,
+            )
+            ssim_vals.append(float(ssim_image[valid].mean()))
+        return ssim_vals or [0.0]
+
     def _log_val_reconstruction(self, input_batch, pred_batch, target_batch):
-        """Log a single `x | pred | y` reconstruction panel to W&B."""
+        """Log one full condition, full prediction, and observed target panel to W&B."""
         if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
             return
 

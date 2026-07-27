@@ -50,9 +50,11 @@ class PairedDataModule(pl.LightningDataModule):
     def from_config(cls, config: dict) -> "PairedDataModule":
         data_cfg = config.get("data", {})
         loader_cfg = data_cfg.get("loader", {})
+        root = _local_data_root(data_cfg.get("root", "data/geotiff/geo_sar"))
+        stats_file = _local_stats_file(root, data_cfg.get("stats_file"))
         return cls(
-            root=data_cfg.get("root", "data/geotiff/geo_sar"),
-            stats_file=data_cfg.get("stats_file"),
+            root=root,
+            stats_file=stats_file,
             batch_size=loader_cfg.get("batch_size", 4),
             num_workers=loader_cfg.get("num_workers", 0),
             pin_memory=loader_cfg.get("pin_memory", False),
@@ -116,3 +118,23 @@ class PairedDataModule(pl.LightningDataModule):
             split=split,
             stats_file=self.stats_file,
         )
+
+
+def _local_data_root(configured_root: str | Path) -> str:
+    root = str(configured_root)
+    if root.endswith("geo_sar"):
+        return os.environ.get("GEO_SAR_OUTPUT_ROOT", root)
+    if root.endswith("geo_pmw"):
+        return os.environ.get("GEO_PMW_OUTPUT_ROOT", root)
+    return root
+
+
+def _local_stats_file(root: str, configured_stats_file: str | Path | None) -> str:
+    if root in {
+        os.environ.get("GEO_SAR_OUTPUT_ROOT"),
+        os.environ.get("GEO_PMW_OUTPUT_ROOT"),
+    }:
+        return str(Path(root) / "stats.json")
+    if configured_stats_file is not None:
+        return str(configured_stats_file)
+    return str(Path(root) / "stats.json")

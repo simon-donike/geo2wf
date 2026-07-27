@@ -52,7 +52,10 @@ class PairedImageDataset(Dataset):
         condition_path = _row_value(row, "condition_path", row.get("geo_path"))
         target_path = _row_value(row, "target_path", row.get("sar_path"))
 
-        condition, condition_mask = _read_geotiff(self.root / condition_path)
+        condition, condition_mask = _read_geotiff(
+            self.root / condition_path,
+            reject_all_zero_fill=True,
+        )
         target, target_mask = _read_geotiff(self.root / target_path)
         condition = _normalize(
             condition, condition_source_type, condition_channels, self.stats
@@ -85,12 +88,23 @@ class PairedImageDataset(Dataset):
         }
 
 
-def _read_geotiff(path: Path) -> tuple[torch.Tensor, torch.Tensor]:
+def _read_geotiff(
+    path: Path,
+    *,
+    reject_all_zero_fill: bool = False,
+) -> tuple[torch.Tensor, torch.Tensor]:
     with rasterio.open(path) as dataset:
         array = dataset.read().astype("float32")
         mask = dataset.dataset_mask() > 0
+    finite_mask = torch.from_numpy(array).isfinite().all(dim=0)
     tensor = torch.from_numpy(array)
-    mask_tensor = torch.from_numpy(mask).bool().unsqueeze(0)
+    mask_tensor = torch.from_numpy(mask).bool() & finite_mask
+    if reject_all_zero_fill:
+        mask_tensor = mask_tensor & ~torch.isclose(
+            tensor,
+            torch.zeros((), dtype=tensor.dtype),
+        ).all(dim=0)
+    mask_tensor = mask_tensor.unsqueeze(0)
     return tensor, mask_tensor
 
 

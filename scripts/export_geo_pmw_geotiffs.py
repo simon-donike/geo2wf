@@ -25,6 +25,10 @@ import xarray as xr
 import yaml
 from tqdm.auto import tqdm
 
+from local_env import load_local_env
+
+load_local_env()
+
 from export_geo_sar_geotiffs import (
     DEFAULT_CLOSEST_MATCH_HOURS,
     DEFAULT_DATA_ROOT,
@@ -51,7 +55,7 @@ from export_geo_sar_geotiffs import (
     _write_manifest,
 )
 
-DEFAULT_OUTPUT_ROOT = Path("data/geotiff/geo_pmw")
+DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_PMW_OUTPUT_ROOT", "data/geotiff/geo_pmw"))
 PMW_CHANNELS = {
     "AMSR2_GCOMW1": ("TB_A89.0V",),
     "GMI_GPM": ("TB_89.0V",),
@@ -94,6 +98,12 @@ def _parse_args() -> ExportConfig:
     config_parser.add_argument("--config", type=Path, default=None)
     known, _ = config_parser.parse_known_args()
     file_config = _load_export_config(known.config)
+    data_root = Path(os.environ.get("TCD_DATA_ROOT", file_config.get("data_root", DEFAULT_DATA_ROOT)))
+    manifest_file = Path(
+        file_config.get("manifest_file", data_root / "index-files" / "observation_manifest_v5.csv")
+    )
+    if "TCD_DATA_ROOT" in os.environ:
+        manifest_file = data_root / "index-files" / "observation_manifest_v5.csv"
 
     parser = argparse.ArgumentParser(
         description="Export PMW-anchored GEO/PMW pairs as raw-value GeoTIFFs."
@@ -102,17 +112,22 @@ def _parse_args() -> ExportConfig:
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path(file_config.get("data_root", DEFAULT_DATA_ROOT)),
+        default=data_root,
     )
     parser.add_argument(
         "--manifest-file",
         type=Path,
-        default=Path(file_config.get("manifest_file", DEFAULT_MANIFEST_FILE)),
+        default=manifest_file,
     )
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(file_config.get("output_root", DEFAULT_OUTPUT_ROOT)),
+        default=Path(
+            os.environ.get(
+                "GEO_PMW_OUTPUT_ROOT",
+                file_config.get("output_root", DEFAULT_OUTPUT_ROOT),
+            )
+        ),
     )
     parser.add_argument(
         "--splits",
