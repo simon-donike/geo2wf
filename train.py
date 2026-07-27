@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
+os.environ.setdefault("WANDB_DIR", "logs/wandb")
+os.environ.setdefault("WANDB_CACHE_DIR", "logs/wandb/cache")
+os.environ.setdefault("WANDB_CONFIG_DIR", "logs/wandb/config")
 
 import pytorch_lightning as pl
 import yaml
@@ -67,12 +77,21 @@ def main() -> None:
         if args.limit_val_batches is not None
         else trainer_cfg.get("limit_val_batches", 1.0)
     )
-    # Lightning logger wrapper for Weights & Biases.
-    wandb_logger = WandbLogger(
-        project=wandb_cfg.get("project", "dif_img_rec"),
-        name=wandb_cfg.get("name"),
-        save_dir=wandb_cfg.get("save_dir", "logs"),
-        log_model=wandb_cfg.get("log_model", False),
+    wandb_disabled = str(os.environ.get("WANDB_DISABLED", "")).lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    wandb_enabled = wandb_cfg.get("enabled", True) and not wandb_disabled
+    wandb_logger = (
+        WandbLogger(
+            project=wandb_cfg.get("project", "dif_img_rec"),
+            name=wandb_cfg.get("name"),
+            save_dir=wandb_cfg.get("save_dir", "logs"),
+            log_model=wandb_cfg.get("log_model", False),
+        )
+        if wandb_enabled
+        else False
     )
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer = pl.Trainer(

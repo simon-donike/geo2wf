@@ -183,7 +183,7 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
             
         return x_t
         
-    def p_loss(self,output,condition):
+    def p_loss(self,output,condition,mask=None):
         """
             Assumes output and input are in [-1,+1] range
         """        
@@ -202,4 +202,11 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
         noise_hat = self.model(model_input, t) 
             
         # apply loss
+        if mask is not None:
+            mask = mask.to(device=device, dtype=noise.dtype)
+            if mask.ndim == 3:
+                mask = mask.unsqueeze(1)
+            if mask.shape[1] == 1 and noise.shape[1] != 1:
+                mask = mask.expand_as(noise)
+            return ((noise - noise_hat).pow(2) * mask).sum() / mask.sum().clamp_min(1.0)
         return self.loss_fn(noise, noise_hat)

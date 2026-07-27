@@ -1,3 +1,11 @@
+import os
+
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
+
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -9,9 +17,10 @@ from .DenoisingDiffusionProcess import *
 class PixelDiffusionConditional(pl.LightningModule):
     """Conditional pixel-space diffusion Lightning module.
 
-    Expects each batch to be `(x, y)` where:
-    - `x`: condition tensor
-    - `y`: target tensor to reconstruct/generate
+    Expects each batch to provide:
+    - `condition`: conditional tensor
+    - `target`: target tensor to reconstruct/generate
+    - `target_mask`: optional target-validity mask
     """
     def __init__(self,
                  condition_channels=3,
@@ -55,8 +64,12 @@ class PixelDiffusionConditional(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""
-        input,output=batch
-        loss = self.model.p_loss(self.input_T(output),self.input_T(input))
+        input, output, target_mask = self._unpack_batch(batch)
+        loss = self.model.p_loss(
+            self.input_T(output),
+            self.input_T(input),
+            mask=target_mask,
+        )
         
         self.log('train_loss',loss,on_step=True,on_epoch=True,prog_bar=True,logger=True)
         
@@ -68,14 +81,20 @@ class PixelDiffusionConditional(pl.LightningModule):
         Logs `val_loss` for scheduler control and, on the first validation batch,
         computes a full denoising reconstruction plus image/metric logging.
         """
-        input,output=batch
-        loss = self.model.p_loss(self.input_T(output),self.input_T(input))
+        input, output, target_mask = self._unpack_batch(batch)
+        loss = self.model.p_loss(
+            self.input_T(output),
+            self.input_T(input),
+            mask=target_mask,
+        )
         
         self.log('val_loss',loss,on_step=False,on_epoch=True,prog_bar=True,logger=True)
 
         if batch_idx == 0:
             pred_batch = self.predict_step(batch, batch_idx)
-            psnr, ssim, l1 = self._compute_reconstruction_metrics(pred_batch, output)
+            psnr, ssim, l1 = self._compute_reconstruction_metrics(
+                pred_batch, output, target_mask
+            )
             self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
@@ -90,7 +109,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         random noise and iteratively denoises to produce the final reconstruction.
         """
         del batch_idx, dataloader_idx
-        input,_ = batch
+        input, _, _ = self._unpack_batch(batch)
         pred = self.model(self.input_T(input))
         return self.output_T(pred)
 
@@ -115,22 +134,47 @@ class PixelDiffusionConditional(pl.LightningModule):
             return image[:3].permute(1, 2, 0).numpy(), None
         return image[0].numpy(), 'gray'
 
-    def _compute_reconstruction_metrics(self, pred_batch, target_batch):
+    def _compute_reconstruction_metrics(
+        self,
+        pred_batch,
+        target_batch,
+        target_mask=None,
+    ):
         """Compute batch-level reconstruction metrics on [0, 1] tensors."""
         pred = pred_batch.detach().float().clamp(0, 1)
         target = target_batch.detach().float().clamp(0, 1)
 
-        l1 = F.l1_loss(pred, target)
+        mask = None
+        if target_mask is not None:
+            mask = target_mask.detach().to(device=pred.device, dtype=pred.dtype)
+            if mask.ndim == 3:
+                mask = mask.unsqueeze(1)
+            if mask.shape[1] == 1 and pred.shape[1] != 1:
+                mask = mask.expand_as(pred)
 
-        pred_np = pred.cpu().numpy()
-        target_np = target.cpu().numpy()
+        if mask is None:
+            l1 = F.l1_loss(pred, target)
+            mse = F.mse_loss(pred, target)
+            pred_for_image_metrics = pred
+            target_for_image_metrics = target
+        else:
+            valid = mask.sum().clamp_min(1.0)
+            l1 = ((pred - target).abs() * mask).sum() / valid
+            mse = ((pred - target).pow(2) * mask).sum() / valid
+            pred_for_image_metrics = pred * mask
+            target_for_image_metrics = target * mask
+
+        pred_np = pred_for_image_metrics.cpu().numpy()
+        target_np = target_for_image_metrics.cpu().numpy()
 
         psnr_vals = []
         ssim_vals = []
         for i in range(pred_np.shape[0]):
             p = pred_np[i]
             t = target_np[i]
-            psnr_vals.append(peak_signal_noise_ratio(t, p, data_range=1.0))
+            psnr_vals.append(
+                peak_signal_noise_ratio(t, p, data_range=1.0)
+            )
             ssim_vals.append(
                 structural_similarity(
                     t,
@@ -141,9 +185,22 @@ class PixelDiffusionConditional(pl.LightningModule):
             )
 
         psnr = torch.tensor(psnr_vals, device=pred.device, dtype=pred.dtype).mean()
+        if not torch.isfinite(psnr):
+            psnr = 10.0 * torch.log10(1.0 / mse.clamp_min(1e-12))
         ssim = torch.tensor(ssim_vals, device=pred.device, dtype=pred.dtype).mean()
 
         return psnr, ssim, l1
+
+    def _unpack_batch(self, batch):
+        """Support both legacy tuple batches and GeoTIFF dict batches."""
+        if isinstance(batch, dict):
+            return (
+                batch["condition"],
+                batch["target"],
+                batch.get("target_mask"),
+            )
+        input, output = batch
+        return input, output, None
 
     def _log_val_reconstruction(self, input_batch, pred_batch, target_batch):
         """Log a single `x | pred | y` reconstruction panel to W&B."""
