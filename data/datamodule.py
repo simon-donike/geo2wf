@@ -12,7 +12,7 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_info
-from torch.utils.data import ConcatDataset, DataLoader, Dataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, RandomSampler
 
 from .dataset import PairedImageDataset
 
@@ -119,17 +119,31 @@ class PairedDataModule(pl.LightningDataModule):
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
 
-    def val_dataloader(self) -> DataLoader:
-        if self.val_dataset is None:
+    def val_dataloader(self) -> list[DataLoader]:
+        if self.val_dataset is None or self.train_dataset is None:
             self.setup("fit")
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            persistent_workers=self.persistent_workers and self.num_workers > 0,
+        world_size = self.trainer.world_size if self.trainer is not None else 1
+        train_sample_count = min(
+            self.batch_size * world_size, len(self.train_dataset)
         )
+        loader_kwargs = {
+            "batch_size": self.batch_size,
+            "num_workers": self.num_workers,
+            "pin_memory": self.pin_memory,
+            "persistent_workers": self.persistent_workers and self.num_workers > 0,
+        }
+        return [
+            DataLoader(self.val_dataset, shuffle=True, **loader_kwargs),
+            DataLoader(
+                self.train_dataset,
+                sampler=RandomSampler(
+                    self.train_dataset,
+                    replacement=False,
+                    num_samples=train_sample_count,
+                ),
+                **loader_kwargs,
+            ),
+        ]
 
     def test_dataloader(self) -> DataLoader:
         if self.test_dataset is None:

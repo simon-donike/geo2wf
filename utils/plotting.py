@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Patch
 
 
 def plot_random_geo_sar_pairs(
@@ -100,12 +100,12 @@ def plot_random_geo_sar_pairs(
             title=_panel_title(row, "SAR", sar["band_name"]),
             cmap="viridis",
         )
-        _plot_footprint_map(
+        _plot_valid_area_map(
             axes_array[row_index, 2],
             geo,
             sar,
             center,
-            title=_panel_title(row, "Footprints", None),
+            title=_panel_title(row, "Valid areas", None),
         )
 
     if output_path is not None:
@@ -297,16 +297,23 @@ def _draw_validation_row(axes, sample, *, has_map):
     center = sample.get("center")
     for ax, (image, cmap, valid, extent, title) in zip(axes, panels):
         ax.imshow(image, extent=extent, origin="upper", cmap=cmap)
-        _overlay_nodata(ax, valid, extent)
+        if title == "Prediction":
+            _outline_valid_area(ax, valid, extent)
         _plot_center(ax, center)
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_aspect("equal", adjustable="box")
     if has_map:
-        geo = {"bounds": _coerce_bounds(sample["condition_bounds"])}
-        output = {"bounds": _coerce_bounds(sample["target_bounds"])}
-        _plot_footprint_map(axes[3], geo, output, center, title="Footprints")
+        geo = {
+            "bounds": _coerce_bounds(sample["condition_bounds"]),
+            "mask": condition_valid,
+        }
+        output = {
+            "bounds": _coerce_bounds(sample["target_bounds"]),
+            "mask": target_valid,
+        }
+        _plot_valid_area_map(axes[3], geo, output, center, title="Valid areas")
     if sample.get("sample_label"):
         axes[0].annotate(
             sample["sample_label"], xy=(0, 1.13), xycoords="axes fraction",
@@ -336,19 +343,20 @@ def _output_plot_view(array, mask):
     return _normalize_channel(array[0], mask), "viridis"
 
 
-def _overlay_nodata(ax, valid_mask, extent):
-    """Shade invalid pixels gray and trace their boundary in orange."""
+def _outline_valid_area(ax, valid_mask, extent):
+    """Trace the valid prediction area without obscuring image pixels."""
     if valid_mask is None:
         return
-    invalid = ~np.asarray(valid_mask, dtype=bool)
-    if not invalid.any():
+    valid = np.asarray(valid_mask, dtype=bool)
+    if not valid.any() or valid.all():
         return
-    overlay = np.ma.masked_where(~invalid, invalid.astype(float))
-    ax.imshow(overlay, extent=extent, origin="upper", cmap=ListedColormap(["#8f8f8f"]), alpha=0.68, vmin=0, vmax=1, interpolation="nearest", zorder=3)
-    height, width = invalid.shape
+    height, width = valid.shape
     x = np.linspace(extent[0], extent[1], width)
     y = np.linspace(extent[3], extent[2], height)
-    ax.contour(x, y, invalid.astype(float), levels=[0.5], colors=["#ff8c00"], linewidths=0.65, zorder=4)
+    ax.contour(
+        x, y, valid.astype(float), levels=[0.5], colors=["#ff8c00"],
+        linewidths=1.2, zorder=4,
+    )
 
 
 def _as_chw_numpy(value):
@@ -391,7 +399,7 @@ def _coerce_bounds(bounds):
     left, right, bottom, top = values
     return BoundingBox(left=left, bottom=bottom, right=right, top=top)
 
-def _plot_footprint_map(
+def _plot_valid_area_map(
     ax: Axes,
     geo: dict[str, Any],
     sar: dict[str, Any],
@@ -400,8 +408,10 @@ def _plot_footprint_map(
     title: str,
 ) -> None:
     lon_min, lon_max, lat_min, lat_max = _combined_bounds(geo["bounds"], sar["bounds"])
-    lon_pad = max((lon_max - lon_min) * 0.12, 0.25)
-    lat_pad = max((lat_max - lat_min) * 0.12, 0.25)
+    # Leave enough surrounding geography visible to make the logged valid areas
+    # easier to place in their broader spatial context.
+    lon_pad = max((lon_max - lon_min) * 0.25, 0.25)
+    lat_pad = max((lat_max - lat_min) * 0.25, 0.25)
     lon_min -= lon_pad
     lon_max += lon_pad
     lat_min -= lat_pad
@@ -415,36 +425,68 @@ def _plot_footprint_map(
         land.astype(int),
         extent=(lon_min, lon_max, lat_min, lat_max),
         origin="lower",
-        cmap="BrBG",
-        alpha=0.35,
+        cmap=ListedColormap(["#cfe8f3", "#e8e3cf"]),
         vmin=0,
         vmax=1,
+        interpolation="nearest",
+        zorder=0,
     )
-    _add_bounds(ax, geo["bounds"], "tab:blue", "GEO")
-    _add_bounds(ax, sar["bounds"], "tab:orange", "SAR")
+    ax.contour(
+        lon_grid, lat_grid, land.astype(float), levels=[0.5],
+        colors=["#849080"], linewidths=0.65, alpha=0.9, zorder=1,
+    )
+    _add_valid_area(ax, geo["mask"], geo["bounds"], "tab:blue")
+    _add_valid_area(ax, sar["mask"], sar["bounds"], "tab:orange")
     _plot_center(ax, center)
-    ax.legend(loc="upper right", fontsize=8, frameon=True)
+    handles = [
+        Patch(facecolor="tab:blue", edgecolor="tab:blue", alpha=0.3, label="GEO valid"),
+        Patch(facecolor="tab:orange", edgecolor="tab:orange", alpha=0.3, label="SAR valid"),
+    ]
+    if center is not None:
+        handles.append(
+            plt.Line2D(
+                [], [], marker="x", linestyle="none", color="red",
+                markersize=8, markeredgewidth=2, label="storm center",
+            )
+        )
+    ax.legend(handles=handles, loc="upper right", fontsize=8, frameon=True)
     ax.set_title(title, fontsize=10)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     ax.set_xlim(lon_min, lon_max)
     ax.set_ylim(lat_min, lat_max)
+    ax.grid(
+        color="white", linestyle="--", linewidth=0.6, alpha=0.65, zorder=1,
+    )
+    ax.set_axisbelow(False)
     ax.set_aspect("equal", adjustable="box")
 
 
-def _add_bounds(ax: Axes, bounds: Any, color: str, label: str) -> None:
-    width = bounds.right - bounds.left
-    height = bounds.top - bounds.bottom
-    patch = Rectangle(
-        (bounds.left, bounds.bottom),
-        width,
-        height,
-        fill=False,
-        edgecolor=color,
-        linewidth=1.8,
-        label=label,
+def _add_valid_area(ax: Axes, mask: Any, bounds: Any, color: str) -> None:
+    """Draw the georeferenced valid-pixel region as filled polygons."""
+    valid = np.asarray(mask, dtype=bool).squeeze()
+    if valid.ndim != 2:
+        raise ValueError(f"Valid-area mask must be 2D, got shape {valid.shape}")
+    if not valid.any():
+        return
+    height, width = valid.shape
+    pixel_width = (bounds.right - bounds.left) / width
+    pixel_height = (bounds.top - bounds.bottom) / height
+    x = np.linspace(
+        bounds.left - pixel_width / 2, bounds.right + pixel_width / 2, width + 2,
     )
-    ax.add_patch(patch)
+    y = np.linspace(
+        bounds.top + pixel_height / 2, bounds.bottom - pixel_height / 2, height + 2,
+    )
+    polygon_mask = np.pad(valid, 1, constant_values=False).astype(float)
+    ax.contourf(
+        x, y, polygon_mask, levels=[0.5, 1.5],
+        colors=[color], alpha=0.3, zorder=2,
+    )
+    ax.contour(
+        x, y, polygon_mask, levels=[0.5],
+        colors=[color], linewidths=1.5, zorder=3,
+    )
 
 
 def _plot_center(ax: Axes, center: tuple[float, float] | None) -> None:

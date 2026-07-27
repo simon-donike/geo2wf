@@ -75,12 +75,20 @@ class PixelDiffusionConditional(pl.LightningModule):
         
         return loss
             
-    def validation_step(self, batch, batch_idx):     
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         """Lightning validation hook.
 
         Logs `val_loss` for scheduler control and, on the first validation batch,
-        computes a full denoising reconstruction plus image/metric logging.
+        computes a full denoising reconstruction plus image/metric logging. The
+        second loader contributes only a training-sample reconstruction image.
         """
+        if dataloader_idx == 1:
+            if batch_idx == 0:
+                pred_batch = self.predict_step(batch, batch_idx, dataloader_idx)
+                self._log_val_reconstruction(
+                    batch, pred_batch, wandb_key="train/reconstruction"
+                )
+            return None
         input, output, target_mask = self._unpack_batch(batch)
         loss = self.model.p_loss(
             self.input_T(output),
@@ -88,17 +96,31 @@ class PixelDiffusionConditional(pl.LightningModule):
             mask=target_mask,
         )
         
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log(
+            'val_loss', loss, on_step=False, on_epoch=True, prog_bar=True,
+            logger=True, sync_dist=True, add_dataloader_idx=False
+        )
 
         if batch_idx == 0:
             pred_batch = self.predict_step(batch, batch_idx)
             psnr, ssim, l1 = self._compute_reconstruction_metrics(
                 pred_batch, output, target_mask
             )
-            self.log('val_recon_psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log('val_recon_ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log('val_recon_l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self._log_val_reconstruction(batch, pred_batch)
+            self.log(
+                'val_recon_psnr', psnr, on_step=False, on_epoch=True,
+                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+            )
+            self.log(
+                'val_recon_ssim', ssim, on_step=False, on_epoch=True,
+                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+            )
+            self.log(
+                'val_recon_l1', l1, on_step=False, on_epoch=True,
+                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+            )
+            self._log_val_reconstruction(
+                batch, pred_batch, wandb_key="val/reconstruction"
+            )
         
         return loss
 
@@ -258,7 +280,9 @@ class PixelDiffusionConditional(pl.LightningModule):
             ssim_vals.append(float(ssim_image[valid].mean()))
         return ssim_vals or [0.0]
 
-    def _log_val_reconstruction(self, batch, pred_batch):
+    def _log_val_reconstruction(
+        self, batch, pred_batch, *, wandb_key="val/reconstruction"
+    ):
         """Log up to five stretched, georeferenced reconstructions with no-data masks."""
         if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
             return
@@ -303,10 +327,19 @@ class PixelDiffusionConditional(pl.LightningModule):
                     "sample_label": label,
                 })
         fig = plot_validation_reconstruction_batch(samples)
-        self.logger.experiment.log(
-            {"val/reconstruction": wandb.Image(fig)}, step=self.global_step,
-        )
-        plt.close(fig)
+        # Keep validation media lightweight: cap the longest rendered edge and
+        # use JPEG instead of W&B's lossless PNG default.
+        max_edge_pixels = 1600
+        width_inches, height_inches = fig.get_size_inches()
+        max_dpi = max_edge_pixels / max(width_inches, height_inches)
+        fig.set_dpi(min(float(fig.dpi), max_dpi))
+        try:
+            self.logger.experiment.log(
+                {wandb_key: wandb.Image(fig, file_type="jpg")},
+                step=self.global_step,
+            )
+        finally:
+            plt.close(fig)
 
     @staticmethod
     def _batch_item(value, index):
