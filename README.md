@@ -57,6 +57,8 @@ What is still deliberately minimal:
 
 - `scripts/export_geo_sar_geotiffs.py` creates one-time local GeoTIFF tensors
   from the larger cyclone manifest.
+- `scripts/export_geo_pmw_geotiffs.py` creates a larger proxy pretraining
+  dataset with the same GEO-to-one-band-target tensor shape.
 - `data/dataset.py` reads the exported GeoTIFF manifest, normalizes raw values
   to `[0, 1]`, and returns tensors for training.
 - `data/datamodule.py` is shaped for split-based paired datasets.
@@ -101,6 +103,11 @@ data/geotiff/geo_sar/
     manifest.csv
 ```
 
+The PMW pretraining export uses the same layout under
+`data/geotiff/geo_pmw/`, with generic manifest columns named
+`condition_path` and `target_path`. The SAR manifests keep backward-compatible
+`geo_path` and `sar_path` columns as well.
+
 The exporter stores raw physical values in GeoTIFFs with internal masks and
 metadata tags. The training dataset handles file-format details and min-max
 normalization.
@@ -144,12 +151,22 @@ Export a tiny smoke dataset:
 
 ```bash
 uv run python scripts/export_geo_sar_geotiffs.py --config configs/config.yaml --limit 2
+uv run python scripts/export_geo_pmw_geotiffs.py --config configs/config_pretrain_geo_pmw.yaml --limit 2
 ```
 
-Run training:
+Run PMW proxy pretraining or SAR fine-tuning:
 
 ```bash
+uv run python train.py --config configs/config_pretrain_geo_pmw.yaml
 uv run python train.py --config configs/config.yaml
+```
+
+For full exports on the cluster, submit the CPU PBS scripts instead of running
+long jobs on a login node:
+
+```bash
+qsub run_scripts/export_geo_pmw_geotiffs_cpu.pbs
+qsub run_scripts/export_geo_sar_geotiffs_cpu.pbs
 ```
 
 To avoid online W&B logging:
@@ -167,7 +184,7 @@ export WANDB_DISABLED=true
 ## Baseline Development Checklist
 
 1. Run the GeoTIFF exporter with `--limit 2` and inspect the split manifests.
-2. Verify dataset tensor shapes: GEO `[4, 128, 128]`, SAR `[1, 128, 128]`.
+2. Verify dataset tensor shapes: GEO `[4, 256, 256]`, SAR `[1, 256, 256]`.
 3. Overfit a tiny subset before scaling up.
 4. Compare generated SAR wind fields against targets using image metrics and
    storm-structure diagnostics that matter physically.
