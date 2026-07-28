@@ -36,6 +36,7 @@ from export_geo_sar_geotiffs import (
     DEFAULT_GRID_SIZE,
     DEFAULT_MANIFEST_FILE,
     DEFAULT_SPLITS,
+    ERA5_CHANNELS,
     GEO_CHANNELS,
     GEO_CHANNEL_SET,
     GEO_CHANNEL_SETS,
@@ -47,11 +48,16 @@ from export_geo_sar_geotiffs import (
     _audit_geo_channels,
     _geo_channels_by_sensor,
     _json_list,
+    _load_era5_channels,
     _load_geo_channels,
     _make_grid,
     _nearest_time_index,
+    _nearest_storm_record,
     _optional_float,
+    _optional_isoformat,
+    _optional_observation_id,
     _optional_timestamp,
+    _records_by_storm,
     _regrid,
     _require_channels,
     _safe_text,
@@ -92,6 +98,8 @@ class ExportConfig:
     limit: int | None
     pmw_sensors: tuple[str, ...]
     geo_channel_set: str
+    include_era5: bool
+    era5_channels: tuple[str, ...]
 
 
 def main() -> None:
@@ -165,6 +173,18 @@ def _parse_args() -> ExportConfig:
         help="Named GEO band set to export.",
     )
     parser.add_argument(
+        "--include-era5",
+        action=argparse.BooleanOptionalAction,
+        default=bool(file_config.get("include_era5", False)),
+        help="Append nearest-time ERA5 fields to the GEO condition tensor.",
+    )
+    parser.add_argument(
+        "--era5-channels",
+        nargs="+",
+        default=list(file_config.get("era5_channels", ERA5_CHANNELS)),
+        help="ERA5 rectilinear variables to append when --include-era5 is active.",
+    )
+    parser.add_argument(
         "--center",
         choices=["image_center", "ibtracs_center"],
         default=str(file_config.get("center", "image_center")),
@@ -204,6 +224,8 @@ def _parse_args() -> ExportConfig:
         limit=args.limit,
         pmw_sensors=tuple(args.pmw_sensors),
         geo_channel_set=args.geo_channel_set,
+        include_era5=args.include_era5,
+        era5_channels=tuple(args.era5_channels),
     )
 
 
@@ -222,8 +244,11 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
 
     geo_channels_by_sensor = _geo_channels_by_sensor(config.geo_channel_set)
+    era5_by_storm = {}
     records = _read_manifest(manifest_file, data_root, config.pmw_sensors)
     _audit_geo_channels(records, geo_channels_by_sensor)
+    if config.include_era5:
+        era5_by_storm = _records_by_storm(records, "era5")
     by_split = {split: [] for split in config.splits}
     skipped_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()
@@ -244,9 +269,11 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                 sample = _build_sample(
                     pmw=pmw,
                     geo=geo,
+                    era5=_nearest_storm_record(era5_by_storm, geo) if config.include_era5 else None,
                     grid_size=config.grid_size,
                     grid_resolution=config.grid_resolution,
                     geo_channels_by_sensor=geo_channels_by_sensor,
+                    era5_channels=config.era5_channels,
                     center=config.center,
                     shift_center=config.shift_center,
                     pad=config.pad,
@@ -266,6 +293,7 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
 
             sample_id = _sample_id(pmw, geo)
             geo_path = split_dir / f"{sample_id}_geo.tif"
+            era5_path = split_dir / f"{sample_id}_era5.tif" if sample.get("era5") is not None else None
             pmw_path = split_dir / f"{sample_id}_pmw.tif"
             tags = _metadata_tags(
                 sample_id=sample_id,
@@ -282,6 +310,15 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                 sample["transform"],
                 tags | {"role": "condition", "source_type": "geo"},
             )
+            if era5_path is not None:
+                _write_geotiff(
+                    era5_path,
+                    sample["era5_array"],
+                    sample["era5_mask"],
+                    sample["era5_band_names"],
+                    sample["transform"],
+                    tags | {"role": "context", "source_type": "era5"},
+                )
             _write_geotiff(
                 pmw_path,
                 sample["pmw"],
@@ -292,6 +329,8 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
             )
             if split == "train":
                 _update_stats(train_stats, "geo", sample["geo_channels"], sample["geo"], sample["geo_band_masks"])
+                if sample.get("era5_array") is not None:
+                    _update_stats(train_stats, "era5", sample["era5_band_names"], sample["era5_array"], sample["era5_band_masks"])
                 _update_stats(train_stats, "pmw", sample["pmw_channels"], sample["pmw"], sample["pmw_band_masks"])
 
             row = {
@@ -299,6 +338,8 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                 "split": split,
                 "storm_id": pmw.storm_id,
                 "condition_path": str(geo_path.relative_to(output_root)),
+                "context_path": str(era5_path.relative_to(output_root)) if era5_path is not None else "",
+                "context_source_type": "era5" if era5_path is not None else "",
                 "target_path": str(pmw_path.relative_to(output_root)),
                 "condition_source_type": "geo",
                 "target_source_type": "pmw",
@@ -309,8 +350,10 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                 "condition_sensor": geo.sensor,
                 "target_sensor": pmw.sensor,
                 "condition_channels": json.dumps(sample["geo_channels"]),
+                "context_channels": json.dumps(sample.get("era5_band_names", ())),
                 "target_channels": json.dumps(sample["pmw_channels"]),
                 "geo_path": str(geo_path.relative_to(output_root)),
+                "era5_path": str(era5_path.relative_to(output_root)) if era5_path is not None else "",
                 "pmw_path": str(pmw_path.relative_to(output_root)),
                 "geo_observation_id": geo.observation_id,
                 "pmw_observation_id": pmw.observation_id,
@@ -321,6 +364,9 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                 "pmw_sensor": pmw.sensor,
                 "geo_channels": json.dumps(sample["geo_channels"]),
                 "pmw_channels": json.dumps(sample["pmw_channels"]),
+                "era5_observation_id": _optional_observation_id(sample.get("era5")),
+                "era5_timestamp": _optional_isoformat(sample.get("era5_timestamp")),
+                "era5_channels": json.dumps(sample.get("era5_channels", ())),
                 "grid_size": config.grid_size,
                 "grid_resolution": config.grid_resolution,
                 "center_lat": sample["center_lat"],
@@ -369,13 +415,14 @@ def _read_manifest(
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Manifest is missing columns: {sorted(missing)}")
-    frame = frame[frame["source_type"].isin({"geo", "pmw"})]
+    frame = frame[frame["source_type"].isin({"geo", "pmw", "era5"})]
     pmw_sensors = set(pmw_sensors)
 
     records: list[Observation] = []
     for _, row in frame.iterrows():
         timestamp = _optional_timestamp(row["timestamp"])
-        if timestamp is None:
+        source_type = str(row["source_type"])
+        if timestamp is None and source_type != "era5":
             continue
         path = Path(str(row["path"])).expanduser()
         if not path.is_absolute():
@@ -385,7 +432,7 @@ def _read_manifest(
             observation_id=str(row["observation_id"]),
             storm_id=str(row["storm_id"]).upper(),
             split=str(row["split"]),
-            source_type=str(row["source_type"]),
+            source_type=source_type,
             source=str(row["source"]),
             sensor=str(row["sensor"]),
             path=path,
@@ -444,12 +491,14 @@ def _build_sample(
     *,
     pmw: Observation,
     geo: Observation,
+    era5: Observation | None = None,
     grid_size: int,
     grid_resolution: float,
     center: str,
     shift_center: bool,
     pad: int,
     geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
+    era5_channels: Sequence[str] = ERA5_CHANNELS,
 ) -> dict[str, Any]:
     center_point = _grid_center(pmw, center, shift_center, grid_size, grid_resolution, pad)
     if center_point is None:
@@ -464,6 +513,28 @@ def _build_sample(
     _require_channels("pmw", pmw_channels, pmw_fields)
 
     geo_regridded = [_regrid(*geo_fields[name], grid_lat, grid_lon) for name in geo_channels]
+    era5_timestamp = None
+    era5_array = None
+    era5_masks = None
+    era5_mask = None
+    era5_band_names: tuple[str, ...] = ()
+    if era5 is not None:
+        era5_fields, era5_timestamp = _load_era5_channels(
+            era5,
+            geo.timestamp,
+            era5_channels,
+        )
+        _require_channels("era5", era5_channels, era5_fields)
+        era5_regridded = [
+            _regrid(*era5_fields[name], grid_lat, grid_lon)
+            for name in era5_channels
+        ]
+        era5_array = np.stack([values for values, _ in era5_regridded]).astype(np.float32)
+        era5_masks = np.stack([mask for _, mask in era5_regridded])
+        era5_mask = np.all(era5_masks & np.isfinite(era5_array), axis=0)
+        if not era5_mask.any():
+            raise ValueError("No valid ERA5 pixels after regridding")
+        era5_band_names = tuple(f"era5_{channel}" for channel in era5_channels)
     pmw_regridded = [_regrid(*pmw_fields[name], grid_lat, grid_lon) for name in pmw_channels]
     geo_array = np.stack([values for values, _ in geo_regridded]).astype(np.float32)
     pmw_array = np.stack([values for values, _ in pmw_regridded]).astype(np.float32)
@@ -485,6 +556,13 @@ def _build_sample(
         "geo_band_masks": geo_masks,
         "pmw_band_masks": pmw_masks,
         "geo_channels": tuple(geo_channels),
+        "era5": era5,
+        "era5_array": era5_array,
+        "era5_mask": era5_mask,
+        "era5_band_masks": era5_masks,
+        "era5_band_names": era5_band_names,
+        "era5_timestamp": era5_timestamp,
+        "era5_channels": tuple(era5_channels) if era5 is not None else (),
         "pmw_channels": tuple(pmw_channels),
         "center_lat": center_point[0],
         "center_lon": center_point[1],
@@ -569,6 +647,9 @@ def _metadata_tags(
         "geo_sensor": geo.sensor,
         "pmw_sensor": pmw.sensor,
         "geo_channels": json.dumps(sample["geo_channels"]),
+        "era5_observation_id": _optional_observation_id(sample.get("era5")),
+        "era5_timestamp": _optional_isoformat(sample.get("era5_timestamp")),
+        "era5_channels": json.dumps(sample.get("era5_channels", ())),
         "pmw_channels": json.dumps(sample["pmw_channels"]),
         "center_lat": sample["center_lat"],
         "center_lon": sample["center_lon"],

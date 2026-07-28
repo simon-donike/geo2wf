@@ -133,10 +133,19 @@ variants use separate folders and config files:
 - SAR: `configs/config_geo_sar_10bands.yaml` -> `data/geotiff/geo_sar_10bands`
 - SAR 2-GPU: `configs/config_geo_sar_10bands_2gpu.yaml`
 - GEO/PMW pretraining: `configs/config_pretrain_geo_pmw_10bands.yaml` -> `data/geotiff/geo_pmw_10bands`
+- SAR + ERA5 context: `configs/config_geo_sar_10bands_era5.yaml` -> `data/geotiff/geo_sar_10bands_era5`
+- GEO/PMW + ERA5 context: `configs/config_pretrain_geo_pmw_10bands_era5.yaml` -> `data/geotiff/geo_pmw_10bands_era5`
 
 For 10-band proxy pretraining, only the GEO condition expands to ten bands. PMW
 targets remain a single selected high-frequency brightness-temperature channel,
 matching the SAR target dimensionality.
+
+The ERA5 variants save seven single-level ERA5 fields as a companion
+`*_era5.tif` on the same crop/grid as the GEO image: precipitable water, SST,
+MSLP, 2m temperature, 2m dewpoint, and 10m u/v wind. The dataset loader reads
+that companion file when `context_path` is present and concatenates it with GEO
+at load time. With 10 GEO bands this gives `10 + 7 + 1 mask = 18` model input
+channels and a one-channel target.
 
 The exporter stores raw physical values in GeoTIFFs with internal masks and
 metadata tags. The training dataset handles file-format details and min-max

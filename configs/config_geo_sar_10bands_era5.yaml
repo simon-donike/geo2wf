@@ -1,0 +1,73 @@
+seed: 42
+
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_channels:
+    - precipitable_water
+    - sst
+    - pressure_msl
+    - temperature_2m
+    - dewpoint_2m
+    - u_wind_10m
+    - v_wind_10m
+  splits: [train, val, test]
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+
+data:
+  root: data/geotiff/geo_sar_10bands_era5
+  stats_file: data/geotiff/geo_sar_10bands_era5/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  target_size: [256, 256]
+  random_flips: true
+  include_test_in_train: true
+  loader:
+    batch_size: 4
+    num_workers: 0
+    pin_memory: false
+    persistent_workers: false
+
+model:
+  in_channels: 18  # Ten GEO bands plus seven ERA5 fields plus one valid-pixel mask.
+  out_channels: 1
+  num_timesteps: 1000
+  schedule: linear
+  unet:
+    dim: 48
+    dim_mults: [1, 2, 4, 8]
+    channels: 19  # Eighteen condition channels plus one noisy target channel.
+    out_dim: 1
+
+optimization:
+  lr: 0.0001
+  reduce_lr_on_plateau:
+    factor: 0.5
+    patience: 25
+
+trainer:
+  max_epochs: 100
+  accelerator: auto
+  devices: 1
+  precision: 32
+  log_every_n_steps: 10
+  enable_checkpointing: false
+  limit_val_batches: 50
+
+logging:
+  wandb:
+    enabled: true
+    project: dif_img_rec
+    name: geo-sar-10bands-era5
+    save_dir: logs
+    log_model: false
