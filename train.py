@@ -17,7 +17,7 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 
 import pytorch_lightning as pl
 import yaml
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from data import PairedDataModule
@@ -132,6 +132,7 @@ def main() -> None:
         save_last=False,
         auto_insert_metric_name=False,
     )
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer_kwargs = {
         "max_epochs": trainer_cfg.get("max_epochs", 1),
@@ -144,7 +145,7 @@ def main() -> None:
         "limit_train_batches": trainer_cfg.get("limit_train_batches", 1.0),
         "logger": wandb_logger,
         "default_root_dir": str(run_dir),
-        "callbacks": [checkpoint_callback],
+        "callbacks": [checkpoint_callback, lr_monitor],
     }
     if trainer_cfg.get("strategy") is not None:
         trainer_kwargs["strategy"] = trainer_cfg["strategy"]
