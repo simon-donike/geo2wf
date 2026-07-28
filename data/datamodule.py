@@ -34,6 +34,7 @@ class PairedDataModule(pl.LightningDataModule):
         target_size: tuple[int, int] = (256, 256),
         random_flips: bool = True,
         include_test_in_train: bool = False,
+        require_era5: bool = False,
     ) -> None:
         super().__init__()
         self.root = Path(root).expanduser()
@@ -48,6 +49,7 @@ class PairedDataModule(pl.LightningDataModule):
         self.target_size = target_size
         self.random_flips = random_flips
         self.include_test_in_train = include_test_in_train
+        self.require_era5 = require_era5
         self._include_test_logged = False
 
         self.train_dataset: Optional[Dataset] = None
@@ -58,6 +60,10 @@ class PairedDataModule(pl.LightningDataModule):
     def from_config(cls, config: dict) -> "PairedDataModule":
         data_cfg = config.get("data", {})
         loader_cfg = data_cfg.get("loader", {})
+        require_era5 = data_cfg.get(
+            "require_era5",
+            config.get("export", {}).get("include_era5", False),
+        )
         root = _local_data_root(data_cfg.get("root", "data/geotiff/geo_sar"))
         stats_file = _local_stats_file(root, data_cfg.get("stats_file"))
         return cls(
@@ -73,6 +79,7 @@ class PairedDataModule(pl.LightningDataModule):
             target_size=tuple(data_cfg.get("target_size", [256, 256])),
             random_flips=data_cfg.get("random_flips", True),
             include_test_in_train=data_cfg.get("include_test_in_train", False),
+            require_era5=require_era5,
         )
 
     def prepare_data(self) -> None:
@@ -160,13 +167,23 @@ class PairedDataModule(pl.LightningDataModule):
     def _make_dataset(
         self, split: str, *, augment: bool = False
     ) -> PairedImageDataset:
-        return PairedImageDataset(
+        dataset = PairedImageDataset(
             root=self.root,
             split=split,
             stats_file=self.stats_file,
             target_size=self.target_size,
             augment=augment,
+            require_era5=self.require_era5,
         )
+        if dataset.filtered_missing_era5_count:
+            rank_zero_info(
+                "ERA5 is required: filtered %d of %d samples without ERA5 "
+                "from the %s split.",
+                dataset.filtered_missing_era5_count,
+                dataset.manifest_sample_count,
+                split,
+            )
+        return dataset
 
 
 def _local_data_root(configured_root: str | Path) -> str:

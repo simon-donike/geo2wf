@@ -4,6 +4,7 @@ import inspect
 
 import pandas as pd
 import torch
+from matplotlib import pyplot as plt
 
 from data.dataset import (
     _manifest_ibtracs_center,
@@ -16,7 +17,11 @@ from data.dataset import (
     _row_float,
     _row_value,
 )
-from utils.plotting import IBTRACS_CENTER_COLUMNS, plot_random_geo_sar_pairs
+from utils.plotting import (
+    IBTRACS_CENTER_COLUMNS,
+    plot_random_geo_sar_pairs,
+    plot_validation_reconstruction_batch,
+)
 
 
 def test_resize_target_resizes_values_and_mask_with_expected_modes() -> None:
@@ -126,3 +131,47 @@ def test_random_pair_plot_defaults_to_ibtracs_manifest_columns() -> None:
     ].default
 
     assert default == IBTRACS_CENTER_COLUMNS
+
+
+def test_validation_plot_adds_era5_wind_map_only_when_available() -> None:
+    base_sample = {
+        "condition": torch.stack(
+            [
+                torch.full((4, 4), 0.2),
+                torch.full((4, 4), 0.4),
+                torch.full((4, 4), 0.6),
+            ]
+        ),
+        "prediction": torch.full((1, 4, 4), 0.3),
+        "target": torch.full((1, 4, 4), 0.5),
+        "condition_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "condition_channels": ["CMI_C13", "CMI_C14", "CMI_C08"],
+        "condition_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "target_bounds": [-1.0, 1.0, -1.0, 1.0],
+        "center": (0.5, -0.5),
+    }
+
+    without_era = plot_validation_reconstruction_batch([base_sample])
+    without_titles = [axis.get_title() for axis in without_era.axes]
+    assert "ERA5 10 m wind speed" not in without_titles
+
+    with_era_sample = dict(base_sample)
+    with_era_sample["condition"] = torch.cat(
+        [base_sample["condition"], torch.full((1, 4, 4), 0.5)]
+    )
+    with_era_sample["condition_channels"] = [
+        *base_sample["condition_channels"],
+        "era5_wind_speed_10m",
+    ]
+    with_era = plot_validation_reconstruction_batch([with_era_sample])
+    axes_by_title = {axis.get_title(): axis for axis in with_era.axes}
+    wind_axis = axes_by_title["ERA5 10 m wind speed"]
+
+    assert float(wind_axis.images[-1].get_array().mean()) == 42.5
+    assert any(
+        collection.get_label() == "IBTrACS center"
+        for collection in wind_axis.collections
+    )
+    plt.close(without_era)
+    plt.close(with_era)

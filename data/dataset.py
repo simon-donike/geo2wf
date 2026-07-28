@@ -34,6 +34,7 @@ class PairedImageDataset(Dataset):
         stats_file: str | Path | None = None,
         target_size: tuple[int, int] = (256, 256),
         augment: bool = False,
+        require_era5: bool = False,
     ) -> None:
         self.root = Path(root).expanduser()
         self.split = split
@@ -43,6 +44,15 @@ class PairedImageDataset(Dataset):
                 f"GeoTIFF manifest does not exist: {self.manifest_file}"
             )
         self.samples = pd.read_csv(self.manifest_file, keep_default_na=False)
+        self.manifest_sample_count = len(self.samples)
+        self.require_era5 = require_era5
+        if self.require_era5:
+            self.samples = self.samples.loc[
+                _manifest_has_era5(self.samples)
+            ].reset_index(drop=True)
+        self.filtered_missing_era5_count = (
+            self.manifest_sample_count - len(self.samples)
+        )
         self.stats_file = (
             Path(stats_file).expanduser()
             if stats_file is not None
@@ -323,3 +333,21 @@ def _row_float(row: pd.Series, column: str) -> float:
         return np.nan
     value = float(row[column])
     return value if np.isfinite(value) else np.nan
+
+
+def _manifest_has_era5(samples: pd.DataFrame) -> pd.Series:
+    """Return rows with an ERA5 path, including legacy manifest layouts."""
+    has_context = pd.Series(False, index=samples.index)
+    if "context_path" in samples.columns:
+        has_context = samples["context_path"].astype(str).str.strip().ne("")
+        if "context_source_type" in samples.columns:
+            has_context &= (
+                samples["context_source_type"]
+                .astype(str)
+                .str.strip()
+                .str.casefold()
+                .eq("era5")
+            )
+    if "era5_path" in samples.columns:
+        has_context |= samples["era5_path"].astype(str).str.strip().ne("")
+    return has_context
