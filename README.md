@@ -187,6 +187,13 @@ Create the local UV environment:
 uv sync
 ```
 
+Run the test suite through UV:
+
+```bash
+uv sync --group dev
+uv run python -m pytest
+```
+
 Export a tiny smoke dataset:
 
 ```bash

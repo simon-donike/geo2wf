@@ -94,10 +94,11 @@ class GaussianForwardProcess(ForwardModel):
         """
         assert (t<self.num_timesteps).all()
         
-        mean=self.alphas_sqrt[t]*x_t
-        std=self.betas_sqrt[t]
+        b=x_t.shape[0]
+        mean=self.alphas_sqrt[t].view(b,1,1,1)*x_t
+        std=self.betas_sqrt[t].view(b,1,1,1)
         
-        noise=torch.randn_like(x_0)
+        noise=torch.randn_like(x_t)
         output=mean+std*noise        
         
         if not return_noise:

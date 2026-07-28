@@ -55,7 +55,7 @@ class DDIM_Sampler(nn.Module):
         # parameters        
         alpha_cumprod_prev = self.alphas_cumprod[t_prev].where(t_prev.ge(0), self.final_alpha_cumprod.to(device)) # >= 0
         alpha_cumprod_prev = alpha_cumprod_prev.view(b,1,1,1)
-        alpha_cumprod_prev_sqrt = self.alphas_cumprod_prev_sqrt[t_prev]
+        alpha_cumprod_prev_sqrt = alpha_cumprod_prev.sqrt()
         
         # estimate origin
         x_0_pred=self.estimate_origin(x_t,t,z_t)
@@ -67,8 +67,8 @@ class DDIM_Sampler(nn.Module):
         prev_sample=alpha_cumprod_prev_sqrt*x_0_pred + x_0_grad
 
         if eta > 0:          
-            noise = torch.randn(model_output.shape, dtype=model_output.dtype)                    
-            prev_sample = prev_sample+std_dev_t*eta*noise
+            noise = torch.randn_like(z_t)                    
+            prev_sample = prev_sample+std_dev_t*noise
 
         return prev_sample
     
@@ -83,6 +83,7 @@ class DDIM_Sampler(nn.Module):
         return var.sqrt()
     
     def estimate_origin(self,x_t,t,z_t):
+        b=x_t.shape[0]
         alpha_cumprod = self.alphas_cumprod[t].view(b,1,1,1)
-        alpha_one_minus_cumprod_sqrt=alphas_one_minus_cumprod_sqrt[t]
+        alpha_one_minus_cumprod_sqrt=self.alphas_one_minus_cumprod_sqrt[t].view(b,1,1,1)
         return(x_t-alpha_one_minus_cumprod_sqrt*z_t)/alpha_cumprod.sqrt()

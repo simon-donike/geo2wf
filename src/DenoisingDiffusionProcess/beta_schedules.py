@@ -14,7 +14,7 @@ def get_beta_schedule(variant, timesteps):
     elif variant=='sigmoid':
         return sigmoid_beta_schedule(timesteps)
     else:
-        raise NotImplemented
+        raise NotImplementedError(f"Unknown beta schedule: {variant}")
 
 def cosine_beta_schedule(timesteps, s=0.008):
     """
