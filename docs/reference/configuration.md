@@ -65,6 +65,17 @@
 | `sparse_target.fill` | `era5` or disabled |
 | `sparse_target.unobserved_loss_weight` | weak ERA5 completion weight in `[0,1]` |
 
+## Residual diffusion `model`
+
+| Key | Purpose |
+|---|---|
+| `type: diffusion_residual` | diffuse a signed physical correction around a dense baseline |
+| `residual.baseline.source` | `era5` or `deterministic` |
+| `residual.baseline.checkpoint_path` | frozen deterministic checkpoint; may instead use `GEO2WF_BASELINE_CKPT` |
+| `residual.soft_scale_ms`, `clip_ms` | odd asinh residual transform parameters |
+| `residual.prediction_min_ms`, `prediction_max_ms` | recomposed physical output bounds |
+| `unet.channels` | noisy residual + prepared condition + explicit baseline and mask |
+
 ## Residual `model`
 
 | Key | Purpose |

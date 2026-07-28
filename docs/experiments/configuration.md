@@ -31,6 +31,18 @@ This is the most important invariant to preserve.
         out_dim: 1
     ```
 
+=== "Residual diffusion"
+
+    ```yaml
+    model:
+      type: diffusion_residual
+      in_channels: 20       # existing prepared condition
+      out_channels: 1
+      unet:
+        channels: 23        # noisy residual + condition + baseline + mask
+        out_dim: 1
+    ```
+
 === "Residual"
 
     ```yaml
