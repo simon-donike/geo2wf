@@ -74,6 +74,7 @@ nav:
   - Models:
       - Model overview: models/index.md
       - Conditional diffusion: models/conditional-diffusion.md
+      - Residual diffusion: models/residual-diffusion.md
       - ERA5 residual baseline: models/era5-residual.md
       - Sampling: models/sampling.md
   - Experiments:

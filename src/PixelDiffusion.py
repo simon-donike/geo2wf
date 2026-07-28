@@ -165,13 +165,13 @@ class PixelDiffusionConditional(pl.LightningModule):
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""
         input, output, target_mask = self._unpack_batch(batch)
-        diffusion_target, loss_weight = self._prepare_diffusion_target(
-            output, target_mask, batch
+        model_target, condition, loss_weight = self._prepare_training_inputs(
+            input, output, target_mask, batch
         )
         batch_size = int(output.shape[0])
         loss = self.model.p_loss(
-            self.input_T(diffusion_target),
-            self._prepare_condition(input, batch),
+            model_target,
+            condition,
             mask=loss_weight,
         )
         
@@ -283,13 +283,13 @@ class PixelDiffusionConditional(pl.LightningModule):
                 )
             return None
         input, output, target_mask = self._unpack_batch(batch)
-        diffusion_target, loss_weight = self._prepare_diffusion_target(
-            output, target_mask, batch
+        model_target, condition, loss_weight = self._prepare_training_inputs(
+            input, output, target_mask, batch
         )
         batch_size = int(output.shape[0])
         loss = self.model.p_loss(
-            self.input_T(diffusion_target),
-            self._prepare_condition(input, batch),
+            model_target,
+            condition,
             mask=loss_weight,
         )
         
@@ -373,13 +373,13 @@ class PixelDiffusionConditional(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         """Evaluate held-out reconstructions on observed target pixels only."""
         input, output, target_mask = self._unpack_batch(batch)
-        diffusion_target, loss_weight = self._prepare_diffusion_target(
-            output, target_mask, batch
+        model_target, condition, loss_weight = self._prepare_training_inputs(
+            input, output, target_mask, batch
         )
         batch_size = int(output.shape[0])
         loss = self.model.p_loss(
-            self.input_T(diffusion_target),
-            self._prepare_condition(input, batch),
+            model_target,
+            condition,
             mask=loss_weight,
         )
         self.log(
@@ -435,6 +435,7 @@ class PixelDiffusionConditional(pl.LightningModule):
     @torch.no_grad()
     def _predict_batch(self, batch, batch_idx, dataloader_idx=0):
         """Sample one reproducible reconstruction for each batch item."""
+        batch = self._prepare_batch_context(batch)
         input, _, _ = self._unpack_batch(batch)
         condition = self._prepare_condition(input, batch)
         process = (
@@ -450,7 +451,39 @@ class PixelDiffusionConditional(pl.LightningModule):
             condition,
         )
         raw_prediction = process(condition, initial_noise=initial_noise)
-        return raw_prediction, self.output_T(raw_prediction)
+        return raw_prediction, self._sample_to_prediction(raw_prediction, batch)
+
+    def _prepare_training_inputs(
+        self,
+        condition,
+        target,
+        target_mask,
+        batch,
+    ):
+        """Prepare a model-space target and condition for one loss call."""
+        batch = self._prepare_batch_context(batch)
+        diffusion_target, loss_weight = self._prepare_diffusion_target(
+            target, target_mask, batch
+        )
+        return (
+            self._target_to_model_space(diffusion_target, batch),
+            self._prepare_condition(condition, batch),
+            loss_weight,
+        )
+
+    def _prepare_batch_context(self, batch):
+        """Hook for task variants that need a shared dense baseline."""
+        return batch
+
+    def _target_to_model_space(self, target, batch):
+        """Map an absolute normalized target to diffusion's [-1, 1] space."""
+        del batch
+        return self.input_T(target)
+
+    def _sample_to_prediction(self, sample, batch):
+        """Map a raw diffusion sample to an absolute normalized prediction."""
+        del batch
+        return self.output_T(sample)
 
     def _fixed_initial_noise(
         self,

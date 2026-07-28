@@ -23,6 +23,10 @@ from pytorch_lightning.loggers import WandbLogger
 
 from data import PairedDataModule
 from src.ERA5Residual import ERA5ResidualRegressor
+from src.ERA5ResidualDiffusion import (
+    ERA5ResidualDiffusion,
+    load_frozen_deterministic_baseline,
+)
 from src.PixelDiffusion import PixelDiffusionConditional
 
 
@@ -56,7 +60,7 @@ def build_model(config: dict) -> pl.LightningModule:
     validation_cfg = config.get("validation", {})
     model_type = str(model_cfg.get("type", "diffusion")).lower()
 
-    if model_type == "diffusion":
+    if model_type in {"diffusion", "diffusion_residual"}:
         unet_cfg = model_cfg.get("unet", {})
         sampling_cfg = model_cfg.get("sampling", {})
         sparse_cfg = model_cfg.get("sparse_target", {})
@@ -66,38 +70,70 @@ def build_model(config: dict) -> pl.LightningModule:
             if ema_cfg.get("enabled", False)
             else None
         )
-        return PixelDiffusionConditional(
-            condition_channels=model_cfg.get("in_channels", 2),
-            generated_channels=model_cfg.get("out_channels", 2),
-            num_timesteps=model_cfg.get("num_timesteps", 1000),
-            schedule=model_cfg.get("schedule", "linear"),
-            model_dim=unet_cfg.get("dim", 64),
-            model_dim_mults=tuple(unet_cfg.get("dim_mults", [1, 2, 4, 8])),
-            model_channels=unet_cfg.get("channels"),
-            model_out_dim=unet_cfg.get("out_dim"),
-            lr=opt_cfg.get("lr", 1e-3),
-            lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
-            lr_scheduler_patience=lr_sched_cfg.get("patience", 25),
-            lr_scheduler_monitor=lr_sched_cfg.get(
+        diffusion_kwargs = {
+            "generated_channels": model_cfg.get("out_channels", 2),
+            "num_timesteps": model_cfg.get("num_timesteps", 1000),
+            "schedule": model_cfg.get("schedule", "linear"),
+            "model_dim": unet_cfg.get("dim", 64),
+            "model_dim_mults": tuple(
+                unet_cfg.get("dim_mults", [1, 2, 4, 8])
+            ),
+            "model_channels": unet_cfg.get("channels"),
+            "model_out_dim": unet_cfg.get("out_dim"),
+            "lr": opt_cfg.get("lr", 1e-3),
+            "lr_scheduler_factor": lr_sched_cfg.get("factor", 0.5),
+            "lr_scheduler_patience": lr_sched_cfg.get("patience", 25),
+            "lr_scheduler_monitor": lr_sched_cfg.get(
                 "monitor", "val/eye_structure_score"
             ),
-            sampling_method=sampling_cfg.get("method", "ddpm"),
-            sampling_timesteps=sampling_cfg.get("timesteps"),
-            sampling_eta=sampling_cfg.get("eta", 0.0),
-            clip_sample=sampling_cfg.get("clip_sample", True),
-            sparse_target_fill=sparse_cfg.get("fill"),
-            unobserved_loss_weight=sparse_cfg.get(
+            "sampling_method": sampling_cfg.get("method", "ddpm"),
+            "sampling_timesteps": sampling_cfg.get("timesteps"),
+            "sampling_eta": sampling_cfg.get("eta", 0.0),
+            "clip_sample": sampling_cfg.get("clip_sample", True),
+            "sparse_target_fill": sparse_cfg.get("fill"),
+            "unobserved_loss_weight": sparse_cfg.get(
                 "unobserved_loss_weight", 0.0
             ),
-            validation_reconstruction_batches=validation_cfg.get(
+            "validation_reconstruction_batches": validation_cfg.get(
                 "reconstruction_batches", 1
             ),
-            validation_seed=validation_cfg.get(
+            "validation_seed": validation_cfg.get(
                 "sampling_seed", config.get("seed", 42)
             ),
-            ema_decay=ema_decay,
-            ema_update_after_step=ema_cfg.get("update_after_step", 0),
-            ema_use_for_eval=ema_cfg.get("use_for_eval", True),
+            "ema_decay": ema_decay,
+            "ema_update_after_step": ema_cfg.get("update_after_step", 0),
+            "ema_use_for_eval": ema_cfg.get("use_for_eval", True),
+        }
+        if model_type == "diffusion":
+            return PixelDiffusionConditional(
+                condition_channels=model_cfg.get("in_channels", 2),
+                **diffusion_kwargs,
+            )
+
+        residual_cfg = model_cfg.get("residual", {})
+        baseline_cfg = residual_cfg.get("baseline", {})
+        baseline_source = str(baseline_cfg.get("source", "era5")).lower()
+        baseline_model = None
+        if baseline_source == "deterministic":
+            checkpoint_path = baseline_cfg.get("checkpoint_path") or os.environ.get(
+                "GEO2WF_BASELINE_CKPT"
+            )
+            if not checkpoint_path:
+                raise ValueError(
+                    "diffusion_residual with a deterministic baseline requires "
+                    "model.residual.baseline.checkpoint_path or the "
+                    "GEO2WF_BASELINE_CKPT environment variable"
+                )
+            baseline_model = load_frozen_deterministic_baseline(checkpoint_path)
+        return ERA5ResidualDiffusion(
+            base_condition_channels=model_cfg.get("in_channels", 20),
+            baseline_source=baseline_source,
+            baseline_model=baseline_model,
+            residual_soft_scale_ms=residual_cfg.get("soft_scale_ms", 5.0),
+            residual_clip_ms=residual_cfg.get("clip_ms", 80.0),
+            prediction_min_ms=residual_cfg.get("prediction_min_ms", 0.0),
+            prediction_max_ms=residual_cfg.get("prediction_max_ms", 80.0),
+            **diffusion_kwargs,
         )
 
     if model_type == "deterministic_residual":
@@ -135,8 +171,8 @@ def build_model(config: dict) -> pl.LightningModule:
         )
 
     raise ValueError(
-        f"Unsupported model.type {model_type!r}; expected "
-        "'diffusion' or 'deterministic_residual'"
+        f"Unsupported model.type {model_type!r}; expected 'diffusion', "
+        "'diffusion_residual', or 'deterministic_residual'"
     )
 
 
