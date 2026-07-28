@@ -27,7 +27,8 @@ multi-temporal windows, masking policies, and full tropical-cyclone metadata.
 Each row shows one random GEO-SAR training pair from the exported GeoTIFF
 dataset. The left panel is a geostationary false-color RGB composite using two
 IR bands as red/green and water vapor as blue, the middle panel is the paired
-SAR wind-speed target, and the red `x` marks the storm center used for the crop.
+SAR wind-speed target, and the red `x` marks the IBTrACS storm center recorded
+in the manifest.
 The right panel places the GEO and SAR footprints on a simple ocean/land mask,
 making the core problem visible: learn a SAR-like wind field from a colocated
 geostationary view of the same tropical cyclone.
