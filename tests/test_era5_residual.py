@@ -134,6 +134,27 @@ def test_validation_statistics_cover_all_calls_in_physical_units() -> None:
     assert statistics[5] == 16  # zero-init model and ERA5 are identical
 
 
+def test_validation_logs_physical_reconstructions_for_val_and_train() -> None:
+    model = _model(validation_reconstruction_batches=1)
+    batch = _batch(batch_size=1, height=2, width=2)
+
+    with patch("src.ERA5Residual.log_wandb_reconstruction") as log_images:
+        model.validation_step(batch, 0, 0)
+        model.validation_step(batch, 1, 0)
+        model.validation_step(batch, 0, 1)
+
+    assert log_images.call_count == 2
+    val_call, train_call = log_images.call_args_list
+    assert val_call.args[:2] == (model, batch)
+    assert torch.equal(val_call.args[2], batch["era5_wind_speed_physical"])
+    assert val_call.kwargs["wandb_key"] == "images/val_reconstruction"
+    assert val_call.kwargs["target_batch"] is batch["target_physical"]
+    assert train_call.args[:2] == (model, batch)
+    assert torch.equal(train_call.args[2], batch["era5_wind_speed_physical"])
+    assert train_call.kwargs["wandb_key"] == "images/train_reconstruction"
+    assert train_call.kwargs["target_batch"] is batch["target_physical"]
+
+
 def test_train_builder_selects_residual_model_and_eye_checkpoint_metric() -> None:
     config = {
         "model": {
@@ -145,6 +166,7 @@ def test_train_builder_selects_residual_model_and_eye_checkpoint_metric() -> Non
             },
         },
         "optimization": {"off_swath_anchor_weight": 0.02},
+        "validation": {"reconstruction_batches": 2},
     }
 
     model = build_model(config)
@@ -152,6 +174,7 @@ def test_train_builder_selects_residual_model_and_eye_checkpoint_metric() -> Non
     assert isinstance(model, ERA5ResidualRegressor)
     assert model.checkpoint_monitor == "val/eye_structure_score"
     assert model.off_swath_anchor_weight == pytest.approx(0.02)
+    assert model.validation_reconstruction_batches == 2
     scheduler_config = model.configure_optimizers()["lr_scheduler"]
     assert scheduler_config["monitor"] == "val/eye_structure_score"
 

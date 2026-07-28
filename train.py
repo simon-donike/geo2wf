@@ -53,13 +53,13 @@ def build_model(config: dict) -> pl.LightningModule:
     model_cfg = config.get("model", {})
     opt_cfg = config.get("optimization", {})
     lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
+    validation_cfg = config.get("validation", {})
     model_type = str(model_cfg.get("type", "diffusion")).lower()
 
     if model_type == "diffusion":
         unet_cfg = model_cfg.get("unet", {})
         sampling_cfg = model_cfg.get("sampling", {})
         sparse_cfg = model_cfg.get("sparse_target", {})
-        validation_cfg = config.get("validation", {})
         ema_cfg = opt_cfg.get("ema", {})
         ema_decay = (
             ema_cfg.get("decay", 0.999)
@@ -129,6 +129,9 @@ def build_model(config: dict) -> pl.LightningModule:
             weight_decay=opt_cfg.get("weight_decay", 1e-4),
             lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
             lr_scheduler_patience=lr_sched_cfg.get("patience", 10),
+            validation_reconstruction_batches=validation_cfg.get(
+                "reconstruction_batches", 1
+            ),
         )
 
     raise ValueError(
