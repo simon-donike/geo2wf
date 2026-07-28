@@ -111,7 +111,7 @@ field is represented in physical units or z-scores, update
 Exported real-data layout:
 
 ```text
-data/geotiff/geo_sar/
+data/geotiff/geo_sar_10bands/
   stats.json
   train/
     manifest.csv
@@ -124,7 +124,7 @@ data/geotiff/geo_sar/
 ```
 
 The PMW pretraining export uses the same layout under
-`data/geotiff/geo_pmw/`, with generic manifest columns named
+`data/geotiff/geo_pmw_10bands/`, with generic manifest columns named
 `condition_path` and `target_path`. The SAR manifests keep backward-compatible
 `geo_path` and `sar_path` columns as well.
 
@@ -140,10 +140,10 @@ Important channel settings:
 
 ```yaml
 model:
-  in_channels: 5
+  in_channels: 11
   out_channels: 1
   unet:
-    channels: 6
+    channels: 12
     out_dim: 1
 ```
 

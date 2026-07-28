@@ -42,14 +42,16 @@ DEFAULT_DATA_ROOT = Path(
 DEFAULT_MANIFEST_FILE = (
     DEFAULT_DATA_ROOT / "index-files" / "observation_manifest_v5.csv"
 )
-DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/geo_sar"))
+DEFAULT_OUTPUT_ROOT = Path(
+    os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/geo_sar_10bands")
+)
 DEFAULT_GRID_SIZE = 256
 DEFAULT_GRID_RESOLUTION = 0.027
 DEFAULT_CLOSEST_MATCH_HOURS = 0.5
 DEFAULT_SPLITS = ("train", "val", "test")
 GEO_CHANNELS = {
-    "ABI": ("CMI_C08", "CMI_C09", "CMI_C13", "CMI_C14"),
-    "AHI": ("B08", "B09", "B13", "B14"),
+    "ABI": tuple(f"CMI_C{index:02d}" for index in range(7, 17)),
+    "AHI": tuple(f"B{index:02d}" for index in range(7, 17)),
 }
 SAR_CHANNELS = ("wind_speed",)
 
@@ -254,6 +256,7 @@ def export_geo_sar_geotiffs(
     output_root.mkdir(parents=True, exist_ok=True)
 
     records = _read_manifest(manifest_file, data_root)
+    _audit_geo_channels(records)
     by_split = {split: [] for split in splits}
     no_match_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()
@@ -454,6 +457,49 @@ def _pair_sar_to_geo(
             if abs(dt_minutes) <= max_minutes:
                 pairs.append((sar, geo, dt_minutes))
     return pairs
+
+
+def _audit_geo_channels(records: Sequence[Observation]) -> None:
+    missing: dict[tuple[str, str], list[str]] = defaultdict(list)
+    checked_files: set[str] = set()
+    for record in records:
+        if record.source_type != "geo" or record.sensor not in GEO_CHANNELS:
+            continue
+        requested = set(GEO_CHANNELS[record.sensor])
+        available = set(record.variables)
+        if not requested & available:
+            if record.sensor in checked_files:
+                continue
+            available = _geo_dataset_channels(record)
+            checked_files.add(record.sensor)
+        for channel in GEO_CHANNELS[record.sensor]:
+            if channel not in available:
+                missing[(record.sensor, channel)].append(record.observation_id)
+    if not missing:
+        return
+
+    lines = ["GEO manifest is missing required common ABI/AHI channels:"]
+    for (sensor, channel), observation_ids in sorted(missing.items()):
+        examples = ", ".join(observation_ids[:5])
+        suffix = "..." if len(observation_ids) > 5 else ""
+        lines.append(
+            f"- {sensor} {channel}: {len(observation_ids)} observations "
+            f"(examples: {examples}{suffix})"
+        )
+    raise ValueError("\n".join(lines))
+
+
+def _geo_dataset_channels(record: Observation) -> set[str]:
+    try:
+        with xr.open_dataset(record.path, engine="h5netcdf") as dataset:
+            if "data" in dataset and "channel" in dataset["data"].dims:
+                return {str(value) for value in dataset["data"]["channel"].values}
+            return {str(name) for name in dataset.data_vars}
+    except OSError as error:
+        raise ValueError(
+            f"Could not inspect GEO channels for {record.observation_id} "
+            f"at {record.path}: {error}"
+        ) from error
 
 
 def _nearest_time_index(
