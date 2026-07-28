@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
+IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
 
 EARTH_RADIUS_M = 6_371_000.0
 ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
@@ -125,7 +126,7 @@ class PairedImageDataset(Dataset):
             "target_mask": target_mask,
             "condition_bounds": condition_bounds,
             "target_bounds": target_bounds,
-            "center": torch.tensor([_row_float(row, "center_lat"), _row_float(row, "center_lon")], dtype=torch.float64),
+            "center": _manifest_ibtracs_center(row),
             "sample_id": str(row["sample_id"]),
             "meta": {
                 "storm_id": str(row["storm_id"]),
@@ -307,6 +308,14 @@ def _row_value(row: pd.Series, primary: str, fallback: Any = "") -> str:
     if primary in row.index and str(row[primary]).strip():
         return str(row[primary])
     return str(fallback)
+
+
+def _manifest_ibtracs_center(row: pd.Series) -> torch.Tensor:
+    """Read the IBTrACS storm center from an exported manifest row."""
+    return torch.tensor(
+        [_row_float(row, column) for column in IBTRACS_CENTER_COLUMNS],
+        dtype=torch.float64,
+    )
 
 
 def _row_float(row: pd.Series, column: str) -> float:

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import inspect
+
 import pandas as pd
 import torch
 
 from data.dataset import (
+    _manifest_ibtracs_center,
     _append_era5_derived_channels,
     _cell_centers,
     _json_list,
@@ -13,6 +16,7 @@ from data.dataset import (
     _row_float,
     _row_value,
 )
+from utils.plotting import IBTRACS_CENTER_COLUMNS, plot_random_geo_sar_pairs
 
 
 def test_resize_target_resizes_values_and_mask_with_expected_modes() -> None:
@@ -99,3 +103,26 @@ def test_row_helpers_handle_primary_fallback_and_missing_floats() -> None:
     assert _row_float(row, "finite") == 3.5
     assert torch.isnan(torch.tensor(_row_float(row, "missing")))
     assert torch.isnan(torch.tensor(_row_float(row, "not_finite")))
+
+
+def test_manifest_ibtracs_center_ignores_image_center_columns() -> None:
+    row = pd.Series(
+        {
+            "center_lat": "10.0",
+            "center_lon": "20.0",
+            "ibtracs_center_lat": "11.5",
+            "ibtracs_center_lon": "22.5",
+        }
+    )
+
+    center = _manifest_ibtracs_center(row)
+
+    assert torch.equal(center, torch.tensor([11.5, 22.5], dtype=torch.float64))
+
+
+def test_random_pair_plot_defaults_to_ibtracs_manifest_columns() -> None:
+    default = inspect.signature(plot_random_geo_sar_pairs).parameters[
+        "center_columns"
+    ].default
+
+    assert default == IBTRACS_CENTER_COLUMNS
