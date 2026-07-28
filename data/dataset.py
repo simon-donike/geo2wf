@@ -57,19 +57,39 @@ class PairedImageDataset(Dataset):
         )
         condition_path = _row_value(row, "condition_path", row.get("geo_path"))
         target_path = _row_value(row, "target_path", row.get("sar_path"))
+        context_path = _row_value(row, "context_path", row.get("era5_path", ""))
+        context_source_type = _row_value(row, "context_source_type", "")
+        context_channels = _json_list(
+            _row_value(row, "context_channels", "[]")
+        )
 
         condition, condition_mask, condition_bounds = _read_geotiff(
             self.root / condition_path,
             reject_all_zero_fill=True,
         )
+        context = None
+        context_mask = None
+        if context_path:
+            context, context_mask, _ = _read_geotiff(self.root / context_path)
         target, target_mask, target_bounds = _read_geotiff(self.root / target_path)
         condition = _normalize(
             condition, condition_source_type, condition_channels, self.stats
         )
+        if context is not None:
+            context = _normalize(
+                context, context_source_type, context_channels, self.stats
+            )
         target = _normalize(target, target_source_type, target_channels, self.stats)
         condition = torch.nan_to_num(condition, nan=0.0)
+        if context is not None:
+            context = torch.nan_to_num(context, nan=0.0)
         target = torch.nan_to_num(target, nan=0.0)
         condition = condition * condition_mask.to(condition.dtype)
+        if context is not None and context_mask is not None:
+            context = context * context_mask.to(context.dtype)
+            condition = torch.cat([condition, context], dim=0)
+            condition_mask = condition_mask & context_mask
+            condition_channels = condition_channels + context_channels
         target = target * target_mask.to(target.dtype)
         target, target_mask = _resize_target(target, target_mask, self.target_size)
         if self.augment:
@@ -97,6 +117,8 @@ class PairedImageDataset(Dataset):
                 ),
                 "dt_minutes": float(row["dt_minutes"]),
                 "condition_channels": condition_channels,
+                "context_source_type": context_source_type,
+                "context_channels": context_channels,
                 "target_channels": target_channels,
             },
         }
