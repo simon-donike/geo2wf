@@ -66,13 +66,17 @@ class PixelDiffusionConditional(pl.LightningModule):
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""
         input, output, target_mask = self._unpack_batch(batch)
+        batch_size = int(output.shape[0])
         loss = self.model.p_loss(
             self.input_T(output),
             self._prepare_condition(input, batch),
             mask=target_mask,
         )
         
-        self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log(
+            'train/loss', loss, on_step=True, on_epoch=True, prog_bar=True,
+            logger=True, sync_dist=True, batch_size=batch_size
+        )
         
         return loss
 
@@ -112,6 +116,7 @@ class PixelDiffusionConditional(pl.LightningModule):
                 )
             return None
         input, output, target_mask = self._unpack_batch(batch)
+        batch_size = int(output.shape[0])
         loss = self.model.p_loss(
             self.input_T(output),
             self._prepare_condition(input, batch),
@@ -120,7 +125,8 @@ class PixelDiffusionConditional(pl.LightningModule):
         
         self.log(
             'val/loss', loss, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, add_dataloader_idx=False
+            logger=True, sync_dist=True, add_dataloader_idx=False,
+            batch_size=batch_size
         )
 
         if batch_idx == 0:
@@ -130,15 +136,18 @@ class PixelDiffusionConditional(pl.LightningModule):
             )
             self.log(
                 'val/psnr', psnr, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+                prog_bar=True, logger=True, sync_dist=True,
+                add_dataloader_idx=False, batch_size=batch_size
             )
             self.log(
                 'val/ssim', ssim, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+                prog_bar=True, logger=True, sync_dist=True,
+                add_dataloader_idx=False, batch_size=batch_size
             )
             self.log(
                 'val/l1', l1, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True, add_dataloader_idx=False
+                prog_bar=True, logger=True, sync_dist=True,
+                add_dataloader_idx=False, batch_size=batch_size
             )
             self._log_val_reconstruction(
                 batch, pred_batch, wandb_key="images/val_reconstruction"
@@ -149,20 +158,33 @@ class PixelDiffusionConditional(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         """Evaluate held-out reconstructions on observed target pixels only."""
         input, output, target_mask = self._unpack_batch(batch)
+        batch_size = int(output.shape[0])
         loss = self.model.p_loss(
             self.input_T(output),
             self._prepare_condition(input, batch),
             mask=target_mask,
         )
-        self.log('test/loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(
+            'test/loss', loss, on_step=False, on_epoch=True, prog_bar=True,
+            logger=True, batch_size=batch_size
+        )
 
         pred_batch = self.predict_step(batch, batch_idx)
         psnr, ssim, l1 = self._compute_reconstruction_metrics(
             pred_batch, output, target_mask
         )
-        self.log('test/psnr', psnr, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('test/ssim', ssim, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('test/l1', l1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(
+            'test/psnr', psnr, on_step=False, on_epoch=True, prog_bar=True,
+            logger=True, batch_size=batch_size
+        )
+        self.log(
+            'test/ssim', ssim, on_step=False, on_epoch=True, prog_bar=True,
+            logger=True, batch_size=batch_size
+        )
+        self.log(
+            'test/l1', l1, on_step=False, on_epoch=True, prog_bar=True,
+            logger=True, batch_size=batch_size
+        )
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):

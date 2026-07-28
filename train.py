@@ -16,6 +16,7 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 
 import pytorch_lightning as pl
+import torch
 import yaml
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -64,6 +65,11 @@ def main() -> None:
 
     config = load_config(args.config)
     trainer_cfg = config.get("trainer", {})
+    # Ampere and newer NVIDIA GPUs can accelerate float32 matrix products with
+    # Tensor Cores. "high" retains more mantissa accuracy than "medium".
+    torch.set_float32_matmul_precision(
+        trainer_cfg.get("float32_matmul_precision", "high")
+    )
     run_dir = create_run_directory(
         args.config, trainer_cfg.get("default_root_dir", "logs")
     )
