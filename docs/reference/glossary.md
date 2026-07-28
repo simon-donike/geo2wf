@@ -27,6 +27,12 @@ GeoTIFF
 IBTrACS
 : International Best Track Archive for Climate Stewardship. Its storm center anchors radial evaluation.
 
+Eye-center displacement
+: Post-hoc distance in kilometres between the lowest eligible smoothed wind
+  value in the reconstructed field and the corresponding minimum in the
+  observed SAR field. IBTrACS constrains the search but is not itself either
+  endpoint of the reported distance.
+
 Inner core
 : The region within 100 km of the configured storm center in current metrics.
 
