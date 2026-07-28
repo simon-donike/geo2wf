@@ -3,7 +3,8 @@ seed: 42  # Global random seed for reproducibility across dataloading and model 
 export:
   data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
   manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
-  output_root: data/geotiff/geo_sar_10bands
+  output_root: data/geotiff/geo_sar
+  geo_channel_set: common4
   splits: [train, val, test]
   grid_size: 256
   grid_resolution: 0.027
@@ -14,8 +15,8 @@ export:
   limit: null
 
 data:
-  root: data/geotiff/geo_sar_10bands
-  stats_file: data/geotiff/geo_sar_10bands/stats.json
+  root: data/geotiff/geo_sar
+  stats_file: data/geotiff/geo_sar/stats.json
   train_split: train
   val_split: val
   test_split: test
@@ -29,14 +30,14 @@ data:
     persistent_workers: false
 
 model:
-  in_channels: 11  # Ten GEO bands plus one binary valid-pixel mask.
+  in_channels: 5  # Four GEO bands plus one binary valid-pixel mask.
   out_channels: 1  # SAR wind_speed target channel.
   num_timesteps: 1000  # Number of diffusion denoising steps.
   schedule: linear  # Beta schedule variant for the forward process.
   unet:
     dim: 48  # Base UNet width. Previous setting was 64; 48 reduces parameter count to about half (30M instead of 55M).
     dim_mults: [1, 2, 4, 8]  # Width multipliers per UNet level.
-    channels: 12  # Eleven condition channels plus one noisy target channel.
+    channels: 6  # Five condition channels plus one noisy target channel.
     out_dim: 1  # UNet output channels; should match model.out_channels.
 
 optimization:

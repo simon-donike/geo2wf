@@ -37,12 +37,15 @@ from export_geo_sar_geotiffs import (
     DEFAULT_MANIFEST_FILE,
     DEFAULT_SPLITS,
     GEO_CHANNELS,
+    GEO_CHANNEL_SET,
+    GEO_CHANNEL_SETS,
     Observation,
     StatsAccumulator,
     _fix_longitudes,
     _grid_center,
     _grid_transform,
     _audit_geo_channels,
+    _geo_channels_by_sensor,
     _json_list,
     _load_geo_channels,
     _make_grid,
@@ -56,16 +59,15 @@ from export_geo_sar_geotiffs import (
     _write_manifest,
 )
 
-DEFAULT_OUTPUT_ROOT = Path(
-    os.environ.get("GEO_PMW_OUTPUT_ROOT", "data/geotiff/geo_pmw_10bands")
-)
-PMW_CHANNELS = {
-    "AMSR2_GCOMW1": ("TB_A89.0V",),
-    "GMI_GPM": ("TB_89.0V",),
-    "SSMIS_F16": ("TB_91.665V",),
-    "SSMIS_F17": ("TB_91.665V",),
-    "SSMIS_F18": ("TB_91.665V",),
+DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_PMW_OUTPUT_ROOT", "data/geotiff/geo_pmw"))
+PMW_SOURCE_CHANNELS = {
+    "AMSR2_GCOMW1": "TB_A89.0V",
+    "GMI_GPM": "TB_89.0V",
+    "SSMIS_F16": "TB_91.665V",
+    "SSMIS_F17": "TB_91.665V",
+    "SSMIS_F18": "TB_91.665V",
 }
+PMW_CHANNELS = {sensor: (channel,) for sensor, channel in PMW_SOURCE_CHANNELS.items()}
 PMW_SWATHS = {
     "AMSR2_GCOMW1": "S5",
     "GMI_GPM": "S1",
@@ -89,6 +91,7 @@ class ExportConfig:
     pad: int
     limit: int | None
     pmw_sensors: tuple[str, ...]
+    geo_channel_set: str
 
 
 def main() -> None:
@@ -156,6 +159,12 @@ def _parse_args() -> ExportConfig:
         ),
     )
     parser.add_argument(
+        "--geo-channel-set",
+        choices=sorted(GEO_CHANNEL_SETS),
+        default=str(file_config.get("geo_channel_set", GEO_CHANNEL_SET)),
+        help="Named GEO band set to export.",
+    )
+    parser.add_argument(
         "--center",
         choices=["image_center", "ibtracs_center"],
         default=str(file_config.get("center", "image_center")),
@@ -194,6 +203,7 @@ def _parse_args() -> ExportConfig:
         pad=args.pad,
         limit=args.limit,
         pmw_sensors=tuple(args.pmw_sensors),
+        geo_channel_set=args.geo_channel_set,
     )
 
 
@@ -211,8 +221,9 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
     output_root = config.output_root.expanduser()
     output_root.mkdir(parents=True, exist_ok=True)
 
+    geo_channels_by_sensor = _geo_channels_by_sensor(config.geo_channel_set)
     records = _read_manifest(manifest_file, data_root, config.pmw_sensors)
-    _audit_geo_channels(records)
+    _audit_geo_channels(records, geo_channels_by_sensor)
     by_split = {split: [] for split in config.splits}
     skipped_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()
@@ -235,6 +246,7 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                     geo=geo,
                     grid_size=config.grid_size,
                     grid_resolution=config.grid_resolution,
+                    geo_channels_by_sensor=geo_channels_by_sensor,
                     center=config.center,
                     shift_center=config.shift_center,
                     pad=config.pad,
@@ -389,7 +401,7 @@ def _read_manifest(
         if record.source_type == "pmw":
             if record.sensor not in pmw_sensors:
                 continue
-            if any(channel not in variables for channel in PMW_CHANNELS[record.sensor]):
+            if PMW_SOURCE_CHANNELS[record.sensor] not in variables:
                 continue
         records.append(record)
     return records
@@ -437,13 +449,14 @@ def _build_sample(
     center: str,
     shift_center: bool,
     pad: int,
+    geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
 ) -> dict[str, Any]:
     center_point = _grid_center(pmw, center, shift_center, grid_size, grid_resolution, pad)
     if center_point is None:
         raise ValueError("PMW observation has no usable grid center")
     grid_lat, grid_lon = _make_grid(center_point[0], center_point[1], grid_size, grid_resolution)
 
-    geo_channels = GEO_CHANNELS[geo.sensor]
+    geo_channels = geo_channels_by_sensor[geo.sensor]
     pmw_channels = PMW_CHANNELS[pmw.sensor]
     geo_fields = _load_geo_channels(geo, geo_channels)
     pmw_fields = _load_pmw_channels(pmw, pmw_channels)
@@ -491,18 +504,18 @@ def _load_pmw_channels(
         decode_times=False,
     ) as source:
         dataset = source.load()
-    missing = [channel for channel in channels if channel not in dataset]
-    if missing:
-        raise KeyError(f"PMW dataset is missing channels in {group}: {missing}")
+    source_channel = PMW_SOURCE_CHANNELS[observation.sensor]
+    if source_channel not in dataset:
+        raise KeyError(f"PMW dataset is missing channel in {group}: {source_channel}")
     lat = _coordinate_values(dataset, "latitude", "lat")
     lon = _fix_longitudes(_coordinate_values(dataset, "longitude", "lon"))
     result = {}
+    values = np.asarray(dataset[source_channel].values, dtype=np.float32).squeeze()
+    if values.ndim != 2:
+        raise ValueError(
+            f"PMW channel {source_channel} in {observation.path} has shape {values.shape}"
+        )
     for channel in channels:
-        values = np.asarray(dataset[channel].values, dtype=np.float32).squeeze()
-        if values.ndim != 2:
-            raise ValueError(
-                f"PMW channel {channel} in {observation.path} has shape {values.shape}"
-            )
         result[channel] = (values, lat, lon)
     return result
 

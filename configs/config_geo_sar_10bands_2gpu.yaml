@@ -1,8 +1,8 @@
 seed: 42
 
 data:
-  root: data/geotiff/geo_sar
-  stats_file: data/geotiff/geo_sar/stats.json
+  root: data/geotiff/geo_sar_10bands
+  stats_file: data/geotiff/geo_sar_10bands/stats.json
   train_split: train
   val_split: val
   test_split: test
@@ -10,21 +10,20 @@ data:
   random_flips: true
   include_test_in_train: true
   loader:
-    # This is per GPU: effective global batch size is nx2 on two GPUs.
     batch_size: 2
     num_workers: 8
     pin_memory: true
     persistent_workers: true
 
 model:
-  in_channels: 5
+  in_channels: 11
   out_channels: 1
   num_timesteps: 1000
   schedule: linear
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
-    channels: 6
+    channels: 12
     out_dim: 1
 
 optimization:
@@ -39,7 +38,7 @@ trainer:
   devices: 2
   strategy: ddp_find_unused_parameters_false
   precision: 16
-  default_root_dir: logs/checkpoints/geo_sar_2gpu
+  default_root_dir: logs/checkpoints/geo_sar_10bands_2gpu
   log_every_n_steps: 10
   enable_checkpointing: true
   limit_val_batches: 50
@@ -48,6 +47,6 @@ logging:
   wandb:
     enabled: true
     project: geo2wf
-    name: geo-sar-2gpu
+    name: geo-sar-10bands-2gpu
     save_dir: logs
     log_model: false
