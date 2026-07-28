@@ -34,6 +34,7 @@ from export_geo_sar_geotiffs import (
     DEFAULT_DATA_ROOT,
     DEFAULT_GRID_RESOLUTION,
     DEFAULT_GRID_SIZE,
+    DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
     DEFAULT_MANIFEST_FILE,
     DEFAULT_SPLITS,
     ERA5_CHANNELS,
@@ -42,6 +43,7 @@ from export_geo_sar_geotiffs import (
     GEO_CHANNEL_SETS,
     Observation,
     StatsAccumulator,
+    _append_native_era5_derived_fields,
     _fix_longitudes,
     _grid_center,
     _grid_transform,
@@ -59,6 +61,7 @@ from export_geo_sar_geotiffs import (
     _optional_timestamp,
     _records_by_storm,
     _regrid,
+    _regrid_continuous,
     _require_channels,
     _safe_text,
     _write_geotiff,
@@ -100,6 +103,7 @@ class ExportConfig:
     geo_channel_set: str
     include_era5: bool
     era5_channels: tuple[str, ...]
+    era5_max_time_gap_hours: float
 
 
 def main() -> None:
@@ -136,12 +140,7 @@ def _parse_args() -> ExportConfig:
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(
-            os.environ.get(
-                "GEO_PMW_OUTPUT_ROOT",
-                file_config.get("output_root", DEFAULT_OUTPUT_ROOT),
-            )
-        ),
+        default=Path(file_config.get("output_root", DEFAULT_OUTPUT_ROOT)),
     )
     parser.add_argument(
         "--splits",
@@ -185,6 +184,17 @@ def _parse_args() -> ExportConfig:
         help="ERA5 rectilinear variables to append when --include-era5 is active.",
     )
     parser.add_argument(
+        "--era5-max-time-gap-hours",
+        type=float,
+        default=float(
+            file_config.get(
+                "era5_max_time_gap_hours",
+                DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
+            )
+        ),
+        help="Reject the nearest ERA5 analysis when it is older than this limit.",
+    )
+    parser.add_argument(
         "--center",
         choices=["image_center", "ibtracs_center"],
         default=str(file_config.get("center", "image_center")),
@@ -226,6 +236,7 @@ def _parse_args() -> ExportConfig:
         geo_channel_set=args.geo_channel_set,
         include_era5=args.include_era5,
         era5_channels=tuple(args.era5_channels),
+        era5_max_time_gap_hours=args.era5_max_time_gap_hours,
     )
 
 
@@ -274,6 +285,7 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
                     grid_resolution=config.grid_resolution,
                     geo_channels_by_sensor=geo_channels_by_sensor,
                     era5_channels=config.era5_channels,
+                    era5_max_time_gap_hours=config.era5_max_time_gap_hours,
                     center=config.center,
                     shift_center=config.shift_center,
                     pad=config.pad,
@@ -499,6 +511,7 @@ def _build_sample(
     pad: int,
     geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
     era5_channels: Sequence[str] = ERA5_CHANNELS,
+    era5_max_time_gap_hours: float = DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
 ) -> dict[str, Any]:
     center_point = _grid_center(pmw, center, shift_center, grid_size, grid_resolution, pad)
     if center_point is None:
@@ -518,23 +531,29 @@ def _build_sample(
     era5_masks = None
     era5_mask = None
     era5_band_names: tuple[str, ...] = ()
+    exported_era5_channels: tuple[str, ...] = ()
     if era5 is not None:
         era5_fields, era5_timestamp = _load_era5_channels(
             era5,
             geo.timestamp,
             era5_channels,
+            max_time_gap_hours=era5_max_time_gap_hours,
         )
         _require_channels("era5", era5_channels, era5_fields)
+        era5_fields = _append_native_era5_derived_fields(era5_fields)
+        exported_era5_channels = tuple(era5_fields)
         era5_regridded = [
-            _regrid(*era5_fields[name], grid_lat, grid_lon)
-            for name in era5_channels
+            _regrid_continuous(*era5_fields[name], grid_lat, grid_lon)
+            for name in exported_era5_channels
         ]
         era5_array = np.stack([values for values, _ in era5_regridded]).astype(np.float32)
         era5_masks = np.stack([mask for _, mask in era5_regridded])
         era5_mask = np.all(era5_masks & np.isfinite(era5_array), axis=0)
         if not era5_mask.any():
             raise ValueError("No valid ERA5 pixels after regridding")
-        era5_band_names = tuple(f"era5_{channel}" for channel in era5_channels)
+        era5_band_names = tuple(
+            f"era5_{channel}" for channel in exported_era5_channels
+        )
     pmw_regridded = [_regrid(*pmw_fields[name], grid_lat, grid_lon) for name in pmw_channels]
     geo_array = np.stack([values for values, _ in geo_regridded]).astype(np.float32)
     pmw_array = np.stack([values for values, _ in pmw_regridded]).astype(np.float32)
@@ -562,7 +581,7 @@ def _build_sample(
         "era5_band_masks": era5_masks,
         "era5_band_names": era5_band_names,
         "era5_timestamp": era5_timestamp,
-        "era5_channels": tuple(era5_channels) if era5 is not None else (),
+        "era5_channels": exported_era5_channels if era5 is not None else (),
         "pmw_channels": tuple(pmw_channels),
         "center_lat": center_point[0],
         "center_lon": center_point[1],

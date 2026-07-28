@@ -209,6 +209,47 @@ uv run python train.py --config configs/config_pretrain_geo_pmw.yaml
 uv run python train.py --config configs/config.yaml
 ```
 
+### ERA5-anchored wind experiments
+
+The ERA5 diffusion configuration now uses clipped per-channel train-stat
+normalization for its conditions (median/IQR after re-export, with mean/std as
+the legacy-stats fallback) and a separate train-range min/max mapping for
+non-negative wind speed (0.2--80 m/s in the current export),
+cosine forward noise, deterministic 100-step DDIM sampling, per-step clean
+sample clipping, EMA inference weights, and weak ERA5 completion outside the
+observed SAR swath. It rejects ERA5 fields more than 3.1 hours from the paired
+observation and selects checkpoints with an eye/inner-core structure score:
+
+```bash
+uv run python train.py --config configs/config_geo_sar_10bands_era5.yaml
+```
+
+The deterministic control predicts a physical wind-speed correction around the
+ERA5 10 m speed field. Its zero-initialized output is exactly ERA5 before the
+first optimizer step, and checkpoints use the same eye-focused validation
+score while also reporting full physical-unit MAE, skill against ERA5, and a
+gated eye-center displacement diagnostic:
+
+```bash
+uv run python train.py --config configs/config_geo_sar_10bands_era5_residual.yaml
+```
+
+Both configurations work with existing exports. Re-export the ERA5 dataset to
+replace legacy nearest-neighbour ERA5 rasters with bilinear fields, calculate
+wind speed and vorticity on the native ERA5 grid, and write median/IQR robust
+statistics:
+
+```bash
+uv run python scripts/export_geo_sar_geotiffs.py \
+  --config configs/config_geo_sar_10bands_era5.yaml
+```
+
+The checked-in legacy exports still use nearest-neighbour seven-band ERA5;
+until re-export, the loader appends target-scaled wind speed and a neutral
+vorticity placeholder. The new cosine configuration should start a fresh run.
+To resume an older linear-schedule checkpoint, restore a linear schedule in the
+config and pass `--ckpt-path`; schedule mismatches are rejected explicitly.
+
 For the prepared local two-GPU GEO-to-SAR run:
 
 ```bash

@@ -270,7 +270,9 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         for sample in samples
     )
     has_era5_wind = any(
-        _era5_wind_speed_index(sample) is not None for sample in samples
+        sample.get("era5_wind_speed_physical") is not None
+        or _era5_wind_speed_index(sample) is not None
+        for sample in samples
     )
     panel_count = 3 + int(has_map) + int(has_era5_wind)
     fig, axes = plt.subplots(
@@ -343,13 +345,24 @@ def _draw_validation_row(axes, sample, *, has_map, has_era5_wind):
     if has_era5_wind:
         wind_ax = axes[3 + int(has_map)]
         wind_index = _era5_wind_speed_index(sample)
-        if wind_index is None:
-            wind_ax.set_axis_off()
+        physical_wind = sample.get("era5_wind_speed_physical")
+        if physical_wind is not None:
+            wind_speed = _as_chw_numpy(physical_wind)[0]
+            wind_valid = _as_2d_mask(
+                sample.get("era5_wind_speed_mask"), wind_speed.shape
+            )
+        elif wind_index is not None:
+            low, high = ERA5_WIND_SPEED_RANGE_M_S
+            wind_speed = condition_array[wind_index] * (high - low) + low
+            wind_valid = condition_valid
         else:
+            wind_ax.set_axis_off()
+            wind_speed = None
+        if wind_speed is not None:
             _plot_era5_wind_speed_map(
                 wind_ax,
-                condition_array[wind_index],
-                condition_valid,
+                wind_speed,
+                wind_valid,
                 sample.get("condition_bounds"),
                 center,
             )
@@ -389,18 +402,19 @@ def _era5_wind_speed_index(sample):
 
 def _plot_era5_wind_speed_map(
     ax,
-    normalized_wind_speed,
+    wind_speed,
     valid_mask,
     bounds,
     center,
 ):
     """Overlay physical ERA5 10 m wind speed on a land/ocean map."""
-    extent = _bounds_extent(bounds, normalized_wind_speed.shape)
+    extent = _bounds_extent(bounds, wind_speed.shape)
     left, right, bottom, top = extent
     lon = np.linspace(left, right, 220)
     lat = np.linspace(bottom, top, 220)
     lon_grid, lat_grid = np.meshgrid(lon, lat)
-    land = globe.is_land(lat_grid, lon_grid)
+    wrapped_lon_grid = (lon_grid + 180.0) % 360.0 - 180.0
+    land = globe.is_land(lat_grid, wrapped_lon_grid)
     ax.imshow(
         land.astype(int),
         extent=extent,
@@ -412,8 +426,6 @@ def _plot_era5_wind_speed_map(
         zorder=0,
     )
 
-    low, high = ERA5_WIND_SPEED_RANGE_M_S
-    wind_speed = normalized_wind_speed * (high - low) + low
     wind_speed = np.ma.masked_where(
         ~np.asarray(valid_mask, dtype=bool), wind_speed
     )
@@ -560,7 +572,8 @@ def _plot_valid_area_map(
     lon = np.linspace(lon_min, lon_max, 220)
     lat = np.linspace(lat_min, lat_max, 220)
     lon_grid, lat_grid = np.meshgrid(lon, lat)
-    land = globe.is_land(lat_grid, lon_grid)
+    wrapped_lon_grid = (lon_grid + 180.0) % 360.0 - 180.0
+    land = globe.is_land(lat_grid, wrapped_lon_grid)
     ax.imshow(
         land.astype(int),
         extent=(lon_min, lon_max, lat_min, lat_max),

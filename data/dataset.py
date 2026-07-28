@@ -18,9 +18,22 @@ ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
 ERA5_V10_CHANNELS = {"era5_v_wind_10m", "v_wind_10m", "era5_v10", "v10"}
 ERA5_WIND_SPEED_10M = "era5_wind_speed_10m"
 ERA5_RELATIVE_VORTICITY_10M = "era5_relative_vorticity_10m"
+NORMALIZATION_MIN_MAX = "min-max"
+NORMALIZATION_ROBUST_ZSCORE = "robust-zscore"
+DEFAULT_ROBUST_CLIP = 4.0
 DEFAULT_CHANNEL_STATS = {
-    ("era5", ERA5_WIND_SPEED_10M): {"min": 0.0, "max": 85.0},
-    ("era5", ERA5_RELATIVE_VORTICITY_10M): {"min": -0.005, "max": 0.005},
+    ("era5", ERA5_WIND_SPEED_10M): {
+        "min": 0.0,
+        "max": 85.0,
+        "median": 10.0,
+        "robust_scale": 5.0,
+    },
+    ("era5", ERA5_RELATIVE_VORTICITY_10M): {
+        "min": -0.005,
+        "max": 0.005,
+        "median": 0.0,
+        "robust_scale": 1.0e-4,
+    },
 }
 
 
@@ -35,6 +48,11 @@ class PairedImageDataset(Dataset):
         target_size: tuple[int, int] = (256, 256),
         augment: bool = False,
         require_era5: bool = False,
+        normalization: str | None = None,
+        target_normalization: str | None = None,
+        robust_clip: float = DEFAULT_ROBUST_CLIP,
+        target_robust_clip: float | None = None,
+        max_era5_time_gap_hours: float | None = None,
     ) -> None:
         self.root = Path(root).expanduser()
         self.split = split
@@ -53,6 +71,17 @@ class PairedImageDataset(Dataset):
         self.filtered_missing_era5_count = (
             self.manifest_sample_count - len(self.samples)
         )
+        self.max_era5_time_gap_hours = max_era5_time_gap_hours
+        self.filtered_stale_era5_count = 0
+        if max_era5_time_gap_hours is not None:
+            if max_era5_time_gap_hours <= 0:
+                raise ValueError("max_era5_time_gap_hours must be positive")
+            gap_hours = _manifest_era5_time_gap_hours(self.samples)
+            keep = gap_hours.notna() & (
+                gap_hours <= float(max_era5_time_gap_hours)
+            )
+            self.filtered_stale_era5_count = int((~keep).sum())
+            self.samples = self.samples.loc[keep].reset_index(drop=True)
         self.stats_file = (
             Path(stats_file).expanduser()
             if stats_file is not None
@@ -63,6 +92,25 @@ class PairedImageDataset(Dataset):
         self.stats = json.loads(self.stats_file.read_text(encoding="utf-8"))
         self.target_size = target_size
         self.augment = augment
+        self.normalization = _normalization_method(self.stats, normalization)
+        self.target_normalization = _normalization_method(
+            self.stats,
+            (
+                self.normalization
+                if target_normalization is None
+                else target_normalization
+            ),
+        )
+        if robust_clip <= 0:
+            raise ValueError("robust_clip must be positive")
+        self.robust_clip = float(robust_clip)
+        self.target_robust_clip = (
+            self.robust_clip
+            if target_robust_clip is None
+            else float(target_robust_clip)
+        )
+        if self.target_robust_clip <= 0:
+            raise ValueError("target_robust_clip must be positive")
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -91,8 +139,13 @@ class PairedImageDataset(Dataset):
             self.root / condition_path,
             reject_all_zero_fill=True,
         )
+        condition_channel_mask = condition_mask.expand(
+            len(condition_channels), -1, -1
+        )
         context = None
         context_mask = None
+        era5_wind_speed_physical = None
+        era5_wind_speed_mask = None
         if context_path:
             context, context_mask, context_bounds = _read_geotiff(
                 self.root / context_path
@@ -104,15 +157,69 @@ class PairedImageDataset(Dataset):
                 context_mask = context_mask & context.isfinite().all(
                     dim=0, keepdim=True
                 )
+                speed_index = _find_channel_index(
+                    context_channels, {ERA5_WIND_SPEED_10M}
+                )
+                if speed_index is not None:
+                    era5_wind_speed_physical = context[
+                        speed_index : speed_index + 1
+                    ].clone()
+                    era5_wind_speed_mask = (
+                        context_mask
+                        & era5_wind_speed_physical.isfinite().all(
+                            dim=0, keepdim=True
+                        )
+                    )
         target, target_mask, target_bounds = _read_geotiff(self.root / target_path)
+        target_physical = torch.nan_to_num(
+            target, nan=0.0, posinf=0.0, neginf=0.0
+        ) * target_mask.to(target.dtype)
+        target_norm_offset, target_norm_scale = _normalization_affine_parameters(
+            target_source_type,
+            target_channels,
+            self.stats,
+            normalization=self.target_normalization,
+            robust_clip=self.target_robust_clip,
+        )
+        condition_zero_values = _normalized_physical_zero(
+            condition_source_type,
+            condition_channels,
+            self.stats,
+            normalization=self.normalization,
+            robust_clip=self.robust_clip,
+        )
         condition = _normalize(
-            condition, condition_source_type, condition_channels, self.stats
+            condition,
+            condition_source_type,
+            condition_channels,
+            self.stats,
+            normalization=self.normalization,
+            robust_clip=self.robust_clip,
         )
         if context is not None:
-            context = _normalize(
-                context, context_source_type, context_channels, self.stats
+            context_zero_values = _normalized_physical_zero(
+                context_source_type,
+                context_channels,
+                self.stats,
+                normalization=self.normalization,
+                robust_clip=self.robust_clip,
             )
-        target = _normalize(target, target_source_type, target_channels, self.stats)
+            context = _normalize(
+                context,
+                context_source_type,
+                context_channels,
+                self.stats,
+                normalization=self.normalization,
+                robust_clip=self.robust_clip,
+            )
+        target = _normalize(
+            target,
+            target_source_type,
+            target_channels,
+            self.stats,
+            normalization=self.target_normalization,
+            robust_clip=self.target_robust_clip,
+        )
         condition = torch.nan_to_num(condition, nan=0.0)
         if context is not None:
             context = torch.nan_to_num(context, nan=0.0)
@@ -121,17 +228,85 @@ class PairedImageDataset(Dataset):
         if context is not None and context_mask is not None:
             context = context * context_mask.to(context.dtype)
             condition = torch.cat([condition, context], dim=0)
+            condition_channel_mask = torch.cat(
+                [
+                    condition_channel_mask,
+                    context_mask.expand(len(context_channels), -1, -1),
+                ],
+                dim=0,
+            )
             condition_mask = condition_mask & context_mask
             condition_channels = condition_channels + context_channels
-        target = target * target_mask.to(target.dtype)
-        target, target_mask = _resize_target(target, target_mask, self.target_size)
-        if self.augment:
-            condition, target, condition_mask, target_mask = _paired_random_flips(
-                condition, target, condition_mask, target_mask
+            condition_zero_values = torch.cat(
+                [condition_zero_values, context_zero_values]
             )
-        return {
+        target = target * target_mask.to(target.dtype)
+        original_target_mask = target_mask
+        target, target_mask = _resize_target(
+            target, original_target_mask, self.target_size
+        )
+        target_physical, _ = _resize_target(
+            target_physical, original_target_mask, self.target_size
+        )
+        era5_wind_speed = None
+        if (
+            era5_wind_speed_physical is not None
+            and era5_wind_speed_mask is not None
+            and target_source_type == "sar"
+            and "wind_speed" in target_channels
+        ):
+            era5_wind_speed_physical = torch.nan_to_num(
+                era5_wind_speed_physical,
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            ) * era5_wind_speed_mask.to(era5_wind_speed_physical.dtype)
+            era5_wind_speed = _normalize(
+                era5_wind_speed_physical,
+                "sar",
+                ["wind_speed"],
+                self.stats,
+                normalization=self.target_normalization,
+                robust_clip=self.target_robust_clip,
+            ) * era5_wind_speed_mask.to(era5_wind_speed_physical.dtype)
+            original_era5_mask = era5_wind_speed_mask
+            era5_wind_speed, era5_wind_speed_mask = _resize_target(
+                era5_wind_speed, original_era5_mask, self.target_size
+            )
+            era5_wind_speed_physical, _ = _resize_target(
+                era5_wind_speed_physical,
+                original_era5_mask,
+                self.target_size,
+            )
+        if self.augment:
+            flip_state = _random_flip_state()
+            condition, target, condition_mask, target_mask = _paired_random_flips(
+                condition,
+                target,
+                condition_mask,
+                target_mask,
+                condition_channels=condition_channels,
+                condition_zero_values=condition_zero_values,
+                condition_channel_mask=condition_channel_mask,
+                flip_state=flip_state,
+            )
+            flip_dims = _flip_dims(flip_state)
+            if flip_dims:
+                target_physical = torch.flip(target_physical, dims=flip_dims)
+                if era5_wind_speed is not None:
+                    era5_wind_speed = torch.flip(era5_wind_speed, dims=flip_dims)
+                    era5_wind_speed_physical = torch.flip(
+                        era5_wind_speed_physical, dims=flip_dims
+                    )
+                    era5_wind_speed_mask = torch.flip(
+                        era5_wind_speed_mask, dims=flip_dims
+                    )
+        sample = {
             "condition": condition,
             "target": target,
+            "target_physical": target_physical,
+            "target_norm_offset": target_norm_offset,
+            "target_norm_scale": target_norm_scale,
             "condition_mask": condition_mask,
             "target_mask": target_mask,
             "condition_bounds": condition_bounds,
@@ -155,6 +330,15 @@ class PairedImageDataset(Dataset):
                 "target_channels": target_channels,
             },
         }
+        if era5_wind_speed is not None:
+            sample.update(
+                {
+                    "era5_wind_speed": era5_wind_speed,
+                    "era5_wind_speed_physical": era5_wind_speed_physical,
+                    "era5_wind_speed_mask": era5_wind_speed_mask,
+                }
+            )
+        return sample
 
 
 def _resize_target(
@@ -179,19 +363,95 @@ def _paired_random_flips(
     target: torch.Tensor,
     condition_mask: torch.Tensor,
     target_mask: torch.Tensor,
+    *,
+    condition_channels: list[str] | None = None,
+    condition_zero_values: torch.Tensor | None = None,
+    condition_channel_mask: torch.Tensor | None = None,
+    flip_state: tuple[bool, bool] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Apply the same random horizontal and vertical flips to a paired sample."""
-    flip_dims = []
-    if torch.rand(()) < 0.5:
-        flip_dims.append(-1)
-    if torch.rand(()) < 0.5:
-        flip_dims.append(-2)
+    """Flip a pair, transforming ERA5 vector and pseudoscalar channels."""
+    if flip_state is None:
+        flip_state = _random_flip_state()
+    flip_dims = _flip_dims(flip_state)
     if flip_dims:
         condition = torch.flip(condition, dims=flip_dims)
         target = torch.flip(target, dims=flip_dims)
         condition_mask = torch.flip(condition_mask, dims=flip_dims)
         target_mask = torch.flip(target_mask, dims=flip_dims)
+        if condition_channel_mask is not None:
+            condition_channel_mask = torch.flip(
+                condition_channel_mask, dims=flip_dims
+            )
+        if condition_channels is not None:
+            if condition_zero_values is None:
+                raise ValueError(
+                    "condition_zero_values are required for physics-aware flips"
+                )
+            condition = _transform_flipped_era5_channels(
+                condition,
+                condition_channels,
+                condition_zero_values,
+                flip_state,
+                valid_mask=(
+                    condition_channel_mask
+                    if condition_channel_mask is not None
+                    else condition_mask
+                ),
+            )
     return condition, target, condition_mask, target_mask
+
+
+def _random_flip_state() -> tuple[bool, bool]:
+    """Return ``(horizontal, vertical)`` random flip decisions."""
+    return bool(torch.rand(()) < 0.5), bool(torch.rand(()) < 0.5)
+
+
+def _flip_dims(flip_state: tuple[bool, bool]) -> list[int]:
+    horizontal, vertical = flip_state
+    dims = []
+    if horizontal:
+        dims.append(-1)
+    if vertical:
+        dims.append(-2)
+    return dims
+
+
+def _transform_flipped_era5_channels(
+    condition: torch.Tensor,
+    channels: list[str],
+    normalized_zero: torch.Tensor,
+    flip_state: tuple[bool, bool],
+    *,
+    valid_mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Apply vector/reflection parity after the spatial tensor flip."""
+    if len(channels) != condition.shape[0] or normalized_zero.numel() != len(channels):
+        raise ValueError("condition channel metadata does not match the tensor")
+    horizontal, vertical = flip_state
+    reflected_once = horizontal != vertical
+    vorticity_names = {
+        ERA5_RELATIVE_VORTICITY_10M,
+        "relative_vorticity_10m",
+    }
+    for index, channel in enumerate(channels):
+        negate = (
+            (horizontal and channel in ERA5_U10_CHANNELS)
+            or (vertical and channel in ERA5_V10_CHANNELS)
+            or (reflected_once and channel in vorticity_names)
+        )
+        if negate:
+            zero = normalized_zero[index].to(
+                device=condition.device, dtype=condition.dtype
+            )
+            reflected = (2.0 * zero - condition[index]).clamp(0.0, 1.0)
+            if valid_mask is not None:
+                if valid_mask.shape[0] == condition.shape[0]:
+                    pixel_mask = valid_mask[index].bool()
+                else:
+                    pixel_mask = valid_mask.all(dim=0)
+                reflected = torch.where(pixel_mask, reflected, condition[index])
+            condition[index] = reflected
+    return condition
 
 
 def _read_geotiff(
@@ -220,22 +480,151 @@ def _normalize(
     source_type: str,
     channels: list[str],
     stats: dict[str, Any],
+    *,
+    normalization: str | None = None,
+    robust_clip: float = DEFAULT_ROBUST_CLIP,
 ) -> torch.Tensor:
-    normalized = tensor.clone().float()
-    stats_by_channel = stats.get("channels", {}).get(source_type, {})
+    offset, scale = _normalization_affine_parameters(
+        source_type,
+        channels,
+        stats,
+        normalization=normalization,
+        robust_clip=robust_clip,
+    )
+    shape = (-1,) + (1,) * (tensor.ndim - 1)
+    offset = offset.to(device=tensor.device, dtype=torch.float32).view(shape)
+    scale = scale.to(device=tensor.device, dtype=torch.float32).view(shape)
+    return ((tensor.float() - offset) / scale).clamp(0.0, 1.0)
+
+
+def _denormalize(
+    tensor: torch.Tensor,
+    source_type: str,
+    channels: list[str],
+    stats: dict[str, Any],
+    *,
+    normalization: str | None = None,
+    robust_clip: float = DEFAULT_ROBUST_CLIP,
+) -> torch.Tensor:
+    """Invert the affine normalization (for values before clipping)."""
+    offset, scale = _normalization_affine_parameters(
+        source_type,
+        channels,
+        stats,
+        normalization=normalization,
+        robust_clip=robust_clip,
+    )
+    shape = (-1,) + (1,) * (tensor.ndim - 1)
+    offset = offset.to(device=tensor.device, dtype=tensor.dtype).view(shape)
+    scale = scale.to(device=tensor.device, dtype=tensor.dtype).view(shape)
+    return tensor * scale + offset
+
+
+def _normalization_affine_parameters(
+    source_type: str,
+    channels: list[str],
+    stats: dict[str, Any],
+    *,
+    normalization: str | None = None,
+    robust_clip: float = DEFAULT_ROBUST_CLIP,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return per-channel ``offset`` and ``scale`` for a train-stat affine map."""
+    method = _normalization_method(stats, normalization)
+    if robust_clip <= 0:
+        raise ValueError("robust_clip must be positive")
+    offsets = []
+    scales = []
     for index, channel in enumerate(channels):
-        channel_stats = stats_by_channel.get(channel)
-        if channel_stats is None:
-            channel_stats = stats_by_channel.get(f"band_{index}")
-        if channel_stats is None:
-            channel_stats = DEFAULT_CHANNEL_STATS.get((source_type, channel))
-        if channel_stats is None:
-            raise KeyError(f"Missing stats for {source_type}:{channel}")
-        min_value = float(channel_stats["min"])
-        max_value = float(channel_stats["max"])
-        denom = max(max_value - min_value, 1e-6)
-        normalized[index] = (normalized[index] - min_value) / denom
-    return normalized.clamp(0.0, 1.0)
+        channel_stats = _channel_stats(
+            source_type, channel, index, stats, normalization=method
+        )
+        if method == NORMALIZATION_MIN_MAX:
+            offset = float(channel_stats["min"])
+            scale = float(channel_stats["max"]) - offset
+        else:
+            center_value = channel_stats.get("median", channel_stats.get("mean"))
+            spread_value = channel_stats.get(
+                "robust_scale", channel_stats.get("std")
+            )
+            if center_value is None or spread_value is None:
+                raise KeyError(
+                    f"Missing robust train stats for {source_type}:{channel}"
+                )
+            center = float(center_value)
+            spread = float(spread_value)
+            offset = center - robust_clip * spread
+            scale = 2.0 * robust_clip * spread
+        offsets.append(offset)
+        scales.append(max(scale, 1e-6))
+    return torch.tensor(offsets, dtype=torch.float32), torch.tensor(
+        scales, dtype=torch.float32
+    )
+
+
+def _normalized_physical_zero(
+    source_type: str,
+    channels: list[str],
+    stats: dict[str, Any],
+    *,
+    normalization: str | None = None,
+    robust_clip: float = DEFAULT_ROBUST_CLIP,
+) -> torch.Tensor:
+    offset, scale = _normalization_affine_parameters(
+        source_type,
+        channels,
+        stats,
+        normalization=normalization,
+        robust_clip=robust_clip,
+    )
+    return -offset / scale
+
+
+def _normalization_method(
+    stats: dict[str, Any], normalization: str | None = None
+) -> str:
+    requested = str(normalization or stats.get("normalization", NORMALIZATION_MIN_MAX))
+    requested = requested.strip().lower().replace("_", "-")
+    aliases = {
+        "minmax": NORMALIZATION_MIN_MAX,
+        "min-max": NORMALIZATION_MIN_MAX,
+        "robust": NORMALIZATION_ROBUST_ZSCORE,
+        "robust-zscore": NORMALIZATION_ROBUST_ZSCORE,
+        "clipped-zscore": NORMALIZATION_ROBUST_ZSCORE,
+    }
+    try:
+        return aliases[requested]
+    except KeyError as error:
+        raise ValueError(
+            f"Unsupported normalization {requested!r}; choose min-max or robust-zscore"
+        ) from error
+
+
+def _channel_stats(
+    source_type: str,
+    channel: str,
+    index: int,
+    stats: dict[str, Any],
+    *,
+    normalization: str,
+) -> dict[str, Any]:
+    channels_by_source = stats.get("channels", {})
+    if (
+        normalization == NORMALIZATION_ROBUST_ZSCORE
+        and source_type == "era5"
+        and channel == ERA5_WIND_SPEED_10M
+    ):
+        target_stats = channels_by_source.get("sar", {}).get("wind_speed")
+        if target_stats is not None:
+            return target_stats
+    stats_by_channel = channels_by_source.get(source_type, {})
+    channel_stats = stats_by_channel.get(channel)
+    if channel_stats is None:
+        channel_stats = stats_by_channel.get(f"band_{index}")
+    if channel_stats is None:
+        channel_stats = DEFAULT_CHANNEL_STATS.get((source_type, channel))
+    if channel_stats is None:
+        raise KeyError(f"Missing stats for {source_type}:{channel}")
+    return channel_stats
 
 
 def _append_era5_derived_channels(
@@ -256,7 +645,12 @@ def _append_era5_derived_channels(
         derived.append(torch.sqrt(u10.pow(2) + v10.pow(2)))
         derived_channels.append(ERA5_WIND_SPEED_10M)
     if ERA5_RELATIVE_VORTICITY_10M not in channels:
-        derived.append(_relative_vorticity_10m(u10, v10, bounds))
+        # Old exports contain nearest-neighbour-upsampled wind. Differentiating
+        # those blocks creates false grid-edge vorticity. Keep the historical
+        # 20-channel schema with a physically neutral placeholder; new exports
+        # provide native-grid vorticity explicitly and take the no-op path here.
+        _ = bounds
+        derived.append(torch.zeros_like(u10))
         derived_channels.append(ERA5_RELATIVE_VORTICITY_10M)
     if not derived:
         return tensor, channels
@@ -351,3 +745,23 @@ def _manifest_has_era5(samples: pd.DataFrame) -> pd.Series:
     if "era5_path" in samples.columns:
         has_context |= samples["era5_path"].astype(str).str.strip().ne("")
     return has_context
+
+
+def _manifest_era5_time_gap_hours(samples: pd.DataFrame) -> pd.Series:
+    """Return absolute ERA5-to-observation gaps, or NaN when unverifiable."""
+    if "era5_timestamp" not in samples:
+        return pd.Series(np.nan, index=samples.index, dtype=float)
+    era5_time = pd.to_datetime(
+        samples["era5_timestamp"], errors="coerce", utc=True
+    )
+    reference_time = pd.Series(pd.NaT, index=samples.index, dtype="datetime64[ns, UTC]")
+    for column in (
+        "condition_timestamp",
+        "geo_timestamp",
+        "target_timestamp",
+        "sar_timestamp",
+    ):
+        if column in samples:
+            parsed = pd.to_datetime(samples[column], errors="coerce", utc=True)
+            reference_time = reference_time.fillna(parsed)
+    return (era5_time - reference_time).abs().dt.total_seconds() / 3600.0
