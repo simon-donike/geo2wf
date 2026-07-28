@@ -16,6 +16,8 @@ from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 
+IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
+
 
 def plot_random_geo_sar_pairs(
     root: str | Path,
@@ -25,7 +27,7 @@ def plot_random_geo_sar_pairs(
     seed: int | None = None,
     geo_rgb_bands: tuple[str, str, str] = ("B13", "B14", "B08"),
     sar_band: int = 1,
-    center_columns: tuple[str, str] = ("center_lat", "center_lon"),
+    center_columns: tuple[str, str] = IBTRACS_CENTER_COLUMNS,
     output_path: str | Path | None = None,
     dpi: int = 180,
 ) -> Figure:
@@ -51,6 +53,7 @@ def plot_random_geo_sar_pairs(
         One-based GeoTIFF band index to display for the SAR target.
     center_columns:
         Manifest latitude/longitude columns used for the storm-center marker.
+        Defaults to the IBTrACS storm center.
     output_path:
         Optional file path where the figure should be saved.
     dpi:
@@ -483,7 +486,7 @@ def _plot_valid_area_map(
         handles.append(
             plt.Line2D(
                 [], [], marker="x", linestyle="none", color="red",
-                markersize=8, markeredgewidth=2, label="storm center",
+                markersize=8, markeredgewidth=2, label="IBTrACS center",
             )
         )
     ax.legend(handles=handles, loc="upper right", fontsize=8, frameon=True)
@@ -537,7 +540,7 @@ def _plot_center(ax: Axes, center: tuple[float, float] | None) -> None:
         s=80,
         c="red",
         linewidths=2.0,
-        label="storm center",
+        label="IBTrACS center",
         zorder=5,
     )
 
