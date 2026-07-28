@@ -209,12 +209,19 @@ def _normalize_band_name(name: str) -> str:
     return normalized
 
 
-def _normalize_channel(channel: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    valid = channel[np.isfinite(channel) & mask]
-    if valid.size == 0:
-        return np.zeros_like(channel, dtype=float)
-    low = float(np.nanmin(valid))
-    high = float(np.nanmax(valid))
+def _normalize_channel(
+    channel: np.ndarray,
+    mask: np.ndarray,
+    value_range: tuple[float, float] | None = None,
+) -> np.ndarray:
+    if value_range is None:
+        valid = channel[np.isfinite(channel) & mask]
+        if valid.size == 0:
+            return np.zeros_like(channel, dtype=float)
+        low = float(np.nanmin(valid))
+        high = float(np.nanmax(valid))
+    else:
+        low, high = value_range
     scale = max(high - low, 1e-6)
     return np.clip((channel - low) / scale, 0.0, 1.0)
 
@@ -280,11 +287,16 @@ def _draw_validation_row(axes, sample, *, has_map):
     condition_image, condition_cmap, band_name = _condition_plot_view(
         condition_array, condition_valid, sample.get("condition_channels")
     )
+    # Derive the display stretch exclusively from valid ground-truth pixels,
+    # then apply those same per-channel limits to prediction and target.
+    output_ranges = _channel_ranges(target_array, target_valid)
     prediction_valid = np.ones(prediction_array.shape[1:], dtype=bool)
     prediction_image, prediction_cmap = _output_plot_view(
-        prediction_array, prediction_valid
+        prediction_array, prediction_valid, output_ranges
     )
-    target_image, target_cmap = _output_plot_view(target_array, target_valid)
+    target_image, target_cmap = _output_plot_view(
+        target_array, target_valid, output_ranges
+    )
     condition_extent = _bounds_extent(
         sample.get("condition_bounds"), condition_array.shape[1:]
     )
@@ -336,12 +348,30 @@ def _condition_plot_view(array, mask, channels):
     return _normalize_channel(array[0], mask), "viridis", names[0] if names else "band 1"
 
 
-def _output_plot_view(array, mask):
+def _channel_ranges(array, mask):
+    """Return per-channel min/max limits from valid ground-truth pixels."""
+    ranges = []
+    for channel in array:
+        valid = channel[np.isfinite(channel) & mask]
+        ranges.append(
+            (float(np.nanmin(valid)), float(np.nanmax(valid)))
+            if valid.size
+            else (0.0, 1.0)
+        )
+    return ranges
+
+
+def _output_plot_view(array, mask, ranges=None):
+    if ranges is None:
+        ranges = [None] * array.shape[0]
     if array.shape[0] == 1:
-        return _normalize_channel(array[0], mask), "viridis"
+        return _normalize_channel(array[0], mask, ranges[0]), "viridis"
     if array.shape[0] >= 3:
-        return np.dstack([_normalize_channel(array[index], mask) for index in range(3)]), None
-    return _normalize_channel(array[0], mask), "viridis"
+        return np.dstack([
+            _normalize_channel(array[index], mask, ranges[index])
+            for index in range(3)
+        ]), None
+    return _normalize_channel(array[0], mask, ranges[0]), "viridis"
 
 
 def _overlay_nodata(ax, valid_mask, extent, *, alpha=0.68):

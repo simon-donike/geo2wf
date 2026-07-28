@@ -61,7 +61,7 @@ class PixelDiffusionConditional(pl.LightningModule):
 
     def output_T(self, input):
         # Inverse mapping from [-1, 1] back to [0, 1] for visualization/metrics.
-        return input.add(1).div(2)
+        return input.add(1).div(2).clamp(0, 1)
     
     def training_step(self, batch, batch_idx):   
         """Lightning train hook for conditional diffusion."""

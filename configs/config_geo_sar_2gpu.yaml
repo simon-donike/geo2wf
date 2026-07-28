@@ -34,7 +34,7 @@ optimization:
     patience: 25
 
 trainer:
-  max_epochs: 100
+  max_epochs: 1000
   accelerator: gpu
   devices: 2
   strategy: ddp_find_unused_parameters_false
