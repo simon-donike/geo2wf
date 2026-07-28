@@ -68,6 +68,9 @@ optimization:
     factor: 0.5
     patience: 10
 
+validation:
+  reconstruction_batches: 1
+
 trainer:
   max_epochs: 100
   accelerator: auto

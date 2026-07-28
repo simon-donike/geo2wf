@@ -18,6 +18,7 @@ from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 from .DenoisingDiffusionProcess import *
 from .DenoisingDiffusionProcess.samplers import DDIM_Sampler, DDPM_Sampler
+from .reconstruction_logging import log_wandb_reconstruction
 from .wind_metrics import RADIAL_METRIC_NAMES, radial_wind_metric_statistics
 
 
@@ -885,102 +886,13 @@ class PixelDiffusionConditional(pl.LightningModule):
     def _log_val_reconstruction(
         self, batch, pred_batch, *, wandb_key="images/val_reconstruction"
     ):
-        """Log up to five stretched, georeferenced reconstructions with no-data masks."""
-        if self.logger is None or self.trainer is None or not self.trainer.is_global_zero:
-            return
-        try:
-            import matplotlib.pyplot as plt
-            import wandb
-            from utils.plotting import plot_validation_reconstruction_batch
-        except ImportError:
-            return
-
-        sample_count = min(int(pred_batch.shape[0]), 5)
-        samples = []
-        if not isinstance(batch, dict):
-            input_batch, target_batch, _ = self._unpack_batch(batch)
-            for index in range(sample_count):
-                samples.append({
-                    "condition": input_batch[index],
-                    "prediction": pred_batch[index],
-                    "target": target_batch[index],
-                })
-        else:
-            meta = batch.get("meta", {})
-            for index in range(sample_count):
-                label = " · ".join(value for value in (
-                    self._batch_value(meta.get("storm_id"), index),
-                    self._batch_value(batch.get("sample_id"), index),
-                ) if value)
-                samples.append({
-                    "condition": batch["condition"][index],
-                    "prediction": pred_batch[index],
-                    "target": batch["target"][index],
-                    "condition_mask": self._batch_item(batch.get("condition_mask"), index),
-                    "target_mask": self._batch_item(batch.get("target_mask"), index),
-                    "era5_wind_speed_physical": self._batch_item(
-                        batch.get("era5_wind_speed_physical"), index
-                    ),
-                    "era5_wind_speed_mask": self._batch_item(
-                        batch.get("era5_wind_speed_mask"), index
-                    ),
-                    "condition_channels": self._channel_names(
-                        meta.get("condition_channels"), index
-                    ),
-                    "condition_bounds": self._batch_item(
-                        batch.get("condition_bounds"), index
-                    ),
-                    "target_bounds": self._batch_item(batch.get("target_bounds"), index),
-                    "center": self._finite_pair(batch.get("center"), index),
-                    "sample_label": label,
-                })
-        fig = plot_validation_reconstruction_batch(samples)
-        # Keep validation media lightweight: cap the longest rendered edge and
-        # use JPEG instead of W&B's lossless PNG default.
-        max_edge_pixels = 1600
-        width_inches, height_inches = fig.get_size_inches()
-        max_dpi = max_edge_pixels / max(width_inches, height_inches)
-        fig.set_dpi(min(float(fig.dpi), max_dpi))
-        try:
-            self.logger.experiment.log(
-                {wandb_key: wandb.Image(fig, file_type="jpg")},
-                step=self.global_step,
-            )
-        finally:
-            plt.close(fig)
-
-    @staticmethod
-    def _batch_item(value, index):
-        if value is None:
-            return None
-        item = value[index]
-        if torch.is_tensor(item):
-            item = item.detach().cpu()
-        return item
-
-    @staticmethod
-    def _batch_value(value, index):
-        if value is None:
-            return ""
-        if isinstance(value, (list, tuple)):
-            return str(value[index]) if index < len(value) else ""
-        return str(value)
-
-    @staticmethod
-    def _channel_names(value, index):
-        if not isinstance(value, (list, tuple)):
-            return None
-        # Default collation transposes each sample's channel list by band.
-        return [
-            str(item[index] if isinstance(item, (list, tuple)) else item)
-            for item in value
-        ]
-
-    @staticmethod
-    def _finite_pair(value, index):
-        if value is None:
-            return None
-        pair = value[index].detach().double().cpu()
-        if pair.numel() != 2 or not torch.isfinite(pair).all():
-            return None
-        return float(pair[0]), float(pair[1])
+        """Log up to five stretched, georeferenced reconstructions."""
+        input_batch, target_batch, _ = self._unpack_batch(batch)
+        log_wandb_reconstruction(
+            self,
+            batch,
+            pred_batch,
+            wandb_key=wandb_key,
+            condition_batch=input_batch,
+            target_batch=target_batch,
+        )

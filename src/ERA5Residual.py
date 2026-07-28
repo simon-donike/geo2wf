@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from .reconstruction_logging import log_wandb_reconstruction
 from .wind_metrics import RADIAL_METRIC_NAMES, radial_wind_metric_statistics
 
 
@@ -178,6 +179,7 @@ class ERA5ResidualRegressor(pl.LightningModule):
         weight_decay: float = 1e-4,
         lr_scheduler_factor: float = 0.5,
         lr_scheduler_patience: int = 10,
+        validation_reconstruction_batches: int = 1,
     ) -> None:
         super().__init__()
         if condition_channels <= 0:
@@ -186,6 +188,8 @@ class ERA5ResidualRegressor(pl.LightningModule):
             raise ValueError("psnr_data_range_ms must be positive")
         if off_swath_anchor_weight < 0:
             raise ValueError("off_swath_anchor_weight must be non-negative")
+        if validation_reconstruction_batches < 1:
+            raise ValueError("validation_reconstruction_batches must be positive")
         self.save_hyperparameters()
 
         self.condition_channels = int(condition_channels)
@@ -199,6 +203,9 @@ class ERA5ResidualRegressor(pl.LightningModule):
         self.weight_decay = float(weight_decay)
         self.lr_scheduler_factor = float(lr_scheduler_factor)
         self.lr_scheduler_patience = int(lr_scheduler_patience)
+        self.validation_reconstruction_batches = int(
+            validation_reconstruction_batches
+        )
 
         # Raw condition + condition-valid mask + explicit ERA5 wind + ERA5 mask.
         self.model = ResidualUNet(
@@ -372,15 +379,22 @@ class ERA5ResidualRegressor(pl.LightningModule):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
-        del batch_idx
-        # Loader 1 is a fixed train preview for diffusion image logging. All
-        # baseline metrics deliberately cover every batch from validation loader 0.
+        # Loader 1 is the fixed train preview used only for image logging.
+        if dataloader_idx == 1:
+            if batch_idx == 0:
+                self._log_reconstruction(
+                    batch,
+                    self.predict_physical(batch),
+                    wandb_key="images/train_reconstruction",
+                )
+            return None
         if dataloader_idx != 0:
             return None
         prediction, target, valid_mask, era5 = self._batch_outputs(batch)
+        bounded_prediction = self._bound_prediction(prediction)
         self._accumulate_statistics(
             self._validation_statistics,
-            self._bound_prediction(prediction),
+            bounded_prediction,
             target,
             valid_mask,
             self._bound_prediction(era5),
@@ -393,6 +407,8 @@ class ERA5ResidualRegressor(pl.LightningModule):
             valid_mask,
             batch,
         )
+        if batch_idx < self.validation_reconstruction_batches:
+            self._log_reconstruction(batch, bounded_prediction)
         return None
 
     def on_validation_epoch_start(self) -> None:
@@ -443,6 +459,22 @@ class ERA5ResidualRegressor(pl.LightningModule):
     ) -> torch.Tensor:
         del batch_idx, dataloader_idx
         return self.predict_physical(batch)
+
+    def _log_reconstruction(
+        self,
+        batch: dict[str, torch.Tensor],
+        prediction: torch.Tensor,
+        *,
+        wandb_key: str = "images/val_reconstruction",
+    ) -> None:
+        """Log physical-wind reconstructions through the shared W&B helper."""
+        log_wandb_reconstruction(
+            self,
+            batch,
+            prediction,
+            wandb_key=wandb_key,
+            target_batch=batch["target_physical"],
+        )
 
     def configure_optimizers(self) -> dict:
         optimizer = torch.optim.AdamW(
