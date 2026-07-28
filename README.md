@@ -143,8 +143,9 @@ matching the SAR target dimensionality.
 The ERA5 variants save seven single-level ERA5 fields as a companion
 `*_era5.tif` on the same crop/grid as the GEO image: precipitable water, SST,
 MSLP, 2m temperature, 2m dewpoint, and 10m u/v wind. The dataset loader reads
-that companion file when `context_path` is present and concatenates it with GEO
-at load time. With 10 GEO bands this gives `10 + 7 + 1 mask = 18` model input
+that companion file when `context_path` is present, derives 10m wind speed and
+10m relative vorticity from u/v wind, and concatenates the ERA5 context with GEO
+at load time. With 10 GEO bands this gives `10 + 9 + 1 mask = 20` model input
 channels and a one-channel target.
 
 The exporter stores raw physical values in GeoTIFFs with internal masks and

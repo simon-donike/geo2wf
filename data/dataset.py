@@ -12,6 +12,17 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
+EARTH_RADIUS_M = 6_371_000.0
+ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
+ERA5_V10_CHANNELS = {"era5_v_wind_10m", "v_wind_10m", "era5_v10", "v10"}
+ERA5_WIND_SPEED_10M = "era5_wind_speed_10m"
+ERA5_RELATIVE_VORTICITY_10M = "era5_relative_vorticity_10m"
+DEFAULT_CHANNEL_STATS = {
+    ("era5", ERA5_WIND_SPEED_10M): {"min": 0.0, "max": 85.0},
+    ("era5", ERA5_RELATIVE_VORTICITY_10M): {"min": -0.005, "max": 0.005},
+}
+
+
 class PairedImageDataset(Dataset):
     """Read exported paired GeoTIFF samples from a split manifest."""
 
@@ -58,9 +69,11 @@ class PairedImageDataset(Dataset):
         condition_path = _row_value(row, "condition_path", row.get("geo_path"))
         target_path = _row_value(row, "target_path", row.get("sar_path"))
         context_path = _row_value(row, "context_path", row.get("era5_path", ""))
-        context_source_type = _row_value(row, "context_source_type", "")
+        context_source_type = _row_value(
+            row, "context_source_type", "era5" if context_path else ""
+        )
         context_channels = _json_list(
-            _row_value(row, "context_channels", "[]")
+            _row_value(row, "context_channels", row.get("era5_channels", "[]"))
         )
 
         condition, condition_mask, condition_bounds = _read_geotiff(
@@ -70,7 +83,16 @@ class PairedImageDataset(Dataset):
         context = None
         context_mask = None
         if context_path:
-            context, context_mask, _ = _read_geotiff(self.root / context_path)
+            context, context_mask, context_bounds = _read_geotiff(
+                self.root / context_path
+            )
+            if context_source_type == "era5":
+                context, context_channels = _append_era5_derived_channels(
+                    context, context_channels, context_bounds
+                )
+                context_mask = context_mask & context.isfinite().all(
+                    dim=0, keepdim=True
+                )
         target, target_mask, target_bounds = _read_geotiff(self.root / target_path)
         condition = _normalize(
             condition, condition_source_type, condition_channels, self.stats
@@ -195,12 +217,84 @@ def _normalize(
         if channel_stats is None:
             channel_stats = stats_by_channel.get(f"band_{index}")
         if channel_stats is None:
+            channel_stats = DEFAULT_CHANNEL_STATS.get((source_type, channel))
+        if channel_stats is None:
             raise KeyError(f"Missing stats for {source_type}:{channel}")
         min_value = float(channel_stats["min"])
         max_value = float(channel_stats["max"])
         denom = max(max_value - min_value, 1e-6)
         normalized[index] = (normalized[index] - min_value) / denom
     return normalized.clamp(0.0, 1.0)
+
+
+def _append_era5_derived_channels(
+    tensor: torch.Tensor,
+    channels: list[str],
+    bounds: torch.Tensor,
+) -> tuple[torch.Tensor, list[str]]:
+    u_index = _find_channel_index(channels, ERA5_U10_CHANNELS)
+    v_index = _find_channel_index(channels, ERA5_V10_CHANNELS)
+    if u_index is None or v_index is None:
+        return tensor, channels
+
+    derived = []
+    derived_channels = []
+    u10 = tensor[u_index]
+    v10 = tensor[v_index]
+    if ERA5_WIND_SPEED_10M not in channels:
+        derived.append(torch.sqrt(u10.pow(2) + v10.pow(2)))
+        derived_channels.append(ERA5_WIND_SPEED_10M)
+    if ERA5_RELATIVE_VORTICITY_10M not in channels:
+        derived.append(_relative_vorticity_10m(u10, v10, bounds))
+        derived_channels.append(ERA5_RELATIVE_VORTICITY_10M)
+    if not derived:
+        return tensor, channels
+    return (
+        torch.cat([tensor, torch.stack(derived)], dim=0),
+        channels + derived_channels,
+    )
+
+
+def _find_channel_index(channels: list[str], names: set[str]) -> int | None:
+    for index, channel in enumerate(channels):
+        if channel in names:
+            return index
+    return None
+
+
+def _relative_vorticity_10m(
+    u10: torch.Tensor,
+    v10: torch.Tensor,
+    bounds: torch.Tensor,
+) -> torch.Tensor:
+    height, width = u10.shape[-2:]
+    if height < 2 or width < 2:
+        return torch.full_like(u10, torch.nan)
+
+    left, right, bottom, top = [float(value) for value in bounds.tolist()]
+    lon = _cell_centers(left, right, width)
+    lat = _cell_centers(top, bottom, height)
+    lat_rad = np.deg2rad(lat)
+    lon_rad = np.deg2rad(lon)
+    coslat = np.cos(lat_rad)[:, None]
+    coslat = np.clip(coslat, 1e-6, None)
+
+    u = u10.detach().cpu().numpy().astype(np.float64, copy=False)
+    v = v10.detach().cpu().numpy().astype(np.float64, copy=False)
+    d_v_d_lambda = np.gradient(v, lon_rad, axis=1, edge_order=1)
+    d_u_coslat_d_phi = np.gradient(u * coslat, lat_rad, axis=0, edge_order=1)
+    vorticity = (
+        d_v_d_lambda / (EARTH_RADIUS_M * coslat)
+        - d_u_coslat_d_phi / (EARTH_RADIUS_M * coslat)
+    )
+    return torch.from_numpy(vorticity.astype(np.float32)).to(
+        device=u10.device, dtype=u10.dtype
+    )
+
+
+def _cell_centers(start: float, stop: float, count: int) -> np.ndarray:
+    spacing = (stop - start) / count
+    return start + (np.arange(count, dtype=np.float64) + 0.5) * spacing
 
 
 def _json_list(value: Any) -> list[str]:
