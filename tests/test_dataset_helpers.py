@@ -175,3 +175,26 @@ def test_validation_plot_adds_era5_wind_map_only_when_available() -> None:
     )
     plt.close(without_era)
     plt.close(with_era)
+
+
+def test_validation_plot_prefers_explicit_physical_era5_wind() -> None:
+    sample = {
+        "condition": torch.full((1, 4, 4), 0.5),
+        "prediction": torch.full((1, 4, 4), 0.3),
+        "target": torch.full((1, 4, 4), 0.5),
+        "condition_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "condition_channels": ["era5_wind_speed_10m"],
+        "condition_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "target_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "era5_wind_speed_physical": torch.full((1, 4, 4), 20.0),
+        "era5_wind_speed_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+    }
+
+    figure = plot_validation_reconstruction_batch([sample])
+    wind_axis = {
+        axis.get_title(): axis for axis in figure.axes
+    }["ERA5 10 m wind speed"]
+
+    assert float(wind_axis.images[-1].get_array().mean()) == 20.0
+    plt.close(figure)

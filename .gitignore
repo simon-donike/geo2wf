@@ -8,6 +8,7 @@ external/
 data/geotiff/
 data/processed/
 data/
+/analysis/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

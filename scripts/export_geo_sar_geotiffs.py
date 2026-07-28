@@ -9,7 +9,7 @@ import os
 import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +29,7 @@ import rasterio
 import xarray as xr
 import yaml
 from rasterio.transform import from_origin
+from scipy.interpolate import RegularGridInterpolator
 from scipy.spatial import cKDTree
 from tqdm.auto import tqdm
 
@@ -69,6 +70,9 @@ ERA5_CHANNELS = (
     "u_wind_10m",
     "v_wind_10m",
 )
+ERA5_DERIVED_CHANNELS = ("wind_speed_10m", "relative_vorticity_10m")
+EARTH_RADIUS_M = 6_371_000.0
+DEFAULT_ERA5_MAX_TIME_GAP_HOURS = 3.1
 
 
 @dataclass(frozen=True)
@@ -107,22 +111,70 @@ class StatsAccumulator:
     mins: dict[str, float]
     maxs: dict[str, float]
     counts: dict[str, int]
+    samples: dict[str, np.ndarray]
+    robust_sample_size: int = 65_536
+    rng: np.random.Generator = field(
+        default_factory=lambda: np.random.default_rng(0), repr=False
+    )
 
     @classmethod
-    def create(cls) -> "StatsAccumulator":
-        return cls(defaultdict(float), defaultdict(float), {}, {}, defaultdict(int))
+    def create(
+        cls, robust_sample_size: int = 65_536, seed: int = 0
+    ) -> "StatsAccumulator":
+        if robust_sample_size <= 0:
+            raise ValueError("robust_sample_size must be positive")
+        return cls(
+            defaultdict(float),
+            defaultdict(float),
+            {},
+            {},
+            defaultdict(int),
+            {},
+            robust_sample_size,
+            np.random.default_rng(seed),
+        )
 
     def update(self, source_type: str, name: str, values: np.ndarray, mask: np.ndarray) -> None:
         key = f"{source_type}:{name}"
         valid = values[np.isfinite(values) & mask]
         if valid.size == 0:
             return
-        valid64 = valid.astype(np.float64)
+        valid64 = valid.astype(np.float64, copy=False).ravel()
+        previous_count = self.counts[key]
         self.sums[key] += float(valid64.sum())
         self.sq_sums[key] += float(np.square(valid64).sum())
         self.counts[key] += int(valid.size)
         self.mins[key] = float(valid64.min()) if key not in self.mins else min(self.mins[key], float(valid64.min()))
         self.maxs[key] = float(valid64.max()) if key not in self.maxs else max(self.maxs[key], float(valid64.max()))
+        self._update_sample(key, valid64, previous_count)
+
+    def _update_sample(
+        self, key: str, incoming: np.ndarray, previous_count: int
+    ) -> None:
+        """Merge a batch into a bounded uniform reservoir without pixel loops."""
+        total_count = previous_count + incoming.size
+        sample_size = min(self.robust_sample_size, total_count)
+        current = self.samples.get(key, np.empty(0, dtype=np.float64))
+        if total_count <= self.robust_sample_size:
+            self.samples[key] = np.concatenate([current, incoming.copy()])
+            return
+        incoming_keep = int(
+            self.rng.hypergeometric(
+                ngood=incoming.size,
+                nbad=previous_count,
+                nsample=sample_size,
+            )
+        )
+        current_keep = sample_size - incoming_keep
+        current_indices = self.rng.choice(
+            current.size, size=current_keep, replace=False
+        )
+        incoming_indices = self.rng.choice(
+            incoming.size, size=incoming_keep, replace=False
+        )
+        self.samples[key] = np.concatenate(
+            [current[current_indices], incoming[incoming_indices]]
+        )
 
     def to_jsonable(self) -> dict[str, Any]:
         channels: dict[str, dict[str, dict[str, float | int]]] = defaultdict(dict)
@@ -132,15 +184,26 @@ class StatsAccumulator:
             source_type, name = key.split(":", 1)
             mean = self.sums[key] / count
             variance = max(self.sq_sums[key] / count - mean * mean, 0.0)
+            sample = self.samples[key]
+            q25, median, q75 = np.quantile(sample, [0.25, 0.5, 0.75])
+            std = math.sqrt(variance)
+            robust_scale = float((q75 - q25) / 1.349)
+            if not math.isfinite(robust_scale) or robust_scale <= 1e-12:
+                robust_scale = max(std, 1e-6)
             channels[source_type][name] = {
                 "min": self.mins[key],
                 "max": self.maxs[key],
                 "mean": mean,
-                "std": math.sqrt(variance),
+                "std": std,
+                "q25": float(q25),
+                "median": float(median),
+                "q75": float(q75),
+                "robust_scale": robust_scale,
                 "count": count,
             }
         return {
             "normalization": "min-max",
+            "available_normalizations": ["min-max", "robust-zscore"],
             "source_key_format": "{source_type}:{channel}",
             "channels": {source: dict(values) for source, values in channels.items()},
         }
@@ -158,6 +221,7 @@ def main() -> None:
         closest_match_hours=args.closest_match_hours,
         include_era5=args.include_era5,
         era5_channels=tuple(args.era5_channels),
+        era5_max_time_gap_hours=args.era5_max_time_gap_hours,
         geo_channel_set=args.geo_channel_set,
         center=args.center,
         shift_center=args.shift_center,
@@ -195,12 +259,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(
-            os.environ.get(
-                "GEO_SAR_OUTPUT_ROOT",
-                config.get("output_root", DEFAULT_OUTPUT_ROOT),
-            )
-        ),
+        # An explicit experiment config must not be silently redirected to a
+        # different dataset by the generic machine-local default. CLI remains
+        # the highest-precedence override through argparse.
+        default=Path(config.get("output_root", DEFAULT_OUTPUT_ROOT)),
     )
     parser.add_argument(
         "--splits",
@@ -242,6 +304,17 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         default=list(config.get("era5_channels", ERA5_CHANNELS)),
         help="ERA5 rectilinear variables to append when --include-era5 is active.",
+    )
+    parser.add_argument(
+        "--era5-max-time-gap-hours",
+        type=float,
+        default=float(
+            config.get(
+                "era5_max_time_gap_hours",
+                DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
+            )
+        ),
+        help="Reject the nearest ERA5 analysis when it is older than this limit.",
     )
     parser.add_argument(
         "--center",
@@ -296,6 +369,7 @@ def export_geo_sar_geotiffs(
     pad: int,
     include_era5: bool = False,
     era5_channels: Sequence[str] = ERA5_CHANNELS,
+    era5_max_time_gap_hours: float = DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
     geo_channel_set: str = GEO_CHANNEL_SET,
     limit: int | None = None,
 ) -> None:
@@ -333,6 +407,7 @@ def export_geo_sar_geotiffs(
                     grid_resolution=grid_resolution,
                     geo_channels_by_sensor=geo_channels_by_sensor,
                     era5_channels=era5_channels,
+                    era5_max_time_gap_hours=era5_max_time_gap_hours,
                     center=center,
                     shift_center=shift_center,
                     pad=pad,
@@ -635,6 +710,7 @@ def _build_sample(
     pad: int,
     geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
     era5_channels: Sequence[str] = ERA5_CHANNELS,
+    era5_max_time_gap_hours: float = DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
 ) -> dict[str, Any]:
     center_point = _grid_center(sar, center, shift_center, grid_size, grid_resolution, pad)
     if center_point is None:
@@ -654,23 +730,29 @@ def _build_sample(
     era5_masks = None
     era5_mask = None
     era5_band_names: tuple[str, ...] = ()
+    exported_era5_channels: tuple[str, ...] = ()
     if era5 is not None:
         era5_fields, era5_timestamp = _load_era5_channels(
             era5,
             geo.timestamp,
             era5_channels,
+            max_time_gap_hours=era5_max_time_gap_hours,
         )
         _require_channels("era5", era5_channels, era5_fields)
+        era5_fields = _append_native_era5_derived_fields(era5_fields)
+        exported_era5_channels = tuple(era5_fields)
         era5_regridded = [
-            _regrid(*era5_fields[name], grid_lat, grid_lon)
-            for name in era5_channels
+            _regrid_continuous(*era5_fields[name], grid_lat, grid_lon)
+            for name in exported_era5_channels
         ]
         era5_array = np.stack([values for values, _ in era5_regridded]).astype(np.float32)
         era5_masks = np.stack([mask for _, mask in era5_regridded])
         era5_mask = np.all(era5_masks & np.isfinite(era5_array), axis=0)
         if not era5_mask.any():
             raise ValueError("No valid ERA5 pixels after regridding")
-        era5_band_names = tuple(f"era5_{channel}" for channel in era5_channels)
+        era5_band_names = tuple(
+            f"era5_{channel}" for channel in exported_era5_channels
+        )
     sar_regridded = [_regrid(*sar_fields[name], grid_lat, grid_lon) for name in sar_channels]
     geo_array = np.stack([values for values, _ in geo_regridded]).astype(np.float32)
     sar_array = np.stack([values for values, _ in sar_regridded]).astype(np.float32)
@@ -698,7 +780,7 @@ def _build_sample(
         "era5_band_masks": era5_masks,
         "era5_band_names": era5_band_names,
         "era5_timestamp": era5_timestamp,
-        "era5_channels": tuple(era5_channels) if era5 is not None else (),
+        "era5_channels": exported_era5_channels if era5 is not None else (),
         "sar_channels": tuple(sar_channels),
         "center_lat": center_point[0],
         "center_lon": center_point[1],
@@ -823,6 +905,7 @@ def _load_era5_channels(
     observation: Observation,
     timestamp: pd.Timestamp | None,
     channels: Sequence[str],
+    max_time_gap_hours: float = DEFAULT_ERA5_MAX_TIME_GAP_HOURS,
 ) -> tuple[dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]], pd.Timestamp | None]:
     if timestamp is None:
         raise ValueError("Cannot select ERA5 time without a GEO timestamp")
@@ -851,6 +934,14 @@ def _load_era5_channels(
         era5_timestamp = era5_timestamp.tz_localize("UTC")
     else:
         era5_timestamp = era5_timestamp.tz_convert("UTC")
+    time_gap_hours = abs(
+        (era5_timestamp - timestamp).total_seconds()
+    ) / 3600.0
+    if time_gap_hours > max_time_gap_hours:
+        raise ValueError(
+            "Nearest ERA5 time is too stale: "
+            f"{time_gap_hours:.2f} h > {max_time_gap_hours:.2f} h"
+        )
 
     lat = _era5_coordinate_values(dataset, "latitude", "lat", era5_index)
     lon = _fix_longitudes(
@@ -882,6 +973,59 @@ def _era5_coordinate_values(
     if "time" in values.dims:
         values = values.isel(time=time_index)
     return np.asarray(values.values, dtype=float).squeeze()
+
+
+def _append_native_era5_derived_fields(
+    fields: Mapping[str, tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Derive wind diagnostics before any spatial upsampling."""
+    result = dict(fields)
+    if "u_wind_10m" not in fields or "v_wind_10m" not in fields:
+        return result
+    u10, lat, lon = fields["u_wind_10m"]
+    v10, v_lat, v_lon = fields["v_wind_10m"]
+    if u10.shape != v10.shape or lat.shape != v_lat.shape or lon.shape != v_lon.shape:
+        raise ValueError("ERA5 10 m wind components do not share a grid")
+    if "wind_speed_10m" not in result:
+        result["wind_speed_10m"] = (
+            np.hypot(u10, v10).astype(np.float32),
+            lat,
+            lon,
+        )
+    if "relative_vorticity_10m" not in result:
+        result["relative_vorticity_10m"] = (
+            _native_relative_vorticity_10m(u10, v10, lat, lon),
+            lat,
+            lon,
+        )
+    return result
+
+
+def _native_relative_vorticity_10m(
+    u10: np.ndarray,
+    v10: np.ndarray,
+    src_lat: np.ndarray,
+    src_lon: np.ndarray,
+) -> np.ndarray:
+    """Compute spherical relative vorticity on the native rectilinear grid."""
+    values, lat_axis, lon_axis = _rectilinear_field(u10, src_lat, src_lon)
+    v_values, v_lat_axis, v_lon_axis = _rectilinear_field(v10, src_lat, src_lon)
+    if not np.allclose(lat_axis, v_lat_axis) or not np.allclose(lon_axis, v_lon_axis):
+        raise ValueError("ERA5 wind components do not share rectilinear coordinates")
+    if values.shape[0] < 2 or values.shape[1] < 2:
+        return np.full(values.shape, np.nan, dtype=np.float32)
+    lat_rad = np.deg2rad(lat_axis)
+    lon_rad = np.unwrap(np.deg2rad(lon_axis))
+    coslat = np.clip(np.cos(lat_rad)[:, None], 1e-6, None)
+    d_v_d_lambda = np.gradient(v_values, lon_rad, axis=1, edge_order=1)
+    d_u_coslat_d_phi = np.gradient(
+        values * coslat, lat_rad, axis=0, edge_order=1
+    )
+    vorticity = (
+        d_v_d_lambda / (EARTH_RADIUS_M * coslat)
+        - d_u_coslat_d_phi / (EARTH_RADIUS_M * coslat)
+    )
+    return vorticity.astype(np.float32)
 
 
 def _coordinate_values(dataset: xr.Dataset, primary: str, fallback: str) -> np.ndarray:
@@ -921,6 +1065,90 @@ def _regrid(
     mask = dist <= 1.5 * spacing
     result[~mask] = np.nan
     return result.reshape(grid_lat.shape), mask.reshape(grid_lat.shape)
+
+
+def _regrid_continuous(
+    values: np.ndarray,
+    src_lat: np.ndarray,
+    src_lon: np.ndarray,
+    grid_lat: np.ndarray,
+    grid_lon: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Bilinearly interpolate a continuous rectilinear field and validity."""
+    values, lat_axis, lon_axis = _rectilinear_field(values, src_lat, src_lon)
+    target_center = float(np.nanmedian(grid_lon))
+    lon_axis = _longitudes_near(lon_axis, target_center)
+    query_lon = _longitudes_near(grid_lon, target_center)
+
+    lat_order = np.argsort(lat_axis)
+    lon_order = np.argsort(lon_axis)
+    lat_axis = lat_axis[lat_order]
+    lon_axis = lon_axis[lon_order]
+    values = values[np.ix_(lat_order, lon_order)]
+    lon_axis, unique_lon_indices = np.unique(lon_axis, return_index=True)
+    values = values[:, unique_lon_indices]
+    lat_axis, unique_lat_indices = np.unique(lat_axis, return_index=True)
+    values = values[unique_lat_indices]
+    if lat_axis.size == 0 or lon_axis.size == 0:
+        return (
+            np.full(grid_lat.shape, np.nan, dtype=np.float32),
+            np.zeros(grid_lat.shape, dtype=bool),
+        )
+
+    finite = np.isfinite(values)
+    method = "linear" if lat_axis.size >= 2 and lon_axis.size >= 2 else "nearest"
+    numerator_interpolator = RegularGridInterpolator(
+        (lat_axis, lon_axis),
+        np.where(finite, values, 0.0),
+        method=method,
+        bounds_error=False,
+        fill_value=0.0,
+    )
+    weight_interpolator = RegularGridInterpolator(
+        (lat_axis, lon_axis),
+        finite.astype(np.float64),
+        method=method,
+        bounds_error=False,
+        fill_value=0.0,
+    )
+    query = np.column_stack([grid_lat.ravel(), query_lon.ravel()])
+    numerator = numerator_interpolator(query)
+    weight = weight_interpolator(query)
+    query_finite = np.isfinite(query).all(axis=1)
+    mask = query_finite & (weight > 0.999)
+    result = np.full(query.shape[0], np.nan, dtype=np.float32)
+    result[mask] = (numerator[mask] / weight[mask]).astype(np.float32)
+    return result.reshape(grid_lat.shape), mask.reshape(grid_lat.shape)
+
+
+def _rectilinear_field(
+    values: np.ndarray,
+    src_lat: np.ndarray,
+    src_lon: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    values = np.asarray(values, dtype=np.float64).squeeze()
+    src_lat = np.asarray(src_lat, dtype=np.float64).squeeze()
+    src_lon = np.asarray(src_lon, dtype=np.float64).squeeze()
+    if src_lat.ndim == 1 and src_lon.ndim == 1:
+        lat_axis, lon_axis = src_lat, src_lon
+    elif src_lat.ndim == 2 and src_lon.ndim == 2:
+        lat_axis, lon_axis = src_lat[:, 0], src_lon[0, :]
+        if not np.allclose(src_lat, lat_axis[:, None], equal_nan=True) or not np.allclose(
+            src_lon, lon_axis[None, :], equal_nan=True
+        ):
+            raise ValueError("Continuous interpolation requires a rectilinear grid")
+    else:
+        raise ValueError("Continuous interpolation requires 1-D or 2-D coordinates")
+    if values.ndim != 2 or values.shape != (lat_axis.size, lon_axis.size):
+        raise ValueError("Continuous field shape does not match its coordinates")
+    if not np.isfinite(lat_axis).all() or not np.isfinite(lon_axis).all():
+        raise ValueError("Rectilinear coordinates contain non-finite values")
+    return values, lat_axis, lon_axis
+
+
+def _longitudes_near(longitudes: np.ndarray, center: float) -> np.ndarray:
+    longitudes = np.asarray(longitudes, dtype=np.float64)
+    return center + (longitudes - center + 180.0) % 360.0 - 180.0
 
 
 def _source_spacing(src_lat: np.ndarray, src_lon: np.ndarray, coslat: float) -> float:

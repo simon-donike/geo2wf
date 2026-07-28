@@ -12,6 +12,88 @@ from .samplers import *
 from .backbones.unet_convnext import *
 
 
+def _prepare_sampler(default_sampler, sampler, forward_process, device):
+    """Move a sampler to the model device and enforce train/sampler agreement."""
+    selected = default_sampler if sampler is None else sampler
+    selected = selected.to(device)
+
+    required = ("timesteps", "train_timesteps", "schedule", "betas")
+    missing = [name for name in required if not hasattr(selected, name)]
+    if missing:
+        raise TypeError(
+            "Sampler is missing required sampling metadata: " + ", ".join(missing)
+        )
+    if int(selected.train_timesteps) != int(forward_process.num_timesteps):
+        raise ValueError(
+            "Sampler train_timesteps does not match the trained diffusion process: "
+            f"{selected.train_timesteps} != {forward_process.num_timesteps}"
+        )
+    if selected.schedule != forward_process.schedule:
+        raise ValueError(
+            "Sampler schedule does not match the trained diffusion process: "
+            f"{selected.schedule!r} != {forward_process.schedule!r}"
+        )
+    if (
+        selected.betas.shape != forward_process.betas.shape
+        or not torch.equal(selected.betas, forward_process.betas)
+    ):
+        raise ValueError("Sampler beta coefficients do not match the forward process")
+    if selected.timesteps.ndim != 1 or selected.timesteps.numel() < 1:
+        raise ValueError("Sampler timesteps must be a non-empty one-dimensional tensor")
+    return selected
+
+
+def _prepare_initial_noise(
+    shape,
+    *,
+    device,
+    dtype,
+    initial_noise=None,
+    generator=None,
+):
+    """Create or validate the reverse chain's initial latent."""
+    expected_shape = tuple(int(value) for value in shape)
+    if initial_noise is None:
+        return torch.randn(
+            expected_shape,
+            device=device,
+            dtype=dtype,
+            generator=generator,
+        )
+    if tuple(initial_noise.shape) != expected_shape:
+        raise ValueError(
+            f"initial_noise has shape {tuple(initial_noise.shape)}, "
+            f"expected {expected_shape}"
+        )
+    return initial_noise.detach().to(device=device, dtype=dtype).clone()
+
+
+def _run_reverse_process(
+    model,
+    x_t,
+    sampler,
+    *,
+    condition=None,
+    generator=None,
+    verbose=False,
+):
+    """Run one sampler schedule with shared conditional/unconditional dispatch."""
+    timestep_values = sampler.timesteps.detach().cpu().tolist()
+    iterator = (
+        tqdm(timestep_values, desc="diffusion sampling", total=len(timestep_values))
+        if verbose
+        else timestep_values
+    )
+    for timestep in iterator:
+        t = torch.full(
+            (x_t.shape[0],), int(timestep), device=x_t.device, dtype=torch.long
+        )
+        model_input = x_t if condition is None else torch.cat([x_t, condition], dim=1)
+        noise_pred = model(model_input, t)
+        x_t = sampler(x_t, t, noise_pred, generator=generator)
+    return x_t
+
+
 class DenoisingDiffusionProcess(nn.Module):
     
     def __init__(self,
@@ -47,43 +129,51 @@ class DenoisingDiffusionProcess(nn.Module):
                
         
         # defaults to a DDPM sampler if None is provided
-        self.sampler=DDPM_Sampler(num_timesteps=self.num_timesteps) if sampler is None else sampler
+        self.sampler = (
+            DDPM_Sampler(
+                num_timesteps=self.num_timesteps,
+                schedule=schedule,
+                clip_sample=True,
+            )
+            if sampler is None
+            else sampler
+        )
         
     @torch.no_grad()
-    def forward(self,
-                shape=(256,256),
-                batch_size=1,
-                sampler=None,
-                verbose=False
-               ):
-        """
-            forward() function triggers a complete inference cycle
-            
-            A custom sampler can be provided as an argument!
-        """           
-        
-        # read dimensions
-        b,c,h,w=batch_size,self.generated_channels,*shape
-        device=next(self.model.parameters()).device
-        
-        # select sampler
-        if sampler is None:
-            sampler=self.sampler
-        else:
-            sampler.to(device)
+    def forward(
+        self,
+        shape=(256, 256),
+        batch_size=1,
+        sampler=None,
+        verbose=False,
+        initial_noise=None,
+        generator=None,
+    ):
+        """Run a complete unconditional reverse process.
 
-        # time steps list
-        num_timesteps=sampler.num_timesteps 
-        it=reversed(range(0, num_timesteps))    
-        
-        x_t = torch.randn([b, self.generated_channels, h, w],device=device)
-                
-        for i in tqdm(it, desc='diffusion sampling', total=num_timesteps) if verbose else it:
-            t = torch.full((b,), i, device=device, dtype=torch.long)
-            z_t=self.model(x_t,t) # prediction of noise
-            x_t = sampler(x_t,t,z_t) # prediction of next state
-            
-        return x_t
+        Samplers expose actual training timesteps, so the model time embedding
+        and sampler coefficients always receive exactly the same timestep.
+        """
+        b, h, w = batch_size, *shape
+        model_parameter = next(self.model.parameters())
+        device = model_parameter.device
+        sampler = _prepare_sampler(
+            self.sampler, sampler, self.forward_process, device
+        )
+        x_t = _prepare_initial_noise(
+            (b, self.generated_channels, h, w),
+            device=device,
+            dtype=model_parameter.dtype,
+            initial_noise=initial_noise,
+            generator=generator,
+        )
+        return _run_reverse_process(
+            self.model,
+            x_t,
+            sampler,
+            generator=generator,
+            verbose=verbose,
+        )
         
     def p_loss(self,output):
         """
@@ -144,44 +234,53 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
                                      with_time_emb=True)
         
         # defaults to a DDPM sampler if None is provided
-        self.sampler=DDPM_Sampler(num_timesteps=self.num_timesteps) if sampler is None else sampler
+        self.sampler = (
+            DDPM_Sampler(
+                num_timesteps=self.num_timesteps,
+                schedule=schedule,
+                clip_sample=True,
+            )
+            if sampler is None
+            else sampler
+        )
         
     @torch.no_grad()
-    def forward(self,
-                condition,
-                sampler=None,
-                verbose=False
-               ):
-        """
-            forward() function triggers a complete inference cycle
-            
-            A custom sampler can be provided as an argument!
-        """
-        
-        # read dimensions
-        b,c,h,w=condition.shape
-        device=next(self.model.parameters()).device
-        condition=condition.to(device)
-        
-        # select sampler
-        if sampler is None:
-            sampler=self.sampler
-        else:
-            sampler.to(device)
+    def forward(
+        self,
+        condition,
+        sampler=None,
+        verbose=False,
+        initial_noise=None,
+        generator=None,
+    ):
+        """Run a complete conditional reverse process.
 
-        # time steps list
-        num_timesteps=sampler.num_timesteps 
-        it=reversed(range(0, num_timesteps))        
-        
-        x_t = torch.randn([b, self.generated_channels, h, w],device=device)
-                
-        for i in tqdm(it, desc='diffusion sampling', total=num_timesteps) if verbose else it:
-            t = torch.full((b,), i, device=device, dtype=torch.long)
-            model_input=torch.cat([x_t,condition],1).to(device)
-            z_t=self.model(model_input,t) # prediction of noise            
-            x_t=self.sampler(x_t,t,z_t) # prediction of next state
-            
-        return x_t
+        ``initial_noise`` makes deterministic DDIM sampling reproducible without
+        touching global RNG state. For stochastic samplers, pass a same-device
+        ``torch.Generator`` to control both initialization and reverse noise.
+        """
+        b, _, h, w = condition.shape
+        model_parameter = next(self.model.parameters())
+        device = model_parameter.device
+        condition = condition.to(device=device, dtype=model_parameter.dtype)
+        sampler = _prepare_sampler(
+            self.sampler, sampler, self.forward_process, device
+        )
+        x_t = _prepare_initial_noise(
+            (b, self.generated_channels, h, w),
+            device=device,
+            dtype=condition.dtype,
+            initial_noise=initial_noise,
+            generator=generator,
+        )
+        return _run_reverse_process(
+            self.model,
+            x_t,
+            sampler,
+            condition=condition,
+            generator=generator,
+            verbose=verbose,
+        )
         
     def p_loss(self,output,condition,mask=None):
         """
