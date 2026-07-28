@@ -42,6 +42,7 @@ from export_geo_sar_geotiffs import (
     _fix_longitudes,
     _grid_center,
     _grid_transform,
+    _audit_geo_channels,
     _json_list,
     _load_geo_channels,
     _make_grid,
@@ -55,7 +56,9 @@ from export_geo_sar_geotiffs import (
     _write_manifest,
 )
 
-DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_PMW_OUTPUT_ROOT", "data/geotiff/geo_pmw"))
+DEFAULT_OUTPUT_ROOT = Path(
+    os.environ.get("GEO_PMW_OUTPUT_ROOT", "data/geotiff/geo_pmw_10bands")
+)
 PMW_CHANNELS = {
     "AMSR2_GCOMW1": ("TB_A89.0V",),
     "GMI_GPM": ("TB_89.0V",),
@@ -209,6 +212,7 @@ def export_geo_pmw_geotiffs(config: ExportConfig) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
 
     records = _read_manifest(manifest_file, data_root, config.pmw_sensors)
+    _audit_geo_channels(records)
     by_split = {split: [] for split in config.splits}
     skipped_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()

@@ -22,7 +22,7 @@ class PairedDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        root: str | Path = "data/geotiff/geo_sar",
+        root: str | Path = "data/geotiff/geo_sar_10bands",
         stats_file: str | Path | None = None,
         batch_size: int = 4,
         num_workers: int = 0,
@@ -58,7 +58,7 @@ class PairedDataModule(pl.LightningDataModule):
     def from_config(cls, config: dict) -> "PairedDataModule":
         data_cfg = config.get("data", {})
         loader_cfg = data_cfg.get("loader", {})
-        root = _local_data_root(data_cfg.get("root", "data/geotiff/geo_sar"))
+        root = _local_data_root(data_cfg.get("root", "data/geotiff/geo_sar_10bands"))
         stats_file = _local_stats_file(root, data_cfg.get("stats_file"))
         return cls(
             root=root,
@@ -171,9 +171,9 @@ class PairedDataModule(pl.LightningDataModule):
 
 def _local_data_root(configured_root: str | Path) -> str:
     root = str(configured_root)
-    if root.endswith("geo_sar"):
+    if root.endswith(("geo_sar", "geo_sar_10bands")):
         return os.environ.get("GEO_SAR_OUTPUT_ROOT", root)
-    if root.endswith("geo_pmw"):
+    if root.endswith(("geo_pmw", "geo_pmw_10bands")):
         return os.environ.get("GEO_PMW_OUTPUT_ROOT", root)
     return root
 
