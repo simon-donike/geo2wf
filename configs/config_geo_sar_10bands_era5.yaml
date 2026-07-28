@@ -34,7 +34,7 @@ data:
   include_test_in_train: true
   loader:
     batch_size: 4
-    num_workers: 0
+    num_workers: 2
     pin_memory: false
     persistent_workers: false
 
@@ -60,6 +60,7 @@ trainer:
   accelerator: auto
   devices: 1
   precision: 32
+  float32_matmul_precision: high
   log_every_n_steps: 10
   enable_checkpointing: false
   limit_val_batches: 50
