@@ -111,7 +111,7 @@ field is represented in physical units or z-scores, update
 Exported real-data layout:
 
 ```text
-data/geotiff/geo_sar_10bands/
+data/geotiff/geo_sar/
   stats.json
   train/
     manifest.csv
@@ -123,10 +123,20 @@ data/geotiff/geo_sar_10bands/
     manifest.csv
 ```
 
-The PMW pretraining export uses the same layout under
-`data/geotiff/geo_pmw_10bands/`, with generic manifest columns named
-`condition_path` and `target_path`. The SAR manifests keep backward-compatible
-`geo_path` and `sar_path` columns as well.
+The PMW pretraining export uses the same layout under `data/geotiff/geo_pmw/`,
+with generic manifest columns named `condition_path` and `target_path`. The SAR
+manifests keep backward-compatible `geo_path` and `sar_path` columns as well.
+
+The default configs keep the original four-GEO-band datasets. The 10-band
+variants use separate folders and config files:
+
+- SAR: `configs/config_geo_sar_10bands.yaml` -> `data/geotiff/geo_sar_10bands`
+- SAR 2-GPU: `configs/config_geo_sar_10bands_2gpu.yaml`
+- GEO/PMW pretraining: `configs/config_pretrain_geo_pmw_10bands.yaml` -> `data/geotiff/geo_pmw_10bands`
+
+For 10-band proxy pretraining, only the GEO condition expands to ten bands. PMW
+targets remain a single selected high-frequency brightness-temperature channel,
+matching the SAR target dimensionality.
 
 The exporter stores raw physical values in GeoTIFFs with internal masks and
 metadata tags. The training dataset handles file-format details and min-max
@@ -140,10 +150,10 @@ Important channel settings:
 
 ```yaml
 model:
-  in_channels: 11
+  in_channels: 5
   out_channels: 1
   unet:
-    channels: 12
+    channels: 6
     out_dim: 1
 ```
 

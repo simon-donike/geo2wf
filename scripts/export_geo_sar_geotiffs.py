@@ -42,17 +42,23 @@ DEFAULT_DATA_ROOT = Path(
 DEFAULT_MANIFEST_FILE = (
     DEFAULT_DATA_ROOT / "index-files" / "observation_manifest_v5.csv"
 )
-DEFAULT_OUTPUT_ROOT = Path(
-    os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/geo_sar_10bands")
-)
+DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/geo_sar"))
 DEFAULT_GRID_SIZE = 256
 DEFAULT_GRID_RESOLUTION = 0.027
 DEFAULT_CLOSEST_MATCH_HOURS = 0.5
 DEFAULT_SPLITS = ("train", "val", "test")
-GEO_CHANNELS = {
-    "ABI": tuple(f"CMI_C{index:02d}" for index in range(7, 17)),
-    "AHI": tuple(f"B{index:02d}" for index in range(7, 17)),
+GEO_CHANNEL_SETS = {
+    "common4": {
+        "ABI": ("CMI_C08", "CMI_C09", "CMI_C13", "CMI_C14"),
+        "AHI": ("B08", "B09", "B13", "B14"),
+    },
+    "common10": {
+        "ABI": tuple(f"CMI_C{index:02d}" for index in range(7, 17)),
+        "AHI": tuple(f"B{index:02d}" for index in range(7, 17)),
+    },
 }
+GEO_CHANNELS = GEO_CHANNEL_SETS["common4"]
+GEO_CHANNEL_SET = "common4"
 SAR_CHANNELS = ("wind_speed",)
 
 
@@ -141,6 +147,7 @@ def main() -> None:
         grid_size=args.grid_size,
         grid_resolution=args.grid_resolution,
         closest_match_hours=args.closest_match_hours,
+        geo_channel_set=args.geo_channel_set,
         center=args.center,
         shift_center=args.shift_center,
         pad=args.pad,
@@ -208,6 +215,12 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--geo-channel-set",
+        choices=sorted(GEO_CHANNEL_SETS),
+        default=str(config.get("geo_channel_set", GEO_CHANNEL_SET)),
+        help="Named GEO band set to export.",
+    )
+    parser.add_argument(
         "--center",
         choices=["image_center", "ibtracs_center"],
         default=str(config.get("center", "image_center")),
@@ -236,6 +249,16 @@ def _load_export_config(config_path: Path | None) -> dict[str, Any]:
     return dict(config.get("export", {}))
 
 
+def _geo_channels_by_sensor(channel_set: str) -> Mapping[str, tuple[str, ...]]:
+    try:
+        return GEO_CHANNEL_SETS[channel_set]
+    except KeyError as error:
+        raise ValueError(
+            f"Unknown GEO channel set {channel_set!r}; "
+            f"choose one of {sorted(GEO_CHANNEL_SETS)}"
+        ) from error
+
+
 def export_geo_sar_geotiffs(
     *,
     data_root: Path,
@@ -248,6 +271,7 @@ def export_geo_sar_geotiffs(
     center: str,
     shift_center: bool,
     pad: int,
+    geo_channel_set: str = GEO_CHANNEL_SET,
     limit: int | None = None,
 ) -> None:
     data_root = data_root.expanduser().resolve()
@@ -255,8 +279,9 @@ def export_geo_sar_geotiffs(
     output_root = output_root.expanduser()
     output_root.mkdir(parents=True, exist_ok=True)
 
+    geo_channels_by_sensor = _geo_channels_by_sensor(geo_channel_set)
     records = _read_manifest(manifest_file, data_root)
-    _audit_geo_channels(records)
+    _audit_geo_channels(records, geo_channels_by_sensor)
     by_split = {split: [] for split in splits}
     no_match_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()
@@ -279,6 +304,7 @@ def export_geo_sar_geotiffs(
                     geo=geo,
                     grid_size=grid_size,
                     grid_resolution=grid_resolution,
+                    geo_channels_by_sensor=geo_channels_by_sensor,
                     center=center,
                     shift_center=shift_center,
                     pad=pad,
@@ -459,20 +485,23 @@ def _pair_sar_to_geo(
     return pairs
 
 
-def _audit_geo_channels(records: Sequence[Observation]) -> None:
+def _audit_geo_channels(
+    records: Sequence[Observation],
+    geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
+) -> None:
     missing: dict[tuple[str, str], list[str]] = defaultdict(list)
     checked_files: set[str] = set()
     for record in records:
-        if record.source_type != "geo" or record.sensor not in GEO_CHANNELS:
+        if record.source_type != "geo" or record.sensor not in geo_channels_by_sensor:
             continue
-        requested = set(GEO_CHANNELS[record.sensor])
+        requested = set(geo_channels_by_sensor[record.sensor])
         available = set(record.variables)
         if not requested & available:
             if record.sensor in checked_files:
                 continue
             available = _geo_dataset_channels(record)
             checked_files.add(record.sensor)
-        for channel in GEO_CHANNELS[record.sensor]:
+        for channel in geo_channels_by_sensor[record.sensor]:
             if channel not in available:
                 missing[(record.sensor, channel)].append(record.observation_id)
     if not missing:
@@ -528,13 +557,14 @@ def _build_sample(
     center: str,
     shift_center: bool,
     pad: int,
+    geo_channels_by_sensor: Mapping[str, Sequence[str]] = GEO_CHANNELS,
 ) -> dict[str, Any]:
     center_point = _grid_center(sar, center, shift_center, grid_size, grid_resolution, pad)
     if center_point is None:
         raise ValueError("SAR observation has no usable grid center")
     grid_lat, grid_lon = _make_grid(center_point[0], center_point[1], grid_size, grid_resolution)
 
-    geo_channels = GEO_CHANNELS[geo.sensor]
+    geo_channels = geo_channels_by_sensor[geo.sensor]
     sar_channels = SAR_CHANNELS
     geo_fields = _load_geo_channels(geo, geo_channels)
     sar_fields = _load_sar_channels(sar, sar_channels)
