@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import torch
 
+from data.datamodule import PairedDataModule
 from data.dataset import (
     EARTH_RADIUS_M,
     ERA5_RELATIVE_VORTICITY_10M,
     ERA5_WIND_SPEED_10M,
+    PairedImageDataset,
     _append_era5_derived_channels,
     _cell_centers,
     _normalize,
@@ -65,3 +68,59 @@ def test_normalize_uses_default_stats_for_derived_era5_channels() -> None:
     )
 
     assert torch.allclose(normalized, torch.full_like(normalized, 0.5))
+
+
+def test_dataset_filters_samples_without_era5_when_required(tmp_path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
+    pd.DataFrame(
+        {
+            "sample_id": ["modern", "legacy", "other-context", "missing"],
+            "context_path": [
+                "train/modern_era5.tif",
+                "",
+                "train/other_context.tif",
+                "",
+            ],
+            "context_source_type": ["era5", "", "ocean", ""],
+            "era5_path": ["", "train/legacy_era5.tif", "", ""],
+        }
+    ).to_csv(split_dir / "manifest.csv", index=False)
+    (tmp_path / "stats.json").write_text("{}", encoding="utf-8")
+
+    dataset = PairedImageDataset(tmp_path, "train", require_era5=True)
+
+    assert dataset.samples["sample_id"].tolist() == ["modern", "legacy"]
+    assert dataset.manifest_sample_count == 4
+    assert dataset.filtered_missing_era5_count == 2
+
+
+def test_dataset_keeps_samples_without_era5_when_not_required(tmp_path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
+    pd.DataFrame(
+        {
+            "sample_id": ["with-era5", "without-era5"],
+            "context_path": ["train/context.tif", ""],
+        }
+    ).to_csv(split_dir / "manifest.csv", index=False)
+    (tmp_path / "stats.json").write_text("{}", encoding="utf-8")
+
+    dataset = PairedImageDataset(tmp_path, "train")
+
+    assert dataset.samples["sample_id"].tolist() == [
+        "with-era5",
+        "without-era5",
+    ]
+    assert dataset.filtered_missing_era5_count == 0
+
+
+def test_datamodule_enables_era5_filter_from_export_config() -> None:
+    datamodule = PairedDataModule.from_config(
+        {
+            "export": {"include_era5": True},
+            "data": {"root": "custom/data"},
+        }
+    )
+
+    assert datamodule.require_era5 is True

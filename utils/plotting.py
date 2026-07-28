@@ -17,6 +17,8 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 
 IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
+ERA5_WIND_SPEED_10M = "era5_wind_speed_10m"
+ERA5_WIND_SPEED_RANGE_M_S = (0.0, 85.0)
 
 
 def plot_random_geo_sar_pairs(
@@ -267,7 +269,10 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         and sample.get("target_bounds") is not None
         for sample in samples
     )
-    panel_count = 4 if has_map else 3
+    has_era5_wind = any(
+        _era5_wind_speed_index(sample) is not None for sample in samples
+    )
+    panel_count = 3 + int(has_map) + int(has_era5_wind)
     fig, axes = plt.subplots(
         len(samples), panel_count,
         figsize=(4.1 * panel_count, 4 * len(samples)),
@@ -275,11 +280,16 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         squeeze=False,
     )
     for row, sample in enumerate(samples):
-        _draw_validation_row(axes[row], sample, has_map=has_map)
+        _draw_validation_row(
+            axes[row],
+            sample,
+            has_map=has_map,
+            has_era5_wind=has_era5_wind,
+        )
     return fig
 
 
-def _draw_validation_row(axes, sample, *, has_map):
+def _draw_validation_row(axes, sample, *, has_map, has_era5_wind):
     condition_array = _as_chw_numpy(sample["condition"])
     prediction_array = _as_chw_numpy(sample["prediction"])
     target_array = _as_chw_numpy(sample["target"])
@@ -330,6 +340,19 @@ def _draw_validation_row(axes, sample, *, has_map):
             "mask": target_valid,
         }
         _plot_valid_area_map(axes[3], geo, output, center, title="Valid areas")
+    if has_era5_wind:
+        wind_ax = axes[3 + int(has_map)]
+        wind_index = _era5_wind_speed_index(sample)
+        if wind_index is None:
+            wind_ax.set_axis_off()
+        else:
+            _plot_era5_wind_speed_map(
+                wind_ax,
+                condition_array[wind_index],
+                condition_valid,
+                sample.get("condition_bounds"),
+                center,
+            )
     if sample.get("sample_label"):
         axes[0].annotate(
             sample["sample_label"], xy=(0, 1.13), xycoords="axes fraction",
@@ -349,6 +372,83 @@ def _condition_plot_view(array, mask, channels):
         band_name = "/".join(names[index] if index < len(names) else f"band {index + 1}" for index in indices)
         return image, None, band_name
     return _normalize_channel(array[0], mask), "viridis", names[0] if names else "band 1"
+
+
+def _era5_wind_speed_index(sample):
+    if sample.get("condition_bounds") is None:
+        return None
+    channels = sample.get("condition_channels")
+    if not channels:
+        return None
+    normalized_names = [str(name).strip().lower() for name in channels]
+    try:
+        return normalized_names.index(ERA5_WIND_SPEED_10M)
+    except ValueError:
+        return None
+
+
+def _plot_era5_wind_speed_map(
+    ax,
+    normalized_wind_speed,
+    valid_mask,
+    bounds,
+    center,
+):
+    """Overlay physical ERA5 10 m wind speed on a land/ocean map."""
+    extent = _bounds_extent(bounds, normalized_wind_speed.shape)
+    left, right, bottom, top = extent
+    lon = np.linspace(left, right, 220)
+    lat = np.linspace(bottom, top, 220)
+    lon_grid, lat_grid = np.meshgrid(lon, lat)
+    land = globe.is_land(lat_grid, lon_grid)
+    ax.imshow(
+        land.astype(int),
+        extent=extent,
+        origin="lower",
+        cmap=ListedColormap(["#cfe8f3", "#e8e3cf"]),
+        vmin=0,
+        vmax=1,
+        interpolation="nearest",
+        zorder=0,
+    )
+
+    low, high = ERA5_WIND_SPEED_RANGE_M_S
+    wind_speed = normalized_wind_speed * (high - low) + low
+    wind_speed = np.ma.masked_where(
+        ~np.asarray(valid_mask, dtype=bool), wind_speed
+    )
+    image = ax.imshow(
+        wind_speed,
+        extent=extent,
+        origin="upper",
+        cmap="turbo",
+        alpha=0.76,
+        interpolation="nearest",
+        zorder=2,
+    )
+    ax.contour(
+        lon_grid,
+        lat_grid,
+        land.astype(float),
+        levels=[0.5],
+        colors=["#414b42"],
+        linewidths=0.75,
+        alpha=0.9,
+        zorder=3,
+    )
+    _plot_center(ax, center)
+    ax.figure.colorbar(
+        image, ax=ax, shrink=0.76, pad=0.03, label=r"Wind speed (m s$^{-1}$)"
+    )
+    ax.set_title("ERA5 10 m wind speed", fontsize=10)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_xlim(left, right)
+    ax.set_ylim(bottom, top)
+    ax.grid(
+        color="white", linestyle="--", linewidth=0.6, alpha=0.65, zorder=4
+    )
+    ax.set_aspect("equal", adjustable="box")
 
 
 def _channel_ranges(array, mask):
