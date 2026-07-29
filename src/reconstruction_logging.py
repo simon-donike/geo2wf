@@ -14,6 +14,7 @@ def log_wandb_reconstruction(
     condition_batch: torch.Tensor | None = None,
     target_batch: torch.Tensor | None = None,
     baseline_batch: torch.Tensor | None = None,
+    physical_wind_output: bool = False,
 ) -> None:
     """Log a shared GEO/prediction/target reconstruction figure to W&B."""
     trainer = getattr(module, "_trainer", None)
@@ -47,6 +48,7 @@ def log_wandb_reconstruction(
             "condition": condition_batch[index],
             "prediction": prediction_batch[index],
             "target": target_batch[index],
+            "physical_wind_output": physical_wind_output,
         }
         if baseline_batch is not None:
             sample["baseline"] = baseline_batch[index]
