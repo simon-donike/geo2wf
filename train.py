@@ -86,6 +86,8 @@ def build_model(config: dict) -> pl.LightningModule:
             "lr_scheduler_monitor": lr_sched_cfg.get(
                 "monitor", "val/eye_structure_score"
             ),
+            "lr_scheduler_cooldown": lr_sched_cfg.get("cooldown", 0),
+            "lr_scheduler_min_lr": lr_sched_cfg.get("min_lr", 0.0),
             "sampling_method": sampling_cfg.get("method", "ddpm"),
             "sampling_timesteps": sampling_cfg.get("timesteps"),
             "sampling_eta": sampling_cfg.get("eta", 0.0),
@@ -165,6 +167,11 @@ def build_model(config: dict) -> pl.LightningModule:
             weight_decay=opt_cfg.get("weight_decay", 1e-4),
             lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
             lr_scheduler_patience=lr_sched_cfg.get("patience", 10),
+            lr_scheduler_monitor=lr_sched_cfg.get(
+                "monitor", "val/eye_structure_score"
+            ),
+            lr_scheduler_cooldown=lr_sched_cfg.get("cooldown", 0),
+            lr_scheduler_min_lr=lr_sched_cfg.get("min_lr", 0.0),
             validation_reconstruction_batches=validation_cfg.get(
                 "reconstruction_batches", 1
             ),

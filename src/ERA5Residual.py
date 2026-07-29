@@ -179,6 +179,9 @@ class ERA5ResidualRegressor(pl.LightningModule):
         weight_decay: float = 1e-4,
         lr_scheduler_factor: float = 0.5,
         lr_scheduler_patience: int = 10,
+        lr_scheduler_monitor: str = "val/eye_structure_score",
+        lr_scheduler_cooldown: int = 0,
+        lr_scheduler_min_lr: float = 0.0,
         validation_reconstruction_batches: int = 1,
     ) -> None:
         super().__init__()
@@ -203,6 +206,9 @@ class ERA5ResidualRegressor(pl.LightningModule):
         self.weight_decay = float(weight_decay)
         self.lr_scheduler_factor = float(lr_scheduler_factor)
         self.lr_scheduler_patience = int(lr_scheduler_patience)
+        self.lr_scheduler_monitor = str(lr_scheduler_monitor)
+        self.lr_scheduler_cooldown = int(lr_scheduler_cooldown)
+        self.lr_scheduler_min_lr = float(lr_scheduler_min_lr)
         self.validation_reconstruction_batches = int(
             validation_reconstruction_batches
         )
@@ -487,12 +493,14 @@ class ERA5ResidualRegressor(pl.LightningModule):
             mode="min",
             factor=self.lr_scheduler_factor,
             patience=self.lr_scheduler_patience,
+            cooldown=self.lr_scheduler_cooldown,
+            min_lr=self.lr_scheduler_min_lr,
         )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": self.checkpoint_monitor,
+                "monitor": self.lr_scheduler_monitor,
             },
         }
 

@@ -10,6 +10,8 @@ from data.dataset import (
     _manifest_ibtracs_center,
     _append_era5_derived_channels,
     _cell_centers,
+    _center_crop,
+    _center_crop_bounds,
     _json_list,
     _normalize,
     _paired_random_flips,
@@ -34,6 +36,19 @@ def test_resize_target_resizes_values_and_mask_with_expected_modes() -> None:
     assert resized_mask.shape == (1, 4, 4)
     assert resized_mask.dtype == torch.bool
     assert torch.all(resized_target[~resized_mask] == 0)
+
+
+def test_center_crop_preserves_pixel_scale_and_updates_bounds() -> None:
+    tensor = torch.arange(36).reshape(1, 6, 6)
+    bounds = torch.tensor([0.0, 6.0, 10.0, 16.0])
+
+    cropped = _center_crop(tensor, (4, 4))
+    cropped_bounds = _center_crop_bounds(bounds, (6, 6), (4, 4))
+
+    assert torch.equal(cropped, tensor[:, 1:5, 1:5])
+    assert torch.equal(
+        cropped_bounds, torch.tensor([1.0, 5.0, 11.0, 15.0])
+    )
 
 
 def test_paired_random_flips_applies_same_spatial_flips_to_all_tensors(monkeypatch) -> None:

@@ -48,6 +48,8 @@ class PixelDiffusionConditional(pl.LightningModule):
                  lr_scheduler_factor=0.5,
                  lr_scheduler_patience=25,
                  lr_scheduler_monitor="val/eye_structure_score",
+                 lr_scheduler_cooldown=0,
+                 lr_scheduler_min_lr=0.0,
                  sampling_method="ddpm",
                  sampling_timesteps=None,
                  sampling_eta=0.0,
@@ -70,6 +72,8 @@ class PixelDiffusionConditional(pl.LightningModule):
         self.lr_scheduler_factor=lr_scheduler_factor
         self.lr_scheduler_patience=lr_scheduler_patience
         self.lr_scheduler_monitor = str(lr_scheduler_monitor)
+        self.lr_scheduler_cooldown = int(lr_scheduler_cooldown)
+        self.lr_scheduler_min_lr = float(lr_scheduler_min_lr)
         self.schedule = str(schedule)
         self._backward_steps = 0
         self.sparse_target_fill = sparse_target_fill
@@ -785,7 +789,9 @@ class PixelDiffusionConditional(pl.LightningModule):
         scheduler = ReduceLROnPlateau(optimizer,
                                       mode='min',
                                       factor=self.lr_scheduler_factor,
-                                      patience=self.lr_scheduler_patience)
+                                      patience=self.lr_scheduler_patience,
+                                      cooldown=self.lr_scheduler_cooldown,
+                                      min_lr=self.lr_scheduler_min_lr)
         return {"optimizer": optimizer,
                 "lr_scheduler": {"scheduler": scheduler,
                                  "monitor": self.lr_scheduler_monitor}}

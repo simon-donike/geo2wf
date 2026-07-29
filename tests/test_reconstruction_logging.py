@@ -22,6 +22,7 @@ def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:
         "target_mask": torch.ones((1, 1, 4, 4), dtype=torch.bool),
     }
     prediction = torch.full((1, 1, 4, 4), 20.0)
+    baseline = torch.full((1, 1, 4, 4), 18.0)
 
     with (
         patch(
@@ -37,12 +38,14 @@ def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:
             prediction,
             wandb_key="images/val_reconstruction",
             target_batch=batch["target_physical"],
+            baseline_batch=baseline,
         )
 
     samples = plot_batch.call_args.args[0]
     assert len(samples) == 1
     assert torch.equal(samples[0]["prediction"], prediction[0])
     assert torch.equal(samples[0]["target"], batch["target_physical"][0])
+    assert torch.equal(samples[0]["baseline"], baseline[0])
     wandb_image.assert_called_once_with(figure, file_type="jpg")
     experiment.log.assert_called_once_with(
         {"images/val_reconstruction": "wandb-image"},

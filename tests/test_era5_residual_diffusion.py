@@ -277,6 +277,9 @@ def test_deterministic_residual_diffusion_preset_requires_external_checkpoint() 
 
     baseline = config["model"]["residual"]["baseline"]
     assert baseline["source"] == "deterministic"
-    assert baseline["checkpoint_path"] is None
+    assert baseline["checkpoint_path"].endswith("epoch=053-step=13122.ckpt")
     assert config["export"]["grid_size"] == 256
     assert config["data"]["target_size"] == [256, 256]
+    assert config["data"]["center_crop_size"] == [192, 192]
+    assert config["trainer"]["max_epochs"] == 5000
+    assert config["trainer"]["checkpoint"]["monitor"] == "val/loss"
