@@ -146,6 +146,44 @@ def test_residual_diffusion_training_step_is_finite() -> None:
     assert torch.isfinite(loss)
 
 
+
+
+def test_inner_core_mask_uses_geographic_center_and_bounds() -> None:
+    model = _model(inner_core_radius_km=20.0)
+    reference = torch.zeros(1, 1, 3, 3)
+
+    mask = model._inner_core_mask(
+        {
+            "center": torch.tensor([[0.0, 0.0]]),
+            "target_bounds": torch.tensor([[-1.0, 1.0, -1.0, 1.0]]),
+        },
+        reference,
+    )
+
+    assert mask.sum() == 1
+    assert mask[0, 0, 1, 1]
+
+def test_sharp_probabilistic_objective_is_finite() -> None:
+    model = _model(
+        min_snr_gamma=5.0,
+        condition_dropout_probability=0.1,
+        gradient_loss_weight=0.05,
+        spectrum_loss_weight=0.05,
+        low_frequency_loss_weight=0.1,
+        high_wind_loss_weight=2.0,
+        high_gradient_loss_weight=2.0,
+        low_frequency_kernel_size=3,
+    )
+    batch = _batch()
+
+    with patch.object(model, "log"), patch(
+        "torch.randint", return_value=torch.zeros(1, dtype=torch.long)
+    ):
+        loss = model.training_step(batch, 0)
+
+    assert loss.ndim == 0
+    assert torch.isfinite(loss)
+
 def test_validation_statistics_compare_reconstruction_to_selected_baseline() -> None:
     model = _model()
     batch = _batch(height=2, width=2)
@@ -282,4 +320,14 @@ def test_deterministic_residual_diffusion_preset_requires_external_checkpoint() 
     assert config["data"]["target_size"] == [256, 256]
     assert config["data"]["center_crop_size"] == [192, 192]
     assert config["trainer"]["max_epochs"] == 5000
-    assert config["trainer"]["checkpoint"]["monitor"] == "val/loss"
+    assert config["trainer"]["checkpoint"]["monitor"] == "val/probabilistic_refinement_score"
+    assert config["data"]["include_test_in_train"] is True
+    assert config["optimization"]["min_snr_gamma"] == 5.0
+    assert config["validation"]["ensemble_size"] == 4
+    assert config["model"]["sampling"]["guidance_scale"] == 1.5
+    assert (
+        config["model"]["classifier_free_guidance"][
+            "condition_dropout_probability"
+        ]
+        == 0.1
+    )

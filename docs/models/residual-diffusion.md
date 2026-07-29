@@ -50,6 +50,35 @@ the existing image and eye-structure metrics.
 `mae_skill_vs_baseline`, so a deterministic stack is measured directly against
 the frozen reconstruction it is meant to improve.
 
+## Sharp probabilistic refinement
+
+The deterministic-baseline preset keeps epsilon diffusion as the generative
+objective and adds four controls aimed at sharp, plausible samples:
+
+- Min-SNR weighting prevents easy, nearly clean timesteps from dominating.
+- Observed SAR and off-swath zero-residual losses are normalized separately, so
+  swath area does not change the configured anchor strength.
+- Inner-core, high-wind, and high-gradient pixels receive modest extra noise-loss weight.
+- At low and medium noise levels, the clean residual estimate receives weak
+  gradient-magnitude, log-spectrum, and low-frequency consistency losses.
+
+The spectrum term compares amplitude rather than phase. It can therefore reward
+SAR-like high-frequency energy without requiring an uncertain feature to occur
+at exactly the observed pixel. The low-frequency term keeps samples tied to the
+broad deterministic reconstruction.
+
+Ten percent condition dropout trains an unconditional branch without changing
+the U-Net shape. Sampling then uses classifier-free guidance; the preset starts
+at `guidance_scale: 1.5`. Higher guidance generally favors condition fidelity
+and lower guidance preserves more diversity.
+
+Validation uses four stable latent members on its first reconstruction batch.
+It reports CRPS, spread, pairwise diversity, ensemble-mean and best-member MAE,
+gradient sharpness ratio, log-spectrum error, and a composite
+`probabilistic_refinement_score`. Checkpoints use the composite score. Inspect
+individual members rather than the ensemble mean when judging sharpness,
+because averaging valid alternatives is expected to blur them.
+
 ## Configuration
 
 The portable ERA5-baseline preset is:

@@ -74,10 +74,23 @@ def _run_reverse_process(
     sampler,
     *,
     condition=None,
+    unconditional_condition=None,
+    guidance_scale=1.0,
     generator=None,
     verbose=False,
 ):
     """Run one sampler schedule with shared conditional/unconditional dispatch."""
+    guidance_scale = float(guidance_scale)
+    if guidance_scale < 0:
+        raise ValueError("guidance_scale must be non-negative")
+    if condition is None and unconditional_condition is not None:
+        raise ValueError("unconditional_condition requires a condition")
+    if unconditional_condition is not None and (
+        unconditional_condition.shape != condition.shape
+    ):
+        raise ValueError(
+            "unconditional_condition must have the same shape as condition"
+        )
     timestep_values = sampler.timesteps.detach().cpu().tolist()
     iterator = (
         tqdm(timestep_values, desc="diffusion sampling", total=len(timestep_values))
@@ -90,6 +103,18 @@ def _run_reverse_process(
         )
         model_input = x_t if condition is None else torch.cat([x_t, condition], dim=1)
         noise_pred = model(model_input, t)
+        if (
+            condition is not None
+            and unconditional_condition is not None
+            and guidance_scale != 1.0
+        ):
+            unconditional_input = torch.cat(
+                [x_t, unconditional_condition], dim=1
+            )
+            unconditional_noise = model(unconditional_input, t)
+            noise_pred = unconditional_noise + guidance_scale * (
+                noise_pred - unconditional_noise
+            )
         x_t = sampler(x_t, t, noise_pred, generator=generator)
     return x_t
 
@@ -252,6 +277,8 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
         verbose=False,
         initial_noise=None,
         generator=None,
+        guidance_scale=1.0,
+        unconditional_condition=None,
     ):
         """Run a complete conditional reverse process.
 
@@ -263,6 +290,10 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
         model_parameter = next(self.model.parameters())
         device = model_parameter.device
         condition = condition.to(device=device, dtype=model_parameter.dtype)
+        if unconditional_condition is not None:
+            unconditional_condition = unconditional_condition.to(
+                device=device, dtype=model_parameter.dtype
+            )
         sampler = _prepare_sampler(
             self.sampler, sampler, self.forward_process, device
         )
@@ -278,34 +309,101 @@ class DenoisingDiffusionConditionalProcess(nn.Module):
             x_t,
             sampler,
             condition=condition,
+            unconditional_condition=unconditional_condition,
+            guidance_scale=guidance_scale,
             generator=generator,
             verbose=verbose,
         )
         
-    def p_loss(self,output,condition,mask=None):
-        """
-            Assumes output and input are in [-1,+1] range
-        """        
-        
-        b,c,h,w=output.shape
-        device=output.device
-        
-        # loss for training
-        
-        # input is the optional condition
-        t = torch.randint(0, self.forward_process.num_timesteps, (b,), device=device).long()
-        output_noisy, noise=self.forward_process(output,t,return_noise=True)        
+    def diffusion_terms(self, output, condition, t=None):
+        """Return one noisy training problem and its clean-sample estimate."""
+        batch_size = output.shape[0]
+        device = output.device
+        if t is None:
+            t = torch.randint(
+                0,
+                self.forward_process.num_timesteps,
+                (batch_size,),
+                device=device,
+            ).long()
+        elif t.shape != (batch_size,):
+            raise ValueError(f"t must have shape ({batch_size},)")
+        output_noisy, noise = self.forward_process(
+            output, t, return_noise=True
+        )
+        model_input = torch.cat([output_noisy, condition], 1).to(device)
+        noise_hat = self.model(model_input, t)
+        alpha_bar = self.forward_process.alphas_cumprod[t].view(
+            batch_size, *((1,) * (output.ndim - 1))
+        ).to(device=device, dtype=output.dtype)
+        clean_prediction = (
+            output_noisy
+            - (1.0 - alpha_bar).clamp_min(0).sqrt() * noise_hat
+        ) / alpha_bar.clamp_min(1e-20).sqrt()
+        snr = (
+            self.forward_process.alphas_cumprod[t]
+            / (1.0 - self.forward_process.alphas_cumprod[t]).clamp_min(1e-20)
+        ).to(device=device, dtype=output.dtype)
+        return {
+            "t": t,
+            "noise": noise,
+            "noise_prediction": noise_hat,
+            "squared_error": (noise - noise_hat).square(),
+            "clean_prediction": clean_prediction,
+            "snr": snr,
+        }
 
-        # reverse pass
-        model_input=torch.cat([output_noisy,condition],1).to(device)
-        noise_hat = self.model(model_input, t) 
-            
-        # apply loss
-        if mask is not None:
-            mask = mask.to(device=device, dtype=noise.dtype)
-            if mask.ndim == 3:
-                mask = mask.unsqueeze(1)
-            if mask.shape[1] == 1 and noise.shape[1] != 1:
-                mask = mask.expand_as(noise)
-            return ((noise - noise_hat).pow(2) * mask).sum() / mask.sum().clamp_min(1.0)
-        return self.loss_fn(noise, noise_hat)
+    @staticmethod
+    def weighted_loss(values, weight=None, sample_weight=None):
+        """Average BCHW losses with optional pixel and per-sample weights."""
+        combined = torch.ones_like(values)
+        if weight is not None:
+            weight = weight.to(device=values.device, dtype=values.dtype)
+            if weight.ndim == 3:
+                weight = weight.unsqueeze(1)
+            if weight.shape[1] == 1 and values.shape[1] != 1:
+                weight = weight.expand_as(values)
+            combined = combined * weight
+        if sample_weight is not None:
+            sample_weight = sample_weight.to(
+                device=values.device, dtype=values.dtype
+            )
+            sample_weight = sample_weight.view(
+                values.shape[0], *((1,) * (values.ndim - 1))
+            )
+            combined = combined * sample_weight
+        return (values * combined).sum() / combined.sum().clamp_min(1.0)
+
+    @staticmethod
+    def min_snr_weight(snr, gamma):
+        """Return epsilon-prediction Min-SNR weights."""
+        if gamma is None:
+            return torch.ones_like(snr)
+        gamma = float(gamma)
+        if gamma <= 0:
+            raise ValueError("min_snr_gamma must be positive")
+        return snr.clamp(max=gamma) / snr.clamp_min(1e-20)
+
+    def p_loss(
+        self,
+        output,
+        condition,
+        mask=None,
+        *,
+        min_snr_gamma=None,
+        t=None,
+        return_details=False,
+    ):
+        """Train epsilon prediction with optional masking and Min-SNR weighting."""
+        details = self.diffusion_terms(output, condition, t=t)
+        timestep_weight = self.min_snr_weight(
+            details["snr"], min_snr_gamma
+        )
+        loss = self.weighted_loss(
+            details["squared_error"], mask, timestep_weight
+        )
+        if return_details:
+            details["timestep_weight"] = timestep_weight
+            details["loss"] = loss
+            return details
+        return loss

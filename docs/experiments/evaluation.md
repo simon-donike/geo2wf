@@ -23,6 +23,22 @@ Predictions are mapped back to m/s using per-channel affine parameters. Metrics 
 
 Positive skill means lower MAE than ERA5; zero ties ERA5; negative skill is worse. The residual model also logs signed bias, Huber loss, PSNR in m/s, and high-wind skill above 17 m/s.
 
+## Probabilistic refinement metrics
+
+Residual diffusion evaluates multiple stable samples without averaging away
+their detail.
+
+| Metric | Better | Meaning |
+|---|---|---|
+| `ensemble_crps_ms` | lower | calibrated scalar ensemble error in m/s |
+| `ensemble_spread_ms` | contextual | mean per-pixel ensemble standard deviation |
+| `ensemble_diversity_ms` | contextual | mean pairwise member difference |
+| `ensemble_mean_mae_ms` | lower | MAE of the ensemble mean; expected to look smoother |
+| `ensemble_best_member_mae_ms` | lower | best complete member per image, not per-pixel cherry-picking |
+| `ensemble_sharpness_ratio` | near 1 | sampled versus observed gradient magnitude |
+| `ensemble_log_spectrum_error` | lower | mismatch in masked log-amplitude spectra |
+| `probabilistic_refinement_score` | lower | CRPS plus configured spectrum and sharpness penalties |
+
 ## Storm-centric structure
 
 All storm metrics use only observed target pixels and geographic distance from
