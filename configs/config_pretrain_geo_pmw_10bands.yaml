@@ -31,14 +31,14 @@ data:
     persistent_workers: false
 
 model:
-  in_channels: 11  # Ten GEO bands plus one binary valid-pixel mask.
+  in_channels: 12  # Ten GEO bands plus distance-to-center and valid-pixel mask.
   out_channels: 1  # One PMW brightness-temperature target channel.
   num_timesteps: 1000
   schedule: linear
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
-    channels: 12  # Eleven condition channels plus one noisy target channel.
+    channels: 13  # Twelve condition channels plus one noisy target channel.
     out_dim: 1
 
 optimization:

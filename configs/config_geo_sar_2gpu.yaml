@@ -17,14 +17,14 @@ data:
     persistent_workers: true
 
 model:
-  in_channels: 5
+  in_channels: 6
   out_channels: 1
   num_timesteps: 1000
   schedule: linear
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
-    channels: 6
+    channels: 7
     out_dim: 1
 
 optimization:

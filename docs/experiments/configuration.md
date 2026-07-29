@@ -24,10 +24,10 @@ This is the most important invariant to preserve.
 
     ```yaml
     model:
-      in_channels: 20       # 10 GEO + 9 ERA5 + condition mask
+      in_channels: 21       # 10 GEO + 9 ERA5 + distance + condition mask
       out_channels: 1
       unet:
-        channels: 21        # prepared condition + noisy target
+        channels: 22        # prepared condition + noisy target
         out_dim: 1
     ```
 
@@ -36,10 +36,10 @@ This is the most important invariant to preserve.
     ```yaml
     model:
       type: diffusion_residual
-      in_channels: 20       # existing prepared condition
+      in_channels: 21       # prepared condition, including distance and mask
       out_channels: 1
       unet:
-        channels: 23        # noisy residual + condition + baseline + mask
+        channels: 24        # noisy residual + condition + baseline + mask
         out_dim: 1
     ```
 
@@ -48,7 +48,7 @@ This is the most important invariant to preserve.
     ```yaml
     model:
       type: deterministic_residual
-      condition_channels: 19  # 10 GEO + 9 ERA5; masks appended in model
+      condition_channels: 20  # 10 GEO + 9 ERA5 + distance; masks appended
     ```
 
 A mismatch fails at convolution or explicit input validation; it is not inferred from a batch.

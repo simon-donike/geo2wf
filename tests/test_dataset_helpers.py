@@ -14,6 +14,7 @@ from data.dataset import (
     _center_crop_bounds,
     _json_list,
     _normalize,
+    _normalized_distance_to_center,
     _paired_random_flips,
     _resize_target,
     _row_float,
@@ -49,6 +50,31 @@ def test_center_crop_preserves_pixel_scale_and_updates_bounds() -> None:
     assert torch.equal(
         cropped_bounds, torch.tensor([1.0, 5.0, 11.0, 15.0])
     )
+
+
+def test_distance_to_ibtracs_center_is_normalized_over_pixel_centers() -> None:
+    distance = _normalized_distance_to_center(
+        torch.tensor([0.0, 2.0, 0.0, 2.0], dtype=torch.float64),
+        (2, 2),
+        torch.tensor([0.5, 0.5], dtype=torch.float64),
+    )
+
+    assert distance.shape == (1, 2, 2)
+    assert distance.dtype == torch.float32
+    assert distance[0, 1, 0] == 0.0
+    assert distance.max() == 1.0
+    assert torch.all((0.0 <= distance) & (distance <= 1.0))
+
+
+def test_distance_to_ibtracs_center_wraps_longitude_at_dateline() -> None:
+    distance = _normalized_distance_to_center(
+        torch.tensor([179.0, 181.0, -1.0, 1.0], dtype=torch.float64),
+        (2, 2),
+        torch.tensor([0.5, -179.5], dtype=torch.float64),
+    )
+
+    assert distance[0, 0, 1] == 0.0
+    assert distance.max() == 1.0
 
 
 def test_paired_random_flips_applies_same_spatial_flips_to_all_tensors(monkeypatch) -> None:

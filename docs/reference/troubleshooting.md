@@ -13,11 +13,16 @@ Training consumes an already exported root. Confirm `data.root/<split>/manifest.
 Recalculate:
 
 ```text
-prepared condition = GEO + optional ERA5 + 1 condition mask
+prepared condition = GEO + optional ERA5 + distance-to-center + condition mask
 unet.channels      = prepared condition + noisy target
 ```
 
-The residual config is different: `condition_channels` excludes the three internally appended mask/baseline features.
+The residual config is different: `condition_channels` includes distance-to-center but excludes the three internally appended mask/baseline features.
+
+Checkpoints trained before the distance channel was added have a narrower first
+convolution and are not shape-compatible with these configs. Start a new run;
+for deterministic-baseline residual diffusion, retrain and select a 20-channel
+deterministic baseline checkpoint first.
 
 ## No `val/eye_structure_score`
 

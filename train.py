@@ -123,7 +123,7 @@ def build_model(config: dict) -> pl.LightningModule:
         }
         if model_type == "diffusion":
             return PixelDiffusionConditional(
-                condition_channels=model_cfg.get("in_channels", 2),
+                condition_channels=model_cfg.get("in_channels", 3),
                 **diffusion_kwargs,
             )
 
@@ -144,7 +144,7 @@ def build_model(config: dict) -> pl.LightningModule:
                 )
             baseline_model = load_frozen_deterministic_baseline(checkpoint_path)
         return ERA5ResidualDiffusion(
-            base_condition_channels=model_cfg.get("in_channels", 20),
+            base_condition_channels=model_cfg.get("in_channels", 21),
             baseline_source=baseline_source,
             baseline_model=baseline_model,
             residual_soft_scale_ms=residual_cfg.get("soft_scale_ms", 5.0),
@@ -188,7 +188,7 @@ def build_model(config: dict) -> pl.LightningModule:
         return ERA5ResidualRegressor(
             condition_channels=model_cfg.get(
                 "condition_channels",
-                model_cfg.get("in_channels", 19),
+                model_cfg.get("in_channels", 20),
             ),
             base_channels=residual_cfg.get("base_channels", 32),
             channel_mults=tuple(
