@@ -146,8 +146,11 @@ The ERA5 variants save seven single-level ERA5 fields as a companion
 MSLP, 2m temperature, 2m dewpoint, and 10m u/v wind. The dataset loader reads
 that companion file when `context_path` is present, derives 10m wind speed and
 10m relative vorticity from u/v wind, and concatenates the ERA5 context with GEO
-at load time. With 10 GEO bands this gives `10 + 9 + 1 mask = 20` model input
-channels and a one-channel target.
+at load time. It then appends a `distance_to_ibtracs_center` raster: great-circle
+distance from every final-crop pixel center to the IBTrACS storm center, divided
+by the farthest distance in that crop. With 10 GEO bands this gives
+`10 + 9 + 1 distance + 1 mask = 21` model input channels and a one-channel
+target.
 
 The exporter stores raw physical values in GeoTIFFs with internal masks and
 metadata tags. The training dataset handles file-format details and min-max
@@ -161,10 +164,10 @@ Important channel settings:
 
 ```yaml
 model:
-  in_channels: 5
+  in_channels: 6
   out_channels: 1
   unet:
-    channels: 6
+    channels: 7
     out_dim: 1
 ```
 

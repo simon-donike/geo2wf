@@ -166,7 +166,7 @@ class ERA5ResidualRegressor(pl.LightningModule):
 
     def __init__(
         self,
-        condition_channels: int = 19,
+        condition_channels: int = 20,
         base_channels: int = 32,
         channel_mults: Sequence[int] = (1, 2, 4, 8),
         huber_delta_ms: float = 2.0,

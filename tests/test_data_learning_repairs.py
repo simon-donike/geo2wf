@@ -14,6 +14,7 @@ from torch.utils.data import SequentialSampler, TensorDataset
 
 from data.datamodule import PairedDataModule, _storm_stratified_indices
 from data.dataset import (
+    DISTANCE_TO_IBTRACS_CENTER,
     ERA5_RELATIVE_VORTICITY_10M,
     ERA5_WIND_SPEED_10M,
     PairedImageDataset,
@@ -269,8 +270,8 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
                 "condition_sensor": "ABI",
                 "target_sensor": "SAR",
                 "dt_minutes": 0.0,
-                "ibtracs_center_lat": 1.0,
-                "ibtracs_center_lon": 1.0,
+                "ibtracs_center_lat": 0.5,
+                "ibtracs_center_lon": 0.5,
             }
         ]
     ).to_csv(split_dir / "manifest.csv", index=False)
@@ -313,9 +314,14 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
 
     sample = PairedImageDataset(tmp_path, "train", target_size=(2, 2))[0]
 
-    assert sample["condition"].shape == (5, 2, 2)
+    assert sample["condition"].shape == (6, 2, 2)
     assert torch.allclose(sample["condition"][3], torch.full((2, 2), 5.0 / 85.0))
     assert torch.allclose(sample["condition"][4], torch.full((2, 2), 0.5))
+    assert sample["condition"][5, 1, 0] == 0.0
+    assert sample["condition"][5].max() == 1.0
+    assert sample["meta"]["condition_channels"][-1] == (
+        DISTANCE_TO_IBTRACS_CENTER
+    )
     assert torch.allclose(sample["target_norm_offset"], torch.tensor([0.0]))
     assert torch.allclose(sample["target_norm_scale"], torch.tensor([10.0]))
     assert torch.allclose(

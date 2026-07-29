@@ -8,13 +8,15 @@
 
 ## Input and architecture
 
-The dataset supplies 19 condition channels: 10 GEO, seven source ERA5 fields, derived wind speed, and derived relative vorticity. The model appends:
+The dataset supplies 20 condition channels: 10 GEO, seven source ERA5 fields,
+derived wind speed, derived relative vorticity, and normalized distance to the
+IBTrACS center. The model appends:
 
 1. the condition-validity mask;
 2. explicit target-normalized ERA5 wind speed; and
 3. the ERA5 wind-validity mask.
 
-Its U-Net therefore receives 22 channels. The compact backbone uses two GroupNorm/SiLU residual blocks per resolution, strided convolution downsampling, bilinear upsampling, encoder skips, and a one-channel residual head.
+Its U-Net therefore receives 23 channels. The compact backbone uses two GroupNorm/SiLU residual blocks per resolution, strided convolution downsampling, bilinear upsampling, encoder skips, and a one-channel residual head.
 
 The final head starts with all weights and bias at zero. Before the first update, the predicted residual is zero and the physical prediction is exactly ERA5. This makes the baseline meaningful from step zero and focuses learning on corrections.
 

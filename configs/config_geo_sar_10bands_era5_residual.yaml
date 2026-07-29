@@ -47,9 +47,9 @@ data:
 
 model:
   type: deterministic_residual
-  # Ten GEO bands plus seven source and two derived ERA5 fields. Masks and the
-  # explicit ERA5 wind baseline are appended by ERA5ResidualRegressor.
-  condition_channels: 19
+  # Ten GEO bands, seven source and two derived ERA5 fields, and normalized
+  # distance-to-center. Masks and the ERA5 baseline are appended internally.
+  condition_channels: 20
   residual:
     base_channels: 32
     channel_mults: [1, 2, 4, 8]

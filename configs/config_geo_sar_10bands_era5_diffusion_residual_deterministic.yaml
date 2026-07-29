@@ -48,9 +48,9 @@ data:
 
 model:
   type: diffusion_residual
-  # Existing prepared condition: ten GEO + nine ERA5 + aggregate valid mask.
+  # Prepared condition: ten GEO + nine ERA5 + distance + aggregate valid mask.
   # ERA5ResidualDiffusion appends the exact baseline and its validity mask.
-  in_channels: 20
+  in_channels: 21
   out_channels: 1
   num_timesteps: 1000
   schedule: cosine
@@ -74,7 +74,7 @@ model:
     # the GEO2WF_BASELINE_CKPT environment variable.
     baseline:
       source: deterministic
-      checkpoint_path: logs/20260729-100203_config_geo_sar_10bands_era5_residual/checkpoints/epoch=053-step=13122.ckpt
+      checkpoint_path: logs/20260729-172117_config_geo_sar_10bands_era5_residual/checkpoints/epoch=062-step=7686.ckpt
     # Odd asinh transform: resolves small corrections without clipping the rare
     # intense positive tail into the narrow bulk of the residual distribution.
     soft_scale_ms: 5.0
@@ -98,7 +98,7 @@ model:
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
-    channels: 23  # Noisy residual + 22 prepared condition channels.
+    channels: 24  # Noisy residual + 23 prepared condition channels.
     out_dim: 1
 
 optimization:

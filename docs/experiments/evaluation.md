@@ -42,8 +42,9 @@ their detail.
 ## Storm-centric structure
 
 All storm metrics use only observed target pixels and geographic distance from
-the IBTrACS center. The center metadata is used by evaluation code; it is not an
-input channel, target, or output of either neural network.
+the IBTrACS center. The same center metadata creates the normalized
+`distance_to_ibtracs_center` condition channel. The center is not a target or
+output of either neural network.
 
 | Metric | Definition |
 |---|---|

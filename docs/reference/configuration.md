@@ -36,6 +36,7 @@
 | `root`, `stats_file` | exported dataset and statistics paths |
 | `train_split`, `val_split`, `test_split` | manifest directory names |
 | `target_size` | runtime target height/width |
+| `center_crop_size` | optional final center crop; distance normalization uses these final bounds |
 | `random_flips` | paired, vector-aware augmentation in train |
 | `include_test_in_train` | concatenate test into train |
 | `require_era5` | filter samples without context |

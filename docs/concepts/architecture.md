@@ -12,7 +12,7 @@ flowchart TB
 
   subgraph Runtime[Training runtime]
     C --> D[PairedImageDataset]
-    D --> N[Normalize, derive ERA5, resize, augment]
+    D --> N[Normalize, derive ERA5 and storm distance, crop, augment]
     N --> L[PairedDataModule]
     L --> B{model.type}
     B -->|diffusion| X[PixelDiffusionConditional]
@@ -53,7 +53,7 @@ model:
 | Layer | Owns | Does not own |
 |---|---|---|
 | Exporter | observation pairing, grid construction, regridding, GeoTIFF tags/masks, train stats | model normalization tensors, batching |
-| Dataset | file reads, derived ERA5 channels, normalization, resize, augmentation, sample metadata | split shuffling, device placement |
+| Dataset | file reads, derived ERA5/storm-distance channels, normalization, resize, augmentation, sample metadata | split shuffling, device placement |
 | DataModule | split construction and DataLoaders | scientific transforms |
 | LightningModule | loss, optimizer, sampling, metrics, shared reconstruction logging | manifest parsing or raster I/O |
 | Trainer | epochs, devices, precision, DDP, callbacks | experiment semantics |

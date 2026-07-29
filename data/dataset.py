@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
+DISTANCE_TO_IBTRACS_CENTER = "distance_to_ibtracs_center"
 
 EARTH_RADIUS_M = 6_371_000.0
 ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
@@ -119,6 +120,7 @@ class PairedImageDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
         row = self.samples.iloc[idx]
+        storm_center = _manifest_ibtracs_center(row)
         condition_source_type = _row_value(row, "condition_source_type", "geo")
         target_source_type = _row_value(row, "target_source_type", "sar")
         condition_channels = _json_list(
@@ -307,6 +309,25 @@ class PairedImageDataset(Dataset):
                 era5_wind_speed_mask = _center_crop(
                     era5_wind_speed_mask, self.center_crop_size
                 )
+        distance_to_center = _normalized_distance_to_center(
+            condition_bounds,
+            condition.shape[-2:],
+            storm_center,
+        )
+        condition = torch.cat([condition, distance_to_center], dim=0)
+        condition_channels = condition_channels + [
+            DISTANCE_TO_IBTRACS_CENTER
+        ]
+        condition_zero_values = torch.cat(
+            [condition_zero_values, condition_zero_values.new_zeros(1)]
+        )
+        condition_channel_mask = torch.cat(
+            [
+                condition_channel_mask,
+                torch.ones_like(distance_to_center, dtype=torch.bool),
+            ],
+            dim=0,
+        )
         if self.augment:
             flip_state = _random_flip_state()
             condition, target, condition_mask, target_mask = _paired_random_flips(
@@ -340,7 +361,7 @@ class PairedImageDataset(Dataset):
             "target_mask": target_mask,
             "condition_bounds": condition_bounds,
             "target_bounds": target_bounds,
-            "center": _manifest_ibtracs_center(row),
+            "center": storm_center,
             "sample_id": str(row["sample_id"]),
             "meta": {
                 "storm_id": str(row["storm_id"]),
@@ -430,6 +451,51 @@ def _center_crop_bounds(
         ]
     )
 
+
+def _normalized_distance_to_center(
+    bounds: torch.Tensor,
+    size: tuple[int, int],
+    center: torch.Tensor,
+) -> torch.Tensor:
+    """Return great-circle distance to an IBTrACS center, scaled to [0, 1]."""
+    height, width = size
+    if height <= 0 or width <= 0:
+        raise ValueError("distance raster dimensions must be positive")
+    if center.numel() != 2 or not torch.isfinite(center).all():
+        raise ValueError(
+            "a finite IBTrACS latitude/longitude center is required to build "
+            "the distance-to-center input"
+        )
+
+    left, right, bottom, top = bounds.to(dtype=torch.float64).unbind()
+    center_latitude, center_longitude = center.to(dtype=torch.float64).unbind()
+    row = torch.arange(height, dtype=torch.float64, device=bounds.device) + 0.5
+    column = torch.arange(width, dtype=torch.float64, device=bounds.device) + 0.5
+    latitude = top - row[:, None] * (top - bottom) / height
+    longitude = left + column[None, :] * (right - left) / width
+
+    latitude_radians = torch.deg2rad(latitude)
+    center_latitude_radians = torch.deg2rad(center_latitude)
+    delta_latitude = latitude_radians - center_latitude_radians
+    delta_longitude = torch.deg2rad(
+        torch.remainder(longitude - center_longitude + 180.0, 360.0) - 180.0
+    )
+    haversine = (
+        torch.sin(delta_latitude / 2.0).square()
+        + torch.cos(latitude_radians)
+        * torch.cos(center_latitude_radians)
+        * torch.sin(delta_longitude / 2.0).square()
+    ).clamp(0.0, 1.0)
+    angular_distance = 2.0 * torch.atan2(
+        torch.sqrt(haversine),
+        torch.sqrt((1.0 - haversine).clamp_min(0.0)),
+    )
+    max_distance = angular_distance.max()
+    if max_distance > torch.finfo(angular_distance.dtype).eps:
+        angular_distance = angular_distance / max_distance
+    else:
+        angular_distance = torch.zeros_like(angular_distance)
+    return angular_distance.to(dtype=torch.float32).unsqueeze(0)
 
 
 def _paired_random_flips(
