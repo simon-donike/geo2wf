@@ -145,8 +145,12 @@ def test_fixed_initial_noise_is_stable_per_sample_id() -> None:
 
     first = module._fixed_initial_noise(batch, 0, 0, condition)
     second = module._fixed_initial_noise(batch, 99, 1, condition)
+    alternate = module._fixed_initial_noise(
+        batch, 99, 1, condition, ensemble_index=1
+    )
 
     assert torch.equal(first, second)
+    assert not torch.equal(first, alternate)
     assert not torch.equal(first[0], first[1])
 
 
@@ -199,3 +203,34 @@ def test_checkpoint_rejects_silent_noise_schedule_change() -> None:
 
     with pytest.raises(ValueError, match="do not match the configured"):
         cosine.on_load_checkpoint({"state_dict": linear.state_dict()})
+
+
+def test_perfect_ensemble_has_zero_crps_and_unit_sharpness() -> None:
+    module = _helper()
+    module.probabilistic_score_sharpness_weight = 2.0
+    target = torch.tensor(
+        [[[[0.0, 0.2, 0.4], [0.1, 0.5, 0.8], [0.3, 0.7, 1.0]]]]
+    )
+    ensemble = target.unsqueeze(0).repeat(3, 1, 1, 1, 1)
+    mask = torch.ones_like(target, dtype=torch.bool)
+
+    metrics = module._ensemble_probabilistic_metrics(
+        ensemble,
+        {
+            "target_physical": target * 10.0,
+            "target_mask": mask,
+            "target_norm_offset": torch.tensor([[0.0]]),
+            "target_norm_scale": torch.tensor([[10.0]]),
+        },
+    )
+
+    assert torch.allclose(metrics["ensemble_crps_ms"], torch.tensor(0.0))
+    assert torch.allclose(metrics["ensemble_spread_ms"], torch.tensor(0.0))
+    assert torch.allclose(
+        metrics["ensemble_sharpness_ratio"], torch.tensor(1.0)
+    )
+    assert torch.allclose(
+        metrics["probabilistic_refinement_score"],
+        torch.tensor(0.0),
+        atol=1e-6,
+    )

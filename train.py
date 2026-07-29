@@ -64,6 +64,7 @@ def build_model(config: dict) -> pl.LightningModule:
         unet_cfg = model_cfg.get("unet", {})
         sampling_cfg = model_cfg.get("sampling", {})
         sparse_cfg = model_cfg.get("sparse_target", {})
+        guidance_cfg = model_cfg.get("classifier_free_guidance", {})
         ema_cfg = opt_cfg.get("ema", {})
         ema_decay = (
             ema_cfg.get("decay", 0.999)
@@ -91,6 +92,7 @@ def build_model(config: dict) -> pl.LightningModule:
             "sampling_method": sampling_cfg.get("method", "ddpm"),
             "sampling_timesteps": sampling_cfg.get("timesteps"),
             "sampling_eta": sampling_cfg.get("eta", 0.0),
+            "guidance_scale": sampling_cfg.get("guidance_scale", 1.0),
             "clip_sample": sampling_cfg.get("clip_sample", True),
             "sparse_target_fill": sparse_cfg.get("fill"),
             "unobserved_loss_weight": sparse_cfg.get(
@@ -101,6 +103,19 @@ def build_model(config: dict) -> pl.LightningModule:
             ),
             "validation_seed": validation_cfg.get(
                 "sampling_seed", config.get("seed", 42)
+            ),
+            "validation_ensemble_size": validation_cfg.get(
+                "ensemble_size", 1
+            ),
+            "validation_ensemble_batches": validation_cfg.get(
+                "ensemble_batches", 1
+            ),
+            "probabilistic_score_sharpness_weight": validation_cfg.get(
+                "probabilistic_score_sharpness_weight", 2.0
+            ),
+            "min_snr_gamma": opt_cfg.get("min_snr_gamma"),
+            "condition_dropout_probability": guidance_cfg.get(
+                "condition_dropout_probability", 0.0
             ),
             "ema_decay": ema_decay,
             "ema_update_after_step": ema_cfg.get("update_after_step", 0),
@@ -113,6 +128,7 @@ def build_model(config: dict) -> pl.LightningModule:
             )
 
         residual_cfg = model_cfg.get("residual", {})
+        residual_loss_cfg = residual_cfg.get("loss", {})
         baseline_cfg = residual_cfg.get("baseline", {})
         baseline_source = str(baseline_cfg.get("source", "era5")).lower()
         baseline_model = None
@@ -135,6 +151,35 @@ def build_model(config: dict) -> pl.LightningModule:
             residual_clip_ms=residual_cfg.get("clip_ms", 80.0),
             prediction_min_ms=residual_cfg.get("prediction_min_ms", 0.0),
             prediction_max_ms=residual_cfg.get("prediction_max_ms", 80.0),
+            gradient_loss_weight=residual_loss_cfg.get("gradient_weight", 0.0),
+            spectrum_loss_weight=residual_loss_cfg.get("spectrum_weight", 0.0),
+            low_frequency_loss_weight=residual_loss_cfg.get(
+                "low_frequency_weight", 0.0
+            ),
+            auxiliary_max_timestep_fraction=residual_loss_cfg.get(
+                "auxiliary_max_timestep_fraction", 0.5
+            ),
+            high_wind_threshold_ms=residual_loss_cfg.get(
+                "high_wind_threshold_ms", 17.0
+            ),
+            high_wind_loss_weight=residual_loss_cfg.get(
+                "high_wind_weight", 1.0
+            ),
+            inner_core_radius_km=residual_loss_cfg.get(
+                "inner_core_radius_km", 100.0
+            ),
+            inner_core_loss_weight=residual_loss_cfg.get(
+                "inner_core_weight", 1.0
+            ),
+            high_gradient_threshold_ms=residual_loss_cfg.get(
+                "high_gradient_threshold_ms", 2.0
+            ),
+            high_gradient_loss_weight=residual_loss_cfg.get(
+                "high_gradient_weight", 1.0
+            ),
+            low_frequency_kernel_size=residual_loss_cfg.get(
+                "low_frequency_kernel_size", 9
+            ),
             **diffusion_kwargs,
         )
 

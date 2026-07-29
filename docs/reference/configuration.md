@@ -61,6 +61,8 @@
 | `sampling.method` | `ddpm` or `ddim` |
 | `sampling.timesteps` | reverse steps; DDPM must equal training steps |
 | `sampling.eta` | DDIM stochasticity |
+| `sampling.guidance_scale` | classifier-free guidance strength; `1` disables guidance |
+| `classifier_free_guidance.condition_dropout_probability` | complete-condition dropout used to train CFG |
 | `sampling.clip_sample` | per-step clean estimate clipping |
 | `sparse_target.fill` | `era5` or disabled |
 | `sparse_target.unobserved_loss_weight` | weak ERA5 completion weight in `[0,1]` |
@@ -74,6 +76,11 @@
 | `residual.baseline.checkpoint_path` | frozen deterministic checkpoint; may instead use `GEO2WF_BASELINE_CKPT` |
 | `residual.soft_scale_ms`, `clip_ms` | odd asinh residual transform parameters |
 | `residual.prediction_min_ms`, `prediction_max_ms` | recomposed physical output bounds |
+| `residual.loss.gradient_weight`, `spectrum_weight` | sharpness auxiliary weights |
+| `residual.loss.low_frequency_weight`, `low_frequency_kernel_size` | broad-field consistency controls |
+| `residual.loss.auxiliary_max_timestep_fraction` | latest normalized training timestep receiving clean-residual auxiliary losses |
+| `residual.loss.high_wind_*`, `high_gradient_*` | structural pixel thresholds and weights |
+| `residual.loss.inner_core_radius_km`, `inner_core_weight` | storm-centered structural emphasis |
 | `unet.channels` | noisy residual + prepared condition + explicit baseline and mask |
 
 ## Residual `model`
@@ -92,6 +99,7 @@
 | Key | Purpose |
 |---|---|
 | `lr` | AdamW learning rate |
+| `min_snr_gamma` | optional epsilon-prediction Min-SNR cap |
 | `weight_decay` | residual AdamW decay |
 | `huber_delta_ms` | residual Huber transition |
 | `off_swath_anchor_weight` | weak ERA5 residual penalty outside SAR |
@@ -113,4 +121,6 @@
 | `checkpoint.monitor`, `mode`, `save_top_k`, `save_last`, `filename` | selection policy |
 | `validation.reconstruction_batches` | reconstruction-image batches per epoch; expensive reverse sampling for diffusion, direct physical prediction for residual |
 | `validation.sampling_seed` | stable per-sample latent namespace |
+| `validation.ensemble_size`, `ensemble_batches` | stable validation ensemble width and evaluated prefix |
+| `validation.probabilistic_score_sharpness_weight` | sharpness contribution to the CRPS-based checkpoint score |
 | `logging.wandb.enabled`, `project`, `name`, `save_dir`, `log_model` | tracking configuration |

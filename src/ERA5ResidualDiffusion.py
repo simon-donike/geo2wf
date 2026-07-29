@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import torch.nn.functional as F
 
 from .ERA5Residual import ERA5ResidualRegressor
 from .PixelDiffusion import PixelDiffusionConditional
@@ -36,6 +37,17 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         residual_clip_ms: float = 80.0,
         prediction_min_ms: float | None = 0.0,
         prediction_max_ms: float | None = 80.0,
+        gradient_loss_weight: float = 0.0,
+        spectrum_loss_weight: float = 0.0,
+        low_frequency_loss_weight: float = 0.0,
+        auxiliary_max_timestep_fraction: float = 0.5,
+        high_wind_threshold_ms: float = 17.0,
+        high_wind_loss_weight: float = 1.0,
+        inner_core_radius_km: float = 100.0,
+        inner_core_loss_weight: float = 1.0,
+        high_gradient_threshold_ms: float = 2.0,
+        high_gradient_loss_weight: float = 1.0,
+        low_frequency_kernel_size: int = 9,
         **diffusion_kwargs: Any,
     ) -> None:
         if base_condition_channels <= 0:
@@ -50,6 +62,27 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             raise ValueError(
                 "residual_clip_ms must exceed residual_soft_scale_ms"
             )
+        for name, value in {
+            "gradient_loss_weight": gradient_loss_weight,
+            "spectrum_loss_weight": spectrum_loss_weight,
+            "low_frequency_loss_weight": low_frequency_loss_weight,
+        }.items():
+            if float(value) < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if not 0.0 < float(auxiliary_max_timestep_fraction) <= 1.0:
+            raise ValueError("auxiliary_max_timestep_fraction must be in (0, 1]")
+        if (
+            high_wind_loss_weight < 1.0
+            or inner_core_loss_weight < 1.0
+            or high_gradient_loss_weight < 1.0
+        ):
+            raise ValueError("structural loss weights must be at least 1")
+        if inner_core_radius_km <= 0:
+            raise ValueError("inner_core_radius_km must be positive")
+        if high_gradient_threshold_ms < 0:
+            raise ValueError("high_gradient_threshold_ms must be non-negative")
+        if low_frequency_kernel_size < 1 or low_frequency_kernel_size % 2 == 0:
+            raise ValueError("low_frequency_kernel_size must be a positive odd integer")
         if (
             prediction_min_ms is not None
             and prediction_max_ms is not None
@@ -98,6 +131,19 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         self.residual_clip_ms = float(residual_clip_ms)
         self.prediction_min_ms = prediction_min_ms
         self.prediction_max_ms = prediction_max_ms
+        self.gradient_loss_weight = float(gradient_loss_weight)
+        self.spectrum_loss_weight = float(spectrum_loss_weight)
+        self.low_frequency_loss_weight = float(low_frequency_loss_weight)
+        self.auxiliary_max_timestep_fraction = float(
+            auxiliary_max_timestep_fraction
+        )
+        self.high_wind_threshold_ms = float(high_wind_threshold_ms)
+        self.high_wind_loss_weight = float(high_wind_loss_weight)
+        self.inner_core_radius_km = float(inner_core_radius_km)
+        self.inner_core_loss_weight = float(inner_core_loss_weight)
+        self.high_gradient_threshold_ms = float(high_gradient_threshold_ms)
+        self.high_gradient_loss_weight = float(high_gradient_loss_weight)
+        self.low_frequency_kernel_size = int(low_frequency_kernel_size)
         self.baseline_model = baseline_model
         if self.baseline_model is not None:
             self.baseline_model.requires_grad_(False)
@@ -121,7 +167,13 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         return module
 
     @torch.no_grad()
-    def forward(self, batch: dict[str, torch.Tensor], *, initial_noise=None):
+    def forward(
+        self,
+        batch: dict[str, torch.Tensor],
+        *,
+        initial_noise=None,
+        guidance_scale=None,
+    ):
         """Sample and return an absolute normalized wind reconstruction."""
         prepared = self._prepare_batch_context(batch)
         condition = self._prepare_condition(prepared["condition"], prepared)
@@ -132,7 +184,18 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             and self.ema_use_for_eval
             else self.model
         )
-        residual_sample = process(condition, initial_noise=initial_noise)
+        selected_guidance = (
+            self.guidance_scale if guidance_scale is None else float(guidance_scale)
+        )
+        unconditional_condition = (
+            torch.zeros_like(condition) if selected_guidance != 1.0 else None
+        )
+        residual_sample = process(
+            condition,
+            initial_noise=initial_noise,
+            guidance_scale=selected_guidance,
+            unconditional_condition=unconditional_condition,
+        )
         return self._sample_to_prediction(residual_sample, prepared)
 
     def encode_residual(self, residual_ms: torch.Tensor) -> torch.Tensor:
@@ -272,6 +335,231 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         del batch
         # encode_residual already returns the diffusion process's [-1, 1] range.
         return target.clamp(-1.0, 1.0)
+
+    def _diffusion_loss(
+        self, model_target, condition, loss_weight, batch, *, stage
+    ):
+        """Optimize calibrated residual noise plus weak structural objectives."""
+        del loss_weight
+        prepared = self._prepare_batch_context(batch)
+        if stage == "train":
+            condition = self._condition_for_training(condition)
+        details = self.model.diffusion_terms(model_target, condition)
+        timestep_weight = self.model.min_snr_weight(
+            details["snr"], self.min_snr_gamma
+        )
+
+        target_physical = prepared["target_physical"].to(
+            device=model_target.device, dtype=model_target.dtype
+        )
+        baseline_physical = prepared[_BASELINE_PHYSICAL].to(
+            device=model_target.device, dtype=model_target.dtype
+        )
+        baseline_valid = prepared[_BASELINE_MASK].to(
+            device=model_target.device
+        ).bool()
+        observed = self._prepare_target_mask(
+            prepared["target_mask"], target_physical
+        ).bool()
+        jointly_observed = observed & baseline_valid
+        anchor_only = ~observed & baseline_valid
+        target_residual_ms = target_physical - baseline_physical
+
+        target_gradient, _ = self._gradient_magnitude(
+            target_residual_ms, jointly_observed.to(model_target.dtype)
+        )
+        structural_weight = torch.ones_like(model_target)
+        structural_weight = torch.where(
+            target_physical >= self.high_wind_threshold_ms,
+            structural_weight * self.high_wind_loss_weight,
+            structural_weight,
+        )
+        inner_core = self._inner_core_mask(prepared, model_target)
+        structural_weight = torch.where(
+            inner_core,
+            structural_weight * self.inner_core_loss_weight,
+            structural_weight,
+        )
+        structural_weight = torch.where(
+            target_gradient >= self.high_gradient_threshold_ms,
+            structural_weight * self.high_gradient_loss_weight,
+            structural_weight,
+        )
+        observation_weight = (
+            jointly_observed.to(model_target.dtype) * structural_weight
+        )
+        observation_loss = self.model.weighted_loss(
+            details["squared_error"], observation_weight, timestep_weight
+        )
+        anchor_loss = self.model.weighted_loss(
+            details["squared_error"],
+            anchor_only.to(model_target.dtype),
+            timestep_weight,
+        )
+
+        auxiliary_enabled = any(
+            weight > 0
+            for weight in (
+                self.gradient_loss_weight,
+                self.spectrum_loss_weight,
+                self.low_frequency_loss_weight,
+            )
+        )
+        if auxiliary_enabled:
+            clean_residual_ms = self.decode_residual(
+                details["clean_prediction"].clamp(-1.0, 1.0)
+            )
+            maximum_auxiliary_timestep = int(
+                (self.model.num_timesteps - 1)
+                * self.auxiliary_max_timestep_fraction
+            )
+            auxiliary_gate = (
+                details["t"] <= maximum_auxiliary_timestep
+            ).to(model_target.dtype).view(-1, 1, 1, 1)
+            auxiliary_mask = (
+                jointly_observed.to(model_target.dtype) * auxiliary_gate
+            )
+            predicted_gradient, gradient_mask = self._gradient_magnitude(
+                clean_residual_ms, auxiliary_mask
+            )
+            auxiliary_target_gradient, _ = self._gradient_magnitude(
+                target_residual_ms, auxiliary_mask
+            )
+            gradient_loss = self.model.weighted_loss(
+                (predicted_gradient - auxiliary_target_gradient).abs(),
+                gradient_mask,
+            )
+            spectrum_loss = self._masked_log_spectrum_loss(
+                clean_residual_ms, target_residual_ms, auxiliary_mask
+            )
+            low_frequency_loss = self._masked_low_frequency_loss(
+                clean_residual_ms, target_residual_ms, auxiliary_mask
+            )
+        else:
+            zero = details["squared_error"].sum() * 0.0
+            gradient_loss = zero
+            spectrum_loss = zero
+            low_frequency_loss = zero
+        loss = (
+            observation_loss
+            + self.unobserved_loss_weight * anchor_loss
+            + self.gradient_loss_weight * gradient_loss
+            + self.spectrum_loss_weight * spectrum_loss
+            + self.low_frequency_loss_weight * low_frequency_loss
+        )
+        metrics = {
+            "diffusion_observed_loss": observation_loss,
+            "diffusion_anchor_loss": anchor_loss,
+            "gradient_loss": gradient_loss,
+            "spectrum_loss": spectrum_loss,
+            "low_frequency_loss": low_frequency_loss,
+        }
+        batch_size = int(model_target.shape[0])
+        for name, value in metrics.items():
+            self.log(
+                f"{stage}/{name}",
+                value,
+                on_step=stage == "train",
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
+        return loss
+
+    def _inner_core_mask(self, batch, reference):
+        """Return pixels within the configured storm-centered physical radius."""
+        if not {"center", "target_bounds"}.issubset(batch):
+            return torch.zeros_like(reference, dtype=torch.bool)
+        center = torch.as_tensor(
+            batch["center"], device=reference.device, dtype=reference.dtype
+        )
+        bounds = torch.as_tensor(
+            batch["target_bounds"],
+            device=reference.device,
+            dtype=reference.dtype,
+        )
+        if center.ndim == 1:
+            center = center.unsqueeze(0)
+        if bounds.ndim == 1:
+            bounds = bounds.unsqueeze(0)
+        if center.shape != (reference.shape[0], 2) or bounds.shape != (
+            reference.shape[0],
+            4,
+        ):
+            return torch.zeros_like(reference, dtype=torch.bool)
+        height, width = reference.shape[-2:]
+        x_fraction = (
+            torch.arange(width, device=reference.device, dtype=reference.dtype)
+            + 0.5
+        ) / width
+        y_fraction = (
+            torch.arange(height, device=reference.device, dtype=reference.dtype)
+            + 0.5
+        ) / height
+        left, right, bottom, top = bounds.unbind(dim=1)
+        longitude = left[:, None, None] + x_fraction[None, None, :] * (
+            right - left
+        )[:, None, None]
+        latitude = top[:, None, None] - y_fraction[None, :, None] * (
+            top - bottom
+        )[:, None, None]
+        center_latitude = center[:, 0, None, None]
+        center_longitude = center[:, 1, None, None]
+        delta_longitude = torch.remainder(
+            longitude - center_longitude + 180.0, 360.0
+        ) - 180.0
+        north_km = (latitude - center_latitude) * 111.32
+        east_km = (
+            delta_longitude
+            * 111.32
+            * torch.cos(torch.deg2rad(center_latitude)).clamp_min(1e-6)
+        )
+        radius_km = torch.sqrt(north_km.square() + east_km.square())
+        valid_center = torch.isfinite(center).all(dim=1).view(-1, 1, 1)
+        valid_bounds = torch.isfinite(bounds).all(dim=1).view(-1, 1, 1)
+        result = (radius_km <= self.inner_core_radius_km) & valid_center & valid_bounds
+        return result.unsqueeze(1).expand_as(reference)
+
+    def _masked_low_frequency_loss(self, prediction, target, mask):
+        kernel = self.low_frequency_kernel_size
+        padding = kernel // 2
+        pooled_weight = F.avg_pool2d(
+            mask, kernel, stride=1, padding=padding
+        )
+        prediction_mean = F.avg_pool2d(
+            prediction * mask, kernel, stride=1, padding=padding
+        ) / pooled_weight.clamp_min(1e-6)
+        target_mean = F.avg_pool2d(
+            target * mask, kernel, stride=1, padding=padding
+        ) / pooled_weight.clamp_min(1e-6)
+        valid = (pooled_weight >= 0.5).to(prediction.dtype)
+        return self.model.weighted_loss(
+            (prediction_mean - target_mean).abs(), valid
+        )
+
+    @staticmethod
+    def _masked_log_spectrum_loss(prediction, target, mask):
+        count = mask.sum(dim=(-2, -1), keepdim=True).clamp_min(1.0)
+        prediction_mean = (prediction * mask).sum(
+            dim=(-2, -1), keepdim=True
+        ) / count
+        target_mean = (target * mask).sum(
+            dim=(-2, -1), keepdim=True
+        ) / count
+        prediction_spectrum = torch.fft.rfft2(
+            (prediction - prediction_mean) * mask, norm="ortho"
+        ).abs()
+        target_spectrum = torch.fft.rfft2(
+            (target - target_mean) * mask, norm="ortho"
+        ).abs()
+        per_sample = (
+            torch.log1p(prediction_spectrum)
+            - torch.log1p(target_spectrum)
+        ).abs().mean(dim=(-3, -2, -1))
+        active = (mask.sum(dim=(-3, -2, -1)) > 0).to(per_sample.dtype)
+        return (per_sample * active).sum() / active.sum().clamp_min(1.0)
 
     def on_validation_epoch_start(self):
         super().on_validation_epoch_start()

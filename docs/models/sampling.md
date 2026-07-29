@@ -32,6 +32,20 @@ model:
 
 With `eta: 0`, the chain is deterministic given initial noise. Positive eta adds controlled stochasticity. DDIM allows fewer steps, making reconstruction logging much cheaper.
 
+## Ensembles and classifier-free guidance
+
+Different initial Gaussian latents produce different conditional samples even
+when DDIM uses `eta: 0`. `validation.ensemble_size` assigns each sample a stable
+latent namespace, making diversity and calibration comparable across epochs.
+The model exposes `sample_ensemble(...)`, which returns tensors shaped
+`[member, batch, channel, height, width]`.
+
+When condition dropout was enabled during training, `sampling.guidance_scale`
+combines conditional and zero-condition noise predictions. A value of `1`
+performs the original single conditional evaluation. Values above `1` usually
+increase fidelity to the baseline and GEO/ERA context at some cost to ensemble
+diversity.
+
 ## Clean-sample clipping
 
 Both samplers estimate the clean target at every step. When `clip_sample: true`, that estimate is clamped to `[-1,1]` before calculating the previous sample. This limits runaway errors at low signal-to-noise timesteps and matches the model’s training range.

@@ -58,7 +58,12 @@ model:
     method: ddim
     timesteps: 100
     eta: 0.0
+    # Diversity comes from distinct initial latents; CFG strengthens baseline/GEO fidelity.
+    guidance_scale: 1.5
     clip_sample: true
+  classifier_free_guidance:
+    # Required during training so guidance_scale can trade diversity for fidelity.
+    condition_dropout_probability: 0.1
   sparse_target:
     # Outside SAR coverage, weakly teach the generated correction to be zero.
     fill: era5
@@ -76,6 +81,20 @@ model:
     clip_ms: 80.0
     prediction_min_ms: 0.0
     prediction_max_ms: 80.0
+    loss:
+      # Preserve the probabilistic diffusion objective while explicitly rewarding
+      # sharp, SAR-like residual structure at stable low/medium noise levels.
+      gradient_weight: 0.05
+      spectrum_weight: 0.05
+      low_frequency_weight: 0.1
+      auxiliary_max_timestep_fraction: 0.5
+      high_wind_threshold_ms: 17.0
+      high_wind_weight: 2.0
+      inner_core_radius_km: 100.0
+      inner_core_weight: 2.0
+      high_gradient_threshold_ms: 2.0
+      high_gradient_weight: 2.0
+      low_frequency_kernel_size: 9
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
@@ -84,6 +103,8 @@ model:
 
 optimization:
   lr: 0.00005
+  # Balance low- and high-noise denoising problems instead of overfitting easy steps.
+  min_snr_gamma: 5.0
   ema:
     enabled: true
     decay: 0.999
@@ -92,7 +113,7 @@ optimization:
   reduce_lr_on_plateau:
     factor: 0.75
     patience: 100
-    monitor: val/loss
+    monitor: val/probabilistic_refinement_score
     cooldown: 5
     min_lr: 0.00001
 
@@ -108,14 +129,18 @@ trainer:
   limit_val_batches: 50
   deterministic: true
   checkpoint:
-    monitor: val/loss
+    monitor: val/probabilistic_refinement_score
     mode: min
     save_top_k: 2
     save_last: true
 
 validation:
   reconstruction_batches: 3
+  # Four fixed members expose calibrated diversity without blurring them together.
+  ensemble_size: 4
+  ensemble_batches: 1
   sampling_seed: 42
+  probabilistic_score_sharpness_weight: 2.0
 
 logging:
   wandb:

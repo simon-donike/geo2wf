@@ -7,6 +7,7 @@ from torch import nn
 from src.DenoisingDiffusionProcess.DenoisingDiffusionProcess import (
     DenoisingDiffusionConditionalProcess,
     DenoisingDiffusionProcess,
+    _run_reverse_process,
 )
 from src.DenoisingDiffusionProcess.samplers.DDIM import DDIM_Sampler
 from src.DenoisingDiffusionProcess.samplers.DDPM import DDPM_Sampler
@@ -157,3 +158,40 @@ def test_derived_sampler_buffers_do_not_break_old_state_dicts() -> None:
     assert "previous_timesteps" not in ddim_keys
     assert "_previous_timestep_lookup" not in ddim_keys
     assert "final_alpha_cumprod" not in ddim_keys
+
+
+class ConditionEchoDenoiser(nn.Module):
+    def forward(self, value: torch.Tensor, timestep: torch.Tensor) -> torch.Tensor:
+        del timestep
+        return value[:, 1:2]
+
+
+class CaptureSampler(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.register_buffer("timesteps", torch.tensor([0]), persistent=False)
+
+    def forward(self, x_t, t, noise_pred, generator=None):
+        del x_t, t, generator
+        return noise_pred
+
+
+def test_classifier_free_guidance_combines_conditional_noise_predictions() -> None:
+    sample = _run_reverse_process(
+        ConditionEchoDenoiser(),
+        torch.zeros(1, 1, 2, 2),
+        CaptureSampler(),
+        condition=torch.ones(1, 1, 2, 2),
+        unconditional_condition=torch.zeros(1, 1, 2, 2),
+        guidance_scale=1.75,
+    )
+
+    assert torch.allclose(sample, torch.full_like(sample, 1.75))
+
+
+def test_min_snr_epsilon_weight_caps_easy_high_snr_steps() -> None:
+    snr = torch.tensor([100.0, 5.0, 1.0])
+
+    weight = DenoisingDiffusionConditionalProcess.min_snr_weight(snr, 5.0)
+
+    assert torch.allclose(weight, torch.tensor([0.05, 1.0, 1.0]))
