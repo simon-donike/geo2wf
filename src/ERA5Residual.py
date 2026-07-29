@@ -480,6 +480,7 @@ class ERA5ResidualRegressor(pl.LightningModule):
             prediction,
             wandb_key=wandb_key,
             target_batch=batch["target_physical"],
+            physical_wind_output=True,
         )
 
     def configure_optimizers(self) -> dict:

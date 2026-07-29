@@ -91,7 +91,7 @@ optimization:
     use_for_eval: true
   reduce_lr_on_plateau:
     factor: 0.75
-    patience: 25
+    patience: 100
     monitor: val/loss
     cooldown: 5
     min_lr: 0.00001

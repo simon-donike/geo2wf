@@ -309,13 +309,22 @@ def _draw_validation_row(
     # Derive the display stretch exclusively from valid ground-truth pixels,
     # then apply those same per-channel limits to prediction and target.
     output_ranges = _channel_ranges(target_array, target_valid)
+    physical_wind_output = (
+        bool(sample.get("physical_wind_output"))
+        and prediction_array.shape[0] == 1
+        and target_array.shape[0] == 1
+    )
     prediction_valid = np.ones(prediction_array.shape[1:], dtype=bool)
-    prediction_image, prediction_cmap = _output_plot_view(
-        prediction_array, prediction_valid, output_ranges
-    )
-    target_image, target_cmap = _output_plot_view(
-        target_array, target_valid, output_ranges
-    )
+    if physical_wind_output:
+        prediction_image, prediction_cmap = prediction_array[0], "turbo"
+        target_image, target_cmap = target_array[0], "turbo"
+    else:
+        prediction_image, prediction_cmap = _output_plot_view(
+            prediction_array, prediction_valid, output_ranges
+        )
+        target_image, target_cmap = _output_plot_view(
+            target_array, target_valid, output_ranges
+        )
     condition_extent = _bounds_extent(
         sample.get("condition_bounds"), condition_array.shape[1:]
     )
@@ -340,9 +349,12 @@ def _draw_validation_row(
             baseline_valid = _as_2d_mask(
                 sample.get("baseline_mask"), baseline_array.shape[1:]
             )
-            baseline_image, baseline_cmap = _output_plot_view(
-                baseline_array, baseline_valid, output_ranges
-            )
+            if physical_wind_output and baseline_array.shape[0] == 1:
+                baseline_image, baseline_cmap = baseline_array[0], "turbo"
+            else:
+                baseline_image, baseline_cmap = _output_plot_view(
+                    baseline_array, baseline_valid, output_ranges
+                )
             panels.append(
                 (
                     baseline_image,
@@ -365,7 +377,23 @@ def _draw_validation_row(
         if image is None:
             ax.set_axis_off()
             continue
-        ax.imshow(image, extent=extent, origin="upper", cmap=cmap)
+        is_wind_panel = physical_wind_output and title != panels[0][4]
+        image_artist = ax.imshow(
+            image,
+            extent=extent,
+            origin="upper",
+            cmap=cmap,
+            vmin=output_ranges[0][0] if is_wind_panel else None,
+            vmax=output_ranges[0][1] if is_wind_panel else None,
+        )
+        if is_wind_panel:
+            ax.figure.colorbar(
+                image_artist,
+                ax=ax,
+                shrink=0.76,
+                pad=0.03,
+                label=r"Wind speed (m s$^{-1}$)",
+            )
         if title in {"Target", "Ground truth", "Deterministic baseline"}:
             _overlay_nodata(ax, valid, extent, alpha=1.0)
         _plot_center(ax, center)
@@ -409,6 +437,7 @@ def _draw_validation_row(
                 wind_valid,
                 sample.get("condition_bounds"),
                 center,
+                value_range=output_ranges[0] if physical_wind_output else None,
             )
     if sample.get("sample_label"):
         axes[0].annotate(
@@ -450,6 +479,8 @@ def _plot_era5_wind_speed_map(
     valid_mask,
     bounds,
     center,
+    *,
+    value_range=None,
 ):
     """Overlay physical ERA5 10 m wind speed on a land/ocean map."""
     extent = _bounds_extent(bounds, wind_speed.shape)
@@ -478,6 +509,8 @@ def _plot_era5_wind_speed_map(
         extent=extent,
         origin="upper",
         cmap="turbo",
+        vmin=value_range[0] if value_range is not None else None,
+        vmax=value_range[1] if value_range is not None else None,
         alpha=0.76,
         interpolation="nearest",
         zorder=2,

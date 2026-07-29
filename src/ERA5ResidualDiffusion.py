@@ -376,6 +376,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             condition_batch=prepared["condition"],
             target_batch=prepared["target_physical"],
             baseline_batch=prepared[_BASELINE_PHYSICAL],
+            physical_wind_output=True,
         )
 
     @staticmethod

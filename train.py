@@ -203,7 +203,18 @@ def main() -> None:
         default=None,
         help="Optional Lightning checkpoint to resume from.",
     )
+    parser.add_argument(
+        "--weights-only-path",
+        type=str,
+        default=None,
+        help=(
+            "Optional Lightning checkpoint used only to initialize model weights. "
+            "Optimizer, scheduler, callback, epoch, and global-step state are ignored."
+        ),
+    )
     args = parser.parse_args()
+    if args.ckpt_path and args.weights_only_path:
+        parser.error("--ckpt-path and --weights-only-path are mutually exclusive")
 
     config = load_config(args.config)
     trainer_cfg = config.get("trainer", {})
@@ -230,6 +241,15 @@ def main() -> None:
 
     # This is the Lightning model used for training and validation.
     model = build_model(config)
+    if args.weights_only_path:
+        checkpoint = torch.load(
+            args.weights_only_path, map_location="cpu", weights_only=False
+        )
+        model.load_state_dict(checkpoint["state_dict"], strict=True)
+        print(
+            "Initialized model weights only from "
+            f"{args.weights_only_path}; optimizer and scheduler start fresh."
+        )
 
     # CLI override has priority over config file value.
     limit_val_batches = (

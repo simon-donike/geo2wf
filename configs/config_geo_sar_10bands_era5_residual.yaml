@@ -67,7 +67,9 @@ optimization:
   off_swath_anchor_weight: 0.05
   reduce_lr_on_plateau:
     factor: 0.75
-    patience: 20
+    # Residual reconstruction improves slowly after the initial broad-field fit.
+    # Wait through long validation plateaus before reducing its learning rate.
+    patience: 100
     monitor: val/loss
     cooldown: 5
     min_lr: 0.00002
@@ -76,9 +78,10 @@ validation:
   reconstruction_batches: 1
 
 trainer:
-  max_epochs: 5000
+  max_epochs: 1000
   accelerator: auto
-  devices: 1
+  devices: 2
+  strategy: ddp_find_unused_parameters_false
   precision: 32
   deterministic: true
   float32_matmul_precision: high
