@@ -359,6 +359,25 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         offset, scale = self._target_affine(batch, prediction_ms)
         return ((prediction_ms - offset) / scale).clamp(0.0, 1.0)
 
+    def _log_val_reconstruction(
+        self, batch, pred_batch, *, wandb_key="images/val_reconstruction"
+    ):
+        """Plot baseline, refinement, and truth on one physical wind scale."""
+        from .reconstruction_logging import log_wandb_reconstruction
+
+        prepared = self._prepare_batch_context(batch)
+        offset, scale = self._target_affine(prepared, pred_batch)
+        refined_physical = pred_batch * scale + offset
+        log_wandb_reconstruction(
+            self,
+            prepared,
+            refined_physical,
+            wandb_key=wandb_key,
+            condition_batch=prepared["condition"],
+            target_batch=prepared["target_physical"],
+            baseline_batch=prepared[_BASELINE_PHYSICAL],
+        )
+
     @staticmethod
     def _target_affine(batch, reference):
         offset = batch["target_norm_offset"].to(

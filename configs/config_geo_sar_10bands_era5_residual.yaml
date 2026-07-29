@@ -31,6 +31,7 @@ data:
   val_split: val
   test_split: test
   target_size: [256, 256]
+  center_crop_size: [192, 192]
   normalization: robust-zscore
   robust_clip: 4.0
   target_normalization: min-max
@@ -58,21 +59,24 @@ model:
     psnr_data_range_ms: 79.8
 
 optimization:
-  lr: 0.0003
+  lr: 0.0002
   weight_decay: 0.0001
   huber_delta_ms: 2.0
   # Outside the observed SAR swath, weakly prefer the ERA5 field instead of an
   # unconstrained learned correction.
   off_swath_anchor_weight: 0.05
   reduce_lr_on_plateau:
-    factor: 0.5
-    patience: 10
+    factor: 0.75
+    patience: 20
+    monitor: val/loss
+    cooldown: 5
+    min_lr: 0.00002
 
 validation:
   reconstruction_batches: 1
 
 trainer:
-  max_epochs: 100
+  max_epochs: 5000
   accelerator: auto
   devices: 1
   precision: 32
@@ -82,7 +86,7 @@ trainer:
   enable_checkpointing: true
   limit_val_batches: 1.0
   checkpoint:
-    monitor: val/eye_structure_score
+    monitor: val/loss
     mode: min
     save_top_k: 2
     save_last: true

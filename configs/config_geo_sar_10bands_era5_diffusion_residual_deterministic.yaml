@@ -31,6 +31,7 @@ data:
   val_split: val
   test_split: test
   target_size: [256, 256]
+  center_crop_size: [192, 192]
   normalization: robust-zscore
   robust_clip: 4.0
   # Wind speed is non-negative and has a meaningful finite train range; this
@@ -68,7 +69,7 @@ model:
     # the GEO2WF_BASELINE_CKPT environment variable.
     baseline:
       source: deterministic
-      checkpoint_path: null
+      checkpoint_path: logs/20260729-100203_config_geo_sar_10bands_era5_residual/checkpoints/epoch=053-step=13122.ckpt
     # Odd asinh transform: resolves small corrections without clipping the rare
     # intense positive tail into the narrow bulk of the residual distribution.
     soft_scale_ms: 5.0
@@ -82,19 +83,21 @@ model:
     out_dim: 1
 
 optimization:
-  lr: 0.0001
+  lr: 0.00005
   ema:
     enabled: true
     decay: 0.999
     update_after_step: 0
     use_for_eval: true
   reduce_lr_on_plateau:
-    factor: 0.5
+    factor: 0.75
     patience: 25
-    monitor: val/eye_structure_score
+    monitor: val/loss
+    cooldown: 5
+    min_lr: 0.00001
 
 trainer:
-  max_epochs: 100
+  max_epochs: 5000
   accelerator: auto
   devices: 2
   strategy: ddp_find_unused_parameters_false
@@ -105,7 +108,7 @@ trainer:
   limit_val_batches: 50
   deterministic: true
   checkpoint:
-    monitor: val/eye_structure_score
+    monitor: val/loss
     mode: min
     save_top_k: 2
     save_last: true

@@ -13,6 +13,7 @@ def log_wandb_reconstruction(
     wandb_key: str,
     condition_batch: torch.Tensor | None = None,
     target_batch: torch.Tensor | None = None,
+    baseline_batch: torch.Tensor | None = None,
 ) -> None:
     """Log a shared GEO/prediction/target reconstruction figure to W&B."""
     trainer = getattr(module, "_trainer", None)
@@ -47,6 +48,8 @@ def log_wandb_reconstruction(
             "prediction": prediction_batch[index],
             "target": target_batch[index],
         }
+        if baseline_batch is not None:
+            sample["baseline"] = baseline_batch[index]
         if isinstance(batch, dict):
             meta = batch.get("meta", {})
             label = " · ".join(
@@ -66,6 +69,9 @@ def log_wandb_reconstruction(
                     ),
                     "era5_wind_speed_mask": _batch_item(
                         batch.get("era5_wind_speed_mask"), index
+                    ),
+                    "baseline_mask": _batch_item(
+                        batch.get("_residual_diffusion_baseline_mask"), index
                     ),
                     "condition_channels": _channel_names(
                         meta.get("condition_channels"), index

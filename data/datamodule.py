@@ -32,6 +32,7 @@ class PairedDataModule(pl.LightningDataModule):
         val_split: str = "val",
         test_split: str = "test",
         target_size: tuple[int, int] = (256, 256),
+        center_crop_size: tuple[int, int] | None = None,
         random_flips: bool = True,
         include_test_in_train: bool = False,
         require_era5: bool = False,
@@ -52,6 +53,7 @@ class PairedDataModule(pl.LightningDataModule):
         self.val_split = val_split
         self.test_split = test_split
         self.target_size = target_size
+        self.center_crop_size = center_crop_size
         self.random_flips = random_flips
         self.include_test_in_train = include_test_in_train
         self.require_era5 = require_era5
@@ -87,6 +89,11 @@ class PairedDataModule(pl.LightningDataModule):
             val_split=data_cfg.get("val_split", "val"),
             test_split=data_cfg.get("test_split", "test"),
             target_size=tuple(data_cfg.get("target_size", [256, 256])),
+            center_crop_size=(
+                tuple(data_cfg["center_crop_size"])
+                if data_cfg.get("center_crop_size") is not None
+                else None
+            ),
             random_flips=data_cfg.get("random_flips", True),
             include_test_in_train=data_cfg.get("include_test_in_train", False),
             require_era5=require_era5,
@@ -198,6 +205,7 @@ class PairedDataModule(pl.LightningDataModule):
             split=split,
             stats_file=self.stats_file,
             target_size=self.target_size,
+            center_crop_size=self.center_crop_size,
             augment=augment,
             require_era5=self.require_era5,
             normalization=self.normalization,

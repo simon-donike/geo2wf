@@ -188,7 +188,7 @@ def test_residual_training_config_builds() -> None:
     assert model.condition_channels == 19
     assert (
         config["trainer"]["checkpoint"]["monitor"]
-        == "val/eye_structure_score"
+        == "val/loss"
     )
     assert config["trainer"]["limit_val_batches"] == 1.0
 

@@ -46,6 +46,7 @@ class PairedImageDataset(Dataset):
         split: str,
         stats_file: str | Path | None = None,
         target_size: tuple[int, int] = (256, 256),
+        center_crop_size: tuple[int, int] | None = None,
         augment: bool = False,
         require_era5: bool = False,
         normalization: str | None = None,
@@ -91,6 +92,7 @@ class PairedImageDataset(Dataset):
             raise FileNotFoundError(f"Stats file does not exist: {self.stats_file}")
         self.stats = json.loads(self.stats_file.read_text(encoding="utf-8"))
         self.target_size = target_size
+        self.center_crop_size = center_crop_size
         self.augment = augment
         self.normalization = _normalization_method(self.stats, normalization)
         self.target_normalization = _normalization_method(
@@ -278,6 +280,33 @@ class PairedImageDataset(Dataset):
                 original_era5_mask,
                 self.target_size,
             )
+        if self.center_crop_size is not None:
+            condition_shape = condition.shape[-2:]
+            target_shape = target.shape[-2:]
+            condition = _center_crop(condition, self.center_crop_size)
+            condition_mask = _center_crop(condition_mask, self.center_crop_size)
+            condition_channel_mask = _center_crop(
+                condition_channel_mask, self.center_crop_size
+            )
+            target = _center_crop(target, self.center_crop_size)
+            target_mask = _center_crop(target_mask, self.center_crop_size)
+            target_physical = _center_crop(target_physical, self.center_crop_size)
+            condition_bounds = _center_crop_bounds(
+                condition_bounds, condition_shape, self.center_crop_size
+            )
+            target_bounds = _center_crop_bounds(
+                target_bounds, target_shape, self.center_crop_size
+            )
+            if era5_wind_speed is not None:
+                era5_wind_speed = _center_crop(
+                    era5_wind_speed, self.center_crop_size
+                )
+                era5_wind_speed_physical = _center_crop(
+                    era5_wind_speed_physical, self.center_crop_size
+                )
+                era5_wind_speed_mask = _center_crop(
+                    era5_wind_speed_mask, self.center_crop_size
+                )
         if self.augment:
             flip_state = _random_flip_state()
             condition, target, condition_mask, target_mask = _paired_random_flips(
@@ -356,6 +385,51 @@ def _resize_target(
         target_mask.unsqueeze(0).float(), size=size, mode="nearest"
     ).squeeze(0).bool()
     return target * target_mask.to(target.dtype), target_mask
+
+def _center_crop(
+    tensor: torch.Tensor,
+    size: tuple[int, int],
+) -> torch.Tensor:
+    """Crop the same centered spatial window from a CHW tensor."""
+    crop_height, crop_width = size
+    height, width = tensor.shape[-2:]
+    if crop_height <= 0 or crop_width <= 0:
+        raise ValueError("center crop dimensions must be positive")
+    if crop_height > height or crop_width > width:
+        raise ValueError(
+            f"center crop {size} exceeds tensor spatial shape {(height, width)}"
+        )
+    top = (height - crop_height) // 2
+    left = (width - crop_width) // 2
+    return tensor[..., top : top + crop_height, left : left + crop_width]
+
+
+def _center_crop_bounds(
+    bounds: torch.Tensor,
+    original_size: tuple[int, int],
+    crop_size: tuple[int, int],
+) -> torch.Tensor:
+    """Update [left, right, bottom, top] bounds for a centered pixel crop."""
+    height, width = original_size
+    crop_height, crop_width = crop_size
+    if crop_height > height or crop_width > width:
+        raise ValueError(
+            f"center crop {crop_size} exceeds spatial shape {original_size}"
+        )
+    top = (height - crop_height) // 2
+    left = (width - crop_width) // 2
+    bounds_left, bounds_right, bounds_bottom, bounds_top = bounds.unbind()
+    x_resolution = (bounds_right - bounds_left) / width
+    y_resolution = (bounds_top - bounds_bottom) / height
+    return torch.stack(
+        [
+            bounds_left + left * x_resolution,
+            bounds_left + (left + crop_width) * x_resolution,
+            bounds_top - (top + crop_height) * y_resolution,
+            bounds_top - top * y_resolution,
+        ]
+    )
+
 
 
 def _paired_random_flips(
