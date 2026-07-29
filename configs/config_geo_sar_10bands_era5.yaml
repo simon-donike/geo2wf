@@ -6,6 +6,7 @@ export:
   output_root: data/geotiff/geo_sar_10bands_era5
   geo_channel_set: common10
   include_era5: true
+  era5_max_time_gap_hours: 3.1
   era5_channels:
     - precipitable_water
     - sst
@@ -30,6 +31,13 @@ data:
   val_split: val
   test_split: test
   target_size: [256, 256]
+  center_crop_size: [192, 192]
+  normalization: robust-zscore
+  robust_clip: 4.0
+  # Wind speed is non-negative and has a meaningful finite train range; this
+  # prevents symmetric robust clipping from admitting negative samples.
+  target_normalization: min-max
+  max_era5_time_gap_hours: 3.1
   random_flips: true
   include_test_in_train: true
   loader:
@@ -39,10 +47,19 @@ data:
     persistent_workers: false
 
 model:
+  type: diffusion
   in_channels: 20  # Ten GEO bands plus nine ERA5 fields plus one valid-pixel mask.
   out_channels: 1
   num_timesteps: 1000
-  schedule: linear
+  schedule: cosine
+  sampling:
+    method: ddim
+    timesteps: 100
+    eta: 0.0
+    clip_sample: true
+  sparse_target:
+    fill: era5
+    unobserved_loss_weight: 0.05
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
@@ -50,20 +67,39 @@ model:
     out_dim: 1
 
 optimization:
-  lr: 0.0001
+  lr: 0.00005
+  ema:
+    enabled: true
+    decay: 0.999
+    update_after_step: 0
+    use_for_eval: true
   reduce_lr_on_plateau:
-    factor: 0.5
+    factor: 0.75
     patience: 25
+    monitor: val/loss
+    cooldown: 5
+    min_lr: 0.00001
 
 trainer:
-  max_epochs: 100
+  max_epochs: 5000
   accelerator: auto
-  devices: 1
+  devices: 2
+  strategy: ddp_find_unused_parameters_false
   precision: 32
   float32_matmul_precision: high
   log_every_n_steps: 10
-  enable_checkpointing: false
+  enable_checkpointing: true
   limit_val_batches: 50
+  deterministic: true
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+
+validation:
+  reconstruction_batches: 3
+  sampling_seed: 42
 
 logging:
   wandb:

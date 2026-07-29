@@ -10,6 +10,8 @@ from data.dataset import (
     _manifest_ibtracs_center,
     _append_era5_derived_channels,
     _cell_centers,
+    _center_crop,
+    _center_crop_bounds,
     _json_list,
     _normalize,
     _paired_random_flips,
@@ -34,6 +36,19 @@ def test_resize_target_resizes_values_and_mask_with_expected_modes() -> None:
     assert resized_mask.shape == (1, 4, 4)
     assert resized_mask.dtype == torch.bool
     assert torch.all(resized_target[~resized_mask] == 0)
+
+
+def test_center_crop_preserves_pixel_scale_and_updates_bounds() -> None:
+    tensor = torch.arange(36).reshape(1, 6, 6)
+    bounds = torch.tensor([0.0, 6.0, 10.0, 16.0])
+
+    cropped = _center_crop(tensor, (4, 4))
+    cropped_bounds = _center_crop_bounds(bounds, (6, 6), (4, 4))
+
+    assert torch.equal(cropped, tensor[:, 1:5, 1:5])
+    assert torch.equal(
+        cropped_bounds, torch.tensor([1.0, 5.0, 11.0, 15.0])
+    )
 
 
 def test_paired_random_flips_applies_same_spatial_flips_to_all_tensors(monkeypatch) -> None:
@@ -175,3 +190,26 @@ def test_validation_plot_adds_era5_wind_map_only_when_available() -> None:
     )
     plt.close(without_era)
     plt.close(with_era)
+
+
+def test_validation_plot_prefers_explicit_physical_era5_wind() -> None:
+    sample = {
+        "condition": torch.full((1, 4, 4), 0.5),
+        "prediction": torch.full((1, 4, 4), 0.3),
+        "target": torch.full((1, 4, 4), 0.5),
+        "condition_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "condition_channels": ["era5_wind_speed_10m"],
+        "condition_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "target_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "era5_wind_speed_physical": torch.full((1, 4, 4), 20.0),
+        "era5_wind_speed_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+    }
+
+    figure = plot_validation_reconstruction_batch([sample])
+    wind_axis = {
+        axis.get_title(): axis for axis in figure.axes
+    }["ERA5 10 m wind speed"]
+
+    assert float(wind_axis.images[-1].get_array().mean()) == 20.0
+    plt.close(figure)

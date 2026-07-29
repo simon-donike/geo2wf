@@ -1,0 +1,123 @@
+seed: 42
+
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_max_time_gap_hours: 3.1
+  era5_channels:
+    - precipitable_water
+    - sst
+    - pressure_msl
+    - temperature_2m
+    - dewpoint_2m
+    - u_wind_10m
+    - v_wind_10m
+  splits: [train, val, test]
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+
+data:
+  root: data/geotiff/geo_sar_10bands_era5
+  stats_file: data/geotiff/geo_sar_10bands_era5/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  target_size: [256, 256]
+  normalization: robust-zscore
+  robust_clip: 4.0
+  # Wind speed is non-negative and has a meaningful finite train range; this
+  # prevents symmetric robust clipping from admitting negative samples.
+  target_normalization: min-max
+  max_era5_time_gap_hours: 3.1
+  random_flips: true
+  include_test_in_train: true
+  loader:
+    batch_size: 4
+    num_workers: 2
+    pin_memory: false
+    persistent_workers: false
+
+model:
+  type: diffusion_residual
+  # Existing prepared condition: ten GEO + nine ERA5 + aggregate valid mask.
+  # ERA5ResidualDiffusion appends the exact baseline and its validity mask.
+  in_channels: 20
+  out_channels: 1
+  num_timesteps: 1000
+  schedule: cosine
+  sampling:
+    method: ddim
+    timesteps: 100
+    eta: 0.0
+    clip_sample: true
+  sparse_target:
+    # Outside SAR coverage, weakly teach the generated correction to be zero.
+    fill: era5
+    unobserved_loss_weight: 0.05
+  residual:
+    # Portable default. To learn a residual on top of the trained deterministic
+    # GEO+ERA5 model, change source to deterministic and set checkpoint_path or
+    # the GEO2WF_BASELINE_CKPT environment variable.
+    baseline:
+      source: era5
+      checkpoint_path: null
+    # Odd asinh transform: resolves small corrections without clipping the rare
+    # intense positive tail into the narrow bulk of the residual distribution.
+    soft_scale_ms: 5.0
+    clip_ms: 80.0
+    prediction_min_ms: 0.0
+    prediction_max_ms: 80.0
+  unet:
+    dim: 48
+    dim_mults: [1, 2, 4, 8]
+    channels: 23  # Noisy residual + 22 prepared condition channels.
+    out_dim: 1
+
+optimization:
+  lr: 0.0001
+  ema:
+    enabled: true
+    decay: 0.999
+    update_after_step: 0
+    use_for_eval: true
+  reduce_lr_on_plateau:
+    factor: 0.5
+    patience: 25
+    monitor: val/eye_structure_score
+
+trainer:
+  max_epochs: 100
+  accelerator: auto
+  devices: 2
+  strategy: ddp_find_unused_parameters_false
+  precision: 32
+  float32_matmul_precision: high
+  log_every_n_steps: 10
+  enable_checkpointing: true
+  limit_val_batches: 50
+  deterministic: true
+  checkpoint:
+    monitor: val/eye_structure_score
+    mode: min
+    save_top_k: 2
+    save_last: true
+
+validation:
+  reconstruction_batches: 3
+  sampling_seed: 42
+
+logging:
+  wandb:
+    enabled: true
+    project: dif_img_rec
+    name: geo-sar-10bands-era5-diffusion-residual
+    save_dir: logs
+    log_model: false

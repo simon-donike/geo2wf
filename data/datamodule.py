@@ -12,9 +12,9 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_info
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, RandomSampler
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 
-from .dataset import PairedImageDataset
+from .dataset import DEFAULT_ROBUST_CLIP, PairedImageDataset
 
 
 class PairedDataModule(pl.LightningDataModule):
@@ -32,9 +32,15 @@ class PairedDataModule(pl.LightningDataModule):
         val_split: str = "val",
         test_split: str = "test",
         target_size: tuple[int, int] = (256, 256),
+        center_crop_size: tuple[int, int] | None = None,
         random_flips: bool = True,
         include_test_in_train: bool = False,
         require_era5: bool = False,
+        normalization: str | None = None,
+        target_normalization: str | None = None,
+        robust_clip: float = DEFAULT_ROBUST_CLIP,
+        target_robust_clip: float | None = None,
+        max_era5_time_gap_hours: float | None = None,
     ) -> None:
         super().__init__()
         self.root = Path(root).expanduser()
@@ -47,9 +53,15 @@ class PairedDataModule(pl.LightningDataModule):
         self.val_split = val_split
         self.test_split = test_split
         self.target_size = target_size
+        self.center_crop_size = center_crop_size
         self.random_flips = random_flips
         self.include_test_in_train = include_test_in_train
         self.require_era5 = require_era5
+        self.normalization = normalization
+        self.target_normalization = target_normalization
+        self.robust_clip = robust_clip
+        self.target_robust_clip = target_robust_clip
+        self.max_era5_time_gap_hours = max_era5_time_gap_hours
         self._include_test_logged = False
 
         self.train_dataset: Optional[Dataset] = None
@@ -77,9 +89,27 @@ class PairedDataModule(pl.LightningDataModule):
             val_split=data_cfg.get("val_split", "val"),
             test_split=data_cfg.get("test_split", "test"),
             target_size=tuple(data_cfg.get("target_size", [256, 256])),
+            center_crop_size=(
+                tuple(data_cfg["center_crop_size"])
+                if data_cfg.get("center_crop_size") is not None
+                else None
+            ),
             random_flips=data_cfg.get("random_flips", True),
             include_test_in_train=data_cfg.get("include_test_in_train", False),
             require_era5=require_era5,
+            normalization=data_cfg.get("normalization"),
+            target_normalization=data_cfg.get("target_normalization"),
+            robust_clip=float(data_cfg.get("robust_clip", DEFAULT_ROBUST_CLIP)),
+            target_robust_clip=(
+                float(data_cfg["target_robust_clip"])
+                if data_cfg.get("target_robust_clip") is not None
+                else None
+            ),
+            max_era5_time_gap_hours=(
+                float(data_cfg["max_era5_time_gap_hours"])
+                if data_cfg.get("max_era5_time_gap_hours") is not None
+                else None
+            ),
         )
 
     def prepare_data(self) -> None:
@@ -140,14 +170,17 @@ class PairedDataModule(pl.LightningDataModule):
             "persistent_workers": self.persistent_workers and self.num_workers > 0,
         }
         return [
-            DataLoader(self.val_dataset, shuffle=True, **loader_kwargs),
             DataLoader(
-                self.train_dataset,
-                sampler=RandomSampler(
-                    self.train_dataset,
-                    replacement=False,
-                    num_samples=train_sample_count,
+                Subset(
+                    self.val_dataset,
+                    _storm_stratified_indices(self.val_dataset),
                 ),
+                shuffle=False,
+                **loader_kwargs,
+            ),
+            DataLoader(
+                Subset(self.train_dataset, range(train_sample_count)),
+                shuffle=False,
                 **loader_kwargs,
             ),
         ]
@@ -172,8 +205,14 @@ class PairedDataModule(pl.LightningDataModule):
             split=split,
             stats_file=self.stats_file,
             target_size=self.target_size,
+            center_crop_size=self.center_crop_size,
             augment=augment,
             require_era5=self.require_era5,
+            normalization=self.normalization,
+            target_normalization=self.target_normalization,
+            robust_clip=self.robust_clip,
+            target_robust_clip=self.target_robust_clip,
+            max_era5_time_gap_hours=self.max_era5_time_gap_hours,
         )
         if dataset.filtered_missing_era5_count:
             rank_zero_info(
@@ -183,7 +222,37 @@ class PairedDataModule(pl.LightningDataModule):
                 dataset.manifest_sample_count,
                 split,
             )
+        if dataset.filtered_stale_era5_count:
+            rank_zero_info(
+                "ERA5 age guard: filtered %d samples with missing or > %.2f h "
+                "ERA5 timestamps from the %s split.",
+                dataset.filtered_stale_era5_count,
+                self.max_era5_time_gap_hours,
+                split,
+            )
         return dataset
+
+
+def _storm_stratified_indices(dataset: Dataset) -> list[int]:
+    """Round-robin validation samples by storm for a representative prefix."""
+    samples = getattr(dataset, "samples", None)
+    if samples is None or "storm_id" not in samples:
+        return list(range(len(dataset)))
+    groups = []
+    for _, group in samples.groupby("storm_id", sort=True):
+        groups.append(group.index.tolist())
+    ordered = []
+    offset = 0
+    while True:
+        added = False
+        for group in groups:
+            if offset < len(group):
+                ordered.append(int(group[offset]))
+                added = True
+        if not added:
+            break
+        offset += 1
+    return ordered
 
 
 def _local_data_root(configured_root: str | Path) -> str:

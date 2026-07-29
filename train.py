@@ -22,6 +22,11 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from data import PairedDataModule
+from src.ERA5Residual import ERA5ResidualRegressor
+from src.ERA5ResidualDiffusion import (
+    ERA5ResidualDiffusion,
+    load_frozen_deterministic_baseline,
+)
 from src.PixelDiffusion import PixelDiffusionConditional
 
 
@@ -47,6 +52,137 @@ def create_run_directory(config_path: str, parent: str | Path) -> Path:
     return run_dir
 
 
+def build_model(config: dict) -> pl.LightningModule:
+    """Build the configured diffusion or deterministic residual model."""
+    model_cfg = config.get("model", {})
+    opt_cfg = config.get("optimization", {})
+    lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
+    validation_cfg = config.get("validation", {})
+    model_type = str(model_cfg.get("type", "diffusion")).lower()
+
+    if model_type in {"diffusion", "diffusion_residual"}:
+        unet_cfg = model_cfg.get("unet", {})
+        sampling_cfg = model_cfg.get("sampling", {})
+        sparse_cfg = model_cfg.get("sparse_target", {})
+        ema_cfg = opt_cfg.get("ema", {})
+        ema_decay = (
+            ema_cfg.get("decay", 0.999)
+            if ema_cfg.get("enabled", False)
+            else None
+        )
+        diffusion_kwargs = {
+            "generated_channels": model_cfg.get("out_channels", 2),
+            "num_timesteps": model_cfg.get("num_timesteps", 1000),
+            "schedule": model_cfg.get("schedule", "linear"),
+            "model_dim": unet_cfg.get("dim", 64),
+            "model_dim_mults": tuple(
+                unet_cfg.get("dim_mults", [1, 2, 4, 8])
+            ),
+            "model_channels": unet_cfg.get("channels"),
+            "model_out_dim": unet_cfg.get("out_dim"),
+            "lr": opt_cfg.get("lr", 1e-3),
+            "lr_scheduler_factor": lr_sched_cfg.get("factor", 0.5),
+            "lr_scheduler_patience": lr_sched_cfg.get("patience", 25),
+            "lr_scheduler_monitor": lr_sched_cfg.get(
+                "monitor", "val/eye_structure_score"
+            ),
+            "lr_scheduler_cooldown": lr_sched_cfg.get("cooldown", 0),
+            "lr_scheduler_min_lr": lr_sched_cfg.get("min_lr", 0.0),
+            "sampling_method": sampling_cfg.get("method", "ddpm"),
+            "sampling_timesteps": sampling_cfg.get("timesteps"),
+            "sampling_eta": sampling_cfg.get("eta", 0.0),
+            "clip_sample": sampling_cfg.get("clip_sample", True),
+            "sparse_target_fill": sparse_cfg.get("fill"),
+            "unobserved_loss_weight": sparse_cfg.get(
+                "unobserved_loss_weight", 0.0
+            ),
+            "validation_reconstruction_batches": validation_cfg.get(
+                "reconstruction_batches", 1
+            ),
+            "validation_seed": validation_cfg.get(
+                "sampling_seed", config.get("seed", 42)
+            ),
+            "ema_decay": ema_decay,
+            "ema_update_after_step": ema_cfg.get("update_after_step", 0),
+            "ema_use_for_eval": ema_cfg.get("use_for_eval", True),
+        }
+        if model_type == "diffusion":
+            return PixelDiffusionConditional(
+                condition_channels=model_cfg.get("in_channels", 2),
+                **diffusion_kwargs,
+            )
+
+        residual_cfg = model_cfg.get("residual", {})
+        baseline_cfg = residual_cfg.get("baseline", {})
+        baseline_source = str(baseline_cfg.get("source", "era5")).lower()
+        baseline_model = None
+        if baseline_source == "deterministic":
+            checkpoint_path = baseline_cfg.get("checkpoint_path") or os.environ.get(
+                "GEO2WF_BASELINE_CKPT"
+            )
+            if not checkpoint_path:
+                raise ValueError(
+                    "diffusion_residual with a deterministic baseline requires "
+                    "model.residual.baseline.checkpoint_path or the "
+                    "GEO2WF_BASELINE_CKPT environment variable"
+                )
+            baseline_model = load_frozen_deterministic_baseline(checkpoint_path)
+        return ERA5ResidualDiffusion(
+            base_condition_channels=model_cfg.get("in_channels", 20),
+            baseline_source=baseline_source,
+            baseline_model=baseline_model,
+            residual_soft_scale_ms=residual_cfg.get("soft_scale_ms", 5.0),
+            residual_clip_ms=residual_cfg.get("clip_ms", 80.0),
+            prediction_min_ms=residual_cfg.get("prediction_min_ms", 0.0),
+            prediction_max_ms=residual_cfg.get("prediction_max_ms", 80.0),
+            **diffusion_kwargs,
+        )
+
+    if model_type == "deterministic_residual":
+        residual_cfg = model_cfg.get("residual", {})
+        return ERA5ResidualRegressor(
+            condition_channels=model_cfg.get(
+                "condition_channels",
+                model_cfg.get("in_channels", 19),
+            ),
+            base_channels=residual_cfg.get("base_channels", 32),
+            channel_mults=tuple(
+                residual_cfg.get("channel_mults", [1, 2, 4, 8])
+            ),
+            huber_delta_ms=opt_cfg.get(
+                "huber_delta_ms",
+                residual_cfg.get("huber_delta_ms", 2.0),
+            ),
+            off_swath_anchor_weight=opt_cfg.get(
+                "off_swath_anchor_weight",
+                residual_cfg.get("off_swath_anchor_weight", 0.05),
+            ),
+            high_wind_threshold_ms=residual_cfg.get(
+                "high_wind_threshold_ms", 17.0
+            ),
+            prediction_min_ms=residual_cfg.get("prediction_min_ms", 0.0),
+            prediction_max_ms=residual_cfg.get("prediction_max_ms"),
+            psnr_data_range_ms=residual_cfg.get("psnr_data_range_ms", 79.8),
+            lr=opt_cfg.get("lr", 3e-4),
+            weight_decay=opt_cfg.get("weight_decay", 1e-4),
+            lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
+            lr_scheduler_patience=lr_sched_cfg.get("patience", 10),
+            lr_scheduler_monitor=lr_sched_cfg.get(
+                "monitor", "val/eye_structure_score"
+            ),
+            lr_scheduler_cooldown=lr_sched_cfg.get("cooldown", 0),
+            lr_scheduler_min_lr=lr_sched_cfg.get("min_lr", 0.0),
+            validation_reconstruction_batches=validation_cfg.get(
+                "reconstruction_batches", 1
+            ),
+        )
+
+    raise ValueError(
+        f"Unsupported model.type {model_type!r}; expected 'diffusion', "
+        "'diffusion_residual', or 'deterministic_residual'"
+    )
+
+
 def main() -> None:
     """Entry point for training with PyTorch Lightning.
 
@@ -61,6 +197,12 @@ def main() -> None:
     parser.add_argument("--config", type=str, default="configs/config.yaml")
     # Optional override for Lightning's validation batch fraction/count.
     parser.add_argument("--limit-val-batches", type=float, default=None)
+    parser.add_argument(
+        "--ckpt-path",
+        type=str,
+        default=None,
+        help="Optional Lightning checkpoint to resume from.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -84,26 +226,10 @@ def main() -> None:
     # DataModule centralizes loader construction and setup for Lightning.
     datamodule = PairedDataModule.from_config(config)
     # Split config sections for clarity.
-    model_cfg = config.get("model", {})
-    opt_cfg = config.get("optimization", {})
-    lr_sched_cfg = opt_cfg.get("reduce_lr_on_plateau", {})
-    unet_cfg = model_cfg.get("unet", {})
     wandb_cfg = config.get("logging", {}).get("wandb", {})
 
     # This is the Lightning model used for training and validation.
-    model = PixelDiffusionConditional(
-        condition_channels=model_cfg.get("in_channels", 2),
-        generated_channels=model_cfg.get("out_channels", 2),
-        num_timesteps=model_cfg.get("num_timesteps", 1000),
-        schedule=model_cfg.get("schedule", "linear"),
-        model_dim=unet_cfg.get("dim", 64),
-        model_dim_mults=tuple(unet_cfg.get("dim_mults", [1, 2, 4, 8])),
-        model_channels=unet_cfg.get("channels"),
-        model_out_dim=unet_cfg.get("out_dim"),
-        lr=opt_cfg.get("lr", 1e-3),
-        lr_scheduler_factor=lr_sched_cfg.get("factor", 0.5),
-        lr_scheduler_patience=lr_sched_cfg.get("patience", 25),
-    )
+    model = build_model(config)
 
     # CLI override has priority over config file value.
     limit_val_batches = (
@@ -129,16 +255,29 @@ def main() -> None:
         if wandb_enabled
         else False
     )
+    checkpoint_cfg = trainer_cfg.get("checkpoint", {})
     checkpoint_callback = ModelCheckpoint(
         dirpath=run_dir / "checkpoints",
-        filename="epoch={epoch:03d}-step={step}",
-        monitor="val/loss",
-        mode="min",
-        save_top_k=2,
-        save_last=False,
+        filename=checkpoint_cfg.get(
+            "filename", "epoch={epoch:03d}-step={step}"
+        ),
+        monitor=checkpoint_cfg.get(
+            "monitor", getattr(model, "checkpoint_monitor", "val/loss")
+        ),
+        mode=checkpoint_cfg.get(
+            "mode", getattr(model, "checkpoint_mode", "min")
+        ),
+        save_top_k=checkpoint_cfg.get("save_top_k", 2),
+        save_last=checkpoint_cfg.get("save_last", False),
         auto_insert_metric_name=False,
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
+    checkpointing_enabled = bool(trainer_cfg.get("enable_checkpointing", True))
+    callbacks = []
+    if checkpointing_enabled:
+        callbacks.append(checkpoint_callback)
+    if wandb_logger:
+        callbacks.append(lr_monitor)
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer_kwargs = {
         "max_epochs": trainer_cfg.get("max_epochs", 1),
@@ -146,20 +285,22 @@ def main() -> None:
         "devices": trainer_cfg.get("devices", 1),
         "precision": trainer_cfg.get("precision", 32),
         "log_every_n_steps": trainer_cfg.get("log_every_n_steps", 10),
-        "enable_checkpointing": True,
+        "enable_checkpointing": checkpointing_enabled,
         "limit_val_batches": limit_val_batches,
         "limit_train_batches": trainer_cfg.get("limit_train_batches", 1.0),
         "logger": wandb_logger,
         "default_root_dir": str(run_dir),
-        "callbacks": [checkpoint_callback, lr_monitor],
+        "callbacks": callbacks,
     }
     if trainer_cfg.get("strategy") is not None:
         trainer_kwargs["strategy"] = trainer_cfg["strategy"]
+    if trainer_cfg.get("deterministic") is not None:
+        trainer_kwargs["deterministic"] = trainer_cfg["deterministic"]
 
     trainer = pl.Trainer(**trainer_kwargs)
 
     # Starts the training/validation loop.
-    trainer.fit(model, datamodule=datamodule)
+    trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
 
 
 if __name__ == "__main__":

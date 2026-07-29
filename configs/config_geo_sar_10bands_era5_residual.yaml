@@ -1,0 +1,100 @@
+seed: 42
+
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_max_time_gap_hours: 3.1
+  era5_channels:
+    - precipitable_water
+    - sst
+    - pressure_msl
+    - temperature_2m
+    - dewpoint_2m
+    - u_wind_10m
+    - v_wind_10m
+  splits: [train, val, test]
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+
+data:
+  root: data/geotiff/geo_sar_10bands_era5
+  stats_file: data/geotiff/geo_sar_10bands_era5/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  target_size: [256, 256]
+  center_crop_size: [192, 192]
+  normalization: robust-zscore
+  robust_clip: 4.0
+  target_normalization: min-max
+  max_era5_time_gap_hours: 3.1
+  random_flips: true
+  include_test_in_train: true
+  require_era5: true
+  loader:
+    batch_size: 4
+    num_workers: 2
+    pin_memory: false
+    persistent_workers: false
+
+model:
+  type: deterministic_residual
+  # Ten GEO bands plus seven source and two derived ERA5 fields. Masks and the
+  # explicit ERA5 wind baseline are appended by ERA5ResidualRegressor.
+  condition_channels: 19
+  residual:
+    base_channels: 32
+    channel_mults: [1, 2, 4, 8]
+    high_wind_threshold_ms: 17.0
+    prediction_min_ms: 0.0
+    prediction_max_ms: null
+    psnr_data_range_ms: 79.8
+
+optimization:
+  lr: 0.0002
+  weight_decay: 0.0001
+  huber_delta_ms: 2.0
+  # Outside the observed SAR swath, weakly prefer the ERA5 field instead of an
+  # unconstrained learned correction.
+  off_swath_anchor_weight: 0.05
+  reduce_lr_on_plateau:
+    factor: 0.75
+    patience: 20
+    monitor: val/loss
+    cooldown: 5
+    min_lr: 0.00002
+
+validation:
+  reconstruction_batches: 1
+
+trainer:
+  max_epochs: 5000
+  accelerator: auto
+  devices: 1
+  precision: 32
+  deterministic: true
+  float32_matmul_precision: high
+  log_every_n_steps: 10
+  enable_checkpointing: true
+  limit_val_batches: 1.0
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+
+logging:
+  wandb:
+    enabled: true
+    project: dif_img_rec
+    name: geo-sar-10bands-era5-residual
+    save_dir: logs
+    log_model: false

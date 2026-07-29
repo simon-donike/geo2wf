@@ -1,0 +1,154 @@
+site_name: geo2wf
+site_description: Conditional diffusion for tropical-cyclone wind-field reconstruction
+site_url: https://simon-donike.github.io/geo2wf/
+repo_url: https://github.com/simon-donike/geo2wf
+repo_name: simon-donike/geo2wf
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 geo2wf contributors
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/images/mark.svg
+  favicon: assets/images/mark.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    annotation: material/plus-circle
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+    - header.autohide
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: geo2wf-light
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: geo2wf-dark
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Start here:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - First experiment: getting-started/first-experiment.md
+  - Concepts:
+      - The reconstruction problem: concepts/problem.md
+      - System architecture: concepts/architecture.md
+      - Diffusion in one page: concepts/diffusion-primer.md
+  - Data:
+      - Data pipeline: data/index.md
+      - Export GEO–SAR: data/export-geo-sar.md
+      - PMW proxy pretraining: data/export-geo-pmw.md
+      - Dataset contract: data/dataset-contract.md
+      - Normalization & masks: data/normalization.md
+  - Models:
+      - Model overview: models/index.md
+      - Conditional diffusion: models/conditional-diffusion.md
+      - Residual diffusion: models/residual-diffusion.md
+      - ERA5 residual baseline: models/era5-residual.md
+      - Sampling: models/sampling.md
+  - Experiments:
+      - Choose an experiment: experiments/index.md
+      - Configuration guide: experiments/configuration.md
+      - Training & checkpoints: experiments/training.md
+      - Evaluation & metrics: experiments/evaluation.md
+      - Visual examples: experiments/visual-examples.md
+      - HPC & multi-GPU: experiments/hpc.md
+  - Reference:
+      - Project map: reference/index.md
+      - Configuration reference: reference/configuration.md
+      - Commands & environment: reference/commands.md
+      - Troubleshooting: reference/troubleshooting.md
+      - Glossary: reference/glossary.md
+
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-,:!=\[\]()"/]+|(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      width: 95vw
+      height: auto
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+  - assets/javascripts/extra.js
+

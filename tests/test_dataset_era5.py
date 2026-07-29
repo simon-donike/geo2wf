@@ -12,6 +12,7 @@ from data.dataset import (
     PairedImageDataset,
     _append_era5_derived_channels,
     _cell_centers,
+    _manifest_era5_time_gap_hours,
     _normalize,
     _relative_vorticity_10m,
 )
@@ -124,3 +125,48 @@ def test_datamodule_enables_era5_filter_from_export_config() -> None:
     )
 
     assert datamodule.require_era5 is True
+
+
+def test_dataset_filters_stale_or_unverifiable_era5_contexts(tmp_path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
+    pd.DataFrame(
+        {
+            "sample_id": ["fresh", "stale", "unknown"],
+            "context_path": ["era5.tif", "era5.tif", "era5.tif"],
+            "context_source_type": ["era5", "era5", "era5"],
+            "era5_timestamp": [
+                "2025-01-01T00:00:00Z",
+                "2025-01-01T00:00:00Z",
+                "",
+            ],
+            "target_timestamp": [
+                "2025-01-01T02:00:00Z",
+                "2025-01-01T10:00:00Z",
+                "2025-01-01T01:00:00Z",
+            ],
+        }
+    ).to_csv(split_dir / "manifest.csv", index=False)
+    (tmp_path / "stats.json").write_text("{}", encoding="utf-8")
+
+    dataset = PairedImageDataset(
+        tmp_path,
+        "train",
+        require_era5=True,
+        max_era5_time_gap_hours=3.1,
+    )
+
+    assert dataset.samples["sample_id"].tolist() == ["fresh"]
+    assert dataset.filtered_stale_era5_count == 2
+
+
+def test_era5_age_uses_condition_timestamp_before_target_timestamp() -> None:
+    samples = pd.DataFrame(
+        {
+            "era5_timestamp": ["2025-01-01T00:00:00Z"],
+            "condition_timestamp": ["2025-01-01T02:00:00Z"],
+            "target_timestamp": ["2025-01-01T10:00:00Z"],
+        }
+    )
+
+    assert _manifest_era5_time_gap_hours(samples).iloc[0] == 2.0
