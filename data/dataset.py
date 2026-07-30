@@ -540,7 +540,8 @@ def _solar_time_features(
     """Return local-solar-time sine/cosine and normalized solar zenith.
 
     Local solar time includes the equation-of-time correction and varies with
-    pixel longitude. Solar zenith is divided by pi, giving a [0, 1] channel.
+    pixel longitude. Sine/cosine are shifted to [0, 1] to honor the dataset
+    condition contract; solar zenith is divided by pi into the same range.
     """
     height, width = shape
     if height <= 0 or width <= 0:
@@ -609,8 +610,8 @@ def _solar_time_features(
 
     return torch.stack(
         [
-            torch.sin(solar_phase),
-            torch.cos(solar_phase),
+            (torch.sin(solar_phase) + 1.0) * 0.5,
+            (torch.cos(solar_phase) + 1.0) * 0.5,
             normalized_zenith,
         ]
     ).to(torch.float32)
