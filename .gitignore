@@ -9,6 +9,7 @@ data/geotiff/
 data/processed/
 data/
 /analysis/
+inference
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

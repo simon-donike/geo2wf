@@ -111,14 +111,14 @@ optimization:
     update_after_step: 0
     use_for_eval: true
   reduce_lr_on_plateau:
-    factor: 0.75
-    patience: 100
+    factor: 0.5
+    patience: 200
     monitor: val/probabilistic_refinement_score
     cooldown: 5
     min_lr: 0.00001
 
 trainer:
-  max_epochs: 5000
+  max_epochs: 10000
   accelerator: auto
   devices: 2
   strategy: ddp_find_unused_parameters_false
