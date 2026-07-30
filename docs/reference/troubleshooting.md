@@ -13,7 +13,7 @@ Training consumes an already exported root. Confirm `data.root/<split>/manifest.
 Recalculate:
 
 ```text
-prepared condition = GEO + optional ERA5 + distance-to-center + condition mask
+prepared condition = GEO + optional ERA5 + distance-to-center + 3 solar-time fields + condition mask
 unet.channels      = prepared condition + noisy target
 ```
 

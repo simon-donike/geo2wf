@@ -37,10 +37,10 @@ The denoiser receives:
 
 ```text
 1 noisy residual
-+ 20 existing prepared GEO/ERA/mask channels
++ 24 existing prepared GEO/ERA/solar/mask channels
 + 1 exact baseline in target normalization
 + 1 baseline-valid mask
-= 23 U-Net input channels
+= 27 U-Net input channels
 ```
 
 Sampling inverts the residual transform, adds the result to the same baseline

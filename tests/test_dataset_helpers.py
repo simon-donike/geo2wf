@@ -7,6 +7,7 @@ import torch
 from matplotlib import pyplot as plt
 
 from data.dataset import (
+    _condition_timestamp,
     _manifest_ibtracs_center,
     _append_era5_derived_channels,
     _cell_centers,
@@ -19,6 +20,7 @@ from data.dataset import (
     _resize_target,
     _row_float,
     _row_value,
+    _solar_time_features,
 )
 from utils.plotting import (
     IBTRACS_CENTER_COLUMNS,
@@ -75,6 +77,39 @@ def test_distance_to_ibtracs_center_wraps_longitude_at_dateline() -> None:
 
     assert distance[0, 0, 1] == 0.0
     assert distance.max() == 1.0
+
+
+def test_solar_time_features_identify_equatorial_local_noon() -> None:
+    features = _solar_time_features(
+        torch.tensor([-0.5, 0.5, -0.5, 0.5], dtype=torch.float64),
+        (1, 1),
+        pd.Timestamp("2025-03-20T12:00:00Z"),
+    )
+
+    assert features.shape == (3, 1, 1)
+    assert features.dtype == torch.float32
+    assert abs(float(features[0, 0, 0])) < 0.1
+    assert float(features[1, 0, 0]) < -0.99
+    assert float(features[2, 0, 0]) < 0.02
+
+
+def test_solar_time_features_vary_with_pixel_longitude() -> None:
+    features = _solar_time_features(
+        torch.tensor([-30.0, 30.0, -1.0, 1.0], dtype=torch.float64),
+        (1, 2),
+        pd.Timestamp("2025-06-21T12:00:00Z"),
+    )
+
+    assert not torch.isclose(features[0, 0, 0], features[0, 0, 1])
+    assert torch.all((features[2] >= 0.0) & (features[2] <= 1.0))
+
+
+def test_condition_timestamp_accepts_geo_timestamp_fallback() -> None:
+    timestamp = _condition_timestamp(
+        pd.Series({"condition_timestamp": "", "geo_timestamp": "2025-01-01T03:00:00Z"})
+    )
+
+    assert timestamp == pd.Timestamp("2025-01-01T03:00:00Z")
 
 
 def test_paired_random_flips_applies_same_spatial_flips_to_all_tensors(monkeypatch) -> None:

@@ -268,6 +268,7 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
                 ),
                 "target_channels": json.dumps(["wind_speed"]),
                 "condition_sensor": "ABI",
+                "condition_timestamp": "2025-06-21T12:00:00Z",
                 "target_sensor": "SAR",
                 "dt_minutes": 0.0,
                 "ibtracs_center_lat": 0.5,
@@ -314,12 +315,12 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
 
     sample = PairedImageDataset(tmp_path, "train", target_size=(2, 2))[0]
 
-    assert sample["condition"].shape == (6, 2, 2)
+    assert sample["condition"].shape == (9, 2, 2)
     assert torch.allclose(sample["condition"][3], torch.full((2, 2), 5.0 / 85.0))
     assert torch.allclose(sample["condition"][4], torch.full((2, 2), 0.5))
     assert sample["condition"][5, 1, 0] == 0.0
     assert sample["condition"][5].max() == 1.0
-    assert sample["meta"]["condition_channels"][-1] == (
+    assert sample["meta"]["condition_channels"][-4] == (
         DISTANCE_TO_IBTRACS_CENTER
     )
     assert torch.allclose(sample["target_norm_offset"], torch.tensor([0.0]))

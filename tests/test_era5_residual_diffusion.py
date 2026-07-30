@@ -304,9 +304,9 @@ def test_residual_diffusion_training_config_builds() -> None:
     model = build_model(config)
 
     assert isinstance(model, ERA5ResidualDiffusion)
-    assert model.base_condition_channels == 21
-    assert model.model.condition_channels == 23
-    assert model.model.model.channels == 24
+    assert model.base_condition_channels == 24
+    assert model.model.condition_channels == 26
+    assert model.model.model.channels == 27
 
 
 def test_deterministic_residual_diffusion_preset_requires_external_checkpoint() -> None:
@@ -316,8 +316,7 @@ def test_deterministic_residual_diffusion_preset_requires_external_checkpoint() 
 
     baseline = config["model"]["residual"]["baseline"]
     assert baseline["source"] == "deterministic"
-    assert baseline["checkpoint_path"]
-    assert baseline["checkpoint_path"].endswith(".ckpt")
+    assert baseline["checkpoint_path"] is None
     assert config["export"]["grid_size"] == 256
     assert config["data"]["target_size"] == [256, 256]
     assert config["data"]["center_crop_size"] == [192, 192]

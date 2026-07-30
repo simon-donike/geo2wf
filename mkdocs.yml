@@ -68,6 +68,7 @@ nav:
       - Diffusion in one page: concepts/diffusion-primer.md
   - Data:
       - Data pipeline: data/index.md
+      - Hosting explorer data on R2: data/r2-hosting.md
       - Export GEO–SAR: data/export-geo-sar.md
       - PMW proxy pretraining: data/export-geo-pmw.md
       - Dataset contract: data/dataset-contract.md
@@ -152,4 +153,3 @@ extra_javascript:
   - assets/javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
   - assets/javascripts/extra.js
-

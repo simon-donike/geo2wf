@@ -13,6 +13,14 @@ from torch.utils.data import Dataset
 
 IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
 DISTANCE_TO_IBTRACS_CENTER = "distance_to_ibtracs_center"
+LOCAL_SOLAR_TIME_SIN = "local_solar_time_sin"
+LOCAL_SOLAR_TIME_COS = "local_solar_time_cos"
+SOLAR_ZENITH_ANGLE = "solar_zenith_angle"
+SOLAR_TIME_CHANNELS = (
+    LOCAL_SOLAR_TIME_SIN,
+    LOCAL_SOLAR_TIME_COS,
+    SOLAR_ZENITH_ANGLE,
+)
 
 EARTH_RADIUS_M = 6_371_000.0
 ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
@@ -314,17 +322,26 @@ class PairedImageDataset(Dataset):
             condition.shape[-2:],
             storm_center,
         )
-        condition = torch.cat([condition, distance_to_center], dim=0)
+        solar_time = _solar_time_features(
+            condition_bounds,
+            condition.shape[-2:],
+            _condition_timestamp(row),
+        )
+        condition = torch.cat(
+            [condition, distance_to_center, solar_time], dim=0
+        )
         condition_channels = condition_channels + [
-            DISTANCE_TO_IBTRACS_CENTER
+            DISTANCE_TO_IBTRACS_CENTER,
+            *SOLAR_TIME_CHANNELS,
         ]
         condition_zero_values = torch.cat(
-            [condition_zero_values, condition_zero_values.new_zeros(1)]
+            [condition_zero_values, condition_zero_values.new_zeros(4)]
         )
         condition_channel_mask = torch.cat(
             [
                 condition_channel_mask,
                 torch.ones_like(distance_to_center, dtype=torch.bool),
+                torch.ones_like(solar_time, dtype=torch.bool),
             ],
             dim=0,
         )
@@ -496,6 +513,107 @@ def _normalized_distance_to_center(
     else:
         angular_distance = torch.zeros_like(angular_distance)
     return angular_distance.to(dtype=torch.float32).unsqueeze(0)
+
+
+def _condition_timestamp(row: pd.Series) -> pd.Timestamp:
+    """Return the UTC GEO acquisition time used to construct the condition."""
+    for column in ("condition_timestamp", "geo_timestamp"):
+        value = _row_value(row, column, "")
+        if value:
+            timestamp = pd.Timestamp(value)
+            if pd.isna(timestamp):
+                continue
+            if timestamp.tzinfo is None:
+                return timestamp.tz_localize("UTC")
+            return timestamp.tz_convert("UTC")
+    raise ValueError(
+        "manifest row is missing a valid condition_timestamp/geo_timestamp; "
+        "solar-time condition channels cannot be constructed"
+    )
+
+
+def _solar_time_features(
+    bounds: torch.Tensor,
+    shape: tuple[int, int],
+    timestamp: pd.Timestamp,
+) -> torch.Tensor:
+    """Return local-solar-time sine/cosine and normalized solar zenith.
+
+    Local solar time includes the equation-of-time correction and varies with
+    pixel longitude. Solar zenith is divided by pi, giving a [0, 1] channel.
+    """
+    height, width = shape
+    if height <= 0 or width <= 0:
+        raise ValueError("solar feature raster dimensions must be positive")
+    timestamp = pd.Timestamp(timestamp)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.tz_localize("UTC")
+    else:
+        timestamp = timestamp.tz_convert("UTC")
+
+    left, right, bottom, top = (float(value) for value in bounds)
+    longitudes = torch.from_numpy(
+        _cell_centers(left, right, width)
+    ).to(torch.float64)
+    latitudes = torch.from_numpy(
+        _cell_centers(top, bottom, height)
+    ).to(torch.float64)
+    latitude_grid, longitude_grid = torch.meshgrid(
+        latitudes, longitudes, indexing="ij"
+    )
+
+    utc_minutes = (
+        timestamp.hour * 60.0
+        + timestamp.minute
+        + timestamp.second / 60.0
+        + timestamp.microsecond / 60_000_000.0
+    )
+    days_in_year = 366.0 if timestamp.is_leap_year else 365.0
+    fractional_year = (
+        2.0
+        * np.pi
+        / days_in_year
+        * (timestamp.dayofyear - 1.0 + (utc_minutes / 60.0 - 12.0) / 24.0)
+    )
+    equation_of_time = 229.18 * (
+        0.000075
+        + 0.001868 * np.cos(fractional_year)
+        - 0.032077 * np.sin(fractional_year)
+        - 0.014615 * np.cos(2.0 * fractional_year)
+        - 0.040849 * np.sin(2.0 * fractional_year)
+    )
+    declination = (
+        0.006918
+        - 0.399912 * np.cos(fractional_year)
+        + 0.070257 * np.sin(fractional_year)
+        - 0.006758 * np.cos(2.0 * fractional_year)
+        + 0.000907 * np.sin(2.0 * fractional_year)
+        - 0.002697 * np.cos(3.0 * fractional_year)
+        + 0.00148 * np.sin(3.0 * fractional_year)
+    )
+
+    solar_minutes = torch.remainder(
+        utc_minutes + equation_of_time + 4.0 * longitude_grid,
+        1440.0,
+    )
+    solar_phase = solar_minutes * (2.0 * np.pi / 1440.0)
+    hour_angle = solar_minutes * (np.pi / 720.0) - np.pi
+    latitude_radians = torch.deg2rad(latitude_grid)
+    cosine_zenith = (
+        torch.sin(latitude_radians) * np.sin(declination)
+        + torch.cos(latitude_radians)
+        * np.cos(declination)
+        * torch.cos(hour_angle)
+    ).clamp(-1.0, 1.0)
+    normalized_zenith = torch.acos(cosine_zenith) / np.pi
+
+    return torch.stack(
+        [
+            torch.sin(solar_phase),
+            torch.cos(solar_phase),
+            normalized_zenith,
+        ]
+    ).to(torch.float32)
 
 
 def _paired_random_flips(
