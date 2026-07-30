@@ -113,6 +113,9 @@ def build_model(config: dict) -> pl.LightningModule:
             "probabilistic_score_sharpness_weight": validation_cfg.get(
                 "probabilistic_score_sharpness_weight", 2.0
             ),
+            "probabilistic_score_target_sharpness_ratio": validation_cfg.get(
+                "probabilistic_score_target_sharpness_ratio", 1.0
+            ),
             "min_snr_gamma": opt_cfg.get("min_snr_gamma"),
             "condition_dropout_probability": guidance_cfg.get(
                 "condition_dropout_probability", 0.0
@@ -155,6 +158,9 @@ def build_model(config: dict) -> pl.LightningModule:
             spectrum_loss_weight=residual_loss_cfg.get("spectrum_weight", 0.0),
             low_frequency_loss_weight=residual_loss_cfg.get(
                 "low_frequency_weight", 0.0
+            ),
+            smoothness_loss_weight=residual_loss_cfg.get(
+                "smoothness_weight", 0.0
             ),
             auxiliary_max_timestep_fraction=residual_loss_cfg.get(
                 "auxiliary_max_timestep_fraction", 0.5

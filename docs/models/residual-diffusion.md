@@ -50,22 +50,24 @@ the existing image and eye-structure metrics.
 `mae_skill_vs_baseline`, so a deterministic stack is measured directly against
 the frozen reconstruction it is meant to improve.
 
-## Sharp probabilistic refinement
+## Probabilistic refinement
 
 The deterministic-baseline preset keeps epsilon diffusion as the generative
-objective and adds four controls aimed at sharp, plausible samples:
+objective and adds controls aimed at coherent, plausible samples:
 
 - Min-SNR weighting prevents easy, nearly clean timesteps from dominating.
 - Observed SAR and off-swath zero-residual losses are normalized separately, so
   swath area does not change the configured anchor strength.
-- Inner-core, high-wind, and high-gradient pixels receive modest extra noise-loss weight.
+- Inner-core and high-wind pixels receive extra noise-loss weight; high-gradient
+  pixels receive only a small additional emphasis.
 - At low and medium noise levels, the clean residual estimate receives weak
-  gradient-magnitude, log-spectrum, and low-frequency consistency losses.
+  gradient-magnitude, log-spectrum, low-frequency consistency, and total-variation
+  losses.
 
-The spectrum term compares amplitude rather than phase. It can therefore reward
-SAR-like high-frequency energy without requiring an uncertain feature to occur
-at exactly the observed pixel. The low-frequency term keeps samples tied to the
-broad deterministic reconstruction.
+The spectrum term compares amplitude rather than phase. The low-frequency term
+keeps samples tied to the broad deterministic reconstruction, while the weak
+total-variation term suppresses pixel-scale ringing in the correction without
+smoothing the deterministic baseline itself.
 
 Ten percent condition dropout trains an unconditional branch without changing
 the U-Net shape. Sampling then uses classifier-free guidance; the preset starts
@@ -78,6 +80,8 @@ gradient sharpness ratio, log-spectrum error, and a composite
 `probabilistic_refinement_score`. Checkpoints use the composite score. Inspect
 individual members rather than the ensemble mean when judging sharpness,
 because averaging valid alternatives is expected to blur them.
+The preset targets a gradient ratio of `0.9`, so checkpoint selection favors a
+slightly smoother field than the SAR observation.
 
 ## Configuration
 

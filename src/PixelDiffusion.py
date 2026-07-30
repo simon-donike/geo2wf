@@ -66,7 +66,8 @@ class PixelDiffusionConditional(pl.LightningModule):
                  guidance_scale=1.0,
                  validation_ensemble_size=1,
                  validation_ensemble_batches=1,
-                 probabilistic_score_sharpness_weight=2.0):
+                 probabilistic_score_sharpness_weight=2.0,
+                 probabilistic_score_target_sharpness_ratio=1.0):
         super().__init__()
         if not 0.0 <= float(unobserved_loss_weight) <= 1.0:
             raise ValueError("unobserved_loss_weight must be in [0, 1]")
@@ -86,6 +87,10 @@ class PixelDiffusionConditional(pl.LightningModule):
             raise ValueError("guidance_scale must be non-negative")
         if float(probabilistic_score_sharpness_weight) < 0:
             raise ValueError("probabilistic_score_sharpness_weight must be non-negative")
+        if float(probabilistic_score_target_sharpness_ratio) <= 0:
+            raise ValueError(
+                "probabilistic_score_target_sharpness_ratio must be positive"
+            )
         self.lr = lr
         self.lr_scheduler_factor=lr_scheduler_factor
         self.lr_scheduler_patience=lr_scheduler_patience
@@ -114,6 +119,9 @@ class PixelDiffusionConditional(pl.LightningModule):
         self.guidance_scale = float(guidance_scale)
         self.probabilistic_score_sharpness_weight = float(
             probabilistic_score_sharpness_weight
+        )
+        self.probabilistic_score_target_sharpness_ratio = float(
+            probabilistic_score_target_sharpness_ratio
         )
 
         sampling_method = str(sampling_method).strip().lower()
@@ -819,7 +827,14 @@ class PixelDiffusionConditional(pl.LightningModule):
         spectrum_error = self._log_spectrum_error(
             ensemble_ms, target_ms, mask
         )
-        sharpness_penalty = sharpness_ratio.clamp_min(1e-6).log().abs()
+        # A target below one deliberately selects slightly smoother members.
+        # Keeping this configurable also preserves exact target matching as the
+        # default for existing experiments.
+        relative_sharpness = (
+            sharpness_ratio
+            / self.probabilistic_score_target_sharpness_ratio
+        )
+        sharpness_penalty = relative_sharpness.clamp_min(1e-6).log().abs()
         refinement_score = crps + self.probabilistic_score_sharpness_weight * (
             sharpness_penalty + 0.1 * spectrum_error
         )

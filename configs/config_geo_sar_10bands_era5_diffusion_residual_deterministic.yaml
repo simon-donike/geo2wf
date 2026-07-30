@@ -82,18 +82,19 @@ model:
     prediction_min_ms: 0.0
     prediction_max_ms: 80.0
     loss:
-      # Preserve the probabilistic diffusion objective while explicitly rewarding
-      # sharp, SAR-like residual structure at stable low/medium noise levels.
-      gradient_weight: 0.05
-      spectrum_weight: 0.05
-      low_frequency_weight: 0.1
+      # Keep the refinement coherent without reproducing every pixel-scale SAR
+      # edge. The weak TV term only smooths the learned residual, not the baseline.
+      gradient_weight: 0.015
+      spectrum_weight: 0.01
+      low_frequency_weight: 0.15
+      smoothness_weight: 0.02
       auxiliary_max_timestep_fraction: 0.5
       high_wind_threshold_ms: 17.0
       high_wind_weight: 2.0
       inner_core_radius_km: 100.0
       inner_core_weight: 2.0
       high_gradient_threshold_ms: 2.0
-      high_gradient_weight: 2.0
+      high_gradient_weight: 1.25
       low_frequency_kernel_size: 9
   unet:
     dim: 48
@@ -140,7 +141,9 @@ validation:
   ensemble_size: 4
   ensemble_batches: 1
   sampling_seed: 42
-  probabilistic_score_sharpness_weight: 2.0
+  probabilistic_score_sharpness_weight: 1.0
+  # Prefer members that retain most, but not all, of SAR's gradient strength.
+  probabilistic_score_target_sharpness_ratio: 0.9
 
 logging:
   wandb:

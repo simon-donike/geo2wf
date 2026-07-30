@@ -79,6 +79,7 @@
 | `residual.prediction_min_ms`, `prediction_max_ms` | recomposed physical output bounds |
 | `residual.loss.gradient_weight`, `spectrum_weight` | sharpness auxiliary weights |
 | `residual.loss.low_frequency_weight`, `low_frequency_kernel_size` | broad-field consistency controls |
+| `residual.loss.smoothness_weight` | weak total-variation penalty on the physical residual |
 | `residual.loss.auxiliary_max_timestep_fraction` | latest normalized training timestep receiving clean-residual auxiliary losses |
 | `residual.loss.high_wind_*`, `high_gradient_*` | structural pixel thresholds and weights |
 | `residual.loss.inner_core_radius_km`, `inner_core_weight` | storm-centered structural emphasis |
@@ -124,4 +125,5 @@
 | `validation.sampling_seed` | stable per-sample latent namespace |
 | `validation.ensemble_size`, `ensemble_batches` | stable validation ensemble width and evaluated prefix |
 | `validation.probabilistic_score_sharpness_weight` | sharpness contribution to the CRPS-based checkpoint score |
+| `validation.probabilistic_score_target_sharpness_ratio` | preferred sampled/observed gradient ratio; values below one select smoother samples |
 | `logging.wandb.enabled`, `project`, `name`, `save_dir`, `log_model` | tracking configuration |
