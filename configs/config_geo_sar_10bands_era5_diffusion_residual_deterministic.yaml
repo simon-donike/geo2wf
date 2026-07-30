@@ -74,8 +74,7 @@ model:
     # the GEO2WF_BASELINE_CKPT environment variable.
     baseline:
       source: deterministic
-      # Set this after retraining the deterministic baseline with solar channels.
-      checkpoint_path: null
+      checkpoint_path: logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt
     # Odd asinh transform: resolves small corrections without clipping the rare
     # intense positive tail into the narrow bulk of the residual distribution.
     soft_scale_ms: 5.0

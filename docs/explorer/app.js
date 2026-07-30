@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,postProcessing=true,assetBaseUrl="";
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,geoFrames=[],sarFrames=[],postProcessing=true,graphModel="model_a",assetBaseUrl="";
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
@@ -33,6 +33,8 @@ function renderMap(){
   layers.clearLayers();
   geoLayers.clearLayers();
   sarLayers.clearLayers();
+  geoFrames=[];
+  sarFrames=[];
   const coords=storm.records.map(r=>[r.lat,r.lon]);
   L.polyline(coords,{color:"#ffffff",weight:8,opacity:.5}).addTo(layers);
   L.polyline(coords,{color:"#e65445",weight:4,opacity:1}).addTo(layers).bindTooltip(`${storm.id} · Storm track`);
@@ -44,16 +46,21 @@ function renderMap(){
       .bindTooltip(`${o.kind} · ${full(r.time)}`);
     const close=L.marker(o.bounds[1],{icon:L.divIcon({className:"geo-close-icon",html:"×",iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:2000,title:"Close Geostationary image"});
     const hide=()=>{geoLayers.removeLayer(image);layers.removeLayer(close);dot.setStyle({fillColor:"#173b48",fillOpacity:.48})};
-    const show=()=>{image.addTo(geoLayers);close.addTo(layers);dot.setStyle({fillColor:"#f2a654",fillOpacity:1});dot.bringToFront();close.setZIndexOffset(2000);currentMarker?.bringToFront()};
+    const show=(showClose=true)=>{image.addTo(geoLayers);if(showClose){close.addTo(layers);close.setZIndexOffset(2000)}else layers.removeLayer(close);dot.setStyle({fillColor:"#f2a654",fillOpacity:1});dot.bringToFront();currentMarker?.bringToFront()};
     close.on("click",hide);
-    dot.on("click",()=>geoLayers.hasLayer(image)?hide():show());
+    dot.on("click",()=>geoLayers.hasLayer(image)?hide():show(!$("#animationMode").checked));
+    geoFrames.push({record:r,show,hide});
   });
   storm.records.filter(r=>r.sar_overlay).forEach(r=>{
     const o=r.sar_overlay;
-    L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"}).addTo(sarLayers)
+    const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"})
       .bindTooltip(`<strong>SAR-derived WF</strong><br>${full(r.time)}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} m/s<br>Shared color scale: 0–60+ m/s`,{className:"sar-tooltip"});
-    L.circleMarker([r.lat,r.lon],{radius:5,color:"#263f4a",weight:2,fillColor:"#fff",fillOpacity:1}).addTo(sarLayers)
+    const dot=L.circleMarker([r.lat,r.lon],{radius:5,color:"#263f4a",weight:2,fillColor:"#fff",fillOpacity:1})
       .bindTooltip(`SAR match · ${full(r.time)}`);
+    const show=()=>{image.addTo(sarLayers);dot.addTo(sarLayers)};
+    const hide=()=>{sarLayers.removeLayer(image);sarLayers.removeLayer(dot)};
+    sarFrames.push({record:r,show,hide});
+    if(!$("#animationMode").checked)show();
   });
   currentMarker=L.circleMarker(coords[0],{radius:8,color:"#fff",weight:3,fillColor:"#e65445",fillOpacity:1}).addTo(layers);
   map.fitBounds(L.latLngBounds(coords).pad(.3),{animate:false,maxZoom:6});
@@ -71,18 +78,22 @@ function domain(metric,start,end){
   if(!values.length)return[0,1];
   const min=Math.min(...values),max=Math.max(...values);
   const padding=Math.max((max-min)*.06,metric==="rmw"?1:.5);
-  return[Math.max(0,min-padding),max+padding]
+  return[0,Math.max(1,max+padding)]
 }
 function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!sorted.length)return null;const m=Math.floor(sorted.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2}
+function graphPrediction(record){return graphModel==="model_b"?record.model_b_prediction:record.prediction}
+function postprocessExcluded(record){return graphModel==="model_a"&&record.postprocess_excluded}
 function smoothedValidValue(metric,record){
   const halfWindow=data.postprocessing.smoothing_hours*3600000/2,target=dt(record.time).getTime();
-  return median(storm.records.filter(r=>!r.postprocess_excluded&&Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>r.prediction[metric]));
+  return median(storm.records.filter(r=>!postprocessExcluded(r)&&Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r)?.[metric]));
 }
 function predictionValue(metric,record){
-  if(!postProcessing)return record.prediction[metric];
-  if(!record.postprocess_excluded)return smoothedValidValue(metric,record);
+  const raw=graphPrediction(record)?.[metric];
+  if(!Number.isFinite(raw))return null;
+  if(!postProcessing)return raw;
+  if(!postprocessExcluded(record))return smoothedValidValue(metric,record);
   const index=storm.records.indexOf(record);let left=index-1,right=index+1;
-  while(left>=0&&storm.records[left].postprocess_excluded)left--;while(right<storm.records.length&&storm.records[right].postprocess_excluded)right++;
+  while(left>=0&&postprocessExcluded(storm.records[left]))left--;while(right<storm.records.length&&postprocessExcluded(storm.records[right]))right++;
   const a=left>=0?smoothedValidValue(metric,storm.records[left]):null,b=right<storm.records.length?smoothedValidValue(metric,storm.records[right]):null;
   if(!Number.isFinite(a))return b;if(!Number.isFinite(b))return a;
   const ta=dt(storm.records[left].time).getTime(),tb=dt(storm.records[right].time).getTime(),u=(dt(record.time).getTime()-ta)/(tb-ta),blend=u*u*(3-2*u);return a+(b-a)*blend;
@@ -100,14 +111,15 @@ function chart(metric,def){
   [hi,(lo+hi)/2,lo].forEach(v=>{const yp=y(v);s.append(svg("line",{class:"chart-grid",x1:C.l,y1:yp,x2:C.w-C.r,y2:yp}));const t=svg("text",{class:"chart-axis",x:2,y:yp+3});t.textContent=v>=100?Math.round(v):v.toFixed(v<10?1:0);s.append(t)});
   [[short(start),C.l],[short(end),C.w-36]].forEach(([v,xp])=>{const t=svg("text",{class:"chart-axis",x:xp,y:C.h-2});t.textContent=v;s.append(t)});
   s.append(svg("path",{class:"geo-path",d:path(pred,r=>r.plot,postProcessing)}));
+  if(pred.length===1)s.append(svg("circle",{class:"geo-dot",cx:x(pred[0].time),cy:y(pred[0].plot),r:3.2}));
   if(sar.length)s.append(svg("path",{class:"sar-path",d:path(sar,r=>r.sar[metric])}));
   sar.forEach(r=>s.append(svg("circle",{class:"sar-dot",cx:x(r.time),cy:y(r.sar[metric]),r:3.5})));
   s.append(svg("line",{class:"cursor-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}));
-  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=predictionValue(metric,r),tip=$("#tooltip"),processedLabel=r.postprocess_excluded?"interpolated":"smoothed";tip.innerHTML=`<strong>${full(r.time)}</strong><br>Prediction ${postProcessing?(Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+" ("+processedLabel+"; raw "+r.prediction[metric].toFixed(1)+")":"Filtered"):r.prediction[metric].toFixed(1)+" "+def.unit}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
+  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=predictionValue(metric,r),raw=graphPrediction(r)?.[metric],tip=$("#tooltip"),processedLabel=postprocessExcluded(r)?"interpolated":"smoothed",predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" ("+processedLabel+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${data.models[graphModel].label} ${predictionLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function charts(){
-  $("#charts").replaceChildren(...Object.entries(data.metrics).map(([m,d])=>chart(m,d)));
+  $("#charts").replaceChildren(...data.models[graphModel].metrics.map(m=>chart(m,data.metrics[m])));
   if(!$("#tooltip")){const t=document.createElement("div");t.id="tooltip";t.className="tooltip";document.body.append(t)}
 }
 function current(){
@@ -117,13 +129,19 @@ function current(){
   const time=dt(r.time).getTime();$$(".cursor-line").forEach(l=>{const start=+l.dataset.start,end=+l.dataset.end,visible=time>=start&&time<=end,xp=C.l+(time-start)/(end-start)*(C.w-C.l-C.r);l.style.display=visible?"":"none";if(visible){l.setAttribute("x1",xp);l.setAttribute("x2",xp)}})
 }
 function stop(){clearInterval(timer);timer=null;$("#playButton").textContent="▶"}
-function play(){if(timer)return stop();$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider");s.value=(+s.value+1)%storm.records.length;current()},+$("#speedSelector").value)}
+function resetAnimation(){geoFrames.forEach(frame=>frame.hide());sarFrames.forEach(frame=>frame.hide())}
+function showAnimationFrame(record){geoFrames.find(frame=>frame.record===record)?.show(false);sarFrames.find(frame=>frame.record===record)?.show()}
+function restoreManualLayers(){resetAnimation();sarFrames.forEach(frame=>frame.show())}
+function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=enabled?360:340}
+function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function selectStorm(id){
   stop();storm=data.storms.find(s=>s.id===id);switcher();renderMap();
   $("#basinLabel").textContent=`${storm.basin} · 2025`;$("#stormTitle").textContent=storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;
   const sl=$("#timeSlider");sl.max=storm.records.length-1;sl.value=0;$("#startDate").textContent=short(storm.start);$("#midDate").textContent=short(storm.records[Math.floor(storm.records.length/2)].time);$("#endDate").textContent=short(storm.end);charts();current()
 }
 $("#timeSlider").oninput=()=>{stop();current()};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
+$("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked);event.target.checked?resetAnimation():restoreManualLayers()};
+$("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=data.models[graphModel].label;charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 const dialog=$("#aboutDialog");$("#helpButton").onclick=()=>dialog.showModal();$("#closeDialog").onclick=$("#confirmDialog").onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close()};
 async function loadData(){
