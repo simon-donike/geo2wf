@@ -57,6 +57,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Storm explorer: explorer.md
   - Start here:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md

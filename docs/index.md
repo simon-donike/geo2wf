@@ -14,6 +14,7 @@ geo2wf is a deliberately focused research baseline that turns colocated geostati
 <div class="geo-actions" markdown>
 [Run the first experiment :material-arrow-right:](getting-started/first-experiment.md){ .md-button .md-button--primary }
 [Understand the system](concepts/architecture.md){ .md-button }
+[Explore the mock dashboard](explorer/dashboard.html){ .md-button }
 </div>
 </div>
 
