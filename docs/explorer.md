@@ -5,11 +5,11 @@ hide:
 
 # Interactive storm explorer
 
-The storm explorer is a standalone interface prototype for future geo2wf outputs. It uses synthetic data to demonstrate the intended map, timeline, radial profile, distribution, and confidence interactions.
+The storm explorer presents the `AL082025` and `EP112025` inference sequences as complete, interactive storm tracks. Follow each GOES-conditioned prediction through time and compare five wind-field diagnostics with the available matched SAR observations.
 
 [Open the storm explorer :material-open-in-new:](explorer/dashboard.html){ .md-button .md-button--primary }
 
-!!! warning "Mock data only"
-    The named storm, wind fields, track, and diagnostics are fictional. No scientific conclusions should be drawn from them.
+!!! info "How to read the charts"
+    Solid red lines show metrics derived from geo2wf predictions. Gray dots are matched SAR observations; dashed gray segments interpolate visually between those sparse measurements.
 
-The explorer is plain HTML, CSS, and JavaScript, so it deploys with this documentation and needs no server or API key.
+The explorer is generated as plain HTML, CSS, JavaScript, and compact JSON, so it deploys with this documentation and needs no server or API key.

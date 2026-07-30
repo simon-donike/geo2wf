@@ -163,13 +163,14 @@ def test_inner_core_mask_uses_geographic_center_and_bounds() -> None:
     assert mask.sum() == 1
     assert mask[0, 0, 1, 1]
 
-def test_sharp_probabilistic_objective_is_finite() -> None:
+def test_structural_and_smoothness_objective_is_finite() -> None:
     model = _model(
         min_snr_gamma=5.0,
         condition_dropout_probability=0.1,
         gradient_loss_weight=0.05,
         spectrum_loss_weight=0.05,
         low_frequency_loss_weight=0.1,
+        smoothness_loss_weight=0.02,
         high_wind_loss_weight=2.0,
         high_gradient_loss_weight=2.0,
         low_frequency_kernel_size=3,
@@ -320,11 +321,19 @@ def test_deterministic_residual_diffusion_preset_requires_external_checkpoint() 
     assert config["export"]["grid_size"] == 256
     assert config["data"]["target_size"] == [256, 256]
     assert config["data"]["center_crop_size"] == [192, 192]
-    assert config["trainer"]["max_epochs"] == 5000
-    assert config["trainer"]["checkpoint"]["monitor"] == "val/probabilistic_refinement_score"
+    assert config["trainer"]["max_epochs"] == 10000
+    assert (
+        config["trainer"]["checkpoint"]["monitor"]
+        == "val/probabilistic_refinement_score"
+    )
     assert config["data"]["include_test_in_train"] is True
     assert config["optimization"]["min_snr_gamma"] == 5.0
     assert config["validation"]["ensemble_size"] == 4
+    assert (
+        config["validation"]["probabilistic_score_target_sharpness_ratio"]
+        == 0.9
+    )
+    assert config["model"]["residual"]["loss"]["smoothness_weight"] == 0.02
     assert config["model"]["sampling"]["guidance_scale"] == 1.5
     assert (
         config["model"]["classifier_free_guidance"][

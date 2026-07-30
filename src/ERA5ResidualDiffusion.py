@@ -40,6 +40,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         gradient_loss_weight: float = 0.0,
         spectrum_loss_weight: float = 0.0,
         low_frequency_loss_weight: float = 0.0,
+        smoothness_loss_weight: float = 0.0,
         auxiliary_max_timestep_fraction: float = 0.5,
         high_wind_threshold_ms: float = 17.0,
         high_wind_loss_weight: float = 1.0,
@@ -66,6 +67,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             "gradient_loss_weight": gradient_loss_weight,
             "spectrum_loss_weight": spectrum_loss_weight,
             "low_frequency_loss_weight": low_frequency_loss_weight,
+            "smoothness_loss_weight": smoothness_loss_weight,
         }.items():
             if float(value) < 0:
                 raise ValueError(f"{name} must be non-negative")
@@ -134,6 +136,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
         self.gradient_loss_weight = float(gradient_loss_weight)
         self.spectrum_loss_weight = float(spectrum_loss_weight)
         self.low_frequency_loss_weight = float(low_frequency_loss_weight)
+        self.smoothness_loss_weight = float(smoothness_loss_weight)
         self.auxiliary_max_timestep_fraction = float(
             auxiliary_max_timestep_fraction
         )
@@ -403,6 +406,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
                 self.gradient_loss_weight,
                 self.spectrum_loss_weight,
                 self.low_frequency_loss_weight,
+                self.smoothness_loss_weight,
             )
         )
         if auxiliary_enabled:
@@ -429,6 +433,11 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
                 (predicted_gradient - auxiliary_target_gradient).abs(),
                 gradient_mask,
             )
+            # Weak total variation on the physical residual suppresses
+            # pixel-scale ringing while leaving the broad baseline untouched.
+            smoothness_loss = self.model.weighted_loss(
+                predicted_gradient, gradient_mask
+            )
             spectrum_loss = self._masked_log_spectrum_loss(
                 clean_residual_ms, target_residual_ms, auxiliary_mask
             )
@@ -440,12 +449,14 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             gradient_loss = zero
             spectrum_loss = zero
             low_frequency_loss = zero
+            smoothness_loss = zero
         loss = (
             observation_loss
             + self.unobserved_loss_weight * anchor_loss
             + self.gradient_loss_weight * gradient_loss
             + self.spectrum_loss_weight * spectrum_loss
             + self.low_frequency_loss_weight * low_frequency_loss
+            + self.smoothness_loss_weight * smoothness_loss
         )
         metrics = {
             "diffusion_observed_loss": observation_loss,
@@ -453,6 +464,7 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
             "gradient_loss": gradient_loss,
             "spectrum_loss": spectrum_loss,
             "low_frequency_loss": low_frequency_loss,
+            "smoothness_loss": smoothness_loss,
         }
         batch_size = int(model_target.shape[0])
         for name, value in metrics.items():

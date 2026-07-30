@@ -2,63 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Interactive geo2wf storm explorer mockup">
-  <title>geo2wf · Storm explorer</title><link rel="stylesheet" href="styles.css">
+  <meta name="description" content="Explore geo2wf wind-field inference across complete tropical-cyclone tracks.">
+  <title>geo2wf · Storm explorer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-  <a class="brand" href="../"><b>↺</b><strong>geo2wf</strong><i></i><span>Storm explorer</span></a>
-  <nav><small>● Mock data</small><button id="help">?</button><a href="../">Back to docs ↗</a></nav>
+<header class="topbar">
+  <a class="brand" href="../"><span class="brand-mark">↺</span><strong>geo2wf</strong><i></i><span>Storm explorer</span></a>
+  <div class="top-actions"><span class="data-badge"><i></i> Inference data</span><button class="icon-button" id="helpButton">?</button><a class="docs-link" href="../">Back to docs ↗</a></div>
 </header>
-<main>
-  <section class="map-side">
-    <div class="panel-head"><div><label>North Atlantic · 2025</label><h1>Storm field</h1></div>
-      <div class="layers"><button class="active" data-layer="wind">Wind field</button><button data-layer="ir">GEO IR</button><button data-layer="spread">Uncertainty</button></div>
+<main class="workspace">
+  <section class="map-panel">
+    <div class="map-heading"><div><p class="eyebrow" id="basinLabel">Loading storm data</p><h1>Storm track</h1></div><div class="storm-switcher" id="stormSwitcher"></div></div>
+    <div class="map" id="map"></div>
+    <div class="timeline">
+      <button id="playButton">▶</button>
+      <div><p><strong id="currentDate">Loading…</strong><span id="observationCount">—</span></p><input id="timeSlider" type="range" min="0" max="1" value="0"><footer><span id="startDate">—</span><span id="midDate">—</span><span id="endDate">—</span></footer></div>
+      <label class="speed-control">Speed<select id="speedSelector"><option value="150">0.5×</option><option value="75" selected>1×</option><option value="38">2×</option><option value="19">4×</option></select></label>
     </div>
-    <div class="map" id="map">
-      <svg viewBox="0 0 900 700" aria-label="Stylized North Atlantic storm map">
-        <defs>
-          <radialGradient id="sea" cx="58%" cy="48%"><stop stop-color="#17495a"/><stop offset="1" stop-color="#071e2b"/></radialGradient>
-          <radialGradient id="storm"><stop stop-color="#fff5dc"/><stop offset=".12" stop-color="#ffb467"/><stop offset=".35" stop-color="#ed725a" stop-opacity=".78"/><stop offset=".7" stop-color="#49d2c9" stop-opacity=".28"/><stop offset="1" stop-color="#49d2c9" stop-opacity="0"/></radialGradient>
-          <pattern id="grid" width="90" height="70" patternUnits="userSpaceOnUse"><path d="M90 0H0V70" fill="none" stroke="#b9dce3" stroke-opacity=".09"/></pattern>
-        </defs>
-        <rect width="900" height="700" fill="url(#sea)"/><rect width="900" height="700" fill="url(#grid)"/>
-        <g class="land"><path d="M0 0h220l20 50 53 25 29 50-38 41 22 42-44 55-18 68-44 35-28 85-64 37-52 114L0 625Z"/><path d="M760 0h140v700H750l-30-70 16-65-44-45 15-70-31-42 15-73-33-40 49-59-12-55 45-34-16-56 45-48Z"/><path d="M170 490l52 15 26 38-15 78-60 79H86l20-68 41-45Z"/></g>
-        <g class="coords"><text x="15" y="340">20°N</text><text x="15" y="200">40°N</text><text x="430" y="685">50°W</text><text x="700" y="685">20°W</text></g>
-        <path class="track" d="M280 530C355 480 405 430 450 385S550 295 625 215"/>
-        <g id="stormGlyph">
-          <circle class="ring a" cx="490" cy="350" r="180"/><circle class="ring b" cx="490" cy="350" r="120"/><circle class="ring c" cx="490" cy="350" r="68"/>
-          <circle class="field" cx="490" cy="350" r="178" fill="url(#storm)"/>
-          <g class="streaks"><path d="M312 350c44-92 165-130 258-78 78 44 105 138 68 213"/><path d="M353 446c-39-70-11-160 65-203 83-46 187-8 218 73"/><path d="M416 486c-67-36-92-121-53-186 38-60 113-81 177-54"/><path d="M516 458c-57 11-109-25-121-80-12-59 29-113 87-124"/></g>
-          <circle class="eye" cx="490" cy="350" r="18"/><circle class="pupil" cx="490" cy="350" r="7"/>
-        </g>
-        <g id="points"></g>
-      </svg>
-      <div class="legend"><p><span>10 m wind speed</span><b id="unit">m/s</b></p><i></i><div><span>0</span><span>20</span><span>40</span><span>60+</span></div></div>
-      <div class="zoom"><button id="zin">+</button><button id="zout">−</button><button id="reset">⌖</button></div>
-      <code id="coords">22.4°N · 48.7°W</code>
-    </div>
-    <div class="timeline"><button id="play">▶</button><div><p><b id="date">18 Sep · 12:00 UTC</b><span>T+<strong id="lead">24</strong> h reconstruction</span></p><input id="time" type="range" min="0" max="7" value="4"><footer><span>Sep 17</span><span>Sep 18</span><span>Sep 19</span><span>Sep 20</span></footer></div></div>
   </section>
-  <aside>
-    <div class="storm-title"><div><label>Selected system</label><h2>Hurricane Orla <small>AL08</small></h2></div><div class="cat"><small>CAT</small><b id="cat">3</b></div></div>
-    <div class="metrics">
-      <article><label>Max wind</label><strong><b id="wind">52</b> <small>m/s</small></strong><em>↑ 4.2%</em></article>
-      <article><label>Min pressure</label><strong><b id="pressure">958</b> <small>hPa</small></strong><em>↓ 11 hPa</em></article>
-      <article><label>Eye radius</label><strong><b id="eye">24</b> <small>km</small></strong><em>± 3.1 km</em></article>
-    </div>
-    <article class="card">
-      <div class="card-head"><div><label>Radial profile</label><h3>Wind speed from storm center</h3></div><small>— Observed　<span>— geo2wf</span></small></div>
-      <div class="chart" id="chart"><svg viewBox="0 0 560 230" preserveAspectRatio="none">
-        <g class="chart-grid"><path d="M44 18V196H544M44 137H544M44 77H544M44 18H544"/></g>
-        <g class="axis"><text x="10" y="201">0</text><text x="5" y="142">20</text><text x="5" y="82">40</text><text x="5" y="23">60</text><text x="40" y="220">0</text><text x="280" y="220">100</text><text x="520" y="220">200 km</text></g>
-        <path id="area"/><path id="obs"/><path id="model"/><line id="hover" y1="18" y2="196"/>
-      </svg><div id="tip"></div></div>
-    </article>
-    <article class="card hist-card"><div class="card-head"><div><label>Field diagnostics</label><h3>Pixel wind distribution</h3></div><button id="units">m/s⌄</button></div><div class="hist" id="hist"></div><footer><span>0</span><span>15</span><span>30</span><span>45</span><span>60+</span></footer></article>
-    <article class="confidence"><p><b>Model confidence</b><strong id="confidence">87%</strong></p><div><i id="confidenceBar"></i></div><small>Highest agreement in the outer circulation. Inspect the eastern eyewall for model spread.</small></article>
+  <aside class="analytics">
+    <div class="analytics-heading"><div><p class="eyebrow">Selected system</p><h2 id="stormTitle">—</h2></div><div class="category"><small>CAT</small><strong id="categoryValue">—</strong></div></div>
+    <div class="summary-strip"><div><span>Geostationary</span><strong id="geoCount">—</strong></div><div><span>SAR matches</span><strong id="sarCount">—</strong></div><div><span>Current prediction max</span><strong id="currentMax">—</strong></div></div>
+    <div class="legend"><span><i class="geo-line"></i> Prediction</span><span><i class="sar-line"></i> SAR-derived WF</span><small>Dashed segments interpolate between available SAR observations</small></div>
+    <section id="charts" class="charts"></section>
+    <p class="method-note">Prediction metrics use the predicted field. SAR metrics use valid pixels inside each SAR swath. RMW is estimated from 10 km radial bins. Post-processing excludes C02-bright daylight artifacts plus one acquisition at each edge, applies a centered six-hour median, smoothly interpolates Prediction across the excluded times, and limits charts to three hours beyond the first and last SAR match.</p>
+    <div class="graph-toolbar"><label class="postprocess-toggle"><input id="postProcessing" type="checkbox" checked><i></i><span>Post-processing</span></label></div>
   </aside>
 </main>
-<dialog><button id="close">×</button><label>Prototype interface</label><h2>This is an interactive mockup</h2><p>Every storm, field, and metric is synthetic. This UI shell can later connect to static JSON, raster-derived tiles, or an API.</p><button id="ok">Got it</button></dialog>
+<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The red series is derived from every geostationary-conditioned prediction. All SAR swaths share a fixed 0–60+ m/s scale. Click a three-hour acquisition dot to show its fixed-scale CMI_C15 image; click it again to hide it. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
+<div class="loading" id="loading"><span></span><p>Preparing storm tracks…</p></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="app.js"></script>
 </body></html>

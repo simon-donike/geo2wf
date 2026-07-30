@@ -74,6 +74,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# image paths
+docs/explorer/sar/*
+docs/explorer/geo/*
+
 # Flask stuff:
 instance/
 .webassets-cache
