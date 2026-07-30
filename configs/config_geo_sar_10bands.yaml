@@ -30,14 +30,14 @@ data:
     persistent_workers: false
 
 model:
-  in_channels: 12  # Ten GEO bands plus distance-to-center and valid-pixel mask.
+  in_channels: 15  # Ten GEO + distance + three solar-time fields + valid mask.
   out_channels: 1
   num_timesteps: 1000
   schedule: linear
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
-    channels: 13  # Twelve condition channels plus one noisy target channel.
+    channels: 16  # Fifteen condition channels plus one noisy target channel.
     out_dim: 1
 
 optimization:

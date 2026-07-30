@@ -1,9 +1,10 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,postProcessing=true;
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,postProcessing=true,assetBaseUrl="";
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
 const cat=v=>v>=1?String(v):({0:"TS","-1":"TD","-2":"SS","-3":"DB","-4":"EX"}[v]||"—");
+const assetUrl=path=>new URL(path,assetBaseUrl||document.baseURI).href;
 
 function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true,attributionControl:false});
@@ -37,7 +38,7 @@ function renderMap(){
   L.polyline(coords,{color:"#e65445",weight:4,opacity:1}).addTo(layers).bindTooltip(`${storm.id} · Storm track`);
   storm.records.filter(r=>r.geo_overlay).forEach(r=>{
     const o=r.geo_overlay;
-    const image=L.imageOverlay(o.image,o.bounds,{opacity:1,interactive:true,className:"geo-overlay",pane:"geoPane"})
+    const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:1,interactive:true,className:"geo-overlay",pane:"geoPane"})
       .bindTooltip(`<strong>Geostationary · ${o.channel}</strong><br>${full(r.time)}<br>Shared scale: 190–292 K`,{className:"geo-tooltip"});
     const dot=L.circleMarker([r.lat,r.lon],{radius:2.1,color:"#dcebee",weight:1,opacity:.65,fillColor:"#173b48",fillOpacity:.48,riseOnHover:true}).addTo(layers)
       .bindTooltip(`${o.kind} · ${full(r.time)}`);
@@ -49,7 +50,7 @@ function renderMap(){
   });
   storm.records.filter(r=>r.sar_overlay).forEach(r=>{
     const o=r.sar_overlay;
-    L.imageOverlay(o.image,o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"}).addTo(sarLayers)
+    L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"}).addTo(sarLayers)
       .bindTooltip(`<strong>SAR-derived WF</strong><br>${full(r.time)}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} m/s<br>Shared color scale: 0–60+ m/s`,{className:"sar-tooltip"});
     L.circleMarker([r.lat,r.lon],{radius:5,color:"#263f4a",weight:2,fillColor:"#fff",fillOpacity:1}).addTo(sarLayers)
       .bindTooltip(`SAR match · ${full(r.time)}`);
@@ -125,4 +126,19 @@ function selectStorm(id){
 $("#timeSlider").oninput=()=>{stop();current()};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 const dialog=$("#aboutDialog");$("#helpButton").onclick=()=>dialog.showModal();$("#closeDialog").onclick=$("#confirmDialog").onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close()};
-fetch("storm-data.json").then(r=>{if(!r.ok)throw Error(`Could not load storm data (${r.status})`);return r.json()}).then(d=>{data=d;initMap();storm=data.storms[0];selectStorm(storm.id);$("#loading").classList.add("hidden")}).catch(e=>{$("#loading").innerHTML=`<p>Could not load explorer data.<br><small>${e.message}</small></p>`;console.error(e)});
+async function loadData(){
+  const releaseUrl=window.GEO2WF_EXPLORER_RELEASE_URL;
+  let manifestUrl=new URL("storm-data.json",document.baseURI);
+  if(releaseUrl){
+    const pointerResponse=await fetch(releaseUrl,{cache:"no-store"});
+    if(!pointerResponse.ok)throw Error(`Could not load release pointer (${pointerResponse.status})`);
+    const pointer=await pointerResponse.json();
+    if(!pointer.manifest)throw Error("Release pointer has no manifest");
+    manifestUrl=new URL(pointer.manifest,releaseUrl)
+  }
+  const response=await fetch(manifestUrl);
+  if(!response.ok)throw Error(`Could not load storm data (${response.status})`);
+  assetBaseUrl=new URL(".",manifestUrl).href;
+  return response.json()
+}
+loadData().then(d=>{data=d;initMap();storm=data.storms[0];selectStorm(storm.id);$("#loading").classList.add("hidden")}).catch(e=>{$("#loading").innerHTML=`<p>Could not load explorer data.<br><small>${e.message}</small></p>`;console.error(e)});

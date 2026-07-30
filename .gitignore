@@ -7,7 +7,7 @@ external/
 .uv-cache/
 data/geotiff/
 data/processed/
-data/
+/data/
 /analysis/
 inference
 

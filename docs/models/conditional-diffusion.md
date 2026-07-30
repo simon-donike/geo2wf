@@ -7,19 +7,19 @@
 The core process concatenates the noisy target with the prepared condition:
 
 ```text
-4-band baseline:    1 noisy target + (4 GEO + 1 distance + 1 mask)       = 7 U-Net channels
-10-band baseline:   1 noisy target + (10 GEO + 1 distance + 1 mask)      = 13
-10-band + ERA5:     1 noisy target + (10 GEO + 9 ERA5 + 1 distance + 1)  = 22
+4-band baseline:   1 noisy target + (4 GEO + 1 distance + 3 solar + 1 mask)       = 10
+10-band baseline:  1 noisy target + (10 GEO + 1 distance + 3 solar + 1 mask)      = 16
+10-band + ERA5:    1 noisy target + (10 GEO + 9 ERA5 + 1 distance + 3 solar + 1)  = 25
 ```
 
 Config invariants:
 
 ```yaml
 model:
-  in_channels: 21       # prepared condition width
+  in_channels: 24       # prepared condition width
   out_channels: 1       # generated target width
   unet:
-    channels: 22        # in_channels + out_channels
+    channels: 25        # in_channels + out_channels
     out_dim: 1          # out_channels
 ```
 

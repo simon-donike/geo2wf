@@ -43,7 +43,7 @@ for key in ("condition", "target", "condition_mask", "target_mask"):
 PY
 ```
 
-For the 4-band baseline with batch size 4 or fewer available samples, expect `condition` to have 5 channels: four GEO bands and distance to the IBTrACS center. The model appends a one-channel condition-validity mask internally, which is why `model.in_channels` is 6.
+For the 4-band baseline, expect `condition` to have 8 channels: four GEO bands, distance to the IBTrACS center, local-solar-time sine/cosine, and normalized solar-zenith angle. The model appends a one-channel condition-validity mask internally, which is why `model.in_channels` is 9.
 
 ## 3. Bound the smoke run
 
