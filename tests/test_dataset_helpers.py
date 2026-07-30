@@ -88,8 +88,8 @@ def test_solar_time_features_identify_equatorial_local_noon() -> None:
 
     assert features.shape == (3, 1, 1)
     assert features.dtype == torch.float32
-    assert abs(float(features[0, 0, 0])) < 0.1
-    assert float(features[1, 0, 0]) < -0.99
+    assert abs(float(features[0, 0, 0]) - 0.5) < 0.05
+    assert float(features[1, 0, 0]) < 0.005
     assert float(features[2, 0, 0]) < 0.02
 
 
@@ -101,6 +101,7 @@ def test_solar_time_features_vary_with_pixel_longitude() -> None:
     )
 
     assert not torch.isclose(features[0, 0, 0], features[0, 0, 1])
+    assert torch.all((features[:2] >= 0.0) & (features[:2] <= 1.0))
     assert torch.all((features[2] >= 0.0) & (features[2] <= 1.0))
 
 
