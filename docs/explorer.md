@@ -5,7 +5,7 @@ hide:
 
 # Interactive storm explorer
 
-The storm explorer presents the `AL082025` and `EP112025` inference sequences as complete, interactive storm tracks. Follow each GOES-conditioned prediction through time and compare five wind-field diagnostics with the available matched SAR observations.
+The storm explorer presents the `AL082025` and `EP112025` inference sequences as complete, interactive storm tracks. Follow each GOES-conditioned prediction through time and compare six wind-field diagnostics with the available matched SAR observations.
 
 [Open the storm explorer :material-open-in-new:](explorer/dashboard.html){ .md-button .md-button--primary }
 

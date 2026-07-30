@@ -14,6 +14,7 @@ from export_geostat_images import GEOSTAT_SCALE_MAX_K, GEOSTAT_SCALE_MIN_K, expo
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUT_ROOT = ROOT / "inference" / "inf_anna"
+MODEL_B_ROOT = ROOT / "inference" / "inf_simon"
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
 GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
@@ -85,6 +86,11 @@ def export_sar_image(observation_id, bundle):
 
 def export_storm(storm_dir):
     summary = pd.read_csv(storm_dir / "inference-summary.csv").sort_values("observation_timestamp").reset_index(drop=True)
+    model_b_path = MODEL_B_ROOT / storm_dir.name / "inference-summary.csv"
+    model_b = pd.read_csv(model_b_path).set_index("observation_id")
+    missing_model_b = set(summary["observation_id"]) - set(model_b.index)
+    if missing_model_b:
+        raise ValueError(f"{model_b_path} is missing {len(missing_model_b)} explorer observations")
     timestamps = pd.to_datetime(summary["observation_timestamp"])
     targets = pd.date_range(timestamps.iloc[0], timestamps.iloc[-1], freq="3h")
     geo_indices = {int((timestamps - target).abs().argmin()) for target in targets}
@@ -96,6 +102,9 @@ def export_storm(storm_dir):
         c02_p99 = finite_number(torch.quantile(c02_valid, 0.99)) if c02_valid.numel() else None
         geo_overlay = export_geostat_image(row.observation_id, bundle, GEO_IMAGE_DIR) if index in geo_indices else None
         prediction = field_metrics(bundle["output"], bundle["input_mask"], bundle["distance_to_center"])
+        prediction["r64"] = finite_number(bundle["output_metrics"]["output_r64_km"])
+        model_b_row = model_b.loc[row.observation_id]
+        model_b_prediction = {"max": finite_number(model_b_row.output_msw_ms), "p90": finite_number(model_b_row.output_p90_ms), "mean": finite_number(model_b_row.output_mean_ms), "core_mean": finite_number(model_b_row.output_core_mean_ms), "rmw": finite_number(model_b_row.output_rmw_km), "r64": finite_number(model_b_row.output_r64_km)}
         sar = None
         sar_overlay = None
         if bundle["sar_data"] is not None:
@@ -109,6 +118,7 @@ def export_storm(storm_dir):
             "category": int(row.ibtracs_category),
             "ibtracs_msw": finite_number(row.ibtracs_msw_ms),
             "prediction": prediction,
+            "model_b_prediction": model_b_prediction,
             "c02_p99": c02_p99,
             "postprocess_excluded": c02_p99 is not None and c02_p99 > POSTPROCESS_C02_P99_MAX,
             "geo_overlay": geo_overlay,
@@ -145,9 +155,12 @@ def main():
         "metrics": {
             "max": {"label": "Maximum wind", "unit": "m/s"},
             "p90": {"label": "90th-percentile wind", "unit": "m/s"},
+            "mean": {"label": "Mean wind", "unit": "m/s"},
             "core_mean": {"label": "Inner-core mean", "unit": "m/s", "note": "Within 100 km"},
             "rmw": {"label": "Radius of maximum wind", "unit": "km"},
+            "r64": {"label": "Radius of 64-knot winds", "unit": "km"},
         },
+        "models": {"model_a": {"label": "Model A", "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"]}, "model_b": {"label": "Model B", "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"]}},
         "storms": storms,
     }
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
