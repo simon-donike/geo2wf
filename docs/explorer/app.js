@@ -1,5 +1,6 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
 const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,geoFrames=[],sarFrames=[],postProcessing=true,graphModel="model_a",assetBaseUrl="";
+const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
@@ -119,7 +120,7 @@ function chart(metric,def){
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function charts(){
-  $("#charts").replaceChildren(...data.models[graphModel].metrics.map(m=>chart(m,data.metrics[m])));
+  $("#charts").replaceChildren(...DISPLAY_METRICS.filter(m=>data.models[graphModel].metrics.includes(m)).map(m=>chart(m,data.metrics[m])));
   if(!$("#tooltip")){const t=document.createElement("div");t.id="tooltip";t.className="tooltip";document.body.append(t)}
 }
 function current(){
