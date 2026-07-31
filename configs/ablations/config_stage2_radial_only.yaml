@@ -1,0 +1,159 @@
+ablation:
+  id: stage2_radial_only
+  family: stage2_diffusion_structure
+  reference: stage2_anchored_cfg
+  design: single_factor_ablation
+  changes:
+  - radial_profile_loss
+seed: 42
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_max_time_gap_hours: 3.1
+  era5_channels:
+  - precipitable_water
+  - sst
+  - pressure_msl
+  - temperature_2m
+  - dewpoint_2m
+  - u_wind_10m
+  - v_wind_10m
+  splits:
+  - train
+  - val
+  - test
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+data:
+  root: data/geotiff/geo_sar_10bands_era5
+  stats_file: data/geotiff/geo_sar_10bands_era5/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  target_size:
+  - 256
+  - 256
+  center_crop_size:
+  - 192
+  - 192
+  normalization: robust-zscore
+  robust_clip: 4.0
+  target_normalization: min-max
+  max_era5_time_gap_hours: 3.1
+  random_flips: true
+  include_test_in_train: true
+  loader:
+    batch_size: 4
+    num_workers: 2
+    pin_memory: false
+    persistent_workers: false
+  sampling:
+    intensity_balanced:
+      enabled: false
+model:
+  type: diffusion_residual
+  in_channels: 24
+  out_channels: 1
+  num_timesteps: 1000
+  schedule: cosine
+  sampling:
+    method: ddim
+    timesteps: 100
+    eta: 0.0
+    guidance_scale: 1.2
+    clip_sample: true
+  classifier_free_guidance:
+    condition_dropout_probability: 0.1
+    preserve_baseline_condition_on_dropout: true
+  sparse_target:
+    fill: era5
+    unobserved_loss_weight: 0.05
+  residual:
+    baseline:
+      source: deterministic
+      checkpoint_path: null
+    soft_scale_ms: 5.0
+    clip_ms: 80.0
+    prediction_min_ms: 0.0
+    prediction_max_ms: 80.0
+    loss:
+      gradient_weight: 0.015
+      spectrum_weight: 0.01
+      low_frequency_weight: 0.15
+      smoothness_weight: 0.02
+      auxiliary_max_timestep_fraction: 0.5
+      high_wind_threshold_ms: 17.0
+      high_wind_weight: 2.0
+      inner_core_radius_km: 100.0
+      inner_core_weight: 2.0
+      high_gradient_threshold_ms: 2.0
+      high_gradient_weight: 1.25
+      low_frequency_kernel_size: 9
+      radial_profile_weight: 0.1
+      radial_profile_bins: 20
+      radial_profile_max_radius_km: 200.0
+    transform: asinh
+  unet:
+    dim: 48
+    dim_mults:
+    - 1
+    - 2
+    - 4
+    - 8
+    channels: 27
+    out_dim: 1
+optimization:
+  lr: 5.0e-05
+  min_snr_gamma: 5.0
+  ema:
+    enabled: true
+    decay: 0.999
+    update_after_step: 0
+    use_for_eval: true
+  reduce_lr_on_plateau:
+    factor: 0.5
+    patience: 200
+    monitor: val/probabilistic_refinement_score
+    cooldown: 5
+    min_lr: 1.0e-05
+trainer:
+  max_epochs: 40
+  accelerator: auto
+  devices: 1
+  strategy: null
+  precision: 32
+  float32_matmul_precision: high
+  log_every_n_steps: 10
+  enable_checkpointing: true
+  limit_val_batches: 50
+  deterministic: true
+  checkpoint:
+    monitor: val/probabilistic_refinement_score
+    mode: min
+    save_top_k: 2
+    save_last: true
+validation:
+  reconstruction_batches: 3
+  log_reconstruction_images: false
+  ensemble_size: 4
+  ensemble_batches: 3
+  sampling_seed: 42
+  probabilistic_score_sharpness_weight: 1.0
+  probabilistic_score_target_sharpness_ratio: 0.9
+  probabilistic_score_peak_weight: 0.25
+  probabilistic_peak_fraction: 0.005
+logging:
+  wandb:
+    enabled: true
+    project: dif_img_rec
+    name: ablation-stage2-radial-only
+    save_dir: logs
+    log_model: false

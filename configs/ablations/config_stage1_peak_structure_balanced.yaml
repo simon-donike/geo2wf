@@ -1,0 +1,145 @@
+ablation:
+  id: stage1_peak_structure_balanced
+  family: stage1_peak_structure
+  reference: stage1_peak_aware
+  design: cumulative_bundle
+  changes:
+  - radial_profile_loss
+  - soft_exceedance_area_loss
+  - intensity_balanced_sampling
+seed: 42
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_sar_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_max_time_gap_hours: 3.1
+  era5_channels:
+  - precipitable_water
+  - sst
+  - pressure_msl
+  - temperature_2m
+  - dewpoint_2m
+  - u_wind_10m
+  - v_wind_10m
+  splits:
+  - train
+  - val
+  - test
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+data:
+  root: data/geotiff/geo_sar_10bands_era5
+  stats_file: data/geotiff/geo_sar_10bands_era5/stats.json
+  train_split: train
+  val_split: val
+  test_split: test
+  target_size:
+  - 256
+  - 256
+  center_crop_size:
+  - 192
+  - 192
+  normalization: robust-zscore
+  robust_clip: 4.0
+  target_normalization: min-max
+  max_era5_time_gap_hours: 3.1
+  random_flips: true
+  include_test_in_train: true
+  require_era5: true
+  loader:
+    batch_size: 4
+    num_workers: 2
+    pin_memory: false
+    persistent_workers: false
+  sampling:
+    intensity_balanced:
+      enabled: true
+      quantile: 0.995
+      bins_ms:
+      - 0.0
+      - 17.0
+      - 25.0
+      - 33.0
+      - 43.0
+      - 60.0
+      - .inf
+      power: 0.75
+      max_weight_ratio: 6.0
+model:
+  type: deterministic_residual
+  condition_channels: 23
+  residual:
+    base_channels: 32
+    channel_mults:
+    - 1
+    - 2
+    - 4
+    - 8
+    high_wind_threshold_ms: 17.0
+    prediction_min_ms: 0.0
+    prediction_max_ms: null
+    psnr_data_range_ms: 79.8
+    loss:
+      high_wind_weight_max: 8.0
+      high_wind_weight_start_ms: 25.0
+      high_wind_weight_full_ms: 50.0
+      peak_weight: 0.05
+      peak_top_fraction: 0.005
+      peak_min_pixels: 16
+      peak_inner_core_radius_km: 100.0
+      radial_profile_weight: 0.1
+      radial_profile_max_radius_km: 200.0
+      radial_profile_bin_km: 10.0
+      radial_profile_min_bin_pixels: 8
+      exceedance_area_weight: 2.0
+      exceedance_thresholds_ms:
+      - 17.0
+      - 33.0
+      - 43.0
+      exceedance_temperature_ms: 2.0
+      peak_structure_radial_weight: 0.25
+      peak_structure_area_weight: 10.0
+optimization:
+  lr: 0.0002
+  weight_decay: 0.0001
+  huber_delta_ms: 2.0
+  off_swath_anchor_weight: 0.05
+  reduce_lr_on_plateau:
+    factor: 0.75
+    patience: 20
+    monitor: val/peak_structure_score
+    cooldown: 5
+    min_lr: 2.0e-05
+validation:
+  reconstruction_batches: 1
+  log_reconstruction_images: false
+trainer:
+  max_epochs: 60
+  accelerator: auto
+  devices: 1
+  strategy: null
+  precision: 32
+  deterministic: true
+  float32_matmul_precision: high
+  log_every_n_steps: 10
+  enable_checkpointing: true
+  limit_val_batches: 1.0
+  checkpoint:
+    monitor: val/peak_structure_score
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    enabled: true
+    project: dif_img_rec
+    name: ablation-stage1-peak-structure-balanced
+    save_dir: logs
+    log_model: false

@@ -12,7 +12,12 @@ import torch
 from rasterio.transform import from_origin
 from torch.utils.data import SequentialSampler, TensorDataset
 
-from data.datamodule import PairedDataModule, _storm_stratified_indices
+from data.datamodule import (
+    DistributedWeightedSampler,
+    PairedDataModule,
+    _balanced_intensity_weights,
+    _storm_stratified_indices,
+)
 from data.dataset import (
     DISTANCE_TO_IBTRACS_CENTER,
     ERA5_RELATIVE_VORTICITY_10M,
@@ -24,6 +29,7 @@ from data.dataset import (
     _normalization_affine_parameters,
     _paired_random_flips,
 )
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from export_geo_sar_geotiffs import (  # noqa: E402
@@ -91,9 +97,7 @@ def test_era5_flip_uses_channel_validity_not_aggregate_geo_mask() -> None:
         ]
     )
     aggregate_mask = torch.zeros(1, 2, 2, dtype=torch.bool)
-    channel_mask = torch.stack(
-        [aggregate_mask[0], torch.ones(2, 2, dtype=torch.bool)]
-    )
+    channel_mask = torch.stack([aggregate_mask[0], torch.ones(2, 2, dtype=torch.bool)])
 
     flipped, _, _, _ = _paired_random_flips(
         condition,
@@ -172,9 +176,7 @@ def test_robust_normalization_uses_train_stats_and_round_trips() -> None:
 def test_robust_derived_era5_speed_uses_sar_target_scale() -> None:
     stats = {
         "channels": {
-            "era5": {
-                ERA5_WIND_SPEED_10M: {"median": 8.0, "robust_scale": 2.0}
-            },
+            "era5": {ERA5_WIND_SPEED_10M: {"median": 8.0, "robust_scale": 2.0}},
             "sar": {"wind_speed": {"median": 20.0, "robust_scale": 5.0}},
         }
     }
@@ -196,9 +198,7 @@ def test_continuous_regrid_is_bilinear_for_a_planar_field() -> None:
     grid_lat = np.array([[0.25, 0.5, 0.75]])
     grid_lon = np.array([[0.25, 0.5, 0.75]])
 
-    regridded, mask = _regrid_continuous(
-        values, lat, lon, grid_lat, grid_lon
-    )
+    regridded, mask = _regrid_continuous(values, lat, lon, grid_lat, grid_lon)
 
     assert mask.all()
     assert np.allclose(regridded, 2.0 * grid_lat + 3.0 * grid_lon)
@@ -216,9 +216,7 @@ def test_native_grid_vorticity_recovers_solid_body_rotation() -> None:
 
     vorticity = _native_relative_vorticity_10m(u10, v10, lat, lon)
 
-    assert np.allclose(
-        vorticity[1:-1, 1:-1], 2.0 * omega, atol=2e-8, rtol=1e-3
-    )
+    assert np.allclose(vorticity[1:-1, 1:-1], 2.0 * omega, atol=2e-8, rtol=1e-3)
 
 
 def test_export_stats_include_bounded_robust_train_statistics() -> None:
@@ -263,9 +261,7 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
                 "context_source_type": "era5",
                 "target_source_type": "sar",
                 "condition_channels": json.dumps(["CMI_C13"]),
-                "context_channels": json.dumps(
-                    ["era5_u_wind_10m", "era5_v_wind_10m"]
-                ),
+                "context_channels": json.dumps(["era5_u_wind_10m", "era5_v_wind_10m"]),
                 "target_channels": json.dumps(["wind_speed"]),
                 "condition_sensor": "ABI",
                 "condition_timestamp": "2025-06-21T12:00:00Z",
@@ -320,9 +316,7 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
     assert torch.allclose(sample["condition"][4], torch.full((2, 2), 0.5))
     assert sample["condition"][5, 1, 0] == 0.0
     assert sample["condition"][5].max() == 1.0
-    assert sample["meta"]["condition_channels"][-4] == (
-        DISTANCE_TO_IBTRACS_CENTER
-    )
+    assert sample["meta"]["condition_channels"][-4] == (DISTANCE_TO_IBTRACS_CENTER)
     assert torch.allclose(sample["target_norm_offset"], torch.tensor([0.0]))
     assert torch.allclose(sample["target_norm_scale"], torch.tensor([10.0]))
     assert torch.allclose(
@@ -331,9 +325,7 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
     assert torch.allclose(
         sample["era5_wind_speed_physical"], torch.full((1, 2, 2), 5.0)
     )
-    assert torch.allclose(
-        sample["era5_wind_speed"], torch.full((1, 2, 2), 0.5)
-    )
+    assert torch.allclose(sample["era5_wind_speed"], torch.full((1, 2, 2), 0.5))
     assert sample["era5_wind_speed_mask"].dtype == torch.bool
     assert sample["era5_wind_speed_mask"].all()
 
@@ -351,12 +343,8 @@ def test_dataset_exposes_physical_target_and_target_scaled_era5_anchor(
     assert torch.allclose(
         separate_target["era5_wind_speed"], torch.full((1, 2, 2), 0.5)
     )
-    assert torch.allclose(
-        separate_target["target_norm_offset"], torch.tensor([0.0])
-    )
-    assert torch.allclose(
-        separate_target["target_norm_scale"], torch.tensor([10.0])
-    )
+    assert torch.allclose(separate_target["target_norm_offset"], torch.tensor([0.0]))
+    assert torch.allclose(separate_target["target_norm_scale"], torch.tensor([10.0]))
 
 
 def test_validation_and_fixed_train_preview_loaders_are_deterministic(tmp_path) -> None:
@@ -401,6 +389,61 @@ def test_datamodule_supports_separate_target_normalization() -> None:
     assert datamodule.robust_clip == 4.0
     assert datamodule.normalization == "robust-zscore"
     assert datamodule.target_normalization == "min-max"
+
+
+def test_intensity_balance_weights_rare_bins_and_caps_ratio() -> None:
+    intensity = torch.tensor([10.0, 12.0, 15.0, 20.0, 35.0, 50.0])
+
+    weights, counts = _balanced_intensity_weights(
+        intensity,
+        bins=(0.0, 17.0, 25.0, 43.0, float("inf")),
+        power=1.0,
+        max_weight_ratio=2.5,
+    )
+
+    assert counts == [3, 1, 1, 1]
+    assert torch.allclose(weights[:3], torch.ones(3, dtype=torch.float64))
+    assert torch.allclose(weights[3:], torch.full((3,), 2.5, dtype=torch.float64))
+
+
+def test_distributed_weighted_sampler_partitions_one_seeded_stream() -> None:
+    weights = torch.tensor([1.0, 2.0, 3.0, 4.0])
+    rank_zero = DistributedWeightedSampler(weights, num_replicas=2, rank=0, seed=7)
+    rank_one = DistributedWeightedSampler(weights, num_replicas=2, rank=1, seed=7)
+    generator = torch.Generator().manual_seed(7)
+    expected = torch.multinomial(weights.double(), 4, True, generator=generator)
+
+    assert list(rank_zero) == expected[0::2].tolist()
+    assert list(rank_one) == expected[1::2].tolist()
+    rank_zero.set_epoch(1)
+    assert list(rank_zero) != expected[0::2].tolist()
+
+
+def test_datamodule_parses_intensity_balanced_sampling() -> None:
+    datamodule = PairedDataModule.from_config(
+        {
+            "seed": 11,
+            "data": {
+                "root": "custom/data",
+                "sampling": {
+                    "intensity_balanced": {
+                        "enabled": True,
+                        "bins_ms": [0.0, 25.0, 43.0, float("inf")],
+                        "quantile": 0.99,
+                        "power": 0.5,
+                        "max_weight_ratio": 4.0,
+                    }
+                },
+            },
+        }
+    )
+
+    assert datamodule.intensity_balanced_sampling
+    assert datamodule.intensity_balance_bins_ms == (0.0, 25.0, 43.0, float("inf"))
+    assert datamodule.intensity_balance_quantile == pytest.approx(0.99)
+    assert datamodule.intensity_balance_power == pytest.approx(0.5)
+    assert datamodule.intensity_balance_max_weight_ratio == pytest.approx(4.0)
+    assert datamodule.sampling_seed == 11
 
 
 def test_explicit_export_output_root_wins_machine_default(

@@ -1,4 +1,5 @@
 import copy
+import math
 import hashlib
 import os
 
@@ -21,8 +22,8 @@ from .DenoisingDiffusionProcess.samplers import DDIM_Sampler, DDPM_Sampler
 from .reconstruction_logging import log_wandb_reconstruction
 from .wind_metrics import RADIAL_METRIC_NAMES, radial_wind_metric_statistics
 
-
 STORM_METRIC_NAMES = ("high_wind_mae_ms",) + RADIAL_METRIC_NAMES
+
 
 class PixelDiffusionConditional(pl.LightningModule):
     """Conditional pixel-space diffusion Lightning module.
@@ -32,42 +33,48 @@ class PixelDiffusionConditional(pl.LightningModule):
     - `target`: target tensor to reconstruct/generate
     - `target_mask`: optional target-validity mask
     """
+
     checkpoint_monitor = "val/eye_structure_score"
     checkpoint_mode = "min"
 
-    def __init__(self,
-                 condition_channels=3,
-                 generated_channels=3,
-                 num_timesteps=1000,
-                 schedule='linear',
-                 model_dim=64,
-                 model_dim_mults=(1,2,4,8),
-                 model_channels=None,
-                 model_out_dim=None,
-                 lr=1e-3,
-                 lr_scheduler_factor=0.5,
-                 lr_scheduler_patience=25,
-                 lr_scheduler_monitor="val/eye_structure_score",
-                 lr_scheduler_cooldown=0,
-                 lr_scheduler_min_lr=0.0,
-                 sampling_method="ddpm",
-                 sampling_timesteps=None,
-                 sampling_eta=0.0,
-                 clip_sample=True,
-                 sparse_target_fill=None,
-                 unobserved_loss_weight=0.0,
-                 validation_reconstruction_batches=1,
-                 validation_seed=42,
-                 ema_decay=None,
-                 ema_update_after_step=0,
-                 ema_use_for_eval=True,
-                 min_snr_gamma=None,
-                 condition_dropout_probability=0.0,
-                 guidance_scale=1.0,
-                 validation_ensemble_size=1,
-                 validation_ensemble_batches=1,
-                 probabilistic_score_sharpness_weight=2.0,
-                 probabilistic_score_target_sharpness_ratio=1.0):
+    def __init__(
+        self,
+        condition_channels=3,
+        generated_channels=3,
+        num_timesteps=1000,
+        schedule="linear",
+        model_dim=64,
+        model_dim_mults=(1, 2, 4, 8),
+        model_channels=None,
+        model_out_dim=None,
+        lr=1e-3,
+        lr_scheduler_factor=0.5,
+        lr_scheduler_patience=25,
+        lr_scheduler_monitor="val/eye_structure_score",
+        lr_scheduler_cooldown=0,
+        lr_scheduler_min_lr=0.0,
+        sampling_method="ddpm",
+        sampling_timesteps=None,
+        sampling_eta=0.0,
+        clip_sample=True,
+        sparse_target_fill=None,
+        unobserved_loss_weight=0.0,
+        validation_reconstruction_batches=1,
+        validation_seed=42,
+        ema_decay=None,
+        ema_update_after_step=0,
+        ema_use_for_eval=True,
+        min_snr_gamma=None,
+        condition_dropout_probability=0.0,
+        guidance_scale=1.0,
+        validation_ensemble_size=1,
+        validation_ensemble_batches=1,
+        probabilistic_score_sharpness_weight=2.0,
+        probabilistic_score_target_sharpness_ratio=1.0,
+        probabilistic_score_peak_weight=0.0,
+        probabilistic_peak_fraction=0.005,
+        log_reconstruction_images=True,
+    ):
         super().__init__()
         if not 0.0 <= float(unobserved_loss_weight) <= 1.0:
             raise ValueError("unobserved_loss_weight must be in [0, 1]")
@@ -86,14 +93,20 @@ class PixelDiffusionConditional(pl.LightningModule):
         if float(guidance_scale) < 0:
             raise ValueError("guidance_scale must be non-negative")
         if float(probabilistic_score_sharpness_weight) < 0:
-            raise ValueError("probabilistic_score_sharpness_weight must be non-negative")
+            raise ValueError(
+                "probabilistic_score_sharpness_weight must be non-negative"
+            )
         if float(probabilistic_score_target_sharpness_ratio) <= 0:
             raise ValueError(
                 "probabilistic_score_target_sharpness_ratio must be positive"
             )
+        if float(probabilistic_score_peak_weight) < 0:
+            raise ValueError("probabilistic_score_peak_weight must be non-negative")
+        if not 0.0 < float(probabilistic_peak_fraction) <= 1.0:
+            raise ValueError("probabilistic_peak_fraction must be in (0, 1]")
         self.lr = lr
-        self.lr_scheduler_factor=lr_scheduler_factor
-        self.lr_scheduler_patience=lr_scheduler_patience
+        self.lr_scheduler_factor = lr_scheduler_factor
+        self.lr_scheduler_patience = lr_scheduler_patience
         self.lr_scheduler_monitor = str(lr_scheduler_monitor)
         self.lr_scheduler_cooldown = int(lr_scheduler_cooldown)
         self.lr_scheduler_min_lr = float(lr_scheduler_min_lr)
@@ -101,21 +114,16 @@ class PixelDiffusionConditional(pl.LightningModule):
         self._backward_steps = 0
         self.sparse_target_fill = sparse_target_fill
         self.unobserved_loss_weight = float(unobserved_loss_weight)
-        self.validation_reconstruction_batches = int(
-            validation_reconstruction_batches
-        )
+        self.validation_reconstruction_batches = int(validation_reconstruction_batches)
+        self.log_reconstruction_images = bool(log_reconstruction_images)
         self.validation_ensemble_size = int(validation_ensemble_size)
         self.validation_ensemble_batches = int(validation_ensemble_batches)
         self.validation_seed = int(validation_seed)
         self.ema_decay = None if ema_decay is None else float(ema_decay)
         self.ema_update_after_step = int(ema_update_after_step)
         self.ema_use_for_eval = bool(ema_use_for_eval)
-        self.min_snr_gamma = (
-            None if min_snr_gamma is None else float(min_snr_gamma)
-        )
-        self.condition_dropout_probability = float(
-            condition_dropout_probability
-        )
+        self.min_snr_gamma = None if min_snr_gamma is None else float(min_snr_gamma)
+        self.condition_dropout_probability = float(condition_dropout_probability)
         self.guidance_scale = float(guidance_scale)
         self.probabilistic_score_sharpness_weight = float(
             probabilistic_score_sharpness_weight
@@ -123,6 +131,8 @@ class PixelDiffusionConditional(pl.LightningModule):
         self.probabilistic_score_target_sharpness_ratio = float(
             probabilistic_score_target_sharpness_ratio
         )
+        self.probabilistic_score_peak_weight = float(probabilistic_score_peak_weight)
+        self.probabilistic_peak_fraction = float(probabilistic_peak_fraction)
 
         sampling_method = str(sampling_method).strip().lower()
         sampling_timesteps = int(sampling_timesteps or num_timesteps)
@@ -147,17 +157,19 @@ class PixelDiffusionConditional(pl.LightningModule):
             )
         else:
             raise ValueError("sampling_method must be 'ddpm' or 'ddim'")
-        
+
         # Core conditional diffusion process used by training, validation, and prediction.
-        self.model=DenoisingDiffusionConditionalProcess(generated_channels=generated_channels,
-                                                        condition_channels=condition_channels,
-                                                        schedule=schedule,
-                                                        num_timesteps=num_timesteps,
-                                                        model_dim=model_dim,
-                                                        model_dim_mults=model_dim_mults,
-                                                        model_channels=model_channels,
-                                                        model_out_dim=model_out_dim,
-                                                        sampler=sampler)
+        self.model = DenoisingDiffusionConditionalProcess(
+            generated_channels=generated_channels,
+            condition_channels=condition_channels,
+            schedule=schedule,
+            num_timesteps=num_timesteps,
+            model_dim=model_dim,
+            model_dim_mults=model_dim_mults,
+            model_channels=model_channels,
+            model_out_dim=model_out_dim,
+            sampler=sampler,
+        )
         self.ema_model = None
         self.register_buffer("_ema_updates", torch.zeros((), dtype=torch.long))
         if self.ema_decay is not None:
@@ -190,7 +202,8 @@ class PixelDiffusionConditional(pl.LightningModule):
         """Lightning inference helper; returns output mapped back to [0, 1]."""
         process = (
             self.ema_model
-            if not self.training and self.ema_model is not None
+            if not self.training
+            and self.ema_model is not None
             and self.ema_use_for_eval
             else self.model
         )
@@ -210,16 +223,12 @@ class PixelDiffusionConditional(pl.LightningModule):
         if probability <= 0:
             return condition
         keep = (
-            torch.rand(
-                condition.shape[0], 1, 1, 1, device=condition.device
-            )
+            torch.rand(condition.shape[0], 1, 1, 1, device=condition.device)
             >= probability
         )
         return condition * keep.to(condition.dtype)
 
-    def _diffusion_loss(
-        self, model_target, condition, loss_weight, batch, *, stage
-    ):
+    def _diffusion_loss(self, model_target, condition, loss_weight, batch, *, stage):
         """Hook for task-specific diffusion objectives."""
         del batch
         if stage == "train":
@@ -230,8 +239,8 @@ class PixelDiffusionConditional(pl.LightningModule):
             mask=loss_weight,
             min_snr_gamma=self.min_snr_gamma,
         )
-    
-    def training_step(self, batch, batch_idx):   
+
+    def training_step(self, batch, batch_idx):
         """Lightning train hook for conditional diffusion."""
         input, output, target_mask = self._unpack_batch(batch)
         model_target, condition, loss_weight = self._prepare_training_inputs(
@@ -241,12 +250,18 @@ class PixelDiffusionConditional(pl.LightningModule):
         loss = self._diffusion_loss(
             model_target, condition, loss_weight, batch, stage="train"
         )
-        
+
         self.log(
-            'train/loss', loss, on_step=True, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, batch_size=batch_size
+            "train/loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            batch_size=batch_size,
         )
-        
+
         return loss
 
     def on_after_backward(self):
@@ -289,9 +304,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             self.ema_model.parameters(), self.model.parameters()
         ):
             ema_parameter.lerp_(parameter.detach(), 1.0 - decay)
-        for ema_buffer, buffer in zip(
-            self.ema_model.buffers(), self.model.buffers()
-        ):
+        for ema_buffer, buffer in zip(self.ema_model.buffers(), self.model.buffers()):
             ema_buffer.copy_(buffer.detach())
         self._ema_updates.add_(1)
 
@@ -333,7 +346,9 @@ class PixelDiffusionConditional(pl.LightningModule):
             # first EMA state is an exact copy of the trained online process.
             for key, value in list(state_dict.items()):
                 if key.startswith("model."):
-                    state_dict[f"ema_model.{key.removeprefix('model.')}"] = value.clone()
+                    state_dict[f"ema_model.{key.removeprefix('model.')}"] = (
+                        value.clone()
+                    )
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         """Lightning validation hook.
@@ -343,7 +358,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         second loader contributes only a training-sample reconstruction image.
         """
         if dataloader_idx == 1:
-            if batch_idx == 0:
+            if self.log_reconstruction_images and batch_idx == 0:
                 pred_batch = self.predict_step(batch, batch_idx, dataloader_idx)
                 self._log_val_reconstruction(
                     batch, pred_batch, wandb_key="images/train_reconstruction"
@@ -357,11 +372,17 @@ class PixelDiffusionConditional(pl.LightningModule):
         loss = self._diffusion_loss(
             model_target, condition, loss_weight, batch, stage="val"
         )
-        
+
         self.log(
-            'val/loss', loss, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, add_dataloader_idx=False,
-            batch_size=batch_size
+            "val/loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            add_dataloader_idx=False,
+            batch_size=batch_size,
         )
 
         if batch_idx < self.validation_reconstruction_batches:
@@ -396,18 +417,18 @@ class PixelDiffusionConditional(pl.LightningModule):
                 for member_index in range(
                     1, min(int(ensemble_predictions.shape[0]), 4)
                 ):
+                    if self.log_reconstruction_images:
+                        self._log_val_reconstruction(
+                            batch,
+                            ensemble_predictions[member_index],
+                            wandb_key=(f"images/val_ensemble_member_{member_index}"),
+                        )
+                if self.log_reconstruction_images:
                     self._log_val_reconstruction(
                         batch,
-                        ensemble_predictions[member_index],
-                        wandb_key=(
-                            f"images/val_ensemble_member_{member_index}"
-                        ),
+                        ensemble_predictions.mean(dim=0),
+                        wandb_key="images/val_ensemble_mean",
                     )
-                self._log_val_reconstruction(
-                    batch,
-                    ensemble_predictions.mean(dim=0),
-                    wandb_key="images/val_ensemble_mean",
-                )
             else:
                 raw_pred, pred_batch = self._predict_batch(
                     batch, batch_idx, dataloader_idx
@@ -416,42 +437,82 @@ class PixelDiffusionConditional(pl.LightningModule):
                 pred_batch, output, target_mask
             )
             self.log(
-                'val/psnr', psnr, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/psnr",
+                psnr,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self.log(
-                'val/ssim', ssim, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/ssim",
+                ssim,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self.log(
-                'val/l1', l1, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/l1",
+                l1,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self.log(
-                'val/reconstruction_l1', l1, on_step=False, on_epoch=True,
-                prog_bar=True, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/reconstruction_l1",
+                l1,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
-            saturation = (raw_pred.abs() >= 1.0 - 1e-6).to(
-                raw_pred.dtype
-            ).mean()
+            saturation = (raw_pred.abs() >= 1.0 - 1e-6).to(raw_pred.dtype).mean()
             self.log(
-                'val/saturation_fraction', saturation, on_step=False,
-                on_epoch=True, prog_bar=False, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/saturation_fraction",
+                saturation,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self.log(
-                'val/raw_sample_min', raw_pred.min(), on_step=False,
-                on_epoch=True, prog_bar=False, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/raw_sample_min",
+                raw_pred.min(),
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self.log(
-                'val/raw_sample_max', raw_pred.max(), on_step=False,
-                on_epoch=True, prog_bar=False, logger=True, sync_dist=True,
-                add_dataloader_idx=False, batch_size=batch_size
+                "val/raw_sample_max",
+                raw_pred.max(),
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+                add_dataloader_idx=False,
+                batch_size=batch_size,
             )
             self._accumulate_storm_statistics(
                 self._validation_storm_statistics,
@@ -463,10 +524,11 @@ class PixelDiffusionConditional(pl.LightningModule):
                 pred_batch,
                 batch,
             )
-            self._log_val_reconstruction(
-                batch, pred_batch, wandb_key="images/val_reconstruction"
-            )
-        
+            if self.log_reconstruction_images:
+                self._log_val_reconstruction(
+                    batch, pred_batch, wandb_key="images/val_reconstruction"
+                )
+
         return loss
 
     def on_validation_epoch_start(self):
@@ -474,9 +536,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         self._validation_physical_statistics.zero_()
 
     def on_validation_epoch_end(self):
-        self._log_physical_statistics(
-            "val", self._validation_physical_statistics
-        )
+        self._log_physical_statistics("val", self._validation_physical_statistics)
         self._log_storm_statistics("val", self._validation_storm_statistics)
 
     def test_step(self, batch, batch_idx):
@@ -490,8 +550,14 @@ class PixelDiffusionConditional(pl.LightningModule):
             model_target, condition, loss_weight, batch, stage="test"
         )
         self.log(
-            'test/loss', loss, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, batch_size=batch_size
+            "test/loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            batch_size=batch_size,
         )
 
         pred_batch = self.predict_step(batch, batch_idx)
@@ -509,16 +575,34 @@ class PixelDiffusionConditional(pl.LightningModule):
             pred_batch, output, target_mask
         )
         self.log(
-            'test/psnr', psnr, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, batch_size=batch_size
+            "test/psnr",
+            psnr,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            batch_size=batch_size,
         )
         self.log(
-            'test/ssim', ssim, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, batch_size=batch_size
+            "test/ssim",
+            ssim,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            batch_size=batch_size,
         )
         self.log(
-            'test/l1', l1, on_step=False, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True, batch_size=batch_size
+            "test/l1",
+            l1,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+            batch_size=batch_size,
         )
         return loss
 
@@ -540,9 +624,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         return prediction
 
     @torch.no_grad()
-    def _predict_batch(
-        self, batch, batch_idx, dataloader_idx=0, ensemble_index=0
-    ):
+    def _predict_batch(self, batch, batch_idx, dataloader_idx=0, ensemble_index=0):
         """Sample one reproducible reconstruction for each batch item."""
         batch = self._prepare_batch_context(batch)
         input, _, _ = self._unpack_batch(batch)
@@ -572,9 +654,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         return raw_prediction, self._sample_to_prediction(raw_prediction, batch)
 
     @torch.no_grad()
-    def sample_ensemble(
-        self, batch, batch_idx=0, dataloader_idx=0, num_samples=None
-    ):
+    def sample_ensemble(self, batch, batch_idx=0, dataloader_idx=0, num_samples=None):
         """Return stable raw and reconstructed ensembles as [K, B, C, H, W]."""
         count = int(num_samples or self.validation_ensemble_size)
         if count < 1:
@@ -682,9 +762,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             )
 
         observed = self._prepare_target_mask(target_mask, target).bool()
-        anchor = batch["era5_wind_speed"].to(
-            device=target.device, dtype=target.dtype
-        )
+        anchor = batch["era5_wind_speed"].to(device=target.device, dtype=target.dtype)
         anchor_valid = self._prepare_target_mask(
             batch["era5_wind_speed_mask"], target
         ).bool()
@@ -790,9 +868,7 @@ class PixelDiffusionConditional(pl.LightningModule):
         observation_term = (absolute_error * mask.unsqueeze(0)).sum() / (
             member_count * count
         )
-        pairwise = (
-            ensemble_ms.unsqueeze(1) - ensemble_ms.unsqueeze(0)
-        ).abs()
+        pairwise = (ensemble_ms.unsqueeze(1) - ensemble_ms.unsqueeze(0)).abs()
         pairwise_mean = pairwise.mean(dim=(0, 1))
         diversity = (pairwise_mean * mask).sum() / count
         crps = observation_term - 0.5 * diversity
@@ -805,12 +881,8 @@ class PixelDiffusionConditional(pl.LightningModule):
         best_member_mae = member_image_error.min(dim=0).values.mean()
         spread = (ensemble_ms.std(dim=0, unbiased=False) * mask).sum() / count
 
-        target_gradient, gradient_mask = self._gradient_magnitude(
-            target_ms, mask
-        )
-        expanded_mask = mask.unsqueeze(0).expand(
-            member_count, -1, -1, -1, -1
-        )
+        target_gradient, gradient_mask = self._gradient_magnitude(target_ms, mask)
+        expanded_mask = mask.unsqueeze(0).expand(member_count, -1, -1, -1, -1)
         ensemble_gradient, _ = self._gradient_magnitude(
             ensemble_ms.reshape(-1, *ensemble_ms.shape[2:]),
             expanded_mask.reshape(-1, *mask.shape[1:]),
@@ -820,23 +892,30 @@ class PixelDiffusionConditional(pl.LightningModule):
         ensemble_gradient = ensemble_gradient.reshape(
             member_count, ensemble_ms.shape[1], *ensemble_gradient.shape[1:]
         )
-        sampled_sharpness = (
-            ensemble_gradient * gradient_mask.unsqueeze(0)
-        ).sum() / (member_count * gradient_count)
-        sharpness_ratio = sampled_sharpness / target_sharpness.clamp_min(1e-6)
-        spectrum_error = self._log_spectrum_error(
-            ensemble_ms, target_ms, mask
+        sampled_sharpness = (ensemble_gradient * gradient_mask.unsqueeze(0)).sum() / (
+            member_count * gradient_count
         )
+        sharpness_ratio = sampled_sharpness / target_sharpness.clamp_min(1e-6)
+        spectrum_error = self._log_spectrum_error(ensemble_ms, target_ms, mask)
         # A target below one deliberately selects slightly smoother members.
         # Keeping this configurable also preserves exact target matching as the
         # default for existing experiments.
         relative_sharpness = (
-            sharpness_ratio
-            / self.probabilistic_score_target_sharpness_ratio
+            sharpness_ratio / self.probabilistic_score_target_sharpness_ratio
         )
         sharpness_penalty = relative_sharpness.clamp_min(1e-6).log().abs()
-        refinement_score = crps + self.probabilistic_score_sharpness_weight * (
-            sharpness_penalty + 0.1 * spectrum_error
+        peak_metrics = self._ensemble_robust_peak_metrics(
+            ensemble_ms,
+            target_ms,
+            mask,
+            fraction=getattr(self, "probabilistic_peak_fraction", 0.005),
+        )
+        refinement_score = (
+            crps
+            + self.probabilistic_score_sharpness_weight
+            * (sharpness_penalty + 0.1 * spectrum_error)
+            + getattr(self, "probabilistic_score_peak_weight", 0.0)
+            * peak_metrics["ensemble_robust_peak_crps_ms"]
         )
         return {
             "ensemble_crps_ms": crps,
@@ -846,7 +925,62 @@ class PixelDiffusionConditional(pl.LightningModule):
             "ensemble_best_member_mae_ms": best_member_mae,
             "ensemble_sharpness_ratio": sharpness_ratio,
             "ensemble_log_spectrum_error": spectrum_error,
+            **peak_metrics,
             "probabilistic_refinement_score": refinement_score,
+        }
+
+    @staticmethod
+    def _ensemble_robust_peak_metrics(ensemble_ms, target_ms, mask, *, fraction):
+        """Score the distribution of member-wise stable inner-field peaks."""
+        member_count, batch_size = ensemble_ms.shape[:2]
+        member_peaks = []
+        target_peaks = []
+        for batch_index in range(batch_size):
+            valid = mask[batch_index].bool().flatten()
+            count = int(valid.sum().detach())
+            if count == 0:
+                continue
+            top_count = max(1, math.ceil(count * float(fraction)))
+            target_values = target_ms[batch_index].flatten()[valid]
+            target_peaks.append(
+                torch.topk(target_values, top_count, sorted=False).values.mean()
+            )
+            sample_peaks = []
+            for member_index in range(member_count):
+                member_values = ensemble_ms[member_index, batch_index].flatten()[valid]
+                sample_peaks.append(
+                    torch.topk(member_values, top_count, sorted=False).values.mean()
+                )
+            member_peaks.append(torch.stack(sample_peaks))
+        if not target_peaks:
+            zero = ensemble_ms.sum() * 0.0
+            return {
+                "ensemble_robust_peak_crps_ms": zero,
+                "ensemble_robust_peak_median_mae_ms": zero,
+                "ensemble_robust_peak_median_bias_ms": zero,
+                "ensemble_robust_peak_10_90_coverage": zero,
+            }
+        peaks = torch.stack(member_peaks, dim=1)
+        target_peak = torch.stack(target_peaks)
+        observation = (peaks - target_peak.unsqueeze(0)).abs().mean()
+        pairwise = (peaks.unsqueeze(1) - peaks.unsqueeze(0)).abs().mean()
+        peak_crps = observation - 0.5 * pairwise
+        # `Tensor.median(dim=...)` selects the lower middle member for an
+        # even ensemble and its CUDA indices kernel is not deterministic.
+        median = torch.quantile(peaks, 0.5, dim=0, interpolation="linear")
+        median_error = median - target_peak
+        lower = torch.quantile(peaks, 0.1, dim=0)
+        upper = torch.quantile(peaks, 0.9, dim=0)
+        coverage = (
+            ((target_peak >= lower) & (target_peak <= upper))
+            .to(ensemble_ms.dtype)
+            .mean()
+        )
+        return {
+            "ensemble_robust_peak_crps_ms": peak_crps,
+            "ensemble_robust_peak_median_mae_ms": median_error.abs().mean(),
+            "ensemble_robust_peak_median_bias_ms": median_error.mean(),
+            "ensemble_robust_peak_10_90_coverage": coverage,
         }
 
     @staticmethod
@@ -861,9 +995,7 @@ class PixelDiffusionConditional(pl.LightningModule):
     @staticmethod
     def _log_spectrum_error(ensemble_ms, target_ms, mask):
         count = mask.sum(dim=(-2, -1), keepdim=True).clamp_min(1.0)
-        target_mean = (target_ms * mask).sum(
-            dim=(-2, -1), keepdim=True
-        ) / count
+        target_mean = (target_ms * mask).sum(dim=(-2, -1), keepdim=True) / count
         target_centered = (target_ms - target_mean) * mask
         ensemble_mask = mask.unsqueeze(0)
         ensemble_count = count.unsqueeze(0)
@@ -872,13 +1004,12 @@ class PixelDiffusionConditional(pl.LightningModule):
         ) / ensemble_count
         ensemble_centered = (ensemble_ms - ensemble_mean) * ensemble_mask
         target_spectrum = torch.fft.rfft2(target_centered, norm="ortho").abs()
-        ensemble_spectrum = torch.fft.rfft2(
-            ensemble_centered, norm="ortho"
-        ).abs()
+        ensemble_spectrum = torch.fft.rfft2(ensemble_centered, norm="ortho").abs()
         return (
-            torch.log1p(ensemble_spectrum)
-            - torch.log1p(target_spectrum).unsqueeze(0)
-        ).abs().mean()
+            (torch.log1p(ensemble_spectrum) - torch.log1p(target_spectrum).unsqueeze(0))
+            .abs()
+            .mean()
+        )
 
     def _accumulate_storm_statistics(self, statistics, prediction, batch):
         """Accumulate fixed-shape eye/high-wind statistics without DDP branches."""
@@ -965,9 +1096,7 @@ class PixelDiffusionConditional(pl.LightningModule):
             baseline_mask = mask * era5_mask
             additions[3] = baseline_mask.sum()
             additions[4] = (error.abs() * baseline_mask).sum()
-            additions[5] = (
-                (era5_ms - target_ms).abs() * baseline_mask
-            ).sum()
+            additions[5] = ((era5_ms - target_ms).abs() * baseline_mask).sum()
         statistics.add_(additions.to(statistics))
 
     def _log_physical_statistics(self, prefix, statistics):
@@ -1049,22 +1178,28 @@ class PixelDiffusionConditional(pl.LightningModule):
             list(filter(lambda p: p.requires_grad, self.model.parameters())),
             lr=self.lr,
         )
-        scheduler = ReduceLROnPlateau(optimizer,
-                                      mode='min',
-                                      factor=self.lr_scheduler_factor,
-                                      patience=self.lr_scheduler_patience,
-                                      cooldown=self.lr_scheduler_cooldown,
-                                      min_lr=self.lr_scheduler_min_lr)
-        return {"optimizer": optimizer,
-                "lr_scheduler": {"scheduler": scheduler,
-                                 "monitor": self.lr_scheduler_monitor}}
+        scheduler = ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=self.lr_scheduler_factor,
+            patience=self.lr_scheduler_patience,
+            cooldown=self.lr_scheduler_cooldown,
+            min_lr=self.lr_scheduler_min_lr,
+        )
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": self.lr_scheduler_monitor,
+            },
+        }
 
     def _to_plot_image(self, tensor):
         """Convert CHW tensor to a matplotlib-friendly image array."""
         image = tensor.detach().float().cpu().clamp(0, 1)
         if image.shape[0] >= 3:
             return image[:3].permute(1, 2, 0).numpy(), None
-        return image[0].numpy(), 'gray'
+        return image[0].numpy(), "gray"
 
     def _compute_reconstruction_metrics(
         self,
@@ -1076,7 +1211,11 @@ class PixelDiffusionConditional(pl.LightningModule):
         pred = pred_batch.detach().float().clamp(0, 1)
         target = target_batch.detach().float().clamp(0, 1)
 
-        mask = self._prepare_target_mask(target_mask, pred) if target_mask is not None else None
+        mask = (
+            self._prepare_target_mask(target_mask, pred)
+            if target_mask is not None
+            else None
+        )
         psnr_vals = []
         ssim_vals = []
 
@@ -1137,7 +1276,6 @@ class PixelDiffusionConditional(pl.LightningModule):
         if condition_mask.shape[1] != 1:
             condition_mask = condition_mask.all(dim=1, keepdim=True)
         return torch.cat([condition, condition_mask], dim=1)
-
 
     def _prepare_target_mask(self, target_mask, reference):
         """Broadcast a target-validity mask to match a BCHW target tensor."""
