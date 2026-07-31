@@ -459,7 +459,7 @@ def main() -> None:
             project=os.environ.get(
                 "WANDB_PROJECT", wandb_cfg.get("project", "dif_img_rec")
             ),
-            name=wandb_cfg.get("name"),
+            name=os.environ.get("WANDB_NAME", wandb_cfg.get("name")),
             save_dir=str(run_dir),
             log_model=wandb_cfg.get("log_model", False),
         )

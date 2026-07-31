@@ -11,18 +11,20 @@ SUITE_DIR=${GEO2WF_ABLATION_SUITE_DIR:-"$ROOT_DIR/logs/ablation-suites/$SUITE_ID
 RUNS_DIR="$SUITE_DIR/runs"
 EVENTS_PATH="$SUITE_DIR/events.jsonl"
 BASELINE_CHECKPOINT=${GEO2WF_INITIAL_BASELINE_CKPT:-"$ROOT_DIR/logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt"}
+WANDB_PROJECT=${GEO2WF_WANDB_PROJECT:-geo2wf-refinement-ablations}
+WANDB_MODE=${GEO2WF_WANDB_MODE:-online}
 
 mkdir -p "$RUNS_DIR"
 test -x "$PYTHON_BIN"
 test -f "$BASELINE_CHECKPOINT"
 
-"$PYTHON_BIN" - "$SUITE_DIR" "$SUITE_ID" "$GPU_ID" "$BASELINE_CHECKPOINT" <<'PY'
+"$PYTHON_BIN" - "$SUITE_DIR" "$SUITE_ID" "$GPU_ID" "$BASELINE_CHECKPOINT" "$WANDB_MODE" "$WANDB_PROJECT" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-suite, suite_id, gpu, checkpoint = sys.argv[1:]
+suite, suite_id, gpu, checkpoint, wandb_mode, wandb_project = sys.argv[1:]
 payload = {
     "schema_version": 1,
     "suite_id": suite_id,
@@ -33,6 +35,7 @@ payload = {
     "gpu_id": gpu,
     "initial_baseline_checkpoint": str(Path(checkpoint).resolve()),
     "include_test_in_train": True,
+    "wandb": {"mode": wandb_mode, "project": wandb_project},
     "experiments": [
         "stage1_control_finetune",
         "stage1_highwind_only",
@@ -147,11 +150,19 @@ PYSTATUS
     CUDA_VISIBLE_DEVICES="$GPU_ID" \
     GEO2WF_RUN_DIR="$run_dir" \
     GEO2WF_BASELINE_CKPT="$baseline_path" \
+    WANDB_MODE="$WANDB_MODE" \
+    WANDB_PROJECT="$WANDB_PROJECT" \
+    WANDB_RUN_GROUP="${experiment%%_*}" \
+    WANDB_NAME="$experiment" \
     PYTHONUNBUFFERED=1 \
       "${command[@]}" >"$run_dir/launcher.log" 2>&1
   else
     CUDA_VISIBLE_DEVICES="$GPU_ID" \
     GEO2WF_RUN_DIR="$run_dir" \
+    WANDB_MODE="$WANDB_MODE" \
+    WANDB_PROJECT="$WANDB_PROJECT" \
+    WANDB_RUN_GROUP="${experiment%%_*}" \
+    WANDB_NAME="$experiment" \
     PYTHONUNBUFFERED=1 \
       "${command[@]}" >"$run_dir/launcher.log" 2>&1
   fi

@@ -65,6 +65,7 @@ nav:
       - Configuration guide: experiments/configuration.md
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
+      - Diffusion refinement ablations: experiments/ablations.md
       - Visual examples: experiments/visual-examples.md
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:
