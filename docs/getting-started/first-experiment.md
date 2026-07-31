@@ -84,5 +84,6 @@ Sampling is much more expensive than one training loss step. For a faster explor
 ## Next
 
 - Inspect [what each batch field means](../data/dataset-contract.md).
-- Learn [how the diffusion loss is formed](../models/conditional-diffusion.md).
+- Read the [main two-stage workflow](../models/two-stage.md).
+- Learn [how standalone diffusion loss is formed](../models/conditional-diffusion.md).
 - Compare [all experiment presets](../experiments/index.md).

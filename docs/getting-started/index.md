@@ -1,43 +1,51 @@
 # Start here
 
-geo2wf is organized as a thin vertical slice through a scientific ML experiment. The shortest useful path is:
+The main geo2wf experiment is a short vertical pipeline with a two-stage model at the end:
 
 ```mermaid
-graph LR
-  A[Source manifest] --> B[Export paired GeoTIFFs]
+flowchart LR
+  A[Source manifest] --> B[Paired GeoTIFFs]
   B --> C[PairedImageDataset]
-  C --> D[Lightning model]
-  D --> E[W&B + checkpoints]
+  C --> D[Stage 1 baseline]
+  D --> E[Stage 2 diffusion]
   E --> F[Physical evaluation]
 ```
 
-## What you will run
+## Recommended reading order
+
+1. Read [Two-stage baseline + diffusion](../models/two-stage.md).
+2. Inspect the [real model inputs and training target](../data/index.md).
+3. [Install the environment](installation.md).
+4. Run the [first smoke experiment](first-experiment.md).
+5. Compare the [experiment presets](../experiments/index.md).
+
+## Main runtime pieces
 
 `train.py`
-: Loads one YAML file, creates a timestamped run directory, seeds all workers, builds the `PairedDataModule`, selects a model by `model.type`, configures W&B and checkpoints, then calls `Trainer.fit()`.
+: Loads one YAML file, creates a timestamped run directory, seeds workers, builds the `PairedDataModule`, selects a model by `model.type`, and configures W&B and checkpoints.
 
 `PairedDataModule`
-: Constructs train, validation, and test datasets. Its validation interface returns two loaders: a storm-stratified validation loader and a tiny training subset used for qualitative reconstruction logging.
-
-`PixelDiffusionConditional`
-: Learns the noise added to a target wind field at a random diffusion step. During validation and prediction it starts from fixed per-sample noise and runs a complete DDPM or DDIM reverse chain.
+: Builds train, validation, and test datasets from split manifests. Validation includes a storm-stratified loader and a small qualitative training subset.
 
 `ERA5ResidualRegressor`
-: A deterministic control that predicts a physical correction in m/s around ERA5 10 m wind speed. Its zero-initialized head means the untrained model is exactly the ERA5 baseline.
+: Stage 1. Produces one physical wind field as ERA5 plus a learned correction.
 
-## Choose your route
+`ERA5ResidualDiffusion`
+: Stage 2. Freezes Stage 1 and learns the signed SAR-minus-baseline residual as a diffusion problem.
 
-=== "I want a smoke run"
+## Choose a route
 
-    Continue to [Installation](installation.md), then [First experiment](first-experiment.md). The smoke path limits export and training work without inventing synthetic data.
+### Run the complete stack
 
-=== "I need to understand the research"
+Start with [Installation](installation.md), then train the two presets in the order shown on the [two-stage workflow page](../models/two-stage.md#training-sequence).
 
-    Read [The reconstruction problem](../concepts/problem.md), [Data pipeline](../data/index.md), and [Evaluation](../experiments/evaluation.md).
+### Run a small smoke test
 
-=== "I am preparing a full run"
+Use [First experiment](first-experiment.md). The smoke path limits export and training work without inventing synthetic observations.
 
-    Compare [experiment configurations](../experiments/index.md), confirm the [data contract](../data/dataset-contract.md), and review [training and checkpoints](../experiments/training.md).
+### Review the research design
+
+Read [The reconstruction problem](../concepts/problem.md), [System architecture](../concepts/architecture.md), and [Evaluation](../experiments/evaluation.md).
 
 !!! warning "Dataset access is external"
-    The exporters default to the larger tropical-cyclone data tree under `/lustre/scratch/1054/tropical_cyclone_dynamics/data`. The source observations are not bundled with this repository. Existing local exports can be used directly if their manifests and `stats.json` are present.
+    Exporters default to the larger tropical-cyclone data tree under `/lustre/scratch/1054/tropical_cyclone_dynamics/data`. Source observations are not bundled with the repository. Existing local exports work when their split manifests and `stats.json` are present.
