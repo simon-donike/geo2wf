@@ -146,19 +146,37 @@ $("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked
 $("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=data.models[graphModel].label;charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 const dialog=$("#aboutDialog");$("#helpButton").onclick=()=>dialog.showModal();$("#closeDialog").onclick=$("#confirmDialog").onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close()};
-async function loadData(){
-  const releaseUrl=window.GEO2WF_EXPLORER_RELEASE_URL;
-  let manifestUrl=new URL("storm-data.json",document.baseURI);
-  if(releaseUrl){
-    const pointerResponse=await fetch(releaseUrl,{cache:"no-store"});
-    if(!pointerResponse.ok)throw Error(`Could not load release pointer (${pointerResponse.status})`);
-    const pointer=await pointerResponse.json();
-    if(!pointer.manifest)throw Error("Release pointer has no manifest");
-    manifestUrl=new URL(pointer.manifest,releaseUrl)
-  }
+async function loadRelease(releaseUrl){
+  const pointerResponse=await fetch(releaseUrl,{cache:"no-store"});
+  if(!pointerResponse.ok)throw Error(`Could not load release pointer (${pointerResponse.status})`);
+  const pointer=await pointerResponse.json();
+  if(!pointer.manifest)throw Error("Release pointer has no manifest");
+  const manifestUrl=new URL(pointer.manifest,releaseUrl);
   const response=await fetch(manifestUrl);
   if(!response.ok)throw Error(`Could not load storm data (${response.status})`);
   assetBaseUrl=new URL(".",manifestUrl).href;
   return response.json()
+}
+async function loadData(){
+  const configuredUrls=window.GEO2WF_EXPLORER_RELEASE_URLS;
+  const releaseUrls=Array.isArray(configuredUrls)
+    ? configuredUrls.filter(Boolean)
+    : [window.GEO2WF_EXPLORER_RELEASE_URL].filter(Boolean);
+  if(!releaseUrls.length){
+    const manifestUrl=new URL("storm-data.json",document.baseURI);
+    const response=await fetch(manifestUrl);
+    if(!response.ok)throw Error(`Could not load storm data (${response.status})`);
+    assetBaseUrl=new URL(".",manifestUrl).href;
+    return response.json()
+  }
+  const failures=[];
+  for(const releaseUrl of releaseUrls){
+    try{return await loadRelease(releaseUrl)}
+    catch(error){
+      failures.push(`${new URL(releaseUrl).host}: ${error.message}`);
+      console.warn(`Explorer data source failed: ${releaseUrl}`,error)
+    }
+  }
+  throw Error(`All explorer data sources failed (${failures.join("; ")})`)
 }
 loadData().then(d=>{data=d;initMap();storm=data.storms[0];selectStorm(storm.id);$("#loading").classList.add("hidden")}).catch(e=>{$("#loading").innerHTML=`<p>Could not load explorer data.<br><small>${e.message}</small></p>`;console.error(e)});
