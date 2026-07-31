@@ -31,17 +31,17 @@ The qualitative comparison should be read alongside physical metrics. Look for:
 
 ## Recreate the pair figure
 
-`utils.plotting.plot_random_geo_sar_pairs()` reads the split manifest and GeoTIFF metadata:
+`src.utils.plotting.plot_random_geo_sar_pairs()` reads the split manifest and GeoTIFF metadata:
 
 ```python
-from utils.plotting import plot_random_geo_sar_pairs
+from src.utils.plotting import plot_random_geo_sar_pairs
 
 plot_random_geo_sar_pairs(
     "data/geotiff/geo_sar",
     split="train",
     n=5,
     seed=42,
-    output_path="resources/geo_sar_random_pairs.png",
+    output_path="docs/assets/images/geo-sar-random-pairs.png",
 )
 ```
 

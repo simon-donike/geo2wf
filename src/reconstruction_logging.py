@@ -27,7 +27,7 @@ def log_wandb_reconstruction(
     try:
         import matplotlib.pyplot as plt
         import wandb
-        from utils.plotting import plot_validation_reconstruction_batch
+        from src.utils.plotting import plot_validation_reconstruction_batch
     except ImportError:
         return
 
