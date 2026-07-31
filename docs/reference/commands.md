@@ -52,8 +52,8 @@ uv run python train.py --config configs/config.yaml \
 ## Batch jobs
 
 ```bash
-qsub run_scripts/export_geo_pmw_geotiffs_cpu.pbs
-qsub run_scripts/export_geo_sar_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_pmw_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_sar_geotiffs_cpu.pbs
 ```
 
 ## Environment variables

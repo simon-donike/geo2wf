@@ -26,7 +26,7 @@ def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:
 
     with (
         patch(
-            "utils.plotting.plot_validation_reconstruction_batch",
+            "src.utils.plotting.plot_validation_reconstruction_batch",
             return_value=figure,
         ) as plot_batch,
         patch("wandb.Image", return_value="wandb-image") as wandb_image,

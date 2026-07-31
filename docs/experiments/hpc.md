@@ -5,8 +5,8 @@
 Full exports are intended for batch workers, not login nodes:
 
 ```bash
-qsub run_scripts/export_geo_sar_geotiffs_cpu.pbs
-qsub run_scripts/export_geo_pmw_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_sar_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_pmw_geotiffs_cpu.pbs
 ```
 
 The scripts activate the project environment, configure paths, and invoke the matching exporter. Review account, queue, walltime, memory, source root, and output root for the target cluster before submitting.

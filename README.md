@@ -22,7 +22,7 @@ multi-temporal windows, masking policies, and full tropical-cyclone metadata.
 
 ## Data Visualization
 
-![Random GEO-SAR training pairs](resources/geo_sar_random_pairs.png)
+![Random GEO-SAR training pairs](docs/assets/images/geo-sar-random-pairs.png)
 
 Each row shows one random GEO-SAR training pair from the exported GeoTIFF
 dataset. The left panel is a geostationary false-color RGB composite using two
@@ -35,7 +35,7 @@ geostationary view of the same tropical cyclone.
 
 ## W&B Logging Preview
 
-![Example W&B reconstruction logging](resources/wandb_logging_preview_2.png)
+![Example W&B reconstruction logging](docs/assets/images/wandb-logging-preview.png)
 
 Example reconstruction panels logged during training. W&B records validation
 reconstructions under `val/reconstruction` and training-sample reconstructions
@@ -269,8 +269,8 @@ For full exports on the cluster, submit the CPU PBS scripts instead of running
 long jobs on a login node:
 
 ```bash
-qsub run_scripts/export_geo_pmw_geotiffs_cpu.pbs
-qsub run_scripts/export_geo_sar_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_pmw_geotiffs_cpu.pbs
+qsub scripts/hpc/export_geo_sar_geotiffs_cpu.pbs
 ```
 
 To avoid online W&B logging:

@@ -21,7 +21,7 @@ geo2wf/
 │       ├── samplers/        DDPM and DDIM
 │       └── backbones/       ConvNeXt-style U-Net
 ├── tests/                   unit and learning-behavior tests
-├── utils/plotting.py        exported-pair visualization
+├── src/utils/plotting.py        exported-pair visualization
 ├── train.py                 runtime entry point
 ├── mkdocs.yml               this documentation site
 └── pyproject.toml           package and tool dependencies
