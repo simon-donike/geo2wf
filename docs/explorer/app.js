@@ -1,5 +1,6 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,geoFrames=[],sarFrames=[],postProcessing=true,graphModel="model_a",assetBaseUrl="";
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,geoFrames=[],sarFrames=[],postProcessing=true,showNwp=false,graphModel="model_a",assetBaseUrl="";
+const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
@@ -75,12 +76,14 @@ function chartTimeDomain(){
   return[Math.max(stormStart,sarTimes[0]-padding),Math.min(stormEnd,sarTimes.at(-1)+padding)]
 }
 function domain(metric,start,end){
-  const values=storm.records.filter(r=>{const time=dt(r.time).getTime();return time>=start&&time<=end}).flatMap(r=>[predictionValue(metric,r),r.sar?.[metric],metric==="max"?r.ibtracs_msw:null]).filter(Number.isFinite);
+  const nwp=metric === "max" ? nwpPoints(start,end).flatMap(series=>series.points.map(point=>point.max)) : [];
+  const values=[...storm.records.filter(r=>{const time=dt(r.time).getTime();return time>=start&&time<=end}).flatMap(r=>[predictionValue(metric,r),r.sar?.[metric],metric==="max"?r.ibtracs_msw:null]),...nwp].filter(Number.isFinite);
   if(!values.length)return[0,1];
   const min=Math.min(...values),max=Math.max(...values);
   const padding=Math.max((max-min)*.06,metric==="rmw"?1:.5);
   return[0,Math.max(1,max+padding)]
 }
+function nwpPoints(start,end){return showNwp?(storm.nwp||[]).map(series=>({...series,points:series.points.filter(point=>{const time=dt(point.time).getTime();return time>=start&&time<=end&&Number.isFinite(point.max)})})).filter(series=>series.points.length):[]}
 function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!sorted.length)return null;const m=Math.floor(sorted.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2}
 function graphPrediction(record){if(graphModel==="model_b")return record.model_b_prediction;if(graphModel==="model_c")return record.model_c_prediction;return record.prediction}
 function postprocessExcluded(record){return graphModel==="model_a"&&record.postprocess_excluded}
@@ -103,7 +106,7 @@ function chart(metric,def){
   const [start,end]=chartTimeDomain(),[lo,hi]=domain(metric,start,end);
   const x=t=>C.l+(dt(t).getTime()-start)/(end-start)*(C.w-C.l-C.r),y=v=>Math.max(C.t,Math.min(C.h-C.b,C.t+(hi-v)/(hi-lo)*(C.h-C.t-C.b)));
   const inWindow=r=>{const time=dt(r.time).getTime();return time>=start&&time<=end};
-  const pred=storm.records.filter(inWindow).map(r=>({...r,plot:predictionValue(metric,r)})).filter(r=>Number.isFinite(r.plot)),sar=storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.sar?.[metric])),ibtracs=metric==="max"?storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.ibtracs_msw)):[];
+  const pred=storm.records.filter(inWindow).map(r=>({...r,plot:predictionValue(metric,r)})).filter(r=>Number.isFinite(r.plot)),sar=storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.sar?.[metric])),ibtracs=metric==="max"?storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.ibtracs_msw)):[],nwp=metric==="max"?nwpPoints(start,end):[];
   const headingKey=metric==="max"?`<span class="category-key">${CATEGORIES.map(c=>`<b style="--cat:${c.color}">${c.label} ${Math.round(c.value)}</b>`).join("")}</span>`:`<span>${def.note||""} · ${def.unit}</span>`;
   const path=(rows,get,breakGaps=false)=>rows.map((r,i)=>`${i&&!(breakGaps&&dt(r.time)-dt(rows[i-1].time)>data.postprocessing.smoothing_hours*3600000)?"L":"M"}${x(r.time).toFixed(1)},${y(get(r)).toFixed(1)}`).join(" ");
   const card=document.createElement("article");card.className="chart-card";card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3>${headingKey}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="none"></svg></div>`;
@@ -111,6 +114,7 @@ function chart(metric,def){
   if(metric==="max")CATEGORIES.forEach(c=>{if(c.value>=lo&&c.value<=hi)s.append(svg("line",{class:"category-threshold",x1:C.l,y1:y(c.value),x2:C.w-C.r,y2:y(c.value),stroke:c.color}))});
   [hi,(lo+hi)/2,lo].forEach(v=>{const yp=y(v);s.append(svg("line",{class:"chart-grid",x1:C.l,y1:yp,x2:C.w-C.r,y2:yp}));const t=svg("text",{class:"chart-axis",x:2,y:yp+3});t.textContent=v>=100?Math.round(v):v.toFixed(v<10?1:0);s.append(t)});
   [[short(start),C.l],[short(end),C.w-36]].forEach(([v,xp])=>{const t=svg("text",{class:"chart-axis",x:xp,y:C.h-2});t.textContent=v;s.append(t)});
+  nwp.forEach((series,index)=>s.append(svg("path",{class:"nwp-path",d:path(series.points,r=>r.max),"stroke-dasharray":NWP_DASHES[index%NWP_DASHES.length],"aria-label":series.label})));
   s.append(svg("path",{class:"geo-path",d:path(pred,r=>r.plot,postProcessing)}));
   if(pred.length===1)s.append(svg("circle",{class:"geo-dot",cx:x(pred[0].time),cy:y(pred[0].plot),r:3.2}));
   if(sar.length)s.append(svg("path",{class:"sar-path",d:path(sar,r=>r.sar[metric])}));
@@ -144,6 +148,7 @@ function selectStorm(id){
 $("#timeSlider").oninput=()=>{stop();current()};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
 $("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked);event.target.checked?resetAnimation():restoreManualLayers()};
 $("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=data.models[graphModel].label;charts();current()};
+$("#showNwp").onchange=event=>{showNwp=event.target.checked;$("#nwpLegend").hidden=!showNwp;charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 const dialog=$("#aboutDialog");$("#helpButton").onclick=()=>dialog.showModal();$("#closeDialog").onclick=$("#confirmDialog").onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close()};
 async function loadRelease(releaseUrl){

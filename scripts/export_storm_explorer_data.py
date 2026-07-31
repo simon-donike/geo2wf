@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUT_ROOT = ROOT / "inference" / "inf_anna"
 MODEL_B_ROOT = ROOT / "inference" / "inf_simon"
 MODEL_C_ROOT = ROOT / "inference" / "inf_model_c"
+NWP_ROOT = ROOT / "inference" / "NWP"
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
 GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
@@ -26,6 +27,8 @@ POSTPROCESS_C02_P99_MAX = 0.4
 POSTPROCESS_SMOOTHING_HOURS = 6.0
 POSTPROCESS_EDGE_PADDING_ACQUISITIONS = 1
 SAR_SCALE_MAX_MS = 60.0
+NWP_STORM_ID = "AL082025"
+NWP_LABELS = {"aifs": "AIFS", "aifs2": "AIFS2", "era5": "ERA5", "gfs": "GFS", "graphcast": "GraphCast", "pangu": "Pangu"}
 
 
 def finite_number(value):
@@ -85,6 +88,20 @@ def export_sar_image(observation_id, bundle):
     }
 
 
+def export_nwp():
+    """Return NWP maximum-wind tracks in the browser format."""
+    series = []
+    for path in sorted(NWP_ROOT.glob("*.csv")):
+        key = path.stem.lower()
+        if key not in NWP_LABELS:
+            continue
+        table = pd.read_csv(path)
+        if not {"valid_time", "max_wind_ms"}.issubset(table.columns):
+            raise ValueError(f"{path} must contain valid_time and max_wind_ms")
+        points = [{"time": pd.Timestamp(row.valid_time).isoformat().replace("+00:00", "Z"), "max": finite_number(row.max_wind_ms)} for row in table.itertuples(index=False) if pd.notna(row.max_wind_ms)]
+        series.append({"id": key, "label": NWP_LABELS[key], "points": points})
+    return series
+
 def export_storm(storm_dir):
     summary = pd.read_csv(storm_dir / "inference-summary.csv").sort_values("observation_timestamp").reset_index(drop=True)
     model_b_path = MODEL_B_ROOT / storm_dir.name / "inference-summary.csv"
@@ -140,13 +157,16 @@ def export_storm(storm_dir):
         start = max(0, index - POSTPROCESS_EDGE_PADDING_ACQUISITIONS)
         end = min(len(records), index + POSTPROCESS_EDGE_PADDING_ACQUISITIONS + 1)
         record["postprocess_excluded"] = any(base_exclusions[start:end])
-    return {
+    storm = {
         "id": storm_dir.name,
         "basin": "North Atlantic" if storm_dir.name.startswith("AL") else "Eastern Pacific",
         "start": records[0]["time"], "end": records[-1]["time"],
         "sar_matches": sum(record["sar"] is not None for record in records),
         "records": records,
     }
+    if storm_dir.name == NWP_STORM_ID:
+        storm["nwp"] = export_nwp()
+    return storm
 
 
 def main():

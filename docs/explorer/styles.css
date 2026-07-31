@@ -467,6 +467,10 @@ p {
   text-align: right;
 }
 
+.nwp-line {
+  border-top: 2px dashed #748188;
+}
+
 .ibtracs-line {
   border-top: 2px solid #27343a;
 }
@@ -541,6 +545,13 @@ p {
   fill: none;
   stroke: var(--red);
   stroke-width: 2.2;
+}
+
+.nwp-path {
+  fill: none;
+  stroke: #748188;
+  stroke-width: 1.2;
+  opacity: .7;
 }
 
 .sar-path {

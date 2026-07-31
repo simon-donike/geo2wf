@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -38,7 +39,9 @@ def test_unpack_batch_supports_dict_and_tuple_batches() -> None:
 def test_prepare_condition_appends_single_validity_channel() -> None:
     module = _helper()
     condition = torch.tensor([[[[0.0, 0.5], [1.0, 2.0]]]])
-    condition_mask = torch.tensor([[[[True, True], [False, True]], [[True, False], [True, True]]]])
+    condition_mask = torch.tensor(
+        [[[[True, True], [False, True]], [[True, False], [True, True]]]]
+    )
 
     prepared = module._prepare_condition(
         condition,
@@ -145,13 +148,56 @@ def test_fixed_initial_noise_is_stable_per_sample_id() -> None:
 
     first = module._fixed_initial_noise(batch, 0, 0, condition)
     second = module._fixed_initial_noise(batch, 99, 1, condition)
-    alternate = module._fixed_initial_noise(
-        batch, 99, 1, condition, ensemble_index=1
-    )
+    alternate = module._fixed_initial_noise(batch, 99, 1, condition, ensemble_index=1)
 
     assert torch.equal(first, second)
     assert not torch.equal(first, alternate)
     assert not torch.equal(first[0], first[1])
+
+
+def test_validation_can_disable_images_without_disabling_metrics() -> None:
+    module = PixelDiffusionConditional(
+        condition_channels=1,
+        generated_channels=1,
+        num_timesteps=4,
+        model_dim=4,
+        model_dim_mults=(1, 2),
+        model_channels=2,
+        model_out_dim=1,
+        sampling_method="ddim",
+        sampling_timesteps=2,
+        log_reconstruction_images=False,
+    )
+    target = torch.zeros(1, 1, 8, 8)
+    batch = {
+        "condition": torch.zeros_like(target),
+        "target": target,
+        "target_mask": torch.ones_like(target, dtype=torch.bool),
+    }
+    prediction = torch.zeros_like(target)
+    metric = torch.tensor(0.0)
+
+    with (
+        patch.object(module, "_diffusion_loss", return_value=metric),
+        patch.object(
+            module, "_predict_batch", return_value=(prediction, prediction)
+        ) as predict,
+        patch.object(
+            module,
+            "_compute_reconstruction_metrics",
+            return_value=(metric, metric, metric),
+        ) as reconstruction_metrics,
+        patch.object(module, "_accumulate_storm_statistics"),
+        patch.object(module, "_accumulate_physical_statistics"),
+        patch.object(module, "_log_val_reconstruction") as log_images,
+        patch.object(module, "log"),
+    ):
+        module.validation_step(batch, 0, 0)
+        module.validation_step(batch, 0, 1)
+
+    predict.assert_called_once()
+    reconstruction_metrics.assert_called_once()
+    log_images.assert_not_called()
 
 
 def test_ema_update_moves_toward_raw_model() -> None:
@@ -209,9 +255,7 @@ def test_perfect_ensemble_has_zero_crps_and_unit_sharpness() -> None:
     module = _helper()
     module.probabilistic_score_sharpness_weight = 2.0
     module.probabilistic_score_target_sharpness_ratio = 1.0
-    target = torch.tensor(
-        [[[[0.0, 0.2, 0.4], [0.1, 0.5, 0.8], [0.3, 0.7, 1.0]]]]
-    )
+    target = torch.tensor([[[[0.0, 0.2, 0.4], [0.1, 0.5, 0.8], [0.3, 0.7, 1.0]]]])
     ensemble = target.unsqueeze(0).repeat(3, 1, 1, 1, 1)
     mask = torch.ones_like(target, dtype=torch.bool)
 
@@ -227,22 +271,58 @@ def test_perfect_ensemble_has_zero_crps_and_unit_sharpness() -> None:
 
     assert torch.allclose(metrics["ensemble_crps_ms"], torch.tensor(0.0))
     assert torch.allclose(metrics["ensemble_spread_ms"], torch.tensor(0.0))
-    assert torch.allclose(
-        metrics["ensemble_sharpness_ratio"], torch.tensor(1.0)
-    )
+    assert torch.allclose(metrics["ensemble_sharpness_ratio"], torch.tensor(1.0))
     assert torch.allclose(
         metrics["probabilistic_refinement_score"],
         torch.tensor(0.0),
         atol=1e-6,
     )
 
+
+def test_ensemble_peak_metrics_detect_compressed_member_maxima() -> None:
+    module = _helper()
+    module.probabilistic_score_sharpness_weight = 0.0
+    module.probabilistic_score_target_sharpness_ratio = 1.0
+    module.probabilistic_score_peak_weight = 0.5
+    module.probabilistic_peak_fraction = 0.25
+    target = torch.tensor([[[[0.1, 0.2], [0.3, 1.0]]]])
+    ensemble = torch.stack([target * 0.5, target * 0.6, target * 0.7], dim=0)
+
+    metrics = module._ensemble_probabilistic_metrics(
+        ensemble,
+        {
+            "target_physical": target * 10.0,
+            "target_mask": torch.ones_like(target, dtype=torch.bool),
+            "target_norm_offset": torch.tensor([[0.0]]),
+            "target_norm_scale": torch.tensor([[10.0]]),
+        },
+    )
+
+    assert metrics["ensemble_robust_peak_crps_ms"] > 0
+    assert metrics["ensemble_robust_peak_median_bias_ms"] < 0
+    assert metrics["ensemble_robust_peak_median_mae_ms"] > 0
+    assert metrics["ensemble_robust_peak_10_90_coverage"] == 0
+    assert metrics["probabilistic_refinement_score"] > metrics["ensemble_crps_ms"]
+
+
+def test_even_ensemble_robust_peak_uses_conventional_median() -> None:
+    ensemble = torch.tensor([[[[[10.0]]]], [[[[30.0]]]]])
+    target = torch.tensor([[[[20.0]]]])
+    mask = torch.ones_like(target, dtype=torch.bool)
+
+    metrics = PixelDiffusionConditional._ensemble_robust_peak_metrics(
+        ensemble, target, mask, fraction=1.0
+    )
+
+    assert metrics["ensemble_robust_peak_median_bias_ms"] == 0
+    assert metrics["ensemble_robust_peak_median_mae_ms"] == 0
+
+
 def test_sharpness_target_ratio_changes_composite_penalty() -> None:
     module = _helper()
     module.probabilistic_score_sharpness_weight = 2.0
     module.probabilistic_score_target_sharpness_ratio = 0.9
-    target = torch.tensor(
-        [[[[0.0, 0.2, 0.4], [0.1, 0.5, 0.8], [0.3, 0.7, 1.0]]]]
-    )
+    target = torch.tensor([[[[0.0, 0.2, 0.4], [0.1, 0.5, 0.8], [0.3, 0.7, 1.0]]]])
     ensemble = target.unsqueeze(0).repeat(3, 1, 1, 1, 1)
     metrics = module._ensemble_probabilistic_metrics(
         ensemble,
