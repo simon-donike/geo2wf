@@ -4,7 +4,7 @@ const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
-const cat=v=>v>=1?String(v):({0:"TS","-1":"TD","-2":"SS","-3":"DB","-4":"EX"}[v]||"—");
+const cat=v=>v>=1?`C${v}`:({0:"TS","-1":"TD","-2":"SS","-3":"DB","-4":"EX"}[v]||"—");
 const assetUrl=path=>new URL(path,assetBaseUrl||document.baseURI).href;
 
 function initMap(){
@@ -75,7 +75,7 @@ function chartTimeDomain(){
   return[Math.max(stormStart,sarTimes[0]-padding),Math.min(stormEnd,sarTimes.at(-1)+padding)]
 }
 function domain(metric,start,end){
-  const values=storm.records.filter(r=>{const time=dt(r.time).getTime();return time>=start&&time<=end}).flatMap(r=>[predictionValue(metric,r),r.sar?.[metric]]).filter(Number.isFinite);
+  const values=storm.records.filter(r=>{const time=dt(r.time).getTime();return time>=start&&time<=end}).flatMap(r=>[predictionValue(metric,r),r.sar?.[metric],metric==="max"?r.ibtracs_msw:null]).filter(Number.isFinite);
   if(!values.length)return[0,1];
   const min=Math.min(...values),max=Math.max(...values);
   const padding=Math.max((max-min)*.06,metric==="rmw"?1:.5);
@@ -103,7 +103,7 @@ function chart(metric,def){
   const [start,end]=chartTimeDomain(),[lo,hi]=domain(metric,start,end);
   const x=t=>C.l+(dt(t).getTime()-start)/(end-start)*(C.w-C.l-C.r),y=v=>Math.max(C.t,Math.min(C.h-C.b,C.t+(hi-v)/(hi-lo)*(C.h-C.t-C.b)));
   const inWindow=r=>{const time=dt(r.time).getTime();return time>=start&&time<=end};
-  const pred=storm.records.filter(inWindow).map(r=>({...r,plot:predictionValue(metric,r)})).filter(r=>Number.isFinite(r.plot)),sar=storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.sar?.[metric]));
+  const pred=storm.records.filter(inWindow).map(r=>({...r,plot:predictionValue(metric,r)})).filter(r=>Number.isFinite(r.plot)),sar=storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.sar?.[metric])),ibtracs=metric==="max"?storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.ibtracs_msw)):[];
   const headingKey=metric==="max"?`<span class="category-key">${CATEGORIES.map(c=>`<b style="--cat:${c.color}">${c.label} ${Math.round(c.value)}</b>`).join("")}</span>`:`<span>${def.note||""} · ${def.unit}</span>`;
   const path=(rows,get,breakGaps=false)=>rows.map((r,i)=>`${i&&!(breakGaps&&dt(r.time)-dt(rows[i-1].time)>data.postprocessing.smoothing_hours*3600000)?"L":"M"}${x(r.time).toFixed(1)},${y(get(r)).toFixed(1)}`).join(" ");
   const card=document.createElement("article");card.className="chart-card";card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3>${headingKey}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="none"></svg></div>`;
@@ -115,8 +115,9 @@ function chart(metric,def){
   if(pred.length===1)s.append(svg("circle",{class:"geo-dot",cx:x(pred[0].time),cy:y(pred[0].plot),r:3.2}));
   if(sar.length)s.append(svg("path",{class:"sar-path",d:path(sar,r=>r.sar[metric])}));
   sar.forEach(r=>s.append(svg("circle",{class:"sar-dot",cx:x(r.time),cy:y(r.sar[metric]),r:3.5})));
+  if(ibtracs.length)s.append(svg("path",{class:"ibtracs-path",d:path(ibtracs,r=>r.ibtracs_msw)}));
   s.append(svg("line",{class:"cursor-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}));
-  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=predictionValue(metric,r),raw=graphPrediction(r)?.[metric],tip=$("#tooltip"),processedLabel=postprocessExcluded(r)?"interpolated":"smoothed",predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" ("+processedLabel+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${data.models[graphModel].label} ${predictionLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
+  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=predictionValue(metric,r),raw=graphPrediction(r)?.[metric],tip=$("#tooltip"),processedLabel=postprocessExcluded(r)?"interpolated":"smoothed",predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" ("+processedLabel+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable",ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${r.ibtracs_msw.toFixed(1)} m/s · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${data.models[graphModel].label} ${predictionLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}${ibtracsLabel}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function charts(){
@@ -126,7 +127,7 @@ function charts(){
 function current(){
   const i=+$("#timeSlider").value,r=storm.records[i];currentMarker.setLatLng([r.lat,r.lon]);
   $("#currentDate").textContent=full(r.time);$("#observationCount").textContent=`Observation ${i+1} of ${storm.records.length}`;
-  $("#categoryValue").textContent=cat(r.category);$("#currentMax").textContent=`${r.prediction.max.toFixed(1)} m/s`;
+  $("#categoryValue").textContent=cat(r.category);
   const time=dt(r.time).getTime();$$(".cursor-line").forEach(l=>{const start=+l.dataset.start,end=+l.dataset.end,visible=time>=start&&time<=end,xp=C.l+(time-start)/(end-start)*(C.w-C.l-C.r);l.style.display=visible?"":"none";if(visible){l.setAttribute("x1",xp);l.setAttribute("x2",xp)}})
 }
 function stop(){clearInterval(timer);timer=null;$("#playButton").textContent="▶"}

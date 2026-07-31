@@ -1,0 +1,11 @@
+{
+  "sample_id": "WP232024_sar_geo_20241030095303_bb2c52ca",
+  "storm_id": "WP232024",
+  "condition_sensor": "AHI",
+  "target_sensor": "RADARSAT Constellation 2",
+  "condition_timestamp": "2024-10-30T09:50:00+00:00",
+  "target_timestamp": "2024-10-30T09:53:03+00:00",
+  "dt_minutes": -3.05,
+  "grid_size": 256,
+  "grid_resolution": 0.027
+}

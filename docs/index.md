@@ -1,113 +1,70 @@
 ---
 hide:
-  - navigation
   - toc
 ---
 
-<div class="geo-hero" markdown>
-<span class="geo-eyebrow">:material-weather-hurricane: Tropical cyclone reconstruction</span>
+<div class="geo-intro" markdown>
+<span class="geo-eyebrow">Tropical-cyclone wind reconstruction</span>
 
-# See the storm. <span>Recover the wind.</span>
+# A baseline first. Diffusion second.
 
-geo2wf is a deliberately focused research baseline that turns colocated geostationary satellite imagery into SAR-like tropical-cyclone wind fields—with conditional pixel diffusion, an ERA5-anchored control, and a data pipeline you can reason about end to end.
+geo2wf reconstructs SAR-like surface wind fields from geostationary satellite imagery and ERA5 context. The main system is deliberately two-stage: a deterministic model commits to a broad physical field, then diffusion models the signed correction that remains.
 
 <div class="geo-actions" markdown>
-[Run the first experiment :material-arrow-right:](getting-started/first-experiment.md){ .md-button .md-button--primary }
-[Understand the system](concepts/architecture.md){ .md-button }
-[Explore the mock dashboard](explorer/dashboard.html){ .md-button }
+[Read the two-stage workflow](models/two-stage.md){ .md-button .md-button--primary }
+[Understand the data](data/index.md){ .md-button }
+[Open the dashboard](explorer/dashboard.html){ .md-button }
 </div>
 </div>
 
-<div class="geo-stats">
-  <div class="geo-stat"><strong>4 / 10</strong><span>common GEO band options</span></div>
-  <div class="geo-stat"><strong>256²</strong><span>default colocated grid</span></div>
-  <div class="geo-stat"><strong>2 paths</strong><span>diffusion + residual control</span></div>
-  <div class="geo-stat"><strong>DDPM / DDIM</strong><span>ancestral or fast sampling</span></div>
+## The central workflow
+
+<div class="stage-flow">
+  <div class="stage-card">
+    <span class="geo-kicker">Stage 1</span>
+    <strong>Deterministic baseline</strong>
+    <p>GEO, ERA5, geometry, solar context, and validity masks produce one dense wind field anchored to ERA5.</p>
+    <code>baseline = ERA5 + learned correction</code>
+  </div>
+  <div class="stage-arrow">→</div>
+  <div class="stage-card">
+    <span class="geo-kicker">Stage 2</span>
+    <strong>Residual diffusion</strong>
+    <p>The Stage 1 checkpoint is frozen. Diffusion samples a signed SAR-minus-baseline residual and adds it back in physical m/s.</p>
+    <code>wind sample = baseline + sampled residual</code>
+  </div>
 </div>
 
-## One question, kept intentionally clear
+The split is useful because the two models have different jobs. Stage 1 learns the stable, broad reconstruction. Stage 2 spends its capacity on plausible eye, eyewall, gradient, and asymmetric structure without having to regenerate the whole field from noise. [See the equations, channel counts, and training sequence.](models/two-stage.md)
 
-> Given a geostationary image crop of a tropical cyclone, can a conditional model generate a plausible SAR-like wind field on the same grid?
+## What the models receive
 
-The repository is the minimum-complexity counterpart to a larger multi-source reconstruction system. It keeps the useful scientific pieces—real observation pairing, geospatial rasters, validity masks, physically meaningful metrics, experiment configs—and removes heterogeneous occurrence sets, temporal windows, and heavy orchestration.
+The checked-in two-stage setup uses a 23-channel data condition:
 
-<div class="geo-flow" markdown>
-<div markdown><span class="geo-kicker">Observe</span><br>GOES ABI or Himawari AHI infrared/water-vapor bands</div>
-<div class="arrow">→</div>
-<div markdown><span class="geo-kicker">Condition</span><br>Normalize, align, mask, and optionally append ERA5 context</div>
-<div class="arrow">→</div>
-<div markdown><span class="geo-kicker">Reconstruct</span><br>Denoise a SAR wind field or learn a correction to ERA5</div>
-<div class="arrow">→</div>
-<div markdown><span class="geo-kicker">Evaluate</span><br>Image quality, physical error, eye and radial structure</div>
+- 10 GEO infrared and water-vapor bands;
+- 9 ERA5 fields: seven exported variables plus derived 10 m wind speed and relative vorticity;
+- 1 normalized distance-to-IBTrACS-center raster; and
+- 3 solar-time fields.
+
+Validity masks and an explicit ERA5 wind anchor are appended by the model. Stage 2 also receives the frozen Stage 1 field and its validity mask. SAR wind is the supervised target during training; it is not an inference-time input.
+
+[![Real GEO, ERA5, SAR, and mask example](assets/images/data-example-target.webp)](data/index.md)
+
+<p class="geo-caption">Real exported sample <code>WP232024_sar_geo_20241030095303_bb2c52ca</code>, rendered from the repository GeoTIFFs with Matplotlib. The data page shows every input family.</p>
+
+## Read by task
+
+<div class="quick-links">
+  <a class="quick-link" href="models/two-stage/"><strong>Understand the model</strong><span>The main two-stage baseline + diffusion article.</span></a>
+  <a class="quick-link" href="data/"><strong>Understand the inputs</strong><span>Real examples, channel lists, masks, and tensor assembly.</span></a>
+  <a class="quick-link" href="getting-started/first-experiment/"><strong>Run an experiment</strong><span>Export a small batch and launch a smoke run.</span></a>
+  <a class="quick-link" href="experiments/"><strong>Choose a preset</strong><span>Compare the stacked workflow with standalone controls.</span></a>
+  <a class="quick-link" href="experiments/evaluation/"><strong>Evaluate structure</strong><span>Physical error, eye, inner core, radial profile, and RMW.</span></a>
+  <a class="quick-link" href="reference/"><strong>Find a file or command</strong><span>Project map, configuration keys, and troubleshooting.</span></a>
 </div>
 
-## Explore by goal
+## Scope
 
-<div class="grid cards" markdown>
+geo2wf is paired image-to-image reconstruction on a shared 256 × 256 geospatial grid. It does not currently model arbitrary observation sets, full storm tracks, or multi-temporal windows. Those boundaries keep the data contract, physical units, masks, and model comparisons inspectable.
 
--   :material-rocket-launch-outline:{ .lg .middle } **Get a run moving**
-
-    ---
-
-    Install with UV, export two samples, inspect a batch, and launch a one-batch smoke run.
-
-    [:octicons-arrow-right-24: First experiment](getting-started/first-experiment.md)
-
--   :material-database-arrow-right-outline:{ .lg .middle } **Understand the data**
-
-    ---
-
-    Follow observations from the source manifest into raw GeoTIFFs, split manifests, train statistics, tensors, and masks.
-
-    [:octicons-arrow-right-24: Data pipeline](data/index.md)
-
--   :material-creation-outline:{ .lg .middle } **Understand diffusion**
-
-    ---
-
-    See what is noised, what the U-Net predicts, how conditioning enters, and why DDIM changes sampling cost.
-
-    [:octicons-arrow-right-24: Conditional diffusion](models/conditional-diffusion.md)
-
--   :material-tune-variant:{ .lg .middle } **Choose a configuration**
-
-    ---
-
-    Compare 4-band, 10-band, ERA5, PMW pretraining, residual-control, and multi-GPU experiments.
-
-    [:octicons-arrow-right-24: Experiment matrix](experiments/index.md)
-
--   :material-chart-bell-curve-cumulative:{ .lg .middle } **Judge storm structure**
-
-    ---
-
-    Go beyond PSNR: measure wind error in m/s, the eye, inner core, radius of maximum wind, and skill against ERA5.
-
-    [:octicons-arrow-right-24: Evaluation](experiments/evaluation.md)
-
--   :material-map-search-outline:{ .lg .middle } **Find a file or command**
-
-    ---
-
-    Use the project map, configuration key reference, environment variables, and troubleshooting guide.
-
-    [:octicons-arrow-right-24: Reference](reference/index.md)
-
-</div>
-
-## The data, at a glance
-
-[![Five random GEO–SAR training pairs](assets/images/geo-sar-random-pairs.png)](experiments/visual-examples.md)
-
-<p class="geo-caption">GEO false-color context, paired SAR wind-speed target, and valid-area footprint. Select the image to inspect it.</p>
-
-!!! info "Know the boundary"
-    geo2wf does **paired image-to-image reconstruction**. It does not currently model arbitrary source sets, observation-time offsets, full storm tracks, multi-temporal windows, or learned source metadata. Those are deliberate non-goals until the focused baseline proves useful.
-
-## Recommended reading path
-
-1. [Install the environment](getting-started/installation.md).
-2. Learn the [reconstruction problem](concepts/problem.md) and [system architecture](concepts/architecture.md).
-3. Follow the [data pipeline](data/index.md), including [normalization and masks](data/normalization.md).
-4. Compare the [conditional diffusion model](models/conditional-diffusion.md) with the [ERA5 residual baseline](models/era5-residual.md).
-5. Pick an [experiment](experiments/index.md), then [train](experiments/training.md) and [evaluate](experiments/evaluation.md).
+Start with [the two-stage workflow](models/two-stage.md), then follow the [data inputs](data/index.md) into [training](experiments/training.md) and [evaluation](experiments/evaluation.md).

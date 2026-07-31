@@ -1,5 +1,5 @@
 site_name: geo2wf
-site_description: Conditional diffusion for tropical-cyclone wind-field reconstruction
+site_description: A two-stage baseline and diffusion system for tropical-cyclone wind-field reconstruction
 site_url: https://tcd.hyperalis.com/
 repo_url: https://github.com/simon-donike/geo2wf
 repo_name: simon-donike/geo2wf
@@ -11,74 +11,55 @@ theme:
   custom_dir: docs/overrides
   logo: assets/images/mark.svg
   favicon: assets/images/mark.svg
-  font:
-    text: Inter
-    code: JetBrains Mono
+  font: false
   icon:
     repo: fontawesome/brands/github
     annotation: material/plus-circle
   features:
-    - announce.dismiss
     - content.action.edit
     - content.action.view
     - content.code.annotate
     - content.code.copy
-    - content.code.select
-    - content.tabs.link
-    - header.autohide
     - navigation.footer
     - navigation.indexes
     - navigation.instant
-    - navigation.instant.prefetch
     - navigation.instant.progress
     - navigation.path
     - navigation.sections
-    - navigation.tabs
     - navigation.top
     - search.highlight
     - search.share
     - search.suggest
     - toc.follow
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: geo2wf-light
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-night
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: geo2wf-dark
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-sunny
-        name: Switch to light mode
+    scheme: default
+    primary: custom
+    accent: custom
 
 nav:
   - Home: index.md
-  - Storm explorer: explorer.md
+  - Core workflow:
+      - Two-stage baseline + diffusion: models/two-stage.md
+      - System architecture: concepts/architecture.md
+      - The reconstruction problem: concepts/problem.md
+      - Diffusion in one page: concepts/diffusion-primer.md
+  - Data:
+      - Inputs and targets: data/index.md
+      - Dataset contract: data/dataset-contract.md
+      - Normalization & masks: data/normalization.md
+      - Export GEO–SAR: data/export-geo-sar.md
+      - PMW proxy pretraining: data/export-geo-pmw.md
+      - Hosting dashboard data on R2: data/r2-hosting.md
+  - Models:
+      - Model overview: models/index.md
+      - Stage 1 — deterministic baseline: models/era5-residual.md
+      - Stage 2 — residual diffusion: models/residual-diffusion.md
+      - Standalone conditional diffusion: models/conditional-diffusion.md
+      - Sampling: models/sampling.md
   - Start here:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md
       - First experiment: getting-started/first-experiment.md
-  - Concepts:
-      - The reconstruction problem: concepts/problem.md
-      - System architecture: concepts/architecture.md
-      - Diffusion in one page: concepts/diffusion-primer.md
-  - Data:
-      - Data pipeline: data/index.md
-      - Hosting explorer data on R2: data/r2-hosting.md
-      - Export GEO–SAR: data/export-geo-sar.md
-      - PMW proxy pretraining: data/export-geo-pmw.md
-      - Dataset contract: data/dataset-contract.md
-      - Normalization & masks: data/normalization.md
-  - Models:
-      - Model overview: models/index.md
-      - Conditional diffusion: models/conditional-diffusion.md
-      - Residual diffusion: models/residual-diffusion.md
-      - ERA5 residual baseline: models/era5-residual.md
-      - Sampling: models/sampling.md
   - Experiments:
       - Choose an experiment: experiments/index.md
       - Configuration guide: experiments/configuration.md
@@ -92,6 +73,7 @@ nav:
       - Commands & environment: reference/commands.md
       - Troubleshooting: reference/troubleshooting.md
       - Glossary: reference/glossary.md
+  - Dashboard: explorer.md
 
 plugins:
   - search:
