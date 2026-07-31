@@ -1,31 +1,38 @@
-# ERA5 residual baseline
+# Stage 1: deterministic baseline
 
-`ERA5ResidualRegressor` asks a sharper control question: can GEO and ERA5 context learn a useful correction to the ERA5 10 m wind field?
+`ERA5ResidualRegressor` is the first stage of the main workflow. It asks whether GEO and ERA5 context can learn a useful physical correction to ERA5 10 m wind:
 
 \[
-\hat y_{wind} = y_{ERA5} + f_\theta(x_{GEO}, x_{ERA5}, masks)
+\hat v_{\mathrm{base}} = v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, masks)
 \]
+
+Its output becomes the frozen baseline consumed by [Stage 2 residual diffusion](residual-diffusion.md). See [Two-stage baseline + diffusion](two-stage.md) for the complete handoff.
 
 ## Input and architecture
 
-The dataset supplies 23 condition channels: 10 GEO, seven source ERA5 fields,
-derived wind speed, derived relative vorticity, normalized distance to the
-IBTrACS center, local-solar-time sine/cosine, and normalized solar zenith. The
-model appends:
+The dataset supplies 23 condition channels:
+
+- 10 GEO bands;
+- seven exported ERA5 fields;
+- derived ERA5 wind speed and relative vorticity;
+- normalized distance to the IBTrACS center; and
+- local-solar-time sine/cosine plus normalized solar zenith.
+
+The model appends:
 
 1. the condition-validity mask;
 2. explicit target-normalized ERA5 wind speed; and
 3. the ERA5 wind-validity mask.
 
-Its U-Net therefore receives 26 channels. The compact backbone uses two GroupNorm/SiLU residual blocks per resolution, strided convolution downsampling, bilinear upsampling, encoder skips, and a one-channel residual head.
+Its compact U-Net therefore receives 26 channels. It uses two GroupNorm/SiLU residual blocks per resolution, strided-convolution downsampling, bilinear upsampling, encoder skips, and a one-channel residual head.
 
-The final head starts with all weights and bias at zero. Before the first update, the predicted residual is zero and the physical prediction is exactly ERA5. This makes the baseline meaningful from step zero and focuses learning on corrections.
+The final head starts with zero weights and bias. Before the first update, the predicted residual is zero and the physical prediction is exactly ERA5. Training can only improve or worsen that explicit starting point; the baseline is meaningful from step zero.
 
 ## Physical-unit objective
 
-The supervised loss is Huber in m/s over the joint target/ERA5 valid mask. With the configured `delta = 2 m/s`, small errors are quadratic and large errors become linear, reducing sensitivity to extreme pixels without discarding them.
+Supervised loss is Huber in m/s over the joint SAR/ERA5 valid mask. With `delta = 2 m/s`, small errors are quadratic and large errors become linear.
 
-Outside the observed SAR swath, a weak anchor loss penalizes residual magnitude where ERA5 is valid:
+Outside the observed SAR swath, a weak anchor penalizes correction magnitude where ERA5 is valid:
 
 ```yaml
 optimization:
@@ -33,22 +40,29 @@ optimization:
   off_swath_anchor_weight: 0.05
 ```
 
-This discourages unconstrained corrections in regions with no SAR supervision. It does not label ERA5 as observed SAR.
+This discourages unconstrained corrections without pretending ERA5 is observed SAR.
 
 ## Prediction bounds
 
-The default clamps physical wind to at least 0 m/s. `prediction_max_ms` is unset, so no upper cap is applied. The configured PSNR data range is 79.8 m/s, corresponding to the current exported target range.
+The default clamps physical wind to at least 0 m/s. `prediction_max_ms` is unset, so Stage 1 has no upper cap. The configured PSNR data range is 79.8 m/s, matching the current target export range.
 
-## Reported diagnostics
+## Diagnostics
 
-The residual model accumulates exact epoch-level pixel statistics and reports:
+The model reports:
 
 - MAE, RMSE, signed bias, Huber loss, and PSNR in physical units;
-- ERA5 MAE on the identical common-valid pixels;
+- ERA5 MAE on identical common-valid pixels;
 - MAE skill versus ERA5;
-- high-wind MAE and high-wind skill for target winds ≥17 m/s; and
-- the shared eye, inner-core, radial, RMW, contrast, and eye-displacement metrics.
+- high-wind MAE and skill for target winds ≥17 m/s; and
+- shared eye, inner-core, radial, RMW, contrast, and eye-displacement metrics.
 
-Validation loader 0 logs physical validation reconstructions for the configured number of batches; loader 1 logs one fixed training preview. Both use the shared georeferenced W&B helper.
+Validation loader 0 logs physical validation reconstructions. Loader 1 logs a fixed training preview for qualitative comparison only.
 
-Use `configs/config_geo_sar_10bands_era5_residual.yaml` and see [Evaluation](../experiments/evaluation.md) for interpretation.
+## Train Stage 1
+
+```bash
+python train.py \
+  --config configs/config_geo_sar_10bands_era5_residual.yaml
+```
+
+After selecting a checkpoint, pass it to Stage 2 through `GEO2WF_BASELINE_CKPT` or `model.residual.baseline.checkpoint_path`. Continue to [Stage 2 residual diffusion](residual-diffusion.md) or [Evaluation](../experiments/evaluation.md).
