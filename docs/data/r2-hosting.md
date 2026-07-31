@@ -15,7 +15,7 @@ In the R2 settings for the `tcd` bucket:
 ```json
 [
   {
-    "AllowedOrigins": ["https://simon-donike.github.io"],
+    "AllowedOrigins": ["https://tcd.hyperalis.com"],
     "AllowedMethods": ["GET", "HEAD"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 86400

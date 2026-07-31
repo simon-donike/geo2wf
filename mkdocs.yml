@@ -1,6 +1,6 @@
 site_name: geo2wf
 site_description: Conditional diffusion for tropical-cyclone wind-field reconstruction
-site_url: https://simon-donike.github.io/geo2wf/
+site_url: https://tcd.hyperalis.com/
 repo_url: https://github.com/simon-donike/geo2wf
 repo_name: simon-donike/geo2wf
 edit_uri: edit/main/docs/
