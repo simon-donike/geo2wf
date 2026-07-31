@@ -82,7 +82,7 @@ function domain(metric,start,end){
   return[0,Math.max(1,max+padding)]
 }
 function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!sorted.length)return null;const m=Math.floor(sorted.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2}
-function graphPrediction(record){return graphModel==="model_b"?record.model_b_prediction:record.prediction}
+function graphPrediction(record){if(graphModel==="model_b")return record.model_b_prediction;if(graphModel==="model_c")return record.model_c_prediction;return record.prediction}
 function postprocessExcluded(record){return graphModel==="model_a"&&record.postprocess_excluded}
 function smoothedValidValue(metric,record){
   const halfWindow=data.postprocessing.smoothing_hours*3600000/2,target=dt(record.time).getTime();

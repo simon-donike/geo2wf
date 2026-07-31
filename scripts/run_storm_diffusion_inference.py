@@ -79,8 +79,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument(
+        "--ensemble-size",
+        type=int,
+        default=1,
+        help="Number of diffusion samples to average in physical wind-speed space.",
+    )
     parser.add_argument("--limit", type=int, default=None, help="Debug: rows per storm.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.ensemble_size < 1:
+        parser.error("--ensemble-size must be at least 1")
+    return args
 
 
 def _bounds(center_lat: float, center_lon: float) -> torch.Tensor:
@@ -323,8 +332,20 @@ def main() -> None:
                 batch["target_mask"] = batch["condition_mask"]
                 batch["target_norm_offset"] = torch.full((len(chunk), 1), target_offset, device=args.device)
                 batch["target_norm_scale"] = torch.full((len(chunk), 1), target_scale, device=args.device)
-                _, normalized = model._predict_batch(batch, start // args.batch_size)
-                prediction = normalized * target_scale + target_offset
+                prediction_sum = None
+                for ensemble_index in range(args.ensemble_size):
+                    _, normalized = model._predict_batch(
+                        batch,
+                        start // args.batch_size,
+                        ensemble_index=ensemble_index,
+                    )
+                    physical = normalized * target_scale + target_offset
+                    prediction_sum = (
+                        physical
+                        if prediction_sum is None
+                        else prediction_sum + physical
+                    )
+                prediction = prediction_sum / args.ensemble_size
                 for index, (row, (_, distance_km)) in enumerate(zip(chunk, prepared)):
                     metric_rows.append(_output_metrics(prediction[index : index + 1], batch["condition_mask"][index : index + 1], distance_km))
                     local_paths.append(str(by_id[row.observation_id].path))
