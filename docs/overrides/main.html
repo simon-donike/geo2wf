@@ -1,16 +1,8 @@
 {% extends "base.html" %}
 
-{% block announce %}
-  <a href="{{ 'getting-started/first-experiment/' | url }}">
-    <strong>New to geo2wf?</strong>
-    Export two pairs and run the smoke experiment in a few commands
-    <span class="twemoji">{% include ".icons/material/arrow-right.svg" %}</span>
-  </a>
-{% endblock %}
-
 {% block extrahead %}
-  <meta name="theme-color" content="#071c2c">
+  <meta name="theme-color" content="#ffffff">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="geo2wf — from GEO imagery to wind fields">
-  <meta property="og:description" content="Conditional diffusion for tropical-cyclone wind-field reconstruction.">
+  <meta property="og:title" content="geo2wf — baseline + diffusion wind reconstruction">
+  <meta property="og:description" content="A two-stage baseline and diffusion system for tropical-cyclone wind-field reconstruction.">
 {% endblock %}

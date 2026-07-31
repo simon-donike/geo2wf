@@ -4,12 +4,13 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Explore geo2wf wind-field inference across complete tropical-cyclone tracks.">
   <title>geo2wf · Storm explorer</title>
+  <link rel="icon" href="../assets/images/mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="../"><span class="brand-mark">↺</span><strong>geo2wf</strong><i></i><span>Storm explorer</span></a>
+  <a class="brand" href="../"><img class="brand-mark" src="../assets/images/mark.svg" alt=""><strong>geo2wf</strong><i></i><span>Storm explorer</span></a>
   <div class="top-actions"><span class="data-badge"><i></i> Inference data</span><button class="icon-button" id="helpButton">?</button><a class="docs-link" href="../">Back to docs ↗</a></div>
 </header>
 <main class="workspace">
@@ -24,16 +25,20 @@
     </div>
   </section>
   <aside class="analytics">
-    <div class="analytics-heading"><div><p class="eyebrow">Selected system</p><h2 id="stormTitle">—</h2></div><div class="category"><small>CAT</small><strong id="categoryValue">—</strong></div></div>
-    <div class="summary-strip"><div><span>Geostationary</span><strong id="geoCount">—</strong></div><div><span>SAR matches</span><strong id="sarCount">—</strong></div><div><span>Current prediction max</span><strong id="currentMax">—</strong></div></div>
+    <div class="summary-strip">
+      <div class="system-summary"><span>Selected system</span><strong id="stormTitle">—</strong></div>
+      <div><span>Geostationary</span><strong id="geoCount">—</strong></div>
+      <div><span>SAR matches</span><strong id="sarCount">—</strong></div>
+      <div class="category"><span>IBTrACS</span><strong id="categoryValue">—</strong></div>
+    </div>
     <div class="model-toolbar"><label for="modelSelector">Graph model</label><select id="modelSelector"><option value="model_a">Model A</option><option value="model_b">Model B</option><option value="model_c">Model C</option></select></div>
-    <div class="legend"><span><i class="geo-line"></i> <b id="predictionLegend">Model A</b></span><span><i class="sar-line"></i> SAR-derived WF</span><small>Dashed segments interpolate between available SAR observations</small></div>
+    <div class="legend"><span><i class="geo-line"></i> <b id="predictionLegend">Model A</b></span><span><i class="sar-line"></i> SAR-derived WF</span><span><i class="ibtracs-line"></i> IBTrACS MSW / class</span><small>IBTrACS is shown on Maximum wind; dashed gray segments interpolate between SAR observations</small></div>
     <section id="charts" class="charts"></section>
-    <p class="method-note">The model selector changes graph series only; map content and summary values remain Model A. Prediction metrics use the selected model output. SAR metrics use valid pixels inside each SAR swath. Model A RMW is estimated from 10 km radial bins; Model B and Model C RMW and R64 use approximate grid-resolution radial bins. Post-processing excludes C02-bright daylight artifacts plus one acquisition at each edge for Model A only, applies a centered six-hour median, smoothly interpolates Prediction across the excluded times, and limits charts to three hours beyond the first and last SAR match.</p>
+    <p class="method-note">The model selector changes graph series only; map content and summary values remain Model A. The IBTrACS maximum sustained wind and classification are included as a reference on the Maximum wind chart. Prediction metrics use the selected model output. SAR metrics use valid pixels inside each SAR swath. Model A RMW is estimated from 10 km radial bins; Model B and Model C RMW and R64 use approximate grid-resolution radial bins. Post-processing excludes C02-bright daylight artifacts plus one acquisition at each edge for Model A only, applies a centered six-hour median, smoothly interpolates Prediction across the excluded times, and limits charts to three hours beyond the first and last SAR match.</p>
     <div class="graph-toolbar"><label class="postprocess-toggle"><input id="postProcessing" type="checkbox" checked><i></i><span>Post-processing</span></label></div>
   </aside>
 </main>
-<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The red series is derived from the selected graph model; the selector does not change the map or summary cards. All SAR swaths share a fixed 0–60+ m/s scale. Click a three-hour acquisition dot to show its fixed-scale CMI_C15 image; click it again to hide it. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
+<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The red series is derived from the selected graph model; the selector does not change the map or summary cards. The black reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. All SAR swaths share a fixed 0–60+ m/s scale. Click a three-hour acquisition dot to show its fixed-scale CMI_C15 image; click it again to hide it. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
 <div class="loading" id="loading"><span></span><p>Preparing storm tracks…</p></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="data-config.js"></script>

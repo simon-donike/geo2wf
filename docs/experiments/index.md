@@ -1,41 +1,51 @@
 # Choose an experiment
 
-The checked-in configs are presets, not inheritance layers. Each is a complete experiment description for the sections it contains.
+Use the two-stage pair for the main system:
+
+1. `config_geo_sar_10bands_era5_residual.yaml` trains the deterministic baseline.
+2. `config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` freezes that checkpoint and trains residual diffusion.
+
+[Read the two-stage workflow before launching the stack.](../models/two-stage.md)
+
+## Preset matrix
 
 | Config | Task | Condition | Model | Devices |
 |---|---|---|---|---:|
-| `config.yaml` | GEO → SAR | 4 GEO | diffusion, linear/DDPM | 1 auto |
-| `config_geo_sar_10bands.yaml` | GEO → SAR | 10 GEO | diffusion, linear/DDPM | 1 auto |
-| `config_geo_sar_2gpu.yaml` | GEO → SAR | 4 GEO | diffusion | 2 GPU |
-| `config_geo_sar_10bands_2gpu.yaml` | GEO → SAR | 10 GEO | diffusion | 2 GPU |
-| `config_geo_sar_10bands_era5.yaml` | GEO + ERA5 → SAR | 10 GEO + 9 ERA5 | cosine diffusion, 100-step DDIM, EMA | 2 auto |
-| `config_geo_sar_10bands_era5_residual.yaml` | improve ERA5 toward SAR | 10 GEO + 9 ERA5 | deterministic residual | 1 auto |
-| `config_pretrain_geo_pmw.yaml` | GEO → PMW | 4 GEO | diffusion | 1 auto |
-| `config_pretrain_geo_pmw_10bands.yaml` | GEO → PMW | 10 GEO | diffusion | 1 auto |
-| `config_pretrain_geo_pmw_10bands_era5.yaml` | GEO + ERA5 → PMW | 10 GEO + 9 ERA5 | diffusion | 1 auto |
+| `config_geo_sar_10bands_era5_residual.yaml` | improve ERA5 toward SAR | 10 GEO + 9 ERA5 + derived | **Stage 1 deterministic baseline** | 1 auto |
+| `config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` | refine frozen Stage 1 | same + Stage 1 field | **Stage 2 residual diffusion** | 2 auto |
+| `config_geo_sar_10bands_era5_diffusion_residual.yaml` | refine ERA5 directly | 10 GEO + 9 ERA5 + derived | residual-diffusion ablation | 2 auto |
+| `config_geo_sar_10bands_era5.yaml` | GEO + ERA5 → SAR | 10 GEO + 9 ERA5 + derived | absolute diffusion | 2 auto |
+| `config.yaml` | GEO → SAR | 4 GEO + derived | basic absolute diffusion | 1 auto |
+| `config_geo_sar_10bands.yaml` | GEO → SAR | 10 GEO + derived | absolute diffusion | 1 auto |
+| `config_geo_sar_2gpu.yaml` | GEO → SAR | 4 GEO + derived | absolute diffusion | 2 GPU |
+| `config_geo_sar_10bands_2gpu.yaml` | GEO → SAR | 10 GEO + derived | absolute diffusion | 2 GPU |
+| `config_pretrain_geo_pmw.yaml` | GEO → PMW | 4 GEO + derived | proxy diffusion | 1 auto |
+| `config_pretrain_geo_pmw_10bands.yaml` | GEO → PMW | 10 GEO + derived | proxy diffusion | 1 auto |
+| `config_pretrain_geo_pmw_10bands_era5.yaml` | GEO + ERA5 → PMW | 10 GEO + 9 ERA5 + derived | proxy diffusion | 1 auto |
+
+Each checked-in YAML is a complete preset, not an inheritance layer.
 
 ## Decision guide
 
 ```mermaid
 flowchart TD
-  A{Goal?} -->|smallest SAR baseline| B[config.yaml]
-  A -->|more GEO spectral context| C[10bands]
-  A -->|test value beyond ERA5| D[ERA5 residual]
-  A -->|generative ERA5-conditioned field| E[ERA5 diffusion]
-  A -->|proxy pretraining| F[PMW config matching channels]
-  B --> G{Two GPUs?}
-  C --> G
-  G -->|yes| H[matching 2gpu preset]
-  G -->|no| I[single-device preset]
+  A{Goal} -->|Main reconstruction system| S1[Train deterministic baseline]
+  S1 --> S2[Freeze checkpoint and train residual diffusion]
+  A -->|Measure skill beyond ERA5| S1
+  A -->|Ablate the learned baseline| ER[Residual diffusion directly on ERA5]
+  A -->|Absolute-field diffusion control| AD[ERA5-conditioned diffusion]
+  A -->|Smallest smoke test| B[4-band basic diffusion]
+  A -->|Proxy pretraining| P[Matching PMW preset]
 ```
 
-## Important comparability choices
+## Comparability checks
 
-- Keep the exported data root and split policy constant when comparing models.
-- `include_test_in_train: true` is active in all presets; disable it for a true held-out test.
-- The ERA5 diffusion config uses robust condition normalization and min–max target normalization, unlike basic presets.
-- DDPM and 100-step DDIM have very different validation cost.
-- The residual baseline predicts in physical m/s; normalized diffusion losses are not directly comparable to residual Huber loss.
-- Two-GPU configs use per-device batch size 2, giving global batch size 4 before gradient accumulation.
+- Keep the export root and split policy constant across models.
+- Checked-in presets use `include_test_in_train: true`; set it to `false` for a true held-out test.
+- Stage 2 must use the exact Stage 1 checkpoint named by `model.residual.baseline.checkpoint_path` or `GEO2WF_BASELINE_CKPT`.
+- Residual models predict in physical m/s; their losses are not numerically comparable with normalized absolute-diffusion noise MSE.
+- DDPM and 100-step DDIM have very different validation costs.
+- Compare Stage 2 against its own frozen baseline using `baseline_mae_ms` and `mae_skill_vs_baseline`.
+- For probabilistic refinement, inspect individual members as well as CRPS, spread, diversity, and the ensemble mean.
 
-Continue to the [configuration guide](configuration.md) before changing channel counts or resume behavior.
+Continue to the [configuration guide](configuration.md), then [training and checkpoints](training.md).

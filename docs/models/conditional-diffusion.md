@@ -1,4 +1,4 @@
-# Conditional diffusion
+# Standalone conditional diffusion
 
 `PixelDiffusionConditional` wraps `DenoisingDiffusionConditionalProcess` with Lightning training, evaluation, logging, EMA, and deterministic validation latents.
 

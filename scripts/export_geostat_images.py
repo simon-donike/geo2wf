@@ -9,6 +9,7 @@ from PIL import Image
 
 GEOSTAT_SCALE_MIN_K = 190.0
 GEOSTAT_SCALE_MAX_K = 292.0
+GEOSTAT_IMAGE_SIZE = 256
 
 
 def export_geostat_image(observation_id, bundle, output_dir: Path):
@@ -28,7 +29,10 @@ def export_geostat_image(observation_id, bundle, output_dir: Path):
     rgb = white + scaled[..., None] * (blue - white)
     rgb[~valid] = white
 
-    image = Image.fromarray(rgb.astype(np.uint8))
+    image = Image.fromarray(rgb.astype(np.uint8)).resize(
+        (GEOSTAT_IMAGE_SIZE, GEOSTAT_IMAGE_SIZE),
+        resample=Image.Resampling.LANCZOS,
+    )
     filename = re.sub(r"[^a-zA-Z0-9_-]+", "_", observation_id) + ".webp"
     image.save(output_dir / filename, "WEBP", lossless=True, method=6)
     lat, lon = bundle["grid_lat"].numpy(), bundle["grid_lon"].numpy()
@@ -40,5 +44,5 @@ def export_geostat_image(observation_id, bundle, output_dir: Path):
         ],
         "kind": "Geostationary",
         "channel": "CMI_C15",
-        "size": 128,
+        "size": GEOSTAT_IMAGE_SIZE,
     }
