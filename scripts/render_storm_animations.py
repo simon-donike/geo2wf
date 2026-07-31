@@ -35,7 +35,8 @@ from src.ERA5Residual import ERA5ResidualRegressor
 
 OUTPUT_DIR = ROOT / "docs" / "assets" / "images"
 STORMS = ("AL082025", "EP112025")
-FPS = 36  # 360 source images / 36 fps = exactly ten seconds.
+FRAME_STEP = 2
+FRAME_DURATION_MS = 40  # 180 selected frames / 25 fps = 7.2 seconds.
 SIZE = 256
 
 
@@ -63,8 +64,8 @@ def _prediction_frame(field: np.ndarray, valid: np.ndarray, label: str, vmin: fl
     value = np.clip((field - vmin) / (vmax - vmin), 0, 1)
     red, yellow, green = np.array([215, 48, 39]), np.array([255, 235, 59]), np.array([26, 150, 65])
     rgb = np.full((*field.shape, 3), 255, dtype=np.uint8)
-    lower = red + (value[..., None] * 2) * (yellow - red)
-    upper = yellow + ((value[..., None] - 0.5) * 2) * (green - yellow)
+    lower = green + (value[..., None] * 2) * (yellow - green)
+    upper = yellow + ((value[..., None] - 0.5) * 2) * (red - yellow)
     ramp = np.where((value <= 0.5)[..., None], lower, upper).astype(np.uint8)
     rgb[valid] = ramp[valid]
     return np.asarray(_caption(Image.fromarray(rgb).resize((SIZE, SIZE), Image.Resampling.LANCZOS), label))
@@ -110,12 +111,13 @@ def main() -> None:
         smoothed.append(np.divide(weighted.sum(axis=0), total, out=np.zeros_like(field), where=total > 0))
     valid_values = np.concatenate([field[mask] for field, mask in zip(smoothed, masks)])
     vmin, vmax = np.percentile(valid_values, [0.5, 99.5])
-    prediction_frames = [_prediction_frame(field, mask, label, float(vmin), float(vmax)) for field, mask, label in zip(smoothed, masks, labels)]
+    geo_frames = geo_frames[::FRAME_STEP]
+    prediction_frames = [_prediction_frame(field, mask, label, float(vmin), float(vmax)) for field, mask, label in zip(smoothed[::FRAME_STEP], masks[::FRAME_STEP], labels[::FRAME_STEP])]
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    imageio.mimsave(OUTPUT_DIR / "all-cmi-c15.gif", geo_frames, format="GIF", duration=1 / FPS, loop=0, palettesize=256, subrectangles=True)
-    imageio.mimsave(OUTPUT_DIR / "all-model-b-predictions.gif", prediction_frames, format="GIF", duration=1 / FPS, loop=0, palettesize=256, subrectangles=True)
-    print(f"Rendered {len(labels)} frames at {FPS} fps (10.0 s); Model B scale: {vmin:.2f}–{vmax:.2f} m/s")
+    imageio.mimsave(OUTPUT_DIR / "all-cmi-c15.gif", geo_frames, format="GIF", duration=FRAME_DURATION_MS, loop=0, palettesize=256, subrectangles=True)
+    imageio.mimsave(OUTPUT_DIR / "all-model-b-predictions.gif", prediction_frames, format="GIF", duration=FRAME_DURATION_MS, loop=0, palettesize=256, subrectangles=True)
+    print(f"Rendered {len(geo_frames)} frames (7.2 s); Model B scale: {vmin:.2f}–{vmax:.2f} m/s")
 
 
 if __name__ == "__main__":

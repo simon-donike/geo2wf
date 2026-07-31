@@ -279,6 +279,9 @@ def initialize_run_manifest(
         "include_test_in_train": bool(
             config.get("data", {}).get("include_test_in_train", False)
         ),
+        "wandb_project": os.environ.get("WANDB_PROJECT"),
+        "wandb_run_group": os.environ.get("WANDB_RUN_GROUP"),
+        "wandb_mode": os.environ.get("WANDB_MODE"),
         "result_path": str((run_dir / "result.json").resolve()),
         "metric_history_path": str((run_dir / "metric-history.jsonl").resolve()),
         "csv_metrics_dir": str((run_dir / "metrics").resolve()),
