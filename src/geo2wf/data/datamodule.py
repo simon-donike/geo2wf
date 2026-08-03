@@ -18,7 +18,8 @@ import torch
 from pytorch_lightning.utilities.rank_zero import rank_zero_info
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Sampler, Subset
 
-from .dataset import DEFAULT_ROBUST_CLIP, PairedImageDataset
+from .collation import collate_wind_field_samples
+from .datasets.paired_geotiff import DEFAULT_ROBUST_CLIP, PairedImageDataset
 
 
 class PairedDataModule(pl.LightningDataModule):
@@ -124,6 +125,13 @@ class PairedDataModule(pl.LightningDataModule):
         self.val_dataset: Optional[PairedImageDataset] = None
         self.test_dataset: Optional[PairedImageDataset] = None
 
+    @property
+    def data_spec(self):
+        """Return the assembled validation-data contract."""
+        if self.val_dataset is None:
+            self.setup("fit")
+        return self.val_dataset.data_spec
+
     @classmethod
     def from_config(cls, config: dict) -> "PairedDataModule":
         data_cfg = config.get("data", {})
@@ -161,9 +169,7 @@ class PairedDataModule(pl.LightningDataModule):
                 if data_cfg.get("max_pmw_time_gap_hours") is not None
                 else None
             ),
-            pmw_include_time_offset=data_cfg.get(
-                "pmw_include_time_offset", False
-            ),
+            pmw_include_time_offset=data_cfg.get("pmw_include_time_offset", False),
             include_ibtracs=data_cfg.get("include_ibtracs", False),
             normalization=data_cfg.get("normalization"),
             target_normalization=data_cfg.get("target_normalization"),
@@ -271,6 +277,7 @@ class PairedDataModule(pl.LightningDataModule):
             sampler=sampler,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=collate_wind_field_samples,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
 
@@ -283,6 +290,7 @@ class PairedDataModule(pl.LightningDataModule):
             "batch_size": self.batch_size,
             "num_workers": self.num_workers,
             "pin_memory": self.pin_memory,
+            "collate_fn": collate_wind_field_samples,
             "persistent_workers": self.persistent_workers and self.num_workers > 0,
         }
         return [
@@ -310,6 +318,7 @@ class PairedDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=collate_wind_field_samples,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
 

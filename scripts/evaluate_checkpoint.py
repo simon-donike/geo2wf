@@ -17,8 +17,10 @@ if str(ROOT) not in sys.path:
 import pytorch_lightning as pl
 import torch
 
-from data import PairedDataModule
-from train import build_model, load_config, resolve_runtime_config
+from geo2wf.data.datamodule import PairedDataModule
+from geo2wf.config import instantiate_datamodule
+from geo2wf.inference import CheckpointLoader
+from geo2wf.training import build_model, load_config, resolve_runtime_config
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,12 +83,12 @@ def main() -> None:
     data["max_pmw_time_gap_hours"] = float(args.pmw_max_time_gap_hours)
     config = resolve_runtime_config(config)
 
-    datamodule = PairedDataModule.from_config(config)
+    datamodule = instantiate_datamodule(config)
     datamodule.setup("fit")
     validation_loader = datamodule.val_dataloader()[0]
-    model = build_model(config)
-    checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
-    model.load_state_dict(checkpoint["state_dict"], strict=True)
+    model = CheckpointLoader.load(
+        config, args.checkpoint, legacy_factory=build_model, strict=True
+    )
     trainer = pl.Trainer(
         accelerator=args.accelerator,
         devices=args.device,

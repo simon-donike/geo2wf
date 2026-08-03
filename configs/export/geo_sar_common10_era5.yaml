@@ -1,0 +1,6 @@
+data_root: ${oc.env:GEO2WF_SOURCE_DATA_ROOT}
+output_root: data/geotiff/geo_sar_10bands_era5
+geo_channel_set: common10
+include_era5: true
+grid_size: 256
+grid_resolution: 0.027

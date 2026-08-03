@@ -1,0 +1,100 @@
+# Modular package architecture
+
+The installable `geo2wf` package under `src/geo2wf/` is the source of truth.
+Root scripts, the old `data` package, CamelCase model modules, and the original
+diffusion paths are compatibility adapters only.
+
+## Package ownership
+
+| Package | Responsibility |
+|---|---|
+| `geo2wf.cli` | thin train, evaluate, infer, and export entry points |
+| `geo2wf.config` | Hydra composition, local environment loading, schemas, legacy loading |
+| `geo2wf.data` | contracts, collation, data module, datasets, raster I/O, features, normalization, augmentation, sampling |
+| `geo2wf.models` | Lightning modules and model-specific networks/objectives/transforms |
+| `geo2wf.diffusion` | forward process, schedules, samplers, and reusable backbone |
+| `geo2wf.objectives` | reusable masked loss primitives |
+| `geo2wf.metrics` | physical and storm tensor calculations |
+| `geo2wf.visualization` | plotting functions returning Matplotlib figures |
+| `geo2wf.tracking` | callbacks, reconstruction media adaptation, CSV/W&B run records |
+| `geo2wf.evaluation` | shared prediction evaluation |
+| `geo2wf.inference` | strict checkpoint loading and unified physical prediction service |
+| `geo2wf.preprocessing` | source/feature logic reusable by export and raw inference |
+
+A model package may import shared contracts, objectives, metrics, and diffusion
+components. It must not import raster I/O, a concrete dataset, CLI code, W&B, or
+Matplotlib.
+
+## Configuration-driven construction
+
+```text
+configs/modular.yaml
+  ├── data/<choice>.yaml       -> local data _target_
+  ├── model/<choice>.yaml      -> local model _target_
+  ├── trainer/<choice>.yaml
+  ├── logging/<choice>.yaml
+  └── experiment/<choice>.yaml (optional overrides)
+```
+
+```bash
+uv run geo2wf-train model=deterministic_residual
+uv run geo2wf-train model=residual_diffusion trainer.devices=2
+```
+
+Available choices are discoverable from filenames. Experiments contain only
+focused overrides; they do not copy complete model/data/trainer configurations.
+The resolved result is saved in every run directory.
+
+## Model extension contract
+
+A modular model subclasses `WindFieldLightningModule` and implements:
+
+```python
+def compute_training_objective(batch: WindFieldBatch) -> LossOutput: ...
+
+def predict_batch(
+    batch: WindFieldBatch,
+    request: PredictionRequest,
+) -> PredictionBatch: ...
+```
+
+It also implements `configure_optimizers()` or returns an optimizer through its
+normal Lightning mechanism. `validate_data_spec()` can be overridden for
+companion, target, unit, or shape requirements; the default checks the declared
+condition-channel count.
+
+The shared base validates required batch keys, logs standardized training loss
+and objective components, exposes Lightning prediction through the common
+request, and writes versioned metadata into new checkpoints.
+
+## Prediction contract
+
+`PredictionBatch.samples_physical` always has shape `[B, E, C, H, W]`.
+`central_physical` has `[B, C, H, W]`; `baseline_physical` is optional.
+Deterministic models use `E=1`. This removes deterministic/diffusion branches
+from downstream metrics and serialization.
+
+`CheckpointLoader` uses the config's `_target_`, strict-loads the state dict,
+and supports a legacy factory for old full YAML. `PredictionService` adapts
+both new `predict_batch()` models and compatible older prediction methods.
+
+## Tracking and visualization boundary
+
+Models log scalars and route reconstruction payloads through the tracking layer.
+Plotting functions accept structured data and return figures without knowing
+about Lightning or W&B. The tracking adapter owns optional imports, and the
+callback supports standardized queued events. The
+W&B-specific import is kept in the tracking layer; CSV metrics and
+machine-readable manifests remain independent.
+
+## Command migration status
+
+- `geo2wf-train` natively composes Hydra groups.
+- `geo2wf-evaluate`, `geo2wf-infer`, and `geo2wf-export` are canonical installed
+  entry points over maintained workflows, retaining their existing argparse and
+  full-YAML options during staged migration.
+- Root scripts and legacy imports forward to the same source implementation and
+  remain supported with deprecation warnings.
+
+See [Configuration](../experiments/configuration.md), [Commands](../reference/commands.md),
+and [Adding components](../reference/adding-components.md).

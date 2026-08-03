@@ -16,11 +16,10 @@ Config invariants:
 
 ```yaml
 model:
-  in_channels: 24       # prepared condition width
-  out_channels: 1       # generated target width
-  unet:
-    channels: 25        # in_channels + out_channels
-    out_dim: 1          # out_channels
+  condition_channels: 24  # prepared condition width
+  generated_channels: 1   # generated target width
+  model_channels: 25       # condition_channels + generated_channels
+  model_out_dim: 1         # generated_channels
 ```
 
 ## Backbone

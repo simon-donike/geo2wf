@@ -1,18 +1,18 @@
 # Export GEO–SAR pairs
 
-`scripts/export_geo_sar_geotiffs.py` turns the larger observation manifest and source files into colocated GEO conditions and SAR wind targets.
+`geo2wf-export geo-sar` turns the larger observation manifest and source files into colocated GEO conditions and SAR wind targets.
 
 ## Basic export
 
 ```bash
-uv run python scripts/export_geo_sar_geotiffs.py \
+uv run geo2wf-export geo-sar \
   --config configs/config.yaml
 ```
 
 The `export` section supplies defaults; explicit CLI flags take precedence. For a safe structural check:
 
 ```bash
-uv run python scripts/export_geo_sar_geotiffs.py \
+uv run geo2wf-export geo-sar \
   --config configs/config.yaml \
   --limit 2
 ```
@@ -36,7 +36,7 @@ Failures caused by missing channels, file I/O, or invalid geometry are recorded 
 ## ERA5-enriched export
 
 ```bash
-uv run python scripts/export_geo_sar_geotiffs.py \
+uv run geo2wf-export geo-sar \
   --config configs/config_geo_sar_10bands_era5.yaml
 ```
 
@@ -45,7 +45,7 @@ The configured seven source fields are precipitable water, sea-surface temperatu
 An ERA5 record is rejected when its nearest-time gap exceeds 3.1 hours in the ERA5 presets. The runtime dataset applies the same guard, protecting against stale legacy manifests.
 
 !!! note "Legacy ERA5 exports"
-    Existing seven-band exports remain loadable. At runtime the dataset derives wind speed and vorticity; older nearest-neighbor products receive a target-scaled speed and a neutral vorticity fallback as described in the repository README. Re-export for bilinear fields and robust median/IQR statistics.
+    Existing seven-band exports remain loadable. At runtime the dataset derives wind speed and vorticity; older nearest-neighbor products receive a target-scaled speed and a neutral vorticity fallback as described in [Normalization & masks](normalization.md). Re-export for bilinear fields and robust median/IQR statistics.
 
 ## Important export keys
 

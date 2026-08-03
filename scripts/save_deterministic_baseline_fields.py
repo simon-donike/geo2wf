@@ -50,7 +50,7 @@ from scripts.run_storm_diffusion_inference import (  # noqa: E402
     _center_crop,
     _normalize,
 )
-from train import build_model, resolve_runtime_config  # noqa: E402
+from geo2wf.training import build_model, resolve_runtime_config  # noqa: E402
 from scripts.pmw_conditioning import (
     nearest_supported_pmw,
     pmw_audit_row,
@@ -58,7 +58,10 @@ from scripts.pmw_conditioning import (
     prepare_pmw_condition_features,
     supported_pmw_by_storm,
 )
-from data.dataset import _normalized_distance_to_center, _solar_time_features  # noqa: E402
+from geo2wf.data.features import (
+    normalized_distance_to_center as _normalized_distance_to_center,
+    solar_time_features as _solar_time_features,
+)  # noqa: E402
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
 DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_anna"
@@ -138,7 +141,34 @@ def _prepare_sample(geo, era5_dataset: xr.Dataset, stats: dict):
     grid_lat, grid_lon = _make_grid(
         geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
     )
-    geo_channels = list({"abi": ["CMI_C07", "CMI_C08", "CMI_C09", "CMI_C10", "CMI_C11", "CMI_C12", "CMI_C13", "CMI_C14", "CMI_C15", "CMI_C16"], "ahi": ["B07", "B08", "B09", "B10", "B11", "B12", "B13", "B14", "B15", "B16"]}[geo.sensor.lower()])
+    geo_channels = list(
+        {
+            "abi": [
+                "CMI_C07",
+                "CMI_C08",
+                "CMI_C09",
+                "CMI_C10",
+                "CMI_C11",
+                "CMI_C12",
+                "CMI_C13",
+                "CMI_C14",
+                "CMI_C15",
+                "CMI_C16",
+            ],
+            "ahi": [
+                "B07",
+                "B08",
+                "B09",
+                "B10",
+                "B11",
+                "B12",
+                "B13",
+                "B14",
+                "B15",
+                "B16",
+            ],
+        }[geo.sensor.lower()]
+    )
     geo_fields = _load_geo_channels(geo, geo_channels)
     geo_regridded = [
         _regrid(*geo_fields[channel], grid_lat, grid_lon) for channel in geo_channels
@@ -165,7 +195,12 @@ def _prepare_sample(geo, era5_dataset: xr.Dataset, stats: dict):
     wind_index = era5_channels.index("wind_speed_10m")
     era5_wind_physical = era5_tensor[wind_index : wind_index + 1].clone()
     geo_tensor = _normalize(
-        geo_tensor, "geo", geo_channels, stats, normalization="robust-zscore", robust_clip=ROBUST_CLIP
+        geo_tensor,
+        "geo",
+        geo_channels,
+        stats,
+        normalization="robust-zscore",
+        robust_clip=ROBUST_CLIP,
     )
     era5_tensor = _normalize(
         era5_tensor,
@@ -205,7 +240,9 @@ def main() -> None:
     for path in (args.config, args.checkpoint, args.manifest):
         if not path.is_file():
             raise FileNotFoundError(path)
-    config = resolve_runtime_config(yaml.safe_load(args.config.read_text(encoding="utf-8")))
+    config = resolve_runtime_config(
+        yaml.safe_load(args.config.read_text(encoding="utf-8"))
+    )
     stats_path = args.stats or Path(config["data"]["stats_file"])
     if not stats_path.is_file():
         raise FileNotFoundError(stats_path)
@@ -215,7 +252,9 @@ def main() -> None:
     era5_by_storm = {}
     for storm in args.storms:
         record = next(
-            item for item in records if item.storm_id == storm and item.source_type == "era5"
+            item
+            for item in records
+            if item.storm_id == storm and item.source_type == "era5"
         )
         with xr.open_dataset(
             record.path, group="rectilinear", engine="h5netcdf", decode_times=True
@@ -233,7 +272,9 @@ def main() -> None:
     counts = {}
     with torch.inference_mode():
         for storm in args.storms:
-            reference = pd.read_csv(args.reference_root / storm / "inference-summary.csv")
+            reference = pd.read_csv(
+                args.reference_root / storm / "inference-summary.csv"
+            )
             if args.limit is not None:
                 reference = reference.head(args.limit).copy()
             storm_dir = output_root / storm / "baseline-fields"
@@ -260,24 +301,45 @@ def main() -> None:
                         )
                         if status != "matched":
                             audit_rows.append(
-                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                                pmw_audit_row(
+                                    geo,
+                                    selected_pmw,
+                                    selected_gap,
+                                    "skipped",
+                                    reason=status,
+                                )
                             )
                             continue
                     sample = _prepare_sample(geo, era5_by_storm[storm], stats)
                     if pmw_enabled:
                         grid_lat, grid_lon = _make_grid(
-                            geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
+                            geo.center[0],
+                            geo.center[1],
+                            GRID_SIZE,
+                            GRID_RESOLUTION_DEGREES,
                         )
                         try:
-                            pmw_features, _, selected_gap = prepare_pmw_condition_features(
-                                geo, selected_pmw, grid_lat, grid_lon, stats,
-                                max_time_gap_hours=pmw_max_gap_hours,
-                                include_time_offset=pmw_include_offset,
-                                crop_size=CROP_SIZE,
+                            pmw_features, _, selected_gap = (
+                                prepare_pmw_condition_features(
+                                    geo,
+                                    selected_pmw,
+                                    grid_lat,
+                                    grid_lon,
+                                    stats,
+                                    max_time_gap_hours=pmw_max_gap_hours,
+                                    include_time_offset=pmw_include_offset,
+                                    crop_size=CROP_SIZE,
+                                )
                             )
                         except (KeyError, OSError, ValueError) as error:
                             audit_rows.append(
-                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                                pmw_audit_row(
+                                    geo,
+                                    selected_pmw,
+                                    selected_gap,
+                                    "skipped",
+                                    reason=str(error),
+                                )
                             )
                             continue
                         sample[0]["condition"] = torch.cat(
@@ -293,7 +355,9 @@ def main() -> None:
                     continue
                 matched_count += len(chunk)
                 batch = {
-                    key: torch.cat([item[0][key] for item in prepared], dim=0).to(args.device)
+                    key: torch.cat([item[0][key] for item in prepared], dim=0).to(
+                        args.device
+                    )
                     for key in prepared[0][0]
                 }
                 baseline = model.predict_physical(batch).detach().float().cpu()
@@ -305,17 +369,23 @@ def main() -> None:
                     np.savez_compressed(
                         path,
                         observation_id=np.asarray(observation_id),
-                        baseline_field_ms=baseline[index, 0].numpy().astype(np.float32, copy=False),
+                        baseline_field_ms=baseline[index, 0]
+                        .numpy()
+                        .astype(np.float32, copy=False),
                         valid_mask=valid[index].numpy().astype(np.uint8, copy=False),
                     )
                     rows.append(
                         {
                             "storm_id": storm,
                             "observation_id": observation_id,
-                            "observation_timestamp": getattr(row, "observation_timestamp", None),
+                            "observation_timestamp": getattr(
+                                row, "observation_timestamp", None
+                            ),
                             "npz_path": str(path.relative_to(output_root)),
                             "baseline_array": "baseline_field_ms",
-                            "shape": "x".join(str(value) for value in baseline[index, 0].shape),
+                            "shape": "x".join(
+                                str(value) for value in baseline[index, 0].shape
+                            ),
                             "dtype": "float32",
                         }
                     )
@@ -331,12 +401,18 @@ def main() -> None:
         "completed_utc": datetime.now(timezone.utc).isoformat(),
         "storms": list(args.storms),
         "records_by_storm": counts,
-        "checkpoint": {"path": str(args.checkpoint.resolve()), "sha256": _sha256(args.checkpoint)},
+        "checkpoint": {
+            "path": str(args.checkpoint.resolve()),
+            "sha256": _sha256(args.checkpoint),
+        },
         "config": str(args.config.resolve()),
         "manifest": str(args.manifest.resolve()),
         "device": str(args.device),
         "include_test_in_train": config.get("data", {}).get("include_test_in_train"),
-        "outputs": {"manifest": "baseline-fields-manifest.csv", "fields": "<storm>/baseline-fields/<observation>.npz"},
+        "outputs": {
+            "manifest": "baseline-fields-manifest.csv",
+            "fields": "<storm>/baseline-fields/<observation>.npz",
+        },
     }
     (output_root / "run-metadata.json").write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"

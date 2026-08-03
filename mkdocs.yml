@@ -41,6 +41,7 @@ nav:
   - Core workflow:
       - Two-stage baseline + diffusion: models/two-stage.md
       - System architecture: concepts/architecture.md
+      - Modular package architecture: concepts/modular-architecture.md
       - The reconstruction problem: concepts/problem.md
       - Diffusion in one page: concepts/diffusion-primer.md
   - Data:
@@ -72,6 +73,7 @@ nav:
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:
       - Project map: reference/index.md
+      - Adding models, datasets, and metrics: reference/adding-components.md
       - Configuration reference: reference/configuration.md
       - Commands & environment: reference/commands.md
       - Troubleshooting: reference/troubleshooting.md

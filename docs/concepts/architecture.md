@@ -1,93 +1,108 @@
 # System architecture
 
-The system has three boundaries: one-time geospatial export, runtime tensor assembly, and the two-stage model stack.
+The system separates one-time geospatial export, runtime tensor assembly, model
+semantics, and shared lifecycle services.
 
 ```mermaid
 flowchart TB
   subgraph Offline[One-time export]
-    M[Observation manifest] --> P[Pair by storm, split, and time]
-    S[GEO / SAR / ERA5 files] --> P
-    P --> G[Shared EPSG:4326 grid]
-    G --> T[Raw GeoTIFFs + masks]
-    T --> C[manifest.csv + stats.json]
+    M[Observation manifest + source files] --> P[Pair and regrid]
+    P --> T[GeoTIFFs + masks + manifests + stats]
   end
-
-  subgraph Runtime[Runtime data]
-    C --> D[PairedImageDataset]
-    D --> N[Normalize + derive geometry and solar fields]
+  subgraph Runtime[Shared runtime]
+    T --> D[Dataset and feature assembly]
+    D --> C[WindFieldBatch + DataSpec]
+    C --> V[Preflight compatibility validation]
   end
-
-  subgraph Stack[Main model stack]
-    N --> B[Stage 1 deterministic baseline]
-    B --> F[Frozen baseline field]
-    N --> R[Stage 2 residual diffusion]
-    F --> R
-    R --> O[Baseline + sampled residual]
+  subgraph Models[Swappable model package]
+    V --> O[Training objective]
+    V --> R[Physical prediction]
   end
-
-  O --> W[Metrics + W&B images]
-  O --> K[Checkpoints]
+  R --> PB[PredictionBatch]
+  PB --> E[Metrics / evaluation]
+  PB --> F[Pure figures]
+  F --> L[Tracking callback]
+  E --> S[JSON / CSV / W&B]
 ```
 
-## The model handoff
+## Composition root
 
-Stage 1 and Stage 2 see the same normalized observation/context condition, but their outputs and objectives differ:
+`geo2wf-train` composes `configs/modular.yaml` and the selected groups. Data and
+model configs instantiate their own `_target_` values, so the runtime does not
+choose models with an `if model.type` registry.
 
-| | Stage 1 | Stage 2 |
-|---|---|---|
-| Input added by the model | ERA5 wind + mask | frozen Stage 1 field + mask + noisy residual |
-| Predicted variable | deterministic correction in m/s | diffusion noise for a transformed signed residual |
-| Physical output | ERA5 + learned correction | Stage 1 baseline + sampled correction |
-| Trainable during Stage 2 | no | yes |
-
-See [Two-stage baseline + diffusion](../models/two-stage.md) for the complete equations and channel counts.
-
-## Entry point: `train.py`
-
-The entry point:
-
-1. loads one YAML file and establishes numeric precision;
-2. creates one timestamped run directory reused by DDP child processes;
-3. builds the data module and dispatches on `model.type`; and
-4. configures the Lightning trainer, W&B logger, scheduler, and checkpoints.
-
-Relevant model types are:
-
-```yaml
-model:
-  type: deterministic_residual  # Stage 1
+```bash
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
 ```
 
-and:
-
-```yaml
-model:
-  type: diffusion_residual      # Stage 2
-```
+The startup path creates a run directory, stores the resolved config and source
+provenance, seeds workers, instantiates data/model components, validates
+`DataSpec`, and then configures Lightning, CSV logging, optional W&B, media
+callbacks, and checkpoints.
 
 ## Layer responsibilities
 
-| Layer | Owns | Does not own |
+| Layer | Owns | Must not own |
 |---|---|---|
-| Exporter | pairing, grid construction, regridding, GeoTIFF masks/tags, train stats | tensor normalization or batching |
-| Dataset | raster reads, derived channels, normalization, crop, augmentation, metadata | split shuffling or device placement |
-| DataModule | split construction and DataLoaders | scientific transforms |
-| Stage 1 module | physical residual loss, dense baseline, baseline metrics | raster I/O |
-| Stage 2 module | residual transform, denoising loss, sampling, ensemble metrics | training the frozen baseline |
+| Export/preprocessing | pairing, grids, regridding, source reads, GeoTIFF tags, statistics | model construction |
+| Dataset | manifest selection, raster reads, normalization, features, crop, augmentation | model-specific channel concatenation |
+| DataModule | split datasets, samplers, loaders, canonical collation, `DataSpec` | scientific prediction logic |
+| Model package | network, objective composition, transforms, sampling behavior | raster I/O, concrete datasets, CLI, W&B, Matplotlib |
+| Shared model base | batch validation, standardized training/predict extension contract, checkpoint metadata | architecture dispatch |
+| Metrics/evaluation | physical prediction calculations and serialization | W&B media |
+| Visualization | pure structured-input-to-`Figure` rendering | Trainer or logger access |
+| Tracking | CSV/W&B adapters, media callback, run manifest | scientific model behavior |
 | Trainer | epochs, devices, precision, DDP, callbacks | experiment semantics |
 
-## Validation has two views
+## Two-stage handoff
 
-`PairedDataModule.val_dataloader()` returns a storm-stratified validation loader and a small fixed training prefix used only for qualitative reconstruction logging. The model excludes that qualitative loader from validation loss.
+Stage 1 produces a deterministic physical field around ERA5. Stage 2 loads that
+checkpoint as a frozen child and samples signed residuals around the exact field:
+
+```text
+Stage 1: baseline = ERA5 + learned correction
+Stage 2: wind member = baseline + sampled residual
+```
+
+Both consume the same `WindFieldBatch` and expose a `PredictionBatch`.
+Deterministic output uses shape `[B, 1, C, H, W]`; diffusion uses
+`[B, ensemble, C, H, W]`.
+
+## Shared data and prediction contracts
+
+`WindFieldBatch`
+: Required tensors, masks, normalization transform, geometry, identifiers, and
+  sample-oriented metadata, plus documented optional companions.
+
+`DataSpec`
+: Ordered channel names, target channels/units, spatial shape, and companion
+  capabilities used for preflight rejection.
+
+`PredictionRequest`
+: Ensemble size, seed, and model-specific overrides.
+
+`PredictionBatch`
+: All physical members, one central physical prediction, and an optional
+  physical baseline.
 
 ## Run directory
 
 ```text
-<default_root_dir>/<YYYYMMDD-HHMMSS>_<config-name>/
+<default_root_dir>/<timestamp>_modular/
 ├── checkpoints/
+├── metrics/metrics.csv
+├── resolved-config.yaml
+├── run-manifest.json
+├── source-diff.patch
+├── source-snapshot/
 └── wandb/
-    ├── cache/
-    └── config/
 ```
 
-Continue with [model inputs](../data/index.md), the [two-stage workflow](../models/two-stage.md), or [training and checkpoints](../experiments/training.md).
+DDP children inherit `GEO2WF_RUN_DIR` and reuse the parent directory. Metrics
+are reduced before epoch values are formed; reconstruction seeds derive from
+stable sample identifiers rather than process rank.
+
+Continue with [modular package ownership](modular-architecture.md), the
+[dataset contract](../data/dataset-contract.md), or [training](../experiments/training.md).

@@ -29,11 +29,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from data.dataset import (  # noqa: E402
-    _normalize,
-    _normalized_distance_to_center,
-    _solar_time_features,
+from geo2wf.data.features import (  # noqa: E402
+    normalized_distance_to_center as _normalized_distance_to_center,
+    solar_time_features as _solar_time_features,
 )
+from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
     GEO_CHANNEL_SETS,
@@ -47,7 +47,7 @@ from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     _regrid,
     _regrid_continuous,
 )
-from src.ERA5Residual import ERA5ResidualRegressor  # noqa: E402
+from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
 from scripts.pmw_conditioning import (
     nearest_supported_pmw,
     pmw_audit_row,
@@ -55,7 +55,7 @@ from scripts.pmw_conditioning import (
     prepare_pmw_condition_features,
     supported_pmw_by_storm,
 )
-from train import build_model, resolve_runtime_config
+from geo2wf.training import build_model, resolve_runtime_config
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
 DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_anna"
@@ -886,24 +886,45 @@ def main() -> None:
                         )
                         if status != "matched":
                             audit_rows.append(
-                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                                pmw_audit_row(
+                                    geo,
+                                    selected_pmw,
+                                    selected_gap,
+                                    "skipped",
+                                    reason=status,
+                                )
                             )
                             continue
                     sample = _prepare_sample(geo, era5_by_storm[storm], stats)
                     if pmw_enabled:
                         grid_lat, grid_lon = _make_grid(
-                            geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
+                            geo.center[0],
+                            geo.center[1],
+                            GRID_SIZE,
+                            GRID_RESOLUTION_DEGREES,
                         )
                         try:
-                            pmw_features, _, selected_gap = prepare_pmw_condition_features(
-                                geo, selected_pmw, grid_lat, grid_lon, stats,
-                                max_time_gap_hours=pmw_max_gap_hours,
-                                include_time_offset=pmw_include_offset,
-                                crop_size=CROP_SIZE,
+                            pmw_features, _, selected_gap = (
+                                prepare_pmw_condition_features(
+                                    geo,
+                                    selected_pmw,
+                                    grid_lat,
+                                    grid_lon,
+                                    stats,
+                                    max_time_gap_hours=pmw_max_gap_hours,
+                                    include_time_offset=pmw_include_offset,
+                                    crop_size=CROP_SIZE,
+                                )
                             )
                         except (KeyError, OSError, ValueError) as error:
                             audit_rows.append(
-                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                                pmw_audit_row(
+                                    geo,
+                                    selected_pmw,
+                                    selected_gap,
+                                    "skipped",
+                                    reason=str(error),
+                                )
                             )
                             continue
                         sample[0]["condition"] = torch.cat(
@@ -1102,7 +1123,9 @@ def main() -> None:
                         pd.DataFrame(audit_rows),
                         state["storm_dir"] / "pmw-inference-audit.csv",
                     )
-                output_table = reference_table.iloc[matched_indices].copy().reset_index(drop=True)
+                output_table = (
+                    reference_table.iloc[matched_indices].copy().reset_index(drop=True)
+                )
                 output_table["original_input_path"] = state["local_paths"]
                 if state["summary_rows"]:
                     for column in state["summary_rows"][0]:
