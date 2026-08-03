@@ -81,6 +81,7 @@ db.sqlite3-journal
 # image paths
 docs/explorer/sar/*
 docs/explorer/geo/*
+docs/explorer/pmw/*
 
 # Flask stuff:
 instance/
