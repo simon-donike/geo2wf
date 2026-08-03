@@ -17,9 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from data import PairedDataModule  # noqa: E402
-from src.ERA5Residual import ERA5ResidualRegressor  # noqa: E402
-from train import load_config  # noqa: E402
+from geo2wf.data.datamodule import PairedDataModule  # noqa: E402
+from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
+from geo2wf.training import load_config  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

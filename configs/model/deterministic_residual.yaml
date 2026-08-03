@@ -1,0 +1,35 @@
+_target_: geo2wf.models.deterministic_residual.ERA5ResidualRegressor
+condition_channels: 23
+base_channels: 32
+channel_mults: [1, 2, 4, 8]
+huber_delta_ms: 2.0
+off_swath_anchor_weight: 0.05
+high_wind_threshold_ms: 17.0
+high_wind_weight_max: 8.0
+high_wind_weight_start_ms: 25.0
+high_wind_weight_full_ms: 50.0
+peak_loss_weight: 0.05
+peak_top_fraction: 0.005
+peak_min_pixels: 16
+peak_inner_core_radius_km: 100.0
+radial_profile_loss_weight: 0.0
+radial_profile_max_radius_km: 200.0
+radial_profile_bin_km: 10.0
+radial_profile_min_bin_pixels: 8
+exceedance_area_loss_weight: 0.0
+exceedance_area_thresholds_ms: [17.0, 33.0, 43.0]
+exceedance_area_temperature_ms: 2.0
+peak_structure_radial_weight: 0.25
+peak_structure_area_weight: 10.0
+prediction_min_ms: 0.0
+prediction_max_ms: null
+psnr_data_range_ms: 79.8
+lr: 0.0002
+weight_decay: 0.0001
+lr_scheduler_factor: 0.75
+lr_scheduler_patience: 100
+lr_scheduler_monitor: val/peak_structure_score
+lr_scheduler_cooldown: 5
+lr_scheduler_min_lr: 0.00002
+validation_reconstruction_batches: 1
+log_reconstruction_images: false

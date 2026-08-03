@@ -46,7 +46,7 @@ That explicit path makes the residual connection unambiguous: the deterministic 
 
 ## Storm geometry and solar context
 
-<span class="channel-count">4</span> These fields are generated in `data/dataset.py` after the rasters are read. They are deterministic functions of raster bounds, the manifest’s IBTrACS center, and the GEO timestamp.
+<span class="channel-count">4</span> These fields are generated in `geo2wf.data.features` after the rasters are read. They are deterministic functions of raster bounds, the manifest’s IBTrACS center, and the GEO timestamp.
 
 <figure class="modality-example">
   <a href="../assets/images/data-example-derived.webp"><img src="../assets/images/data-example-derived.webp" alt="Derived distance-to-center and three solar-time model input rasters"></a>

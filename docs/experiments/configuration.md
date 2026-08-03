@@ -1,85 +1,137 @@
 # Configuration guide
 
-One YAML file flows through exporter defaults, runtime data construction, model construction, optimization, trainer behavior, validation, and logging.
-
-## Section map
+Training composes small Hydra groups instead of copying one complete experiment
+file. `configs/modular.yaml` is the composition root:
 
 ```yaml
-seed: 42                    # reproducibility
-export: {}                  # one-time raster preparation
-data: {}                    # runtime dataset and loaders
-model: {}                   # architecture, diffusion, sampling
-optimization: {}            # optimizer, EMA, LR scheduler
-trainer: {}                 # Lightning runtime and checkpoints
-validation: {}              # reconstruction sampling controls
-logging:
-  wandb: {}                 # experiment tracking
+defaults:
+  - data: geo_sar_common10_era5
+  - model: deterministic_residual
+  - trainer: default
+  - logging: default
+  - optional experiment: null
+  - _self_
+
+seed: 42
 ```
 
-## Channel arithmetic
+## Groups and choices
 
-This is the most important invariant to preserve.
+A choice is the YAML filename without `.yaml`.
 
-=== "Diffusion"
+| Group | Checked-in choices | Owns |
+|---|---|---|
+| `data` | `geo_sar_common4`, `geo_sar_common10_era5` | export root, splits, normalization, companions, loader, sampling |
+| `model` | `conditional_diffusion`, `deterministic_residual`, `residual_diffusion`, `residual_diffusion_deterministic_baseline` | constructor, architecture, objective, optimizer, sampling |
+| `trainer` | `default` | devices, precision, loop bounds, checkpoint policy |
+| `logging` | `default` | optional W&B adapter |
+| `experiment` | `ablations/stage1_peak_aware` | focused cross-group overrides only |
 
-    ```yaml
-    model:
-      in_channels: 24       # 10 GEO + 9 ERA5 + distance + 3 solar + mask
-      out_channels: 1
-      unet:
-        channels: 25        # prepared condition + noisy target
-        out_dim: 1
-    ```
+List filenames below `configs/<group>/` to discover new choices. Each data and
+model config has a local `_target_`; adding one does not require a central
+runtime dispatch table.
 
-=== "Residual diffusion"
+## Select groups
 
-    ```yaml
-    model:
-      type: diffusion_residual
-      in_channels: 24       # prepared condition, including distance, solar, mask
-      out_channels: 1
-      unet:
-        channels: 27        # noisy residual + condition + baseline + mask
-        out_dim: 1
-    ```
+```bash
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
+```
 
-=== "Residual"
+Stage 2 selects the constructor that loads its baseline from the environment:
 
-    ```yaml
-    model:
-      type: deterministic_residual
-      condition_channels: 23  # 10 GEO + 9 ERA5 + distance + 3 solar; masks appended
-    ```
+```bash
+GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=residual_diffusion_deterministic_baseline
+```
 
-A mismatch fails at convolution or explicit input validation; it is not inferred from a batch.
+The ERA5-only residual-diffusion ablation uses `model=residual_diffusion`.
 
-## Export versus data
+## Override values
 
-`export.output_root` is where a future export writes. `data.root` is what training reads. They should normally match, but they are independent so training can point at an existing immutable export.
+Use dotted keys for one run:
 
-`TCD_DATA_ROOT` overrides source data discovery. Standard output-root environment overrides are recognized only for roots ending in the conventional `geo_sar`, `geo_sar_10bands`, `geo_pmw`, or `geo_pmw_10bands` names; custom ERA5 roots remain explicit.
+```bash
+uv run geo2wf-train \
+  model=deterministic_residual \
+  trainer.devices=2 \
+  trainer.strategy=ddp_find_unused_parameters_false \
+  data.loader.batch_size=2 \
+  logging.wandb.name=stage1-two-gpu
+```
 
-## Trainer values with special semantics
+Use `null`, booleans, lists, and strings with Hydra syntax. Quote shell-sensitive
+values. Unknown keys are rejected unless Hydra's explicit `+new.key=value`
+syntax is used; adding an unrecognized runtime key normally has no effect and
+should be avoided.
 
-`limit_val_batches`
-: An integer means that many batches. A float in `[0,1]` means a fraction. The CLI `--limit-val-batches` overrides YAML.
+## Channel compatibility
 
-`devices`
-: Passed directly to Lightning. `devices: 2` with `accelerator: auto` still requires an environment where Lightning can select two supported devices.
+`DataSpec` records ordered condition and target channels, spatial shape, units,
+and available companions. Training calls `model.validate_data_spec(...)`
+before the first batch. A mismatch therefore reports the model width and actual
+channel names during startup.
 
-`precision`
-: Basic multi-GPU presets use Lightning 1.9’s `16`; ERA5 experiments use 32-bit precision.
+The checked-in ERA5 data provides 23 data-condition channels:
 
-`enable_checkpointing`
-: Controls whether the callback is registered. The base configs turn it off; production configs turn it on.
+```text
+10 GEO + 9 ERA5 + distance + 3 solar = 23
+```
 
-## Checkpoint monitor precedence
+Model configs distinguish those data channels from masks, baselines, and noisy
+target channels appended internally. Do not copy channel values between model
+families without following their assembly description.
 
-`trainer.checkpoint.monitor` wins. Otherwise the model’s `checkpoint_monitor` is used, currently `val/eye_structure_score`. Filename, mode, top-k, and `save_last` also come from `trainer.checkpoint` with defaults.
+## Trainer and checkpoint semantics
 
-The LR scheduler monitor is independent under `optimization.reduce_lr_on_plateau.monitor`. Ensure the chosen metric is logged in every relevant validation epoch. Eye-structure score is emitted only when all required component metrics are available.
+`trainer.limit_train_batches` and `trainer.limit_val_batches`
+: An integer means that many batches. A float in `[0,1]` means a fraction.
 
-!!! warning "Bounded validation can hide the monitor"
-    If too few validation samples contain adequate eye/core coverage, `val/eye_structure_score` may not be produced. Increase reconstruction coverage or choose a reliably available monitor for early debugging.
+`trainer.devices`
+: Passed to Lightning. Requesting two devices still requires two usable devices.
 
-See [Configuration reference](../reference/configuration.md) for every key used by the checked-in presets.
+`trainer.checkpoint.monitor`
+: Overrides the model's `checkpoint_monitor`. When null, the model default is
+  used. The named metric must be logged during every eligible validation epoch.
+
+`trainer.default_root_dir`
+: Parent of timestamped run directories. It is not the final run directory.
+
+## Logging configuration
+
+```yaml
+logging:
+  wandb:
+    enabled: true
+    project: geo2wf
+    name: null
+    log_model: false
+```
+
+`WANDB_DISABLED=true` disables W&B construction regardless of config. CSV
+metrics, run manifests, resolved configuration, and checkpoints remain active.
+`WANDB_MODE=offline` retains local W&B artifacts for later synchronization.
+
+## Resolved configuration
+
+Every run writes `resolved-config.yaml` before training and records its absolute
+path in `run-manifest.json`. Environment-backed checkpoint paths are materialized
+there, making the actual run input inspectable.
+
+## Legacy full YAML files
+
+Existing files such as `configs/config_geo_sar_10bands_era5_residual.yaml` are
+still accepted:
+
+```bash
+uv run geo2wf-train \
+  --config configs/config_geo_sar_10bands_era5_residual.yaml
+```
+
+A full YAML file cannot be combined with Hydra overrides. Use the grouped
+configuration for new work. Legacy keys (`model.type`, `optimization`, and
+`validation`) are translated by the compatibility construction path and are
+documented in the [configuration reference](../reference/configuration.md#legacy-full-yaml-reference).

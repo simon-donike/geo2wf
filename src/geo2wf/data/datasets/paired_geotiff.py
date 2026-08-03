@@ -10,6 +10,7 @@ import rasterio
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+from geo2wf.data.contracts import DataSpec
 
 IBTRACS_CENTER_COLUMNS = ("ibtracs_center_lat", "ibtracs_center_lon")
 DISTANCE_TO_IBTRACS_CENTER = "distance_to_ibtracs_center"
@@ -86,8 +87,8 @@ class PairedImageDataset(Dataset):
             self.samples = self.samples.loc[
                 _manifest_has_era5(self.samples)
             ].reset_index(drop=True)
-        self.filtered_missing_era5_count = (
-            self.manifest_sample_count - len(self.samples)
+        self.filtered_missing_era5_count = self.manifest_sample_count - len(
+            self.samples
         )
         self.include_pmw = bool(include_pmw)
         self.pmw_as_condition = bool(pmw_as_condition)
@@ -109,9 +110,7 @@ class PairedImageDataset(Dataset):
             if max_pmw_time_gap_hours <= 0:
                 raise ValueError("max_pmw_time_gap_hours must be positive")
             gap_hours = _manifest_pmw_time_gap_hours(self.samples)
-            keep = gap_hours.notna() & (
-                gap_hours <= float(max_pmw_time_gap_hours)
-            )
+            keep = gap_hours.notna() & (gap_hours <= float(max_pmw_time_gap_hours))
             self.filtered_stale_pmw_count = int((~keep).sum())
             self.samples = self.samples.loc[keep].reset_index(drop=True)
         self.include_ibtracs = bool(include_ibtracs)
@@ -126,9 +125,7 @@ class PairedImageDataset(Dataset):
             if max_era5_time_gap_hours <= 0:
                 raise ValueError("max_era5_time_gap_hours must be positive")
             gap_hours = _manifest_era5_time_gap_hours(self.samples)
-            keep = gap_hours.notna() & (
-                gap_hours <= float(max_era5_time_gap_hours)
-            )
+            keep = gap_hours.notna() & (gap_hours <= float(max_era5_time_gap_hours))
             self.filtered_stale_era5_count = int((~keep).sum())
             self.samples = self.samples.loc[keep].reset_index(drop=True)
         self.stats_file = (
@@ -165,6 +162,29 @@ class PairedImageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
+    @property
+    def data_spec(self) -> DataSpec:
+        """Describe actual assembled tensors without duplicating channel logic."""
+        if not len(self):
+            raise ValueError(f"{self.split} dataset is empty")
+        augment = self.augment
+        self.augment = False
+        try:
+            sample = self[0]
+        finally:
+            self.augment = augment
+        metadata = sample["meta"]
+        companions = frozenset(
+            name for name in ("era5_wind_speed", "pmw", "ibtracs") if name in sample
+        )
+        return DataSpec(
+            condition_channels=tuple(metadata["condition_channels"]),
+            target_channels=tuple(metadata["target_channels"]),
+            spatial_shape=tuple(int(value) for value in sample["target"].shape[-2:]),
+            target_units="m s-1",
+            companions=companions,
+        )
+
     def __getitem__(self, idx: int) -> dict[str, Any]:
         row = self.samples.iloc[idx]
         storm_center = _manifest_ibtracs_center(row)
@@ -196,9 +216,7 @@ class PairedImageDataset(Dataset):
             self.root / condition_path,
             reject_all_zero_fill=True,
         )
-        condition_channel_mask = condition_mask.expand(
-            len(condition_channels), -1, -1
-        )
+        condition_channel_mask = condition_mask.expand(len(condition_channels), -1, -1)
         pmw = None
         pmw_physical = None
         pmw_mask = None
@@ -242,9 +260,7 @@ class PairedImageDataset(Dataset):
                     ].clone()
                     era5_wind_speed_mask = (
                         context_mask
-                        & era5_wind_speed_physical.isfinite().all(
-                            dim=0, keepdim=True
-                        )
+                        & era5_wind_speed_physical.isfinite().all(dim=0, keepdim=True)
                     )
         target, target_mask, target_bounds = _read_geotiff(self.root / target_path)
         target_physical = torch.nan_to_num(
@@ -383,9 +399,7 @@ class PairedImageDataset(Dataset):
                 target_bounds, target_shape, self.center_crop_size
             )
             if era5_wind_speed is not None:
-                era5_wind_speed = _center_crop(
-                    era5_wind_speed, self.center_crop_size
-                )
+                era5_wind_speed = _center_crop(era5_wind_speed, self.center_crop_size)
                 era5_wind_speed_physical = _center_crop(
                     era5_wind_speed_physical, self.center_crop_size
                 )
@@ -409,9 +423,7 @@ class PairedImageDataset(Dataset):
             condition.shape[-2:],
             _condition_timestamp(row),
         )
-        condition = torch.cat(
-            [condition, distance_to_center, solar_time], dim=0
-        )
+        condition = torch.cat([condition, distance_to_center, solar_time], dim=0)
         condition_channels = condition_channels + [
             DISTANCE_TO_IBTRACS_CENTER,
             *SOLAR_TIME_CHANNELS,
@@ -454,9 +466,7 @@ class PairedImageDataset(Dataset):
                 normalized_gap = float(
                     np.clip(0.5 + gap_minutes / (2.0 * max_gap_minutes), 0.0, 1.0)
                 )
-                pmw_features.append(
-                    pmw.new_full((1, *pmw.shape[-2:]), normalized_gap)
-                )
+                pmw_features.append(pmw.new_full((1, *pmw.shape[-2:]), normalized_gap))
                 pmw_feature_names.append(PMW_TIME_OFFSET)
                 pmw_feature_masks.append(torch.ones_like(pmw_mask))
             condition = torch.cat([condition, *pmw_features], dim=0)
@@ -571,9 +581,11 @@ def _resize_target(
     target = F.interpolate(
         target.unsqueeze(0), size=size, mode="bilinear", align_corners=False
     ).squeeze(0)
-    target_mask = F.interpolate(
-        target_mask.unsqueeze(0).float(), size=size, mode="nearest"
-    ).squeeze(0).bool()
+    target_mask = (
+        F.interpolate(target_mask.unsqueeze(0).float(), size=size, mode="nearest")
+        .squeeze(0)
+        .bool()
+    )
     return target * target_mask.to(target.dtype), target_mask
 
 
@@ -588,9 +600,10 @@ def _validate_pmw_condition_grid(
     sample_id: str,
 ) -> None:
     """Reject PMW companions that are not on the exported condition grid."""
-    with rasterio.open(condition_path) as condition_dataset, rasterio.open(
-        pmw_path
-    ) as pmw_dataset:
+    with (
+        rasterio.open(condition_path) as condition_dataset,
+        rasterio.open(pmw_path) as pmw_dataset,
+    ):
         if (
             condition_dataset.crs != pmw_dataset.crs
             or condition_dataset.transform != pmw_dataset.transform
@@ -746,15 +759,9 @@ def _solar_time_features(
         timestamp = timestamp.tz_convert("UTC")
 
     left, right, bottom, top = (float(value) for value in bounds)
-    longitudes = torch.from_numpy(
-        _cell_centers(left, right, width)
-    ).to(torch.float64)
-    latitudes = torch.from_numpy(
-        _cell_centers(top, bottom, height)
-    ).to(torch.float64)
-    latitude_grid, longitude_grid = torch.meshgrid(
-        latitudes, longitudes, indexing="ij"
-    )
+    longitudes = torch.from_numpy(_cell_centers(left, right, width)).to(torch.float64)
+    latitudes = torch.from_numpy(_cell_centers(top, bottom, height)).to(torch.float64)
+    latitude_grid, longitude_grid = torch.meshgrid(latitudes, longitudes, indexing="ij")
 
     utc_minutes = (
         timestamp.hour * 60.0
@@ -795,9 +802,7 @@ def _solar_time_features(
     latitude_radians = torch.deg2rad(latitude_grid)
     cosine_zenith = (
         torch.sin(latitude_radians) * np.sin(declination)
-        + torch.cos(latitude_radians)
-        * np.cos(declination)
-        * torch.cos(hour_angle)
+        + torch.cos(latitude_radians) * np.cos(declination) * torch.cos(hour_angle)
     ).clamp(-1.0, 1.0)
     normalized_zenith = torch.acos(cosine_zenith) / np.pi
 
@@ -831,9 +836,7 @@ def _paired_random_flips(
         condition_mask = torch.flip(condition_mask, dims=flip_dims)
         target_mask = torch.flip(target_mask, dims=flip_dims)
         if condition_channel_mask is not None:
-            condition_channel_mask = torch.flip(
-                condition_channel_mask, dims=flip_dims
-            )
+            condition_channel_mask = torch.flip(condition_channel_mask, dims=flip_dims)
         if condition_channels is not None:
             if condition_zero_values is None:
                 raise ValueError(
@@ -914,7 +917,15 @@ def _read_geotiff(
     with rasterio.open(path) as dataset:
         array = dataset.read().astype("float32")
         mask = dataset.dataset_mask() > 0
-        bounds = torch.tensor([dataset.bounds.left, dataset.bounds.right, dataset.bounds.bottom, dataset.bounds.top], dtype=torch.float64)
+        bounds = torch.tensor(
+            [
+                dataset.bounds.left,
+                dataset.bounds.right,
+                dataset.bounds.bottom,
+                dataset.bounds.top,
+            ],
+            dtype=torch.float64,
+        )
     finite_mask = torch.from_numpy(array).isfinite().all(dim=0)
     tensor = torch.from_numpy(array)
     mask_tensor = torch.from_numpy(mask).bool() & finite_mask
@@ -995,9 +1006,7 @@ def _normalization_affine_parameters(
             scale = float(channel_stats["max"]) - offset
         else:
             center_value = channel_stats.get("median", channel_stats.get("mean"))
-            spread_value = channel_stats.get(
-                "robust_scale", channel_stats.get("std")
-            )
+            spread_value = channel_stats.get("robust_scale", channel_stats.get("std"))
             if center_value is None or spread_value is None:
                 raise KeyError(
                     f"Missing robust train stats for {source_type}:{channel}"
@@ -1140,9 +1149,8 @@ def _relative_vorticity_10m(
     v = v10.detach().cpu().numpy().astype(np.float64, copy=False)
     d_v_d_lambda = np.gradient(v, lon_rad, axis=1, edge_order=1)
     d_u_coslat_d_phi = np.gradient(u * coslat, lat_rad, axis=0, edge_order=1)
-    vorticity = (
-        d_v_d_lambda / (EARTH_RADIUS_M * coslat)
-        - d_u_coslat_d_phi / (EARTH_RADIUS_M * coslat)
+    vorticity = d_v_d_lambda / (EARTH_RADIUS_M * coslat) - d_u_coslat_d_phi / (
+        EARTH_RADIUS_M * coslat
     )
     return torch.from_numpy(vorticity.astype(np.float32)).to(
         device=u10.device, dtype=u10.dtype
@@ -1214,9 +1222,7 @@ def _manifest_pmw_time_gap_hours(samples: pd.DataFrame) -> pd.Series:
     if "pmw_timestamp" not in samples:
         return pd.Series(np.nan, index=samples.index, dtype=float)
     pmw_time = pd.to_datetime(samples["pmw_timestamp"], errors="coerce", utc=True)
-    reference_time = pd.Series(
-        pd.NaT, index=samples.index, dtype="datetime64[ns, UTC]"
-    )
+    reference_time = pd.Series(pd.NaT, index=samples.index, dtype="datetime64[ns, UTC]")
     for column in (
         "target_timestamp",
         "sar_timestamp",
@@ -1234,9 +1240,7 @@ def _ibtracs_metadata_schema(
 ) -> tuple[tuple[str, ...], frozenset[str]]:
     """Infer stable, collatable types for all prefixed IBTrACS columns."""
     columns = tuple(
-        str(column)
-        for column in samples.columns
-        if str(column).startswith("ibtracs_")
+        str(column) for column in samples.columns if str(column).startswith("ibtracs_")
     )
     numeric = set()
     for column in columns:
@@ -1272,9 +1276,7 @@ def _manifest_era5_time_gap_hours(samples: pd.DataFrame) -> pd.Series:
     """Return absolute ERA5-to-observation gaps, or NaN when unverifiable."""
     if "era5_timestamp" not in samples:
         return pd.Series(np.nan, index=samples.index, dtype=float)
-    era5_time = pd.to_datetime(
-        samples["era5_timestamp"], errors="coerce", utc=True
-    )
+    era5_time = pd.to_datetime(samples["era5_timestamp"], errors="coerce", utc=True)
     reference_time = pd.Series(pd.NaT, index=samples.index, dtype="datetime64[ns, UTC]")
     for column in (
         "condition_timestamp",

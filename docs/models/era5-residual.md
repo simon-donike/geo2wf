@@ -35,7 +35,7 @@ Supervised loss is Huber in m/s over the joint SAR/ERA5 valid mask. With `delta 
 Outside the observed SAR swath, a weak anchor penalizes correction magnitude where ERA5 is valid:
 
 ```yaml
-optimization:
+model:
   huber_delta_ms: 2.0
   off_swath_anchor_weight: 0.05
 ```
@@ -69,8 +69,9 @@ produce numeric artifacts without large visualization payloads.
 ## Train Stage 1
 
 ```bash
-python train.py \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
 ```
 
-After selecting a checkpoint, pass it to Stage 2 through `GEO2WF_BASELINE_CKPT` or `model.residual.baseline.checkpoint_path`. Continue to [Stage 2 residual diffusion](residual-diffusion.md) or [Evaluation](../experiments/evaluation.md).
+After selecting a checkpoint, pass it to Stage 2 through `GEO2WF_BASELINE_CKPT` or the modular `model.baseline_checkpoint_path` override. The historical full-YAML equivalent is `model.residual.baseline.checkpoint_path`. Continue to [Stage 2 residual diffusion](residual-diffusion.md) or [Evaluation](../experiments/evaluation.md).

@@ -1,0 +1,6 @@
+# @package _global_
+model:
+  high_wind_weight_max: 8.0
+  peak_loss_weight: 0.05
+  radial_profile_loss_weight: 0.0
+  exceedance_area_loss_weight: 0.0
