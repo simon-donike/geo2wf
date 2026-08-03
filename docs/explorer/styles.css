@@ -18,6 +18,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -103,6 +107,23 @@ select {
   height: 7px;
   background: var(--accent);
   border-radius: 50%;
+}
+
+.inference-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 11px;
+  color: var(--muted);
+  background: #fff8e8;
+  border: 1px solid #ead9aa;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.inference-notice strong {
+  color: var(--ink);
 }
 
 .icon-button,

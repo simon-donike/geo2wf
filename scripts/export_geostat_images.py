@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-
 GEOSTAT_SCALE_MIN_K = 190.0
 GEOSTAT_SCALE_MAX_K = 292.0
 GEOSTAT_IMAGE_SIZE = 256
@@ -16,6 +15,18 @@ def export_geostat_image(observation_id, bundle, output_dir: Path):
     channel_index = bundle["input_channels"].index("CMI_C15")
     channel = bundle["input"][channel_index].float().numpy()
     valid = bundle["input_mask"].bool().numpy() & np.isfinite(channel)
+    return export_geostat_array(
+        observation_id,
+        channel,
+        valid,
+        bundle["grid_lat"].numpy(),
+        bundle["grid_lon"].numpy(),
+        output_dir,
+    )
+
+
+def export_geostat_array(observation_id, channel, valid, lat, lon, output_dir: Path):
+    """Export a physical CMI_C15 array without requiring an inference bundle."""
     scaled = np.clip(
         (channel - GEOSTAT_SCALE_MIN_K) / (GEOSTAT_SCALE_MAX_K - GEOSTAT_SCALE_MIN_K),
         0,
@@ -35,7 +46,6 @@ def export_geostat_image(observation_id, bundle, output_dir: Path):
     )
     filename = re.sub(r"[^a-zA-Z0-9_-]+", "_", observation_id) + ".webp"
     image.save(output_dir / filename, "WEBP", lossless=True, method=6)
-    lat, lon = bundle["grid_lat"].numpy(), bundle["grid_lon"].numpy()
     return {
         "image": f"geo/{filename}",
         "bounds": [

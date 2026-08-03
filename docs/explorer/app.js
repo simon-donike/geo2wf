@@ -28,7 +28,7 @@ function initMap(){
   L.control.layers(null,{"SAR wind fields":sarLayers},{collapsed:false,position:"topright"}).addTo(map);
 }
 function switcher(){
-  $("#stormSwitcher").innerHTML=`<label><span>Storm</span><select id="stormSelect">${data.storms.map(s=>`<option value="${s.id}" ${s.id===storm.id?"selected":""}>${s.id} · ${s.basin}</option>`).join("")}</select></label>`;
+  $("#stormSwitcher").innerHTML=`<label><span>Storm</span><select id="stormSelect">${data.storms.map(s=>`<option value="${s.id}" ${s.id===storm.id?"selected":""}>${s.id}${s.name?` · ${s.name}`:""} · ${s.basin}</option>`).join("")}</select></label>`;
   $("#stormSelect").onchange=event=>selectStorm(event.target.value);
 }
 function renderMap(){
@@ -142,7 +142,11 @@ function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=ena
 function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function selectStorm(id){
   stop();storm=data.storms.find(s=>s.id===id);switcher();renderMap();
-  $("#basinLabel").textContent=`${storm.basin} · 2025`;$("#stormTitle").textContent=storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;
+  const inferenceAvailable=storm.inference_available!==false;
+  graphModel="model_a";$("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;
+  $(".model-toolbar").hidden=!inferenceAvailable;$("#inferenceNotice").hidden=inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;$("#methodNote").hidden=!inferenceAvailable;$(".graph-toolbar").hidden=!inferenceAvailable;
+  postProcessing=inferenceAvailable&&$("#postProcessing").checked;
+  $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormTitle").textContent=storm.name?`${storm.name} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;
   const sl=$("#timeSlider");sl.max=storm.records.length-1;sl.value=0;$("#startDate").textContent=short(storm.start);$("#midDate").textContent=short(storm.records[Math.floor(storm.records.length/2)].time);$("#endDate").textContent=short(storm.end);charts();current()
 }
 $("#timeSlider").oninput=()=>{stop();current()};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
