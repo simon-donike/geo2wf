@@ -59,22 +59,26 @@ model:
     timesteps: 100
     eta: 0.0
     # Diversity comes from distinct initial latents; CFG strengthens baseline/GEO fidelity.
-    guidance_scale: 1.5
+    guidance_scale: 1.2
     clip_sample: true
   classifier_free_guidance:
     # Required during training so guidance_scale can trade diversity for fidelity.
     condition_dropout_probability: 0.1
+    preserve_baseline_condition_on_dropout: true
   sparse_target:
     # Outside SAR coverage, weakly teach the generated correction to be zero.
     fill: era5
-    unobserved_loss_weight: 0.05
+    unobserved_loss_weight: 0.1
   residual:
     # Portable default. To learn a residual on top of the trained deterministic
     # GEO+ERA5 model, change source to deterministic and set checkpoint_path or
     # the GEO2WF_BASELINE_CKPT environment variable.
     baseline:
       source: deterministic
-      checkpoint_path: logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt
+      # Best completed Model B (stage1_peak_aware). Set this to another
+      # artifact for a different baseline; the environment variable is used
+      # when this path is null.
+      checkpoint_path: logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/checkpoints/epoch=020-step=5103.ckpt
     # Odd asinh transform: resolves small corrections without clipping the rare
     # intense positive tail into the narrow bulk of the residual distribution.
     soft_scale_ms: 5.0
@@ -89,13 +93,25 @@ model:
       low_frequency_weight: 0.15
       smoothness_weight: 0.02
       auxiliary_max_timestep_fraction: 0.5
-      high_wind_threshold_ms: 17.0
-      high_wind_weight: 2.0
+      # Selected Stage 2 default: structured residual refinement in asinh space.
+      high_wind_threshold_ms: 25.0
+      high_wind_weight: 4.0
       inner_core_radius_km: 100.0
       inner_core_weight: 2.0
       high_gradient_threshold_ms: 2.0
       high_gradient_weight: 1.25
       low_frequency_kernel_size: 9
+      robust_peak_weight: 0.03
+      robust_peak_fraction: 0.005
+      radial_profile_weight: 0.1
+      radial_profile_bins: 20
+      radial_profile_max_radius_km: 200.0
+      exceedance_area_weight: 2.0
+      exceedance_thresholds_ms: [17.0, 33.0, 43.0]
+      exceedance_temperature_ms: 2.0
+      multiscale_field_weight: 0.05
+      multiscale_kernel_sizes: [1, 3, 9, 21]
+      annular_residual_weight: 0.02
   unet:
     dim: 48
     dim_mults: [1, 2, 4, 8]
@@ -139,9 +155,12 @@ validation:
   reconstruction_batches: 3
   # Four fixed members expose calibrated diversity without blurring them together.
   ensemble_size: 4
-  ensemble_batches: 1
+  ensemble_batches: 3
   sampling_seed: 42
   probabilistic_score_sharpness_weight: 1.0
+  probabilistic_score_peak_weight: 0.25
+  probabilistic_peak_fraction: 0.005
+  log_reconstruction_images: false
   # Prefer members that retain most, but not all, of SAR's gradient strength.
   probabilistic_score_target_sharpness_ratio: 0.9
 

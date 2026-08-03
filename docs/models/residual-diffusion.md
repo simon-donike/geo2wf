@@ -52,8 +52,9 @@ The deterministic-baseline preset keeps epsilon diffusion as the generative obje
 - classifier-free guidance through condition dropout.
 
 The spectrum term compares amplitude rather than phase. The low-frequency term keeps members tied to the broad baseline, while total variation suppresses pixel-scale ringing in the correction without smoothing Stage 1 itself.
+The selected structured-asinh default also adds robust peak, radial-profile, soft exceedance-area, multi-scale, and target-relative annular terms.
 
-Ten percent condition dropout trains an unconditional branch without changing U-Net shape. The preset starts sampling at `guidance_scale: 1.5`; higher values generally favor condition fidelity, while lower values preserve more diversity.
+Ten percent condition dropout trains an unconditional branch without changing U-Net shape. The checked-in preset samples at `guidance_scale: 1.2`, the compromise selected from the K=10 sweep; higher values reduce raw maximum-wind bias but narrow ensemble coverage, while lower values preserve more diversity.
 
 ## Validation ensemble
 

@@ -26,6 +26,17 @@ This study covers two production models:
 
 There is no standalone Model A experiment in this suite.
 
+## Selected checked-in defaults
+
+The main presets now use the best overall-utility settings from the completed
+suite: Model B uses `stage1_peak_aware` (smooth high-wind weighting plus the
+robust inner-core peak term), and Model C uses the `stage2_structured_asinh`
+objective with `guidance_scale: 1.2`. The Stage 2 runner hands off the completed
+peak-aware Model B checkpoint by default. The control and balanced variants stay
+unchanged so the ablation remains reproducible. The completed Stage 2 artifacts
+were trained before this handoff change (on the balanced baseline), so retrain
+Model C with the updated runner before deploying the new pair.
+
 ## Stage 1 ablations
 
 Stage 1 predicts the dense deterministic wind field used as the Stage 2
@@ -40,8 +51,8 @@ variants:
 | `config_stage1_radial_only.yaml` | Flip-aware radial-profile Huber loss |
 | `config_stage1_exceedance_only.yaml` | Soft area losses at 17, 33, and 43 m/s |
 | `config_stage1_sampling_only.yaml` | Intensity-balanced training sampler |
-| `config_stage1_peak_aware.yaml` | High-wind, peak, radial, and exceedance losses together |
-| `config_stage1_peak_structure_balanced.yaml` | Peak-aware objective plus balanced sampling |
+| `config_stage1_peak_aware.yaml` | Smooth high-wind weighting plus robust inner-core/top-fraction peak loss |
+| `config_stage1_peak_structure_balanced.yaml` | Peak-aware objective plus intensity-balanced sampling |
 
 The peak and structure metrics should be read together. `robust_peak_mae_ms`
 measures maximum-wind error without allowing one noisy pixel to dominate;

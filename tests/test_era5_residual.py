@@ -422,7 +422,7 @@ def test_residual_training_config_builds() -> None:
 
     assert isinstance(model, ERA5ResidualRegressor)
     assert model.condition_channels == 23
-    assert config["trainer"]["checkpoint"]["monitor"] == "val/loss"
+    assert config["trainer"]["checkpoint"]["monitor"] == "val/peak_structure_score"
     assert config["trainer"]["limit_val_batches"] == 1.0
 
 
