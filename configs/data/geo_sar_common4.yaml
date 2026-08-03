@@ -1,0 +1,18 @@
+_target_: geo2wf.config.loading.build_paired_datamodule
+root: data/geotiff/geo_sar
+stats_file: data/geotiff/geo_sar/stats.json
+train_split: train
+val_split: val
+test_split: test
+target_size: [256, 256]
+center_crop_size: null
+random_flips: true
+include_test_in_train: false
+require_era5: false
+include_pmw: false
+include_ibtracs: false
+loader:
+  batch_size: 4
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false

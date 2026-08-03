@@ -20,10 +20,10 @@ import rasterio
 import torch
 from matplotlib.colors import ListedColormap
 
-from data.dataset import (
-    _append_era5_derived_channels,
-    _normalized_distance_to_center,
-    _solar_time_features,
+from geo2wf.data.features import (
+    append_era5_derived_channels as _append_era5_derived_channels,
+    normalized_distance_to_center as _normalized_distance_to_center,
+    solar_time_features as _solar_time_features,
 )
 
 
@@ -50,11 +50,15 @@ def read_manifest_row(data_root: Path, split: str, sample_id: str) -> pd.Series:
     manifest = pd.read_csv(data_root / split / "manifest.csv")
     rows = manifest.loc[manifest["sample_id"] == sample_id]
     if len(rows) != 1:
-        raise ValueError(f"Expected one manifest row for {sample_id!r}, found {len(rows)}")
+        raise ValueError(
+            f"Expected one manifest row for {sample_id!r}, found {len(rows)}"
+        )
     return rows.iloc[0]
 
 
-def read_raster(path: Path) -> tuple[np.ndarray, np.ndarray, list[str], rasterio.coords.BoundingBox]:
+def read_raster(
+    path: Path,
+) -> tuple[np.ndarray, np.ndarray, list[str], rasterio.coords.BoundingBox]:
     with rasterio.open(path) as dataset:
         array = dataset.read().astype(np.float32)
         mask = dataset.dataset_mask() > 0
@@ -97,13 +101,19 @@ def style_axis(ax: plt.Axes) -> None:
 
 def add_center(ax: plt.Axes, row: pd.Series, shape: tuple[int, int], bounds) -> None:
     height, width = shape
-    column = (float(row["ibtracs_center_lon"]) - bounds.left) / (
-        bounds.right - bounds.left
-    ) * width
-    line = (bounds.top - float(row["ibtracs_center_lat"])) / (
-        bounds.top - bounds.bottom
-    ) * height
-    ax.plot(column, line, marker="+", color="#d3483e", markersize=9, markeredgewidth=1.8)
+    column = (
+        (float(row["ibtracs_center_lon"]) - bounds.left)
+        / (bounds.right - bounds.left)
+        * width
+    )
+    line = (
+        (bounds.top - float(row["ibtracs_center_lat"]))
+        / (bounds.top - bounds.bottom)
+        * height
+    )
+    ax.plot(
+        column, line, marker="+", color="#d3483e", markersize=9, markeredgewidth=1.8
+    )
 
 
 def save_figure(fig: plt.Figure, output_path: Path, dpi: int) -> None:

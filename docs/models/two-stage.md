@@ -87,8 +87,9 @@ The baseline also makes evaluation clearer. Stage 2 reports `baseline_mae_ms` an
 ### 1. Train Stage 1
 
 ```bash
-python train.py \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
 ```
 
 Choose a Stage 1 checkpoint using physical and storm-structure validation metrics, not training loss alone.
@@ -97,8 +98,9 @@ Choose a Stage 1 checkpoint using physical and storm-structure validation metric
 
 ```bash
 GEO2WF_BASELINE_CKPT=/path/to/deterministic.ckpt \
-  python train.py \
-  --config configs/config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=residual_diffusion_deterministic_baseline
 ```
 
 The baseline module stays in evaluation mode, is excluded from the optimizer, and is saved inside the residual-diffusion checkpoint for reproducibility.

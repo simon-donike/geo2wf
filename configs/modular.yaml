@@ -1,0 +1,9 @@
+defaults:
+  - data: geo_sar_common10_era5
+  - model: deterministic_residual
+  - trainer: default
+  - logging: default
+  - optional experiment: null
+  - _self_
+
+seed: 42

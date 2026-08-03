@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
 import numpy as np
 import torch
 
-from data.dataset import _normalize
+from geo2wf.data.normalization import normalize as _normalize
 from scripts.export_geo_sar_geotiffs import (
     PMW_SOURCE_CHANNELS,
     Observation,
