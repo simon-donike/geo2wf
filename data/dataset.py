@@ -21,6 +21,9 @@ SOLAR_TIME_CHANNELS = (
     LOCAL_SOLAR_TIME_COS,
     SOLAR_ZENITH_ANGLE,
 )
+PMW_BRIGHTNESS_TEMPERATURE_89V = "pmw_brightness_temperature_89v"
+PMW_VALID_MASK = "pmw_valid_mask"
+PMW_TIME_OFFSET = "pmw_time_offset"
 
 EARTH_RADIUS_M = 6_371_000.0
 ERA5_U10_CHANNELS = {"era5_u_wind_10m", "u_wind_10m", "era5_u10", "u10"}
@@ -59,6 +62,9 @@ class PairedImageDataset(Dataset):
         augment: bool = False,
         require_era5: bool = False,
         include_pmw: bool = False,
+        pmw_as_condition: bool = False,
+        max_pmw_time_gap_hours: float | None = None,
+        pmw_include_time_offset: bool = False,
         include_ibtracs: bool = False,
         normalization: str | None = None,
         target_normalization: str | None = None,
@@ -84,11 +90,30 @@ class PairedImageDataset(Dataset):
             self.manifest_sample_count - len(self.samples)
         )
         self.include_pmw = bool(include_pmw)
+        self.pmw_as_condition = bool(pmw_as_condition)
+        self.pmw_include_time_offset = bool(pmw_include_time_offset)
+        if self.pmw_as_condition and not self.include_pmw:
+            raise ValueError("pmw_as_condition requires include_pmw")
+        if self.pmw_include_time_offset and not self.pmw_as_condition:
+            raise ValueError("pmw_include_time_offset requires pmw_as_condition")
         self.filtered_missing_pmw_count = 0
         if self.include_pmw:
             has_pmw = _manifest_has_pmw(self.samples)
             self.filtered_missing_pmw_count = int((~has_pmw).sum())
             self.samples = self.samples.loc[has_pmw].reset_index(drop=True)
+        self.max_pmw_time_gap_hours = max_pmw_time_gap_hours
+        self.filtered_stale_pmw_count = 0
+        if max_pmw_time_gap_hours is not None:
+            if not self.include_pmw:
+                raise ValueError("max_pmw_time_gap_hours requires include_pmw")
+            if max_pmw_time_gap_hours <= 0:
+                raise ValueError("max_pmw_time_gap_hours must be positive")
+            gap_hours = _manifest_pmw_time_gap_hours(self.samples)
+            keep = gap_hours.notna() & (
+                gap_hours <= float(max_pmw_time_gap_hours)
+            )
+            self.filtered_stale_pmw_count = int((~keep).sum())
+            self.samples = self.samples.loc[keep].reset_index(drop=True)
         self.include_ibtracs = bool(include_ibtracs)
         self.ibtracs_columns, self.numeric_ibtracs_columns = (
             _ibtracs_metadata_schema(self.samples)
@@ -180,6 +205,16 @@ class PairedImageDataset(Dataset):
         pmw_bounds = None
         if pmw_path:
             pmw, pmw_mask, pmw_bounds = _read_geotiff(self.root / pmw_path)
+            if self.pmw_as_condition:
+                _validate_pmw_condition_grid(
+                    condition,
+                    condition_bounds,
+                    pmw,
+                    pmw_bounds,
+                    condition_path=self.root / condition_path,
+                    pmw_path=self.root / pmw_path,
+                    sample_id=str(row["sample_id"]),
+                )
             pmw_physical = torch.nan_to_num(
                 pmw, nan=0.0, posinf=0.0, neginf=0.0
             ) * pmw_mask.to(pmw.dtype)
@@ -392,6 +427,49 @@ class PairedImageDataset(Dataset):
             ],
             dim=0,
         )
+        if self.pmw_as_condition:
+            if pmw is None or pmw_mask is None:
+                raise RuntimeError(
+                    f"sample {row['sample_id']} passed PMW filtering without PMW data"
+                )
+            if pmw.shape[0] != 1:
+                raise ValueError(
+                    "PMW conditioning requires exactly one 89--92 GHz channel; "
+                    f"sample {row['sample_id']} has {pmw.shape[0]}"
+                )
+            pmw_features = [pmw, pmw_mask.to(pmw.dtype)]
+            pmw_feature_names = [PMW_BRIGHTNESS_TEMPERATURE_89V, PMW_VALID_MASK]
+            pmw_feature_masks = [pmw_mask, torch.ones_like(pmw_mask)]
+            if self.pmw_include_time_offset:
+                gap_minutes = _row_float(row, "pmw_dt_minutes")
+                if not np.isfinite(gap_minutes):
+                    raise ValueError(
+                        f"sample {row['sample_id']} has no finite pmw_dt_minutes"
+                    )
+                if self.max_pmw_time_gap_hours is None:
+                    raise ValueError(
+                        "pmw_include_time_offset requires max_pmw_time_gap_hours"
+                    )
+                max_gap_minutes = self.max_pmw_time_gap_hours * 60.0
+                normalized_gap = float(
+                    np.clip(0.5 + gap_minutes / (2.0 * max_gap_minutes), 0.0, 1.0)
+                )
+                pmw_features.append(
+                    pmw.new_full((1, *pmw.shape[-2:]), normalized_gap)
+                )
+                pmw_feature_names.append(PMW_TIME_OFFSET)
+                pmw_feature_masks.append(torch.ones_like(pmw_mask))
+            condition = torch.cat([condition, *pmw_features], dim=0)
+            condition_channels = condition_channels + pmw_feature_names
+            condition_zero_values = torch.cat(
+                [
+                    condition_zero_values,
+                    condition_zero_values.new_zeros(len(pmw_features)),
+                ]
+            )
+            condition_channel_mask = torch.cat(
+                [condition_channel_mask, *pmw_feature_masks], dim=0
+            )
         if self.augment:
             flip_state = _random_flip_state()
             condition, target, condition_mask, target_mask = _paired_random_flips(
@@ -497,6 +575,47 @@ def _resize_target(
         target_mask.unsqueeze(0).float(), size=size, mode="nearest"
     ).squeeze(0).bool()
     return target * target_mask.to(target.dtype), target_mask
+
+
+def _validate_pmw_condition_grid(
+    condition: torch.Tensor,
+    condition_bounds: torch.Tensor,
+    pmw: torch.Tensor,
+    pmw_bounds: torch.Tensor,
+    condition_path: Path,
+    pmw_path: Path,
+    *,
+    sample_id: str,
+) -> None:
+    """Reject PMW companions that are not on the exported condition grid."""
+    with rasterio.open(condition_path) as condition_dataset, rasterio.open(
+        pmw_path
+    ) as pmw_dataset:
+        if (
+            condition_dataset.crs != pmw_dataset.crs
+            or condition_dataset.transform != pmw_dataset.transform
+            or condition_dataset.width != pmw_dataset.width
+            or condition_dataset.height != pmw_dataset.height
+        ):
+            raise ValueError(
+                f"sample {sample_id} PMW raster grid does not exactly match condition"
+            )
+    if pmw.shape[-2:] != condition.shape[-2:]:
+        raise ValueError(
+            f"sample {sample_id} PMW shape {tuple(pmw.shape[-2:])} does not match "
+            f"condition shape {tuple(condition.shape[-2:])}"
+        )
+    if not torch.allclose(
+        pmw_bounds.to(torch.float64),
+        condition_bounds.to(torch.float64),
+        rtol=0.0,
+        atol=1.0e-8,
+    ):
+        raise ValueError(
+            f"sample {sample_id} PMW bounds {pmw_bounds.tolist()} do not match "
+            f"condition bounds {condition_bounds.tolist()}"
+        )
+
 
 def _center_crop(
     tensor: torch.Tensor,
@@ -1085,6 +1204,29 @@ def _manifest_has_pmw(samples: pd.DataFrame) -> pd.Series:
     if "pmw_path" not in samples.columns:
         return pd.Series(False, index=samples.index, dtype=bool)
     return samples["pmw_path"].astype(str).str.strip().ne("")
+
+
+def _manifest_pmw_time_gap_hours(samples: pd.DataFrame) -> pd.Series:
+    """Return absolute PMW-to-target gaps, or NaN when unverifiable."""
+    if "pmw_dt_minutes" in samples:
+        gap_minutes = pd.to_numeric(samples["pmw_dt_minutes"], errors="coerce")
+        return gap_minutes.abs() / 60.0
+    if "pmw_timestamp" not in samples:
+        return pd.Series(np.nan, index=samples.index, dtype=float)
+    pmw_time = pd.to_datetime(samples["pmw_timestamp"], errors="coerce", utc=True)
+    reference_time = pd.Series(
+        pd.NaT, index=samples.index, dtype="datetime64[ns, UTC]"
+    )
+    for column in (
+        "target_timestamp",
+        "sar_timestamp",
+        "condition_timestamp",
+        "geo_timestamp",
+    ):
+        if column in samples:
+            parsed = pd.to_datetime(samples[column], errors="coerce", utc=True)
+            reference_time = reference_time.fillna(parsed)
+    return (pmw_time - reference_time).abs().dt.total_seconds() / 3600.0
 
 
 def _ibtracs_metadata_schema(

@@ -41,6 +41,9 @@ class PairedDataModule(pl.LightningDataModule):
         include_test_in_train: bool = False,
         require_era5: bool = False,
         include_pmw: bool = False,
+        pmw_as_condition: bool = False,
+        max_pmw_time_gap_hours: float | None = None,
+        pmw_include_time_offset: bool = False,
         include_ibtracs: bool = False,
         normalization: str | None = None,
         target_normalization: str | None = None,
@@ -78,6 +81,9 @@ class PairedDataModule(pl.LightningDataModule):
         self.include_test_in_train = include_test_in_train
         self.require_era5 = require_era5
         self.include_pmw = bool(include_pmw)
+        self.pmw_as_condition = bool(pmw_as_condition)
+        self.max_pmw_time_gap_hours = max_pmw_time_gap_hours
+        self.pmw_include_time_offset = bool(pmw_include_time_offset)
         self.include_ibtracs = bool(include_ibtracs)
         self.normalization = normalization
         self.target_normalization = target_normalization
@@ -149,6 +155,15 @@ class PairedDataModule(pl.LightningDataModule):
             include_test_in_train=data_cfg.get("include_test_in_train", False),
             require_era5=require_era5,
             include_pmw=data_cfg.get("include_pmw", False),
+            pmw_as_condition=data_cfg.get("pmw_as_condition", False),
+            max_pmw_time_gap_hours=(
+                float(data_cfg["max_pmw_time_gap_hours"])
+                if data_cfg.get("max_pmw_time_gap_hours") is not None
+                else None
+            ),
+            pmw_include_time_offset=data_cfg.get(
+                "pmw_include_time_offset", False
+            ),
             include_ibtracs=data_cfg.get("include_ibtracs", False),
             normalization=data_cfg.get("normalization"),
             target_normalization=data_cfg.get("target_normalization"),
@@ -309,6 +324,9 @@ class PairedDataModule(pl.LightningDataModule):
             require_era5=self.require_era5,
             include_pmw=self.include_pmw,
             include_ibtracs=self.include_ibtracs,
+            pmw_as_condition=self.pmw_as_condition,
+            max_pmw_time_gap_hours=self.max_pmw_time_gap_hours,
+            pmw_include_time_offset=self.pmw_include_time_offset,
             normalization=self.normalization,
             target_normalization=self.target_normalization,
             robust_clip=self.robust_clip,
@@ -337,6 +355,14 @@ class PairedDataModule(pl.LightningDataModule):
                 "companion from the %s split.",
                 dataset.filtered_missing_pmw_count,
                 dataset.manifest_sample_count,
+                split,
+            )
+        if dataset.filtered_stale_pmw_count:
+            rank_zero_info(
+                "PMW age guard: filtered %d samples with missing or > %.2f h "
+                "PMW timestamps from the %s split.",
+                dataset.filtered_stale_pmw_count,
+                self.max_pmw_time_gap_hours,
                 split,
             )
         return dataset

@@ -148,6 +148,20 @@ class ERA5ResidualDiffusion(PixelDiffusionConditional):
                 "a frozen deterministic baseline_model is required when "
                 "baseline_source='deterministic'"
             )
+        if baseline_source == "deterministic" and baseline_model is not None:
+            baseline_condition_channels = getattr(
+                baseline_model, "condition_channels", None
+            )
+            expected_baseline_channels = int(base_condition_channels) - 1
+            if (
+                baseline_condition_channels is not None
+                and baseline_condition_channels != expected_baseline_channels
+            ):
+                raise ValueError(
+                    "deterministic baseline condition width does not match residual "
+                    f"diffusion: expected {expected_baseline_channels}, got "
+                    f"{baseline_condition_channels}"
+                )
         if baseline_source == "era5" and baseline_model is not None:
             raise ValueError(
                 "baseline_model must be omitted when baseline_source='era5'"

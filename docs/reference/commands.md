@@ -39,6 +39,9 @@ uv run python train.py --config configs/config.yaml
 uv run python train.py --config configs/config_pretrain_geo_pmw.yaml
 uv run python train.py --config configs/config_geo_sar_10bands_era5.yaml
 uv run python train.py --config configs/config_geo_sar_10bands_era5_residual.yaml
+uv run python train.py --config configs/config_geo_sar_10bands_era5_pmw_residual.yaml
+GEO2WF_BASELINE_CKPT=/path/to/pmw-stage1.ckpt uv run python train.py \
+  --config configs/config_geo_sar_10bands_era5_pmw_diffusion_residual_deterministic.yaml
 ```
 
 Resume or bound validation:
@@ -48,6 +51,34 @@ uv run python train.py --config configs/config.yaml \
   --ckpt-path /path/to/last.ckpt \
   --limit-val-batches 10
 ```
+
+Evaluate the current and PMW checkpoints separately on the identical one-hour
+PMW validation cohort, then apply the stage-specific promotion gates:
+
+```bash
+uv run python scripts/evaluate_checkpoint.py \
+  --config configs/config_geo_sar_10bands_era5_residual.yaml \
+  --checkpoint /path/to/current-stage1.ckpt \
+  --output logs/current-stage1-common-pmw.json
+uv run python scripts/evaluate_checkpoint.py \
+  --config configs/config_geo_sar_10bands_era5_pmw_residual.yaml \
+  --checkpoint /path/to/pmw-stage1.ckpt \
+  --output logs/pmw-stage1-common-pmw.json
+uv run python scripts/compare_pmw_evaluations.py \
+  --stage 1 \
+  --current logs/current-stage1-common-pmw.json \
+  --candidate logs/pmw-stage1-common-pmw.json \
+  --output logs/pmw-stage1-promotion.json
+```
+
+Use `--stage 2` with the two diffusion reports for Stage 2. The comparator
+verifies the ordered evaluation-row fingerprint and full-validation setting,
+then applies the documented MAE/peak or probabilistic/CRPS/skill gates. Reports
+retain the warning that the current and PMW checkpoints had different training
+cohorts.
+
+PMW-aware storm inference writes `pmw-inference-audit.csv` beside each output
+summary and omits frames without a supported overpass inside the configured window.
 
 ## Batch jobs
 

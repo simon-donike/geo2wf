@@ -26,7 +26,10 @@ swath additionally return `pmw`, `pmw_physical`, `pmw_mask`, and `pmw_bounds`.
 Rows without a PMW path are filtered so standard PyTorch collation always sees
 the same keys. The companion is aligned and augmented with the core pair but
 remains separate from `condition`, preserving existing model input-channel
-contracts.
+contracts. With `pmw_as_condition: true`, the loader instead validates the PMW
+grid and appends brightness temperature plus an independent swath mask;
+`pmw_include_time_offset` adds the signed, normalized timing plane. The aggregate
+GEO/ERA5 mask is deliberately not intersected with partial PMW coverage.
 
 With `data.include_ibtracs: true`, each sample also returns `ibtracs`, a mapping
 containing every `ibtracs_*` manifest column. Numeric columns are returned as
