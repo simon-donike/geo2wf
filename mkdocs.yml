@@ -66,6 +66,7 @@ nav:
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
       - Diffusion refinement ablations: experiments/ablations.md
+      - Completed ablation analysis: experiments/ablation-analysis.md
       - Visual examples: experiments/visual-examples.md
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:
