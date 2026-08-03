@@ -117,6 +117,7 @@ data/geotiff/geo_sar/
   train/
     manifest.csv
     AL012023_sar_geo_20230115070023_abcd1234_geo.tif
+    AL012023_sar_geo_20230115070023_abcd1234_pmw.tif
     AL012023_sar_geo_20230115070023_abcd1234_sar.tif
   val/
     manifest.csv
@@ -127,6 +128,11 @@ data/geotiff/geo_sar/
 The PMW pretraining export uses the same layout under `data/geotiff/geo_pmw/`,
 with generic manifest columns named `condition_path` and `target_path`. The SAR
 manifests keep backward-compatible `geo_path` and `sar_path` columns as well.
+SAR exports can also include the closest supported PMW swath on the shared grid
+and join the complete nearest IBTrACS row. Both export and runtime flags are off
+in the checked-in configs. When `data.include_pmw` is enabled, the dataset
+returns PMW as a separate companion tensor, so model channel contracts remain
+unchanged; `data.include_ibtracs` exposes the prefixed track metadata.
 
 The default configs keep the original four-GEO-band datasets. The 10-band
 variants use separate folders and config files:

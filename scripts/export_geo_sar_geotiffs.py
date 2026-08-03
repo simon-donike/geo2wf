@@ -47,6 +47,8 @@ DEFAULT_OUTPUT_ROOT = Path(os.environ.get("GEO_SAR_OUTPUT_ROOT", "data/geotiff/g
 DEFAULT_GRID_SIZE = 256
 DEFAULT_GRID_RESOLUTION = 0.027
 DEFAULT_CLOSEST_MATCH_HOURS = 0.5
+DEFAULT_PMW_MAX_TIME_GAP_HOURS = 12.0
+DEFAULT_IBTRACS_MAX_TIME_GAP_HOURS = 6.1
 DEFAULT_SPLITS = ("train", "val", "test")
 GEO_CHANNEL_SETS = {
     "common4": {
@@ -61,6 +63,21 @@ GEO_CHANNEL_SETS = {
 GEO_CHANNELS = GEO_CHANNEL_SETS["common4"]
 GEO_CHANNEL_SET = "common4"
 SAR_CHANNELS = ("wind_speed",)
+PMW_SOURCE_CHANNELS = {
+    "AMSR2_GCOMW1": "TB_A89.0V",
+    "GMI_GPM": "TB_89.0V",
+    "SSMIS_F16": "TB_91.665V",
+    "SSMIS_F17": "TB_91.665V",
+    "SSMIS_F18": "TB_91.665V",
+}
+PMW_CHANNELS = {sensor: (channel,) for sensor, channel in PMW_SOURCE_CHANNELS.items()}
+PMW_SWATHS = {
+    "AMSR2_GCOMW1": "S5",
+    "GMI_GPM": "S1",
+    "SSMIS_F16": "S4",
+    "SSMIS_F17": "S4",
+    "SSMIS_F18": "S4",
+}
 ERA5_CHANNELS = (
     "precipitable_water",
     "sst",
@@ -219,6 +236,12 @@ def main() -> None:
         grid_size=args.grid_size,
         grid_resolution=args.grid_resolution,
         closest_match_hours=args.closest_match_hours,
+        include_pmw=args.include_pmw,
+        pmw_sensors=tuple(args.pmw_sensors),
+        pmw_max_time_gap_hours=args.pmw_max_time_gap_hours,
+        include_ibtracs=args.include_ibtracs,
+        ibtracs_file=args.ibtracs_file,
+        ibtracs_max_time_gap_hours=args.ibtracs_max_time_gap_hours,
         include_era5=args.include_era5,
         era5_channels=tuple(args.era5_channels),
         era5_max_time_gap_hours=args.era5_max_time_gap_hours,
@@ -294,6 +317,54 @@ def _parse_args() -> argparse.Namespace:
         help="Named GEO band set to export.",
     )
     parser.add_argument(
+        "--include-pmw",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.get("include_pmw", False)),
+        help="Export the nearest PMW swath on the shared SAR/GEO grid.",
+    )
+    parser.add_argument(
+        "--pmw-sensors",
+        nargs="+",
+        default=list(config.get("pmw_sensors", PMW_CHANNELS)),
+        choices=sorted(PMW_CHANNELS),
+        help="PMW imagers eligible for nearest-time matching.",
+    )
+    parser.add_argument(
+        "--pmw-max-time-gap-hours",
+        type=float,
+        default=float(
+            config.get("pmw_max_time_gap_hours", DEFAULT_PMW_MAX_TIME_GAP_HOURS)
+        ),
+        help="Maximum absolute SAR-to-PMW time difference.",
+    )
+    parser.add_argument(
+        "--include-ibtracs",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.get("include_ibtracs", False)),
+        help="Join the nearest complete IBTrACS row to each SAR sample.",
+    )
+    parser.add_argument(
+        "--ibtracs-file",
+        type=Path,
+        default=Path(
+            config.get(
+                "ibtracs_file",
+                data_root / "IBTrACs" / "ibtracs.ALL.list.v04r01.csv",
+            )
+        ),
+    )
+    parser.add_argument(
+        "--ibtracs-max-time-gap-hours",
+        type=float,
+        default=float(
+            config.get(
+                "ibtracs_max_time_gap_hours",
+                DEFAULT_IBTRACS_MAX_TIME_GAP_HOURS,
+            )
+        ),
+        help="Maximum absolute SAR-to-IBTrACS record time difference.",
+    )
+    parser.add_argument(
         "--include-era5",
         action=argparse.BooleanOptionalAction,
         default=bool(config.get("include_era5", False)),
@@ -364,6 +435,12 @@ def export_geo_sar_geotiffs(
     grid_size: int,
     grid_resolution: float,
     closest_match_hours: float,
+    include_pmw: bool = False,
+    pmw_sensors: Sequence[str] = tuple(PMW_CHANNELS),
+    pmw_max_time_gap_hours: float = DEFAULT_PMW_MAX_TIME_GAP_HOURS,
+    include_ibtracs: bool = False,
+    ibtracs_file: Path | None = None,
+    ibtracs_max_time_gap_hours: float = DEFAULT_IBTRACS_MAX_TIME_GAP_HOURS,
     center: str,
     shift_center: bool,
     pad: int,
@@ -373,6 +450,10 @@ def export_geo_sar_geotiffs(
     geo_channel_set: str = GEO_CHANNEL_SET,
     limit: int | None = None,
 ) -> None:
+    if pmw_max_time_gap_hours <= 0:
+        raise ValueError("pmw_max_time_gap_hours must be positive")
+    if ibtracs_max_time_gap_hours <= 0:
+        raise ValueError("ibtracs_max_time_gap_hours must be positive")
     data_root = data_root.expanduser().resolve()
     manifest_file = manifest_file.expanduser().resolve()
     output_root = output_root.expanduser()
@@ -382,6 +463,34 @@ def export_geo_sar_geotiffs(
     records = _read_manifest(manifest_file, data_root)
     _audit_geo_channels(records, geo_channels_by_sensor)
     era5_by_storm = _records_by_storm(records, "era5") if include_era5 else {}
+    selected_pmw_sensors = set(pmw_sensors)
+    pmw_by_storm = (
+        _records_by_storm(
+            [
+                record
+                for record in records
+                if record.source_type == "pmw"
+                and record.sensor in selected_pmw_sensors
+            ],
+            "pmw",
+        )
+        if include_pmw
+        else {}
+    )
+    ibtracs_by_storm: dict[str, pd.DataFrame] = {}
+    ibtracs_units: dict[str, str] = {}
+    if include_ibtracs:
+        resolved_ibtracs = (
+            ibtracs_file
+            if ibtracs_file is not None
+            else data_root / "IBTrACs" / "ibtracs.ALL.list.v04r01.csv"
+        )
+        ibtracs_by_storm, ibtracs_units = _read_ibtracs(
+            resolved_ibtracs,
+            storm_ids={
+                record.storm_id for record in records if record.source_type == "sar"
+            },
+        )
     by_split = {split: [] for split in splits}
     no_match_rows: list[dict[str, Any]] = []
     train_stats = StatsAccumulator.create()
@@ -425,9 +534,45 @@ def export_geo_sar_geotiffs(
                 )
                 continue
 
+            pmw = None
+            pmw_dt_minutes = None
+            if include_pmw:
+                candidate = _nearest_storm_record(pmw_by_storm, sar)
+                if candidate is not None:
+                    candidate_gap = (
+                        (candidate.timestamp - sar.timestamp).total_seconds() / 60.0
+                    )
+                    if abs(candidate_gap) <= pmw_max_time_gap_hours * 60.0:
+                        try:
+                            pmw_sample = _build_pmw_companion(
+                                candidate,
+                                sample["grid_lat"],
+                                sample["grid_lon"],
+                            )
+                            sample.update(pmw_sample)
+                            pmw = candidate
+                            pmw_dt_minutes = candidate_gap
+                        except (KeyError, OSError, ValueError) as error:
+                            no_match_rows.append(
+                                {
+                                    "split": split,
+                                    "storm_id": sar.storm_id,
+                                    "sar_observation_id": sar.observation_id,
+                                    "pmw_observation_id": candidate.observation_id,
+                                    "reason": f"PMW companion: {error}",
+                                }
+                            )
+
+            ibtracs_record, ibtracs_dt_minutes = _match_ibtracs_record(
+                ibtracs_by_storm,
+                sar,
+                ibtracs_max_time_gap_hours,
+            )
+
             sample_id = _sample_id(sar, geo)
             geo_path = split_dir / f"{sample_id}_geo.tif"
             era5_path = split_dir / f"{sample_id}_era5.tif" if sample.get("era5") is not None else None
+            pmw_path = split_dir / f"{sample_id}_pmw.tif" if pmw is not None else None
             sar_path = split_dir / f"{sample_id}_sar.tif"
             tags = _metadata_tags(
                 sample_id=sample_id,
@@ -435,6 +580,10 @@ def export_geo_sar_geotiffs(
                 geo=geo,
                 dt_minutes=dt_minutes,
                 sample=sample,
+                pmw=pmw,
+                pmw_dt_minutes=pmw_dt_minutes,
+                ibtracs_record=ibtracs_record,
+                ibtracs_dt_minutes=ibtracs_dt_minutes,
             )
             _write_geotiff(
                 geo_path,
@@ -452,6 +601,15 @@ def export_geo_sar_geotiffs(
                     sample["era5_band_names"],
                     sample["transform"],
                     tags | {"role": "context", "source_type": "era5"},
+                )
+            if pmw_path is not None:
+                _write_geotiff(
+                    pmw_path,
+                    sample["pmw"],
+                    sample["pmw_mask"],
+                    sample["pmw_channels"],
+                    sample["transform"],
+                    tags | {"role": "companion", "source_type": "pmw"},
                 )
             _write_geotiff(
                 sar_path,
@@ -485,6 +643,7 @@ def export_geo_sar_geotiffs(
                 "target_channels": json.dumps(sample["sar_channels"]),
                 "geo_path": str(geo_path.relative_to(output_root)),
                 "era5_path": str(era5_path.relative_to(output_root)) if era5_path is not None else "",
+                "pmw_path": str(pmw_path.relative_to(output_root)) if pmw_path is not None else "",
                 "sar_path": str(sar_path.relative_to(output_root)),
                 "geo_observation_id": geo.observation_id,
                 "sar_observation_id": sar.observation_id,
@@ -497,6 +656,11 @@ def export_geo_sar_geotiffs(
                 "era5_observation_id": _optional_observation_id(sample.get("era5")),
                 "era5_timestamp": _optional_isoformat(sample.get("era5_timestamp")),
                 "era5_channels": json.dumps(sample.get("era5_channels", ())),
+                "pmw_observation_id": _optional_observation_id(pmw),
+                "pmw_timestamp": _optional_isoformat(pmw.timestamp if pmw is not None else None),
+                "pmw_dt_minutes": pmw_dt_minutes if pmw_dt_minutes is not None else "",
+                "pmw_sensor": pmw.sensor if pmw is not None else "",
+                "pmw_channels": json.dumps(sample.get("pmw_channels", ())),
                 "sar_channels": json.dumps(sample["sar_channels"]),
                 "grid_size": grid_size,
                 "grid_resolution": grid_resolution,
@@ -505,6 +669,13 @@ def export_geo_sar_geotiffs(
                 "ibtracs_center_lat": sar.ibtracs_center_lat,
                 "ibtracs_center_lon": sar.ibtracs_center_lon,
             }
+            row.update(
+                _ibtracs_manifest_fields(
+                    ibtracs_record,
+                    ibtracs_dt_minutes,
+                    source_columns=ibtracs_units,
+                )
+            )
             rows.append(row)
             by_split[split].append(row)
 
@@ -515,6 +686,23 @@ def export_geo_sar_geotiffs(
     (output_root / "stats.json").write_text(
         json.dumps(train_stats.to_jsonable(), indent=2), encoding="utf-8"
     )
+    if include_ibtracs:
+        (output_root / "ibtracs_schema.json").write_text(
+            json.dumps(
+                {
+                    "source_file": str(resolved_ibtracs),
+                    "match_reference": "SAR timestamp",
+                    "max_time_gap_hours": ibtracs_max_time_gap_hours,
+                    "column_prefix": "ibtracs_",
+                    "units": {
+                        f"ibtracs_{name.lower()}": unit
+                        for name, unit in ibtracs_units.items()
+                    },
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
     if no_match_rows:
         _write_manifest(output_root / "skipped.csv", no_match_rows)
 
@@ -539,7 +727,7 @@ def _read_manifest(manifest_file: Path, data_root: Path) -> list[Observation]:
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Manifest is missing columns: {sorted(missing)}")
-    frame = frame[frame["source_type"].isin({"geo", "sar", "era5"})]
+    frame = frame[frame["source_type"].isin({"geo", "sar", "pmw", "era5"})]
 
     records: list[Observation] = []
     for _, row in frame.iterrows():
@@ -569,6 +757,11 @@ def _read_manifest(manifest_file: Path, data_root: Path) -> list[Observation]:
             continue
         if record.source_type == "sar" and "wind_speed" not in record.variables:
             continue
+        if record.source_type == "pmw":
+            if record.sensor not in PMW_SOURCE_CHANNELS:
+                continue
+            if PMW_SOURCE_CHANNELS[record.sensor] not in record.variables:
+                continue
         records.append(record)
     return records
 
@@ -633,6 +826,147 @@ def _nearest_storm_record(
         timed_records,
         key=lambda record: abs((record.timestamp - reference.timestamp).total_seconds()),
     )
+
+
+def _read_ibtracs(
+    path: Path,
+    storm_ids: Iterable[str] | None = None,
+) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    """Read IBTrACS once, retaining every source column and its unit."""
+    path = path.expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"IBTrACS file does not exist: {path}")
+    units_row = pd.read_csv(
+        path,
+        nrows=1,
+        dtype=str,
+        keep_default_na=False,
+        low_memory=False,
+    ).iloc[0]
+    source_columns = list(units_row.index)
+    required = {"USA_ATCF_ID", "ISO_TIME"}
+    missing = required - set(source_columns)
+    if missing:
+        raise ValueError(f"IBTrACS is missing columns: {sorted(missing)}")
+    requested_storms = (
+        {str(value).strip().upper() for value in storm_ids}
+        if storm_ids is not None
+        else None
+    )
+    selected_chunks = []
+    for chunk in pd.read_csv(
+        path,
+        skiprows=[1],
+        dtype=str,
+        keep_default_na=False,
+        low_memory=False,
+        chunksize=25_000,
+    ):
+        chunk["USA_ATCF_ID"] = chunk["USA_ATCF_ID"].str.strip().str.upper()
+        if requested_storms is not None:
+            chunk = chunk.loc[chunk["USA_ATCF_ID"].isin(requested_storms)]
+        else:
+            chunk = chunk.loc[chunk["USA_ATCF_ID"] != ""]
+        if not chunk.empty:
+            selected_chunks.append(chunk)
+    frame = (
+        pd.concat(selected_chunks, ignore_index=True)
+        if selected_chunks
+        else pd.DataFrame(columns=source_columns)
+    )
+    frame["_ibtracs_timestamp"] = pd.to_datetime(
+        frame["ISO_TIME"], format="mixed", utc=True, errors="coerce"
+    )
+    by_storm = {
+        storm_id: group.reset_index(drop=True)
+        for storm_id, group in frame.loc[frame["USA_ATCF_ID"] != ""].groupby(
+            "USA_ATCF_ID", sort=False
+        )
+    }
+    units = {
+        str(column): str(units_row.get(column, "")).strip()
+        for column in frame.columns
+        if column != "_ibtracs_timestamp"
+    }
+    return by_storm, units
+
+
+def _match_ibtracs_record(
+    by_storm: Mapping[str, pd.DataFrame],
+    reference: Observation,
+    max_time_gap_hours: float,
+) -> tuple[Mapping[str, Any] | None, float | None]:
+    records = by_storm.get(reference.storm_id)
+    if records is None or records.empty or reference.timestamp is None:
+        return None, None
+    gaps = (records["_ibtracs_timestamp"] - reference.timestamp).abs()
+    if gaps.isna().all():
+        return None, None
+    index = gaps.idxmin()
+    gap_minutes = float(
+        (records.loc[index, "_ibtracs_timestamp"] - reference.timestamp).total_seconds()
+        / 60.0
+    )
+    if abs(gap_minutes) > max_time_gap_hours * 60.0:
+        return None, None
+    record = records.loc[index].drop(labels=["_ibtracs_timestamp"]).to_dict()
+    return record, gap_minutes
+
+
+def _ibtracs_manifest_fields(
+    record: Mapping[str, Any] | None,
+    dt_minutes: float | None,
+    source_columns: Iterable[str] = (),
+) -> dict[str, Any]:
+    """Return convenient intensity values plus the complete matched row."""
+    fields = {
+        f"ibtracs_{str(name).lower()}": "" for name in source_columns
+    }
+    if record is None:
+        fields.update(
+            {
+                "ibtracs_dt_minutes": "",
+                "ibtracs_msw_kt": "",
+                "ibtracs_msw_ms": "",
+                "ibtracs_msw_source": "",
+                "ibtracs_mslp_hpa": "",
+                "ibtracs_mslp_source": "",
+            }
+        )
+        return fields
+    fields.update(
+        {
+            f"ibtracs_{str(name).lower()}": value
+            for name, value in record.items()
+        }
+    )
+    wind, wind_source = _preferred_ibtracs_value(
+        record, ("WMO_WIND", "USA_WIND")
+    )
+    pressure, pressure_source = _preferred_ibtracs_value(
+        record, ("WMO_PRES", "USA_PRES")
+    )
+    fields.update(
+        {
+            "ibtracs_dt_minutes": dt_minutes if dt_minutes is not None else "",
+            "ibtracs_msw_kt": wind if wind is not None else "",
+            "ibtracs_msw_ms": wind * 0.514444 if wind is not None else "",
+            "ibtracs_msw_source": wind_source,
+            "ibtracs_mslp_hpa": pressure if pressure is not None else "",
+            "ibtracs_mslp_source": pressure_source,
+        }
+    )
+    return fields
+
+
+def _preferred_ibtracs_value(
+    record: Mapping[str, Any], columns: Sequence[str]
+) -> tuple[float | None, str]:
+    for column in columns:
+        value = _optional_float(record.get(column))
+        if value is not None:
+            return value, column
+    return None, ""
 
 
 def _audit_geo_channels(
@@ -899,6 +1233,55 @@ def _load_sar_channels(
             values = values.isel(time=0)
         result[channel] = (np.asarray(values.values, dtype=np.float32), lat, lon)
     return result
+
+
+def _build_pmw_companion(
+    pmw: Observation,
+    grid_lat: np.ndarray,
+    grid_lon: np.ndarray,
+) -> dict[str, Any]:
+    channels = PMW_CHANNELS[pmw.sensor]
+    fields = _load_pmw_channels(pmw, channels)
+    _require_channels("pmw", channels, fields)
+    regridded = [
+        _regrid(*fields[name], grid_lat, grid_lon) for name in channels
+    ]
+    array = np.stack([values for values, _ in regridded]).astype(np.float32)
+    masks = np.stack([mask for _, mask in regridded])
+    mask = np.all(masks & np.isfinite(array), axis=0)
+    if not mask.any():
+        raise ValueError("No valid PMW pixels after regridding")
+    return {
+        "pmw": array,
+        "pmw_mask": mask,
+        "pmw_band_masks": masks,
+        "pmw_channels": tuple(channels),
+    }
+
+
+def _load_pmw_channels(
+    observation: Observation,
+    channels: Sequence[str],
+) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    group = f"passive_microwave/{PMW_SWATHS[observation.sensor]}"
+    with xr.open_dataset(
+        observation.path,
+        group=group,
+        engine="h5netcdf",
+        decode_times=False,
+    ) as source:
+        dataset = source.load()
+    source_channel = PMW_SOURCE_CHANNELS[observation.sensor]
+    if source_channel not in dataset:
+        raise KeyError(f"PMW dataset is missing channel in {group}: {source_channel}")
+    lat = _coordinate_values(dataset, "latitude", "lat")
+    lon = _fix_longitudes(_coordinate_values(dataset, "longitude", "lon"))
+    values = np.asarray(dataset[source_channel].values, dtype=np.float32).squeeze()
+    if values.ndim != 2:
+        raise ValueError(
+            f"PMW channel {source_channel} in {observation.path} has shape {values.shape}"
+        )
+    return {channel: (values, lat, lon) for channel in channels}
 
 
 def _load_era5_channels(
@@ -1209,8 +1592,12 @@ def _metadata_tags(
     geo: Observation,
     dt_minutes: float,
     sample: Mapping[str, Any],
+    pmw: Observation | None = None,
+    pmw_dt_minutes: float | None = None,
+    ibtracs_record: Mapping[str, Any] | None = None,
+    ibtracs_dt_minutes: float | None = None,
 ) -> dict[str, Any]:
-    return {
+    result = {
         "sample_id": sample_id,
         "storm_id": sar.storm_id,
         "split": sar.split,
@@ -1230,7 +1617,36 @@ def _metadata_tags(
         "center_lon": sample["center_lon"],
         "ibtracs_center_lat": sar.ibtracs_center_lat,
         "ibtracs_center_lon": sar.ibtracs_center_lon,
+        "pmw_observation_id": _optional_observation_id(pmw),
+        "pmw_timestamp": _optional_isoformat(pmw.timestamp if pmw is not None else None),
+        "pmw_dt_minutes": pmw_dt_minutes if pmw_dt_minutes is not None else "",
+        "pmw_sensor": pmw.sensor if pmw is not None else "",
+        "pmw_channels": json.dumps(sample.get("pmw_channels", ())),
     }
+    important_ibtracs = _ibtracs_manifest_fields(
+        ibtracs_record, ibtracs_dt_minutes
+    )
+    result.update(
+        {
+            key: value
+            for key, value in important_ibtracs.items()
+            if key
+            in {
+                "ibtracs_dt_minutes",
+                "ibtracs_sid",
+                "ibtracs_name",
+                "ibtracs_iso_time",
+                "ibtracs_nature",
+                "ibtracs_usa_sshs",
+                "ibtracs_msw_kt",
+                "ibtracs_msw_ms",
+                "ibtracs_msw_source",
+                "ibtracs_mslp_hpa",
+                "ibtracs_mslp_source",
+            }
+        }
+    )
+    return result
 
 
 def _optional_observation_id(observation: Observation | None) -> str:
@@ -1249,6 +1665,10 @@ def _update_stats(stats: StatsAccumulator, sample: Mapping[str, Any]) -> None:
         for index, channel in enumerate(sample.get("era5_band_names", ())):
             stats.update("era5", channel, sample["era5_array"][index], sample["era5_band_masks"][index])
             stats.update("era5", f"band_{index}", sample["era5_array"][index], sample["era5_band_masks"][index])
+    if sample.get("pmw") is not None:
+        for index, channel in enumerate(sample.get("pmw_channels", ())):
+            stats.update("pmw", channel, sample["pmw"][index], sample["pmw_band_masks"][index])
+            stats.update("pmw", f"band_{index}", sample["pmw"][index], sample["pmw_band_masks"][index])
     for index, channel in enumerate(sample["sar_channels"]):
         stats.update("sar", channel, sample["sar"][index], sample["sar_band_masks"][index])
         stats.update("sar", f"band_{index}", sample["sar"][index], sample["sar_band_masks"][index])
@@ -1258,7 +1678,10 @@ def _write_manifest(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     if not rows:
         path.write_text("", encoding="utf-8")
         return
-    fieldnames = list(rows[0].keys())
+    # Optional companions/track matches can add columns only on later rows.
+    # Preserve insertion order while taking the union so mixed-match exports
+    # remain writable and unmatched cells are emitted as blanks.
+    fieldnames = list(dict.fromkeys(key for row in rows for key in row))
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()

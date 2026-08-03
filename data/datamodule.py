@@ -40,6 +40,8 @@ class PairedDataModule(pl.LightningDataModule):
         random_flips: bool = True,
         include_test_in_train: bool = False,
         require_era5: bool = False,
+        include_pmw: bool = False,
+        include_ibtracs: bool = False,
         normalization: str | None = None,
         target_normalization: str | None = None,
         robust_clip: float = DEFAULT_ROBUST_CLIP,
@@ -75,6 +77,8 @@ class PairedDataModule(pl.LightningDataModule):
         self.random_flips = random_flips
         self.include_test_in_train = include_test_in_train
         self.require_era5 = require_era5
+        self.include_pmw = bool(include_pmw)
+        self.include_ibtracs = bool(include_ibtracs)
         self.normalization = normalization
         self.target_normalization = target_normalization
         self.robust_clip = robust_clip
@@ -144,6 +148,8 @@ class PairedDataModule(pl.LightningDataModule):
             random_flips=data_cfg.get("random_flips", True),
             include_test_in_train=data_cfg.get("include_test_in_train", False),
             require_era5=require_era5,
+            include_pmw=data_cfg.get("include_pmw", False),
+            include_ibtracs=data_cfg.get("include_ibtracs", False),
             normalization=data_cfg.get("normalization"),
             target_normalization=data_cfg.get("target_normalization"),
             robust_clip=float(data_cfg.get("robust_clip", DEFAULT_ROBUST_CLIP)),
@@ -301,6 +307,8 @@ class PairedDataModule(pl.LightningDataModule):
             center_crop_size=self.center_crop_size,
             augment=augment,
             require_era5=self.require_era5,
+            include_pmw=self.include_pmw,
+            include_ibtracs=self.include_ibtracs,
             normalization=self.normalization,
             target_normalization=self.target_normalization,
             robust_clip=self.robust_clip,
@@ -321,6 +329,14 @@ class PairedDataModule(pl.LightningDataModule):
                 "ERA5 timestamps from the %s split.",
                 dataset.filtered_stale_era5_count,
                 self.max_era5_time_gap_hours,
+                split,
+            )
+        if dataset.filtered_missing_pmw_count:
+            rank_zero_info(
+                "PMW is enabled: filtered %d of %d samples without a PMW "
+                "companion from the %s split.",
+                dataset.filtered_missing_pmw_count,
+                dataset.manifest_sample_count,
                 split,
             )
         return dataset

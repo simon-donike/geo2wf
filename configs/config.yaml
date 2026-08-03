@@ -9,6 +9,10 @@ export:
   grid_size: 256
   grid_resolution: 0.027
   closest_match_hours: 0.5
+  include_pmw: false
+  pmw_max_time_gap_hours: 12.0
+  include_ibtracs: false
+  ibtracs_max_time_gap_hours: 6.1
   center: image_center
   shift_center: true
   pad: 8
@@ -23,6 +27,8 @@ data:
   target_size: [256, 256]
   random_flips: true
   include_test_in_train: true  # Add the test split to training; validation stays separate.
+  include_pmw: false  # Return PMW companions and filter unmatched rows when enabled.
+  include_ibtracs: false  # Return complete prefixed IBTrACS metadata when enabled.
   loader:
     batch_size: 4  # Number of samples per optimization step.
     num_workers: 0  # Number of worker processes used by PyTorch DataLoader.

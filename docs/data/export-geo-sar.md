@@ -22,12 +22,14 @@ uv run python scripts/export_geo_sar_geotiffs.py \
 1. Read and validate manifest observations.
 2. Group records by split and storm.
 3. Match each SAR occurrence with its closest GEO occurrence within `closest_match_hours`.
-4. Confirm required GEO and SAR channels exist.
-5. Select a crop center, build the shared geographic grid, and optionally shift it to include the IBTrACS center.
-6. Regrid continuous source channels and construct joint validity.
-7. Optionally select a temporally close ERA5 analysis and regrid it.
-8. Write condition, context, and target rasters plus one manifest row.
-9. Update channel statistics when processing the train split.
+4. Optionally match the closest supported PMW swath within `pmw_max_time_gap_hours`.
+5. Match the nearest IBTrACS track row and retain every source field.
+6. Confirm required GEO and SAR channels exist.
+7. Select a crop center, build the shared geographic grid, and optionally shift it to include the IBTrACS center.
+8. Regrid continuous source channels and construct joint validity.
+9. Optionally select a temporally close ERA5 analysis and regrid it.
+10. Write condition, companion, context, and target rasters plus one manifest row.
+11. Update channel statistics when processing the train split.
 
 Failures caused by missing channels, file I/O, or invalid geometry are recorded and skipped instead of aborting the entire export.
 
@@ -53,6 +55,11 @@ An ERA5 record is rejected when its nearest-time gap exceeds 3.1 hours in the ER
 | `grid_size` | `256` | square output dimension |
 | `grid_resolution` | `0.027` | degrees per output pixel |
 | `closest_match_hours` | `0.5` | maximum GEO–SAR time gap |
+| `include_pmw` | `false` | export the nearest PMW companion |
+| `pmw_max_time_gap_hours` | `12.0` | maximum SAR–PMW time gap |
+| `include_ibtracs` | `false` | join the complete nearest IBTrACS record |
+| `ibtracs_file` | `<data_root>/IBTrACs/ibtracs.ALL.list.v04r01.csv` | IBTrACS all-basins CSV |
+| `ibtracs_max_time_gap_hours` | `6.1` | maximum SAR–IBTrACS time gap |
 | `center` | `image_center` | initial crop center strategy |
 | `shift_center` | `true` | include IBTrACS center if near crop edge |
 | `pad` | `8` | source-read padding around the requested grid |
@@ -69,5 +76,15 @@ An ERA5 record is rejected when its nearest-time gap exceeds 3.1 hours in the ER
     `batch["center"]` means the latter. Storm metrics therefore remain anchored
     to IBTrACS even when the storm is not at the geometric center of the
     GeoTIFF.
+
+When PMW is available, the exporter writes `<sample_id>_pmw.tif` on exactly the
+same grid as GEO and SAR. The manifest records its path, sensor, channel,
+timestamp, and signed `pmw_dt_minutes`. A missing or unreadable PMW companion
+does not discard an otherwise valid GEO–SAR pair.
+
+The nearest IBTrACS row is expanded into `ibtracs_<source-column>` manifest
+columns. Convenience fields include `ibtracs_msw_kt`, `ibtracs_msw_ms`,
+`ibtracs_mslp_hpa`, their selected WMO/USA source columns, and the signed match
+offset. `ibtracs_schema.json` records source units for every retained field.
 
 See the complete [configuration reference](../reference/configuration.md).
