@@ -1,17 +1,30 @@
 :root {
-  --ink: #17242b;
+  /* FDL brand palette. Change --spot to theme another lab or case study. */
+  --fdl-black: #000000;
+  --fdl-space: #111427;
+  --lab-heliolab: #e83e4d;
+  --lab-earth-systems: #019fa2;
+  --lab-lunar: #808080;
+  --lab-fdl-med: #99d7db;
+  --lab-flight: #3a7ba3;
+  --lab-nio: #7853c9;
+  --spot: var(--lab-earth-systems);
+
+  --ink: var(--fdl-space);
   --muted: #66747b;
   --surface: #ffffff;
   --surface-alt: #f4f6f6;
   --border: #d7dddf;
-  --accent: #0a7378;
-  --accent-soft: #dfeeee;
+  --accent: var(--spot);
+  --accent-ink: color-mix(in srgb, var(--spot) 70%, var(--fdl-space));
+  --accent-soft: color-mix(in srgb, var(--spot) 12%, white);
   --red: #c8463d;
   --sar: #707d83;
   color: var(--ink);
   background: #ffffff;
   color-scheme: light;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Helvetica Neue", "Helvetica New", Helvetica, Arial, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -40,6 +53,14 @@ select {
 button,
 select {
   cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .topbar {
@@ -173,7 +194,7 @@ select {
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -208,7 +229,7 @@ p {
   position: absolute;
   left: 10px;
   top: 5px;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 7px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -234,7 +255,7 @@ p {
   position: absolute;
   right: 10px;
   top: 10px;
-  color: var(--accent);
+  color: var(--accent-ink);
   pointer-events: none;
 }
 
@@ -288,7 +309,7 @@ p {
   width: 100%;
   height: 3px;
   margin: 9px 0 5px;
-  accent-color: var(--red);
+  accent-color: var(--accent);
 }
 
 .timeline footer {
@@ -650,7 +671,7 @@ dialog {
 }
 
 dialog::backdrop {
-  background: #17242b66;
+  background: rgb(17 20 39 / 40%);
 }
 
 .dialog-close {
