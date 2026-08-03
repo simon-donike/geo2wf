@@ -23,11 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from data.dataset import (  # noqa: E402
-    _normalize,
-    _normalized_distance_to_center,
-    _solar_time_features,
+from geo2wf.data.features import (  # noqa: E402
+    normalized_distance_to_center as _normalized_distance_to_center,
+    solar_time_features as _solar_time_features,
 )
+from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
     GEO_CHANNEL_SETS,
@@ -41,7 +41,7 @@ from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     _regrid,
     _regrid_continuous,
 )
-from src.ERA5Residual import ERA5ResidualRegressor  # noqa: E402
+from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
 from scripts.pmw_conditioning import (
     nearest_supported_pmw,
     pmw_audit_row,
@@ -83,8 +83,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--limit", type=int, default=None, help="Debug: rows per storm.")
+    parser.add_argument(
+        "--device", default="cuda" if torch.cuda.is_available() else "cpu"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Debug: rows per storm."
+    )
     return parser.parse_args()
 
 
@@ -145,24 +149,32 @@ def _output_metrics(
     field = output.squeeze().cpu()
     valid = valid.squeeze().cpu().bool() & torch.isfinite(field)
     if int(valid.sum()) < math.ceil(0.05 * field.numel()):
-        return {key: math.nan for key in ("msw", "r64", "p90", "core_mean", "rmw", "mean")}
+        return {
+            key: math.nan for key in ("msw", "r64", "p90", "core_mean", "rmw", "mean")
+        }
     values = field[valid]
     core = field[valid & (distance_km <= 100.0)]
     bin_width = float(
         torch.nanmedian(torch.abs(torch.diff(distance_km[:, CROP_SIZE // 2])))
     )
     bin_width = bin_width if math.isfinite(bin_width) and bin_width > 0 else 3.0
-    radii = torch.arange(
-        0.0, float(distance_km[valid].max()) + bin_width, bin_width
-    )
+    radii = torch.arange(0.0, float(distance_km[valid].max()) + bin_width, bin_width)
     radial_distance, radial_wind = [], []
     for radius in radii:
         annulus = valid & (distance_km >= radius) & (distance_km < radius + bin_width)
         if annulus.any():
             radial_distance.append(float(radius))
             radial_wind.append(float(field[annulus].mean()))
-    r64 = [radius for radius, wind in zip(radial_distance, radial_wind) if wind >= R64_THRESHOLD_MS]
-    rmw = radial_distance[radial_wind.index(max(radial_wind))] if radial_wind else math.nan
+    r64 = [
+        radius
+        for radius, wind in zip(radial_distance, radial_wind)
+        if wind >= R64_THRESHOLD_MS
+    ]
+    rmw = (
+        radial_distance[radial_wind.index(max(radial_wind))]
+        if radial_wind
+        else math.nan
+    )
     return {
         "msw": float(values.max()),
         "r64": max(r64) if r64 else math.nan,
@@ -183,9 +195,7 @@ def _era5_fields(
         raise ValueError("ERA5 dataset has no time steps")
     selected_time = times[index]
     lat = _era5_coordinate_values(dataset, "latitude", "lat", index)
-    lon = _fix_longitudes(
-        _era5_coordinate_values(dataset, "longitude", "lon", index)
-    )
+    lon = _fix_longitudes(_era5_coordinate_values(dataset, "longitude", "lon", index))
     if lat.ndim == 1 and lon.ndim == 1:
         lon, lat = np.meshgrid(lon, lat)
     return {
@@ -262,7 +272,6 @@ def _prepare_sample(
     condition = torch.cat([geo_tensor, era5_tensor], dim=0)
     condition = _center_crop(torch.nan_to_num(condition) * valid)
 
-
     era5_wind = _center_crop(torch.nan_to_num(era5_wind) * valid)
     era5_wind_physical = _center_crop(torch.nan_to_num(era5_wind_physical) * valid)
     valid = _center_crop(valid)
@@ -305,9 +314,11 @@ def main() -> None:
             record.path, group="rectilinear", engine="h5netcdf", decode_times=True
         ) as source:
             era5_by_storm[storm] = source[list(ERA5_CHANNELS)].load()
-    model = ERA5ResidualRegressor.load_from_checkpoint(
-        args.checkpoint, map_location="cpu"
-    ).eval().to(args.device)
+    model = (
+        ERA5ResidualRegressor.load_from_checkpoint(args.checkpoint, map_location="cpu")
+        .eval()
+        .to(args.device)
+    )
     args.output_root.mkdir(parents=True, exist_ok=True)
 
     with torch.inference_mode():
@@ -330,7 +341,13 @@ def main() -> None:
                     )
                     if status != "matched":
                         audit_rows.append(
-                            pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                            pmw_audit_row(
+                                geo,
+                                selected_pmw,
+                                selected_gap,
+                                "skipped",
+                                reason=status,
+                            )
                         )
                         continue
                     grid_lat, grid_lon = _make_grid(
@@ -338,19 +355,27 @@ def main() -> None:
                     )
                     try:
                         pmw_features, _, selected_gap = prepare_pmw_condition_features(
-                            geo, selected_pmw, grid_lat, grid_lon, stats,
+                            geo,
+                            selected_pmw,
+                            grid_lat,
+                            grid_lon,
+                            stats,
                             max_time_gap_hours=pmw_max_gap_hours,
                             include_time_offset=pmw_include_offset,
                             crop_size=CROP_SIZE,
                         )
                     except (KeyError, OSError, ValueError) as error:
                         audit_rows.append(
-                            pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                            pmw_audit_row(
+                                geo,
+                                selected_pmw,
+                                selected_gap,
+                                "skipped",
+                                reason=str(error),
+                            )
                         )
                         continue
-                batch, distance_km = _prepare_sample(
-                    geo, era5_by_storm[storm], stats
-                )
+                batch, distance_km = _prepare_sample(geo, era5_by_storm[storm], stats)
                 if pmw_features is not None:
                     batch["condition"] = torch.cat(
                         [batch["condition"], pmw_features.unsqueeze(0)], dim=1

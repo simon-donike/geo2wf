@@ -1,74 +1,123 @@
 # Training & checkpoints
 
-## Launch a run
+## Launch a composed run
 
 ```bash
-uv run python train.py --config configs/config_geo_sar_10bands_era5.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
 ```
 
-Optional flags:
+Model switching is configuration, not Python dispatch:
 
 ```bash
-uv run python train.py \
-  --config configs/config.yaml \
-  --limit-val-batches 5 \
-  --ckpt-path /path/to/last.ckpt
+uv run geo2wf-train model=conditional_diffusion
+uv run geo2wf-train model=residual_diffusion
 ```
 
 ## Startup sequence
 
-1. Machine-local environment values are loaded.
-2. BLAS thread counts and Matplotlib cache location are bounded.
-3. YAML is parsed and float32 matrix-multiply precision is set.
-4. A timestamped run directory is created and shared with DDP child processes.
-5. W&B directories are nested inside that run.
-6. Python/PyTorch/worker seeds are set through Lightning.
-7. Data and model are built.
-8. Callbacks and trainer are configured.
-9. `trainer.fit(..., ckpt_path=...)` begins training or resume.
+1. Load machine-local environment values and bound numerical-library threads.
+2. Compose the selected groups and resolve environment interpolation.
+3. Create one timestamped run directory, reused by DDP child processes.
+4. Save `resolved-config.yaml`, source provenance, and `run-manifest.json`.
+5. Seed Python, PyTorch, and DataLoader workers through Lightning.
+6. Instantiate the data module and model from their local `_target_` values.
+7. Build `DataSpec` and reject incompatible channel/companion contracts.
+8. Configure CSV logging, optional W&B, callbacks, scheduler, and checkpoints.
+9. Call `trainer.fit(model, datamodule=..., ckpt_path=...)`.
 
-## What gets optimized
+## Resume a run
 
-The diffusion model uses AdamW over trainable parameters in its online diffusion process. The EMA copy never receives gradients. The residual model uses AdamW with configurable weight decay. Both use `ReduceLROnPlateau` in `min` mode.
-
-## Logging
-
-When enabled, W&B receives:
-
-- step/epoch training loss and backward-step counter;
-- validation loss and reconstruction metrics;
-- physical and storm-centric metrics;
-- georeferenced condition/prediction/target panels with masks, centers, footprints, and optional ERA5 wind;
-- training-subset reconstruction panels; and
-- optimizer learning rate when the logger is active.
-
-Disable external logging with either:
+`--ckpt-path` restores model weights and Lightning training state: optimizer,
+scheduler, callbacks, epoch, and global step.
 
 ```bash
-export WANDB_MODE=offline
+uv run geo2wf-train \
+  model=deterministic_residual \
+  --ckpt-path /path/to/last.ckpt
 ```
 
-or:
+The selected model and data configuration must still match the checkpoint.
+Diffusion additionally checks saved schedule coefficients and timestep count.
+
+## Initialize weights only
+
+Use `--weights-only-path` for deliberate transfer learning. It strict-loads the
+state dictionary but starts optimizer, scheduler, epoch, and step state fresh.
+It is mutually exclusive with `--ckpt-path`.
 
 ```bash
-export WANDB_DISABLED=true
+uv run geo2wf-train \
+  model=conditional_diffusion \
+  --weights-only-path /path/to/source.ckpt
 ```
 
-`WANDB_DISABLED` also prevents construction of the logger. Offline mode retains local W&B artifacts for later sync.
+Changed condition widths or architecture keys still fail strict loading. A
+partial-load policy must be an explicit model-specific migration, not an
+implicit training flag.
 
-## Resume safety
+## Stage 1 and Stage 2
 
-A Lightning checkpoint restores model, optimizer, scheduler, global step, and the custom backward-step counter. Diffusion resume additionally compares saved beta coefficients with the configured forward process. A mismatch raises an error.
+```bash
+# Stage 1
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual
 
-Use this rule:
+# Stage 2
+GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=residual_diffusion_deterministic_baseline
+```
 
-- same schedule, timestep count, channels, and architecture → resume is plausible;
-- changed schedule or target definition → start fresh;
-- added EMA to an older compatible checkpoint → supported; EMA is initialized from online weights;
-- changed input bands or context width → treat as transfer learning, not resume.
+The baseline is loaded strictly, frozen, kept in evaluation mode, excluded from
+the optimizer, and stored inside the Stage 2 checkpoint.
 
 ## Checkpoint selection
 
-ERA5 production configs save the best two checkpoints by the lowest `val/eye_structure_score` plus `last.ckpt`. This composite weights eye MAE 0.5, inner-core MAE 1, radial-profile MAE 1, RMW error 0.1, and eye-to-eyewall contrast error 1.
+When `trainer.checkpoint.monitor` is null, the model supplies its standard
+monitor and mode. The callback writes under `<run>/checkpoints/` using the
+configured filename, top-k count, and `save_last` policy.
 
-A lower score is better. Eye-center displacement is logged when gated quality conditions pass but is not included in this composite.
+A monitor must be emitted for the validation coverage in use. Very small
+validation limits can omit storm metrics when no sample satisfies their
+coverage gates; use `val/loss` temporarily or increase coverage for a smoke run.
+
+## Logging and run artifacts
+
+Every run creates:
+
+```text
+<default_root_dir>/<timestamp>_modular/
+├── checkpoints/
+├── metrics/metrics.csv
+├── resolved-config.yaml
+├── run-manifest.json
+├── source-diff.patch
+├── source-snapshot/
+└── wandb/                         # only used when W&B is active/offline
+```
+
+The run manifest records status, resolved config, checkpoint provenance, split
+policy, git/source state, runtime metadata, final metrics, and failures. CSV
+logging and manifests do not depend on W&B.
+
+## W&B modes
+
+```bash
+export WANDB_DISABLED=true   # no W&B logger
+export WANDB_MODE=offline    # local W&B files, no online traffic
+```
+
+Models import neither W&B nor Matplotlib; reconstruction payloads are routed through
+the tracking layer, whose callback can also drain standardized events.
+
+## Resume safety
+
+- Same architecture, channel order, schedule, and target definition: resume is plausible.
+- Changed optimizer only: use weights-only initialization if intentional.
+- Changed diffusion schedule or target normalization: start a fresh run.
+- Changed bands, companions, or spatial contract: select compatible config and checkpoint.
+- Older compatible checkpoints remain strict-loadable; only new checkpoints receive `geo2wf` metadata.

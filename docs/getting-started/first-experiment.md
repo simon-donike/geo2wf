@@ -1,89 +1,103 @@
 # First experiment
 
-This path proves the complete contract with two exported pairs per split and a deliberately bounded training loop.
+This smoke path exercises the canonical exporter, composed configuration,
+`DataSpec` validation, Lightning lifecycle, CSV logging, and physical prediction
+contract with deliberately bounded work.
 
-## 1. Export a tiny GEO–SAR dataset
+## 1. Export two GEO–SAR pairs per split
 
 ```bash
-uv run python scripts/export_geo_sar_geotiffs.py \
+uv run geo2wf-export geo-sar \
   --config configs/config.yaml \
   --limit 2
 ```
 
-Expected layout:
+The command retains the exporter's established full-YAML/flag interface. It
+writes raw values and masks, then derives `stats.json` from the training split
+only.
 
 ```text
 data/geotiff/geo_sar/
 ├── stats.json
-├── train/
-│   ├── manifest.csv
-│   ├── <sample>_geo.tif
-│   └── <sample>_sar.tif
-├── val/
-└── test/
+├── train/manifest.csv
+├── val/manifest.csv
+└── test/manifest.csv
 ```
 
-The export matches each SAR observation to the closest acceptable GEO observation from the same split, builds a shared 256 × 256 EPSG:4326 grid, regrids channels, writes raw physical values and masks, then calculates statistics from the **training split only**.
-
-## 2. Check one batch
+## 2. Inspect the composed data contract
 
 ```bash
 uv run python - <<'PY'
-import yaml
-from data import PairedDataModule
+from geo2wf.config import compose_config, instantiate_datamodule
 
-with open("configs/config.yaml", encoding="utf-8") as stream:
-    config = yaml.safe_load(stream)
+config = compose_config([
+    "data=geo_sar_common4",
+    "model=conditional_diffusion",
+    "model.condition_channels=9",
+    "model.model_channels=10",
+])
+datamodule = instantiate_datamodule(config)
+datamodule.setup("fit")
+print(datamodule.data_spec)
 
-dm = PairedDataModule.from_config(config)
-dm.setup("fit")
-batch = next(iter(dm.train_dataloader()))
+batch = next(iter(datamodule.train_dataloader()))
 for key in ("condition", "target", "condition_mask", "target_mask"):
     print(key, tuple(batch[key].shape), batch[key].dtype)
+print("sample ids:", batch["sample_id"])
+print("metadata records:", len(batch["meta"]))
 PY
 ```
 
-For the 4-band baseline, expect `condition` to have 8 channels: four GEO bands, distance to the IBTrACS center, local-solar-time sine/cosine, and normalized solar-zenith angle. The model appends a one-channel condition-validity mask internally, which is why `model.in_channels` is 9.
+The four-band export supplies eight data-condition channels: four GEO bands,
+distance to the IBTrACS center, local-solar-time sine/cosine, and solar zenith.
+The diffusion model appends the condition mask, so this smoke override uses
+`condition_channels=9`; noisy target concatenation makes `model_channels=10`.
+The production ERA5 config already contains its correct widths and needs no
+such override.
 
-## 3. Bound the smoke run
-
-Copy the base config to a local ignored or temporary config and set:
-
-```yaml
-trainer:
-  max_epochs: 1
-  limit_train_batches: 1
-  limit_val_batches: 1
-  enable_checkpointing: false
-logging:
-  wandb:
-    enabled: false
-```
-
-Then launch:
+## 3. Run one training and validation batch
 
 ```bash
-uv run python train.py --config /path/to/smoke.yaml
+WANDB_DISABLED=true uv run geo2wf-train \
+  data=geo_sar_common4 \
+  model=conditional_diffusion \
+  model.condition_channels=9 \
+  model.model_channels=10 \
+  model.num_timesteps=10 \
+  model.sampling_method=ddim \
+  model.sampling_timesteps=2 \
+  model.validation_reconstruction_batches=0 \
+  trainer.max_epochs=1 \
+  trainer.limit_train_batches=1 \
+  trainer.limit_val_batches=1 \
+  trainer.enable_checkpointing=false \
+  data.loader.num_workers=0
 ```
 
-!!! note "Why a copied config?"
-    Keeping smoke-only limits out of `configs/config.yaml` avoids accidentally carrying them into a real experiment. `train.py` also accepts `--limit-val-batches`, but train-batch limiting currently comes from YAML.
+Hydra overrides are temporary: no copied smoke YAML is required. Use
+`WANDB_DISABLED=true` to prove that CSV logging and the run manifest do not
+depend on W&B.
 
-## 4. Read the signals
+## 4. Inspect the run directory
 
-A healthy run should:
+The command prints the timestamped directory created under `logs/`. It contains:
 
-- print the seeded Lightning setup and U-Net time-embedding message;
-- report `train/loss` and `val/loss` without NaNs;
-- perform a reverse-process reconstruction for the configured validation batch;
-- report normalized PSNR, SSIM, and L1; and
-- report physical metrics when reversible target statistics are available.
+```text
+logs/<timestamp>_modular/
+├── resolved-config.yaml
+├── run-manifest.json
+├── source-diff.patch
+├── metrics/metrics.csv
+└── source-snapshot/              # relevant untracked source, when present
+```
 
-Sampling is much more expensive than one training loss step. For a faster exploratory validation path, use a DDIM config with fewer reverse steps; see [Sampling](../models/sampling.md).
+A successful smoke run has finite `train/loss` and `val/loss`. Reverse sampling
+is reduced to one reconstruction batch and two DDIM steps; scientific runs
+should use the model config's validated sampling settings.
 
 ## Next
 
-- Inspect [what each batch field means](../data/dataset-contract.md).
-- Read the [main two-stage workflow](../models/two-stage.md).
-- Learn [how standalone diffusion loss is formed](../models/conditional-diffusion.md).
-- Compare [all experiment presets](../experiments/index.md).
+- [Configuration groups and override rules](../experiments/configuration.md)
+- [Training, resume, and transfer](../experiments/training.md)
+- [Dataset contract](../data/dataset-contract.md)
+- [Two-stage workflow](../models/two-stage.md)

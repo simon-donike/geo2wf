@@ -1,0 +1,17 @@
+max_epochs: 1000
+accelerator: auto
+devices: 1
+precision: 32
+deterministic: true
+float32_matmul_precision: high
+log_every_n_steps: 10
+enable_checkpointing: true
+limit_train_batches: 1.0
+limit_val_batches: 1.0
+default_root_dir: logs
+checkpoint:
+  filename: epoch={epoch:03d}-step={step}
+  monitor: null
+  mode: min
+  save_top_k: 2
+  save_last: true

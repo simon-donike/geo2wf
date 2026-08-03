@@ -301,5 +301,5 @@ For a serious model comparison, report at least:
 5. qualitative reconstructions using fixed latents; and
 6. split policy, number of storms, normalization, and sampling settings.
 
-!!! caution "The checked-in split policy"
-    Presets combine the test split into training. Do not label resulting test metrics as held-out generalization unless `include_test_in_train` was disabled before training.
+!!! caution "Check the resolved split policy"
+    Modular data configs default to `include_test_in_train: false`, while some historical full-YAML presets set it to `true`. Read `resolved-config.yaml`; do not call metrics held-out generalization when test was merged into training.

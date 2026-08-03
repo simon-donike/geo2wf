@@ -73,8 +73,9 @@ Checkpoints use the composite score. Inspect individual members when judging sha
 
 ```bash
 GEO2WF_BASELINE_CKPT=/path/to/deterministic.ckpt \
-  python train.py \
-  --config configs/config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=residual_diffusion_deterministic_baseline
 ```
 
 The deterministic module is loaded as a frozen child, kept in evaluation mode, excluded from the optimizer, and saved with the residual-diffusion checkpoint.
@@ -82,8 +83,9 @@ The deterministic module is loaded as a frozen child, kept in evaluation mode, e
 For the ERA5-only ablation:
 
 ```bash
-python train.py \
-  --config configs/config_geo_sar_10bands_era5_diffusion_residual.yaml
+uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=residual_diffusion
 ```
 
 Continue to [Sampling](sampling.md) or [Evaluation](../experiments/evaluation.md).

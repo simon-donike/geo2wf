@@ -2,49 +2,68 @@
 
 ```text
 geo2wf/
-├── configs/                 experiment presets
-├── data/
-│   ├── dataset.py           GeoTIFF → normalized sample dictionary
-│   └── datamodule.py        split datasets and Lightning loaders
-├── scripts/
-│   ├── export_geo_sar_geotiffs.py
-│   ├── export_geo_pmw_geotiffs.py
-│   └── local_env.py
-├── src/
-│   ├── PixelDiffusion.py    conditional diffusion LightningModule
-│   ├── ERA5Residual.py      deterministic physical residual control
-│   ├── wind_metrics.py      storm-centric metrics
-│   ├── reconstruction_logging.py shared W&B image assembly
-│   └── DenoisingDiffusionProcess/
-│       ├── forward.py       Gaussian forward process
-│       ├── beta_schedules.py
-│       ├── samplers/        DDPM and DDIM
-│       └── backbones/       ConvNeXt-style U-Net
-├── tests/                   unit and learning-behavior tests
-├── src/utils/plotting.py        exported-pair visualization
-├── train.py                 runtime entry point
-├── mkdocs.yml               this documentation site
-└── pyproject.toml           package and tool dependencies
+├── configs/
+│   ├── modular.yaml
+│   ├── data/ model/ trainer/ logging/
+│   ├── experiment/ export/
+│   └── config*.yaml                 compatibility research presets
+├── src/geo2wf/
+│   ├── cli/
+│   ├── config/
+│   ├── data/
+│   │   ├── contracts.py collation.py datamodule.py
+│   │   ├── datasets/paired_geotiff.py
+│   │   └── manifests.py raster_io.py normalization.py features.py
+│   ├── models/
+│   │   ├── base.py
+│   │   ├── conditional_diffusion/
+│   │   ├── deterministic_residual/
+│   │   └── residual_diffusion/
+│   ├── diffusion/
+│   │   ├── process.py forward_process.py beta_schedules.py
+│   │   ├── samplers/
+│   │   └── backbones/
+│   ├── objectives/ metrics/ visualization/ tracking/
+│   ├── evaluation/ inference/ preprocessing/
+│   └── training.py
+├── scripts/                            maintained workflow implementations
+├── tests/
+├── train.py and legacy modules         forwarding compatibility adapters
+├── mkdocs.yml
+└── pyproject.toml
 ```
 
-## Responsibilities by file
+## Where to make a change
 
-| File | Read this when… |
+| Responsibility | Canonical location |
 |---|---|
-| `train.py` | tracing config-to-Trainer wiring, run directories, W&B, checkpoints |
-| `data/dataset.py` | debugging manifest columns, raster masks, normalization, derived ERA5, augmentation |
-| `data/datamodule.py` | debugging splits, validation ordering, worker or batch behavior |
-| `src/PixelDiffusion.py` | changing diffusion loss, EMA, sampling validation, metrics, images |
-| `src/ERA5Residual.py` | changing the deterministic baseline or physical loss |
-| `src/reconstruction_logging.py` | changing shared W&B sample assembly or media sizing |
-| `src/wind_metrics.py` | changing storm geometry, radial bins, eye gates, metric availability |
-| `DenoisingDiffusionProcess.py` | changing reverse-loop orchestration or conditional concatenation |
-| `samplers/DDPM.py` / `DDIM.py` | changing posterior coefficients or timestep traversal |
-| `scripts/export_*` | changing source pairing, grids, regridding, tags, or statistics |
+| training composition and Trainer wiring | `src/geo2wf/training.py`, `src/geo2wf/config/` |
+| batch/capability types | `src/geo2wf/data/contracts.py` |
+| metadata-safe collation | `src/geo2wf/data/collation.py` |
+| split loaders and `DataSpec` | `src/geo2wf/data/datamodule.py` |
+| paired GeoTIFF behavior | `src/geo2wf/data/datasets/paired_geotiff.py` |
+| raster reads, normalization, derived features, augmentation, sampling | named modules under `src/geo2wf/data/` |
+| common model lifecycle contract | `src/geo2wf/models/base.py` |
+| one model's network/objective/sampling | its descriptive package under `src/geo2wf/models/` |
+| forward diffusion and schedules | `src/geo2wf/diffusion/forward_process.py`, `beta_schedules.py` |
+| reverse sampling | `src/geo2wf/diffusion/samplers/` |
+| reusable loss primitives | `src/geo2wf/objectives/` |
+| physical/storm metrics | `src/geo2wf/metrics/`, framework adaptation in `evaluation/` |
+| plotting | `src/geo2wf/visualization/` |
+| W&B/CSV/media/run records | `src/geo2wf/tracking/` |
+| strict loading and unified prediction | `src/geo2wf/inference/` |
+| source pairing and export | reusable APIs under `preprocessing/`; thin maintained scripts under `scripts/` |
+
+Do not add new behavior to `data/`, CamelCase `src/*.py`, the root `train.py`,
+or the old `src/DenoisingDiffusionProcess/` paths. They exist so old imports and
+checkpoints remain usable.
 
 ## Test map
 
-The tests cover beta schedules, the forward process, samplers, reproducible sampling, dataset helpers and ERA5 behavior, normalization/data-learning repairs, residual model learning, pixel-diffusion helpers, and storm metrics. Run all tests after changing any config-facing behavior:
+The suite covers composition, contract validation, metadata collation, strict
+checkpoint compatibility, data transforms and sampling, schedules, samplers,
+model learning behavior, prediction shapes/seeds, metric aggregation, and
+architecture boundaries.
 
 ```bash
 uv run python -m pytest
@@ -52,9 +71,9 @@ uv run python -m pytest
 
 <div class="grid cards" markdown>
 
-- **[Configuration reference](configuration.md)** — all checked-in YAML keys.
-- **[Commands & environment](commands.md)** — copy-ready command index.
-- **[Troubleshooting](troubleshooting.md)** — common shape, data, metric, and runtime failures.
-- **[Glossary](glossary.md)** — sensor, diffusion, and cyclone terms.
+- **[Adding components](adding-components.md)** — extension workflow and acceptance checklist.
+- **[Configuration reference](configuration.md)** — grouped keys and legacy translation.
+- **[Commands](commands.md)** — copy-ready installed commands.
+- **[Troubleshooting](troubleshooting.md)** — common data, channel, checkpoint, and runtime failures.
 
 </div>

@@ -1,0 +1,5 @@
+wandb:
+  enabled: true
+  project: geo2wf
+  name: null
+  log_model: false

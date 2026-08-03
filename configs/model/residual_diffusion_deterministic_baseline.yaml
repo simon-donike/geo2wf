@@ -1,0 +1,6 @@
+defaults:
+  - residual_diffusion
+  - _self_
+
+baseline_source: deterministic
+baseline_checkpoint_path: ${oc.env:GEO2WF_BASELINE_CKPT}

@@ -1,51 +1,53 @@
 # Start here
 
-The main geo2wf experiment is a short vertical pipeline with a two-stage model at the end:
+The supported workflow is an installable `geo2wf` package with a composed
+training configuration and thin export, evaluation, and inference commands.
 
 ```mermaid
 flowchart LR
-  A[Source manifest] --> B[Paired GeoTIFFs]
-  B --> C[PairedImageDataset]
-  C --> D[Stage 1 baseline]
-  D --> E[Stage 2 diffusion]
-  E --> F[Physical evaluation]
+  A[Source manifest] --> B[geo2wf-export]
+  B --> C[WindFieldBatch + DataSpec]
+  C --> D[geo2wf-train]
+  D --> E[CheckpointLoader]
+  E --> F[geo2wf-evaluate / geo2wf-infer]
 ```
 
 ## Recommended reading order
 
-1. Read [Two-stage baseline + diffusion](../models/two-stage.md).
-2. Inspect the [real model inputs and training target](../data/index.md).
-3. [Install the environment](installation.md).
-4. Run the [first smoke experiment](first-experiment.md).
-5. Compare the [experiment presets](../experiments/index.md).
+1. [Install and verify the package](installation.md).
+2. Run the [first smoke experiment](first-experiment.md).
+3. Learn [how config groups and overrides compose](../experiments/configuration.md).
+4. Read the [two-stage scientific workflow](../models/two-stage.md).
+5. Use the [command reference](../reference/commands.md) for evaluation and inference.
 
 ## Main runtime pieces
 
-`train.py`
-: Loads one YAML file, creates a timestamped run directory, seeds workers, builds the `PairedDataModule`, selects a model by `model.type`, and configures W&B and checkpoints.
+`geo2wf-train`
+: Composes `data`, `model`, `trainer`, `logging`, and optional `experiment`
+  groups; validates the model against the dataset `DataSpec`; creates the run
+  directory; and starts Lightning.
 
 `PairedDataModule`
-: Builds train, validation, and test datasets from split manifests. Validation includes a storm-stratified loader and a small qualitative training subset.
+: Builds datasets and loaders from split manifests. Its canonical collator
+  stacks tensors while keeping metadata sample-oriented.
 
-`ERA5ResidualRegressor`
-: Stage 1. Produces one physical wind field as ERA5 plus a learned correction.
+`WindFieldLightningModule`
+: Defines the common training-objective and physical-prediction extension
+  points used by modular models.
 
-`ERA5ResidualDiffusion`
-: Stage 2. Freezes Stage 1 and learns the signed SAR-minus-baseline residual as a diffusion problem.
+`CheckpointLoader` and `PredictionService`
+: Strict-load old or new checkpoints and expose deterministic and ensemble
+  predictions through one physical-unit `PredictionBatch`.
 
 ## Choose a route
 
-### Run the complete stack
-
-Start with [Installation](installation.md), then train the two presets in the order shown on the [two-stage workflow page](../models/two-stage.md#training-sequence).
-
-### Run a small smoke test
-
-Use [First experiment](first-experiment.md). The smoke path limits export and training work without inventing synthetic observations.
-
-### Review the research design
-
-Read [The reconstruction problem](../concepts/problem.md), [System architecture](../concepts/architecture.md), and [Evaluation](../experiments/evaluation.md).
+- To prove the installation and configuration, follow [First experiment](first-experiment.md).
+- To train the main stack, use the [Stage 1 → Stage 2 sequence](../models/two-stage.md#training-sequence).
+- To add a component, follow [Adding models, datasets, and metrics](../reference/adding-components.md).
+- To understand package ownership, read [Modular package architecture](../concepts/modular-architecture.md).
 
 !!! warning "Dataset access is external"
-    Exporters default to the larger tropical-cyclone data tree under `/lustre/scratch/1054/tropical_cyclone_dynamics/data`. Source observations are not bundled with the repository. Existing local exports work when their split manifests and `stats.json` are present.
+    Source observations are not bundled with the repository. Exporters normally
+    read the larger tropical-cyclone archive selected by `TCD_DATA_ROOT` or
+    `--data-root`. An existing export only needs split manifests, rasters, and
+    `stats.json`.
