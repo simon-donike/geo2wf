@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,currentMarker,geoFrames=[],sarFrames=[],postProcessing=true,showNwp=false,graphModel="model_a",assetBaseUrl="";
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=true,showNwp=false,graphModel="model_a",assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
@@ -12,6 +12,7 @@ function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true,attributionControl:false});
   map.createPane("geoPane");map.getPane("geoPane").style.zIndex=350;
   map.createPane("sarPane");map.getPane("sarPane").style.zIndex=340;
+  map.createPane("pmwPane");map.getPane("pmwPane").style.zIndex=345;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
     maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
@@ -22,10 +23,16 @@ function initMap(){
   const geostatKey=L.control({position:"bottomright"});
   geostatKey.onAdd=()=>{const el=L.DomUtil.create("div","geostat-key");el.innerHTML=`<strong>Geostationary · ${data.geostat_color_scale.channel}</strong><i></i><span><b>${data.geostat_color_scale.min} K</b><b>${data.geostat_color_scale.mid} K</b><b>${data.geostat_color_scale.max} K</b></span>`;return el};
   geostatKey.addTo(map);
+  const pmwKey=L.control({position:"bottomright"});
+  pmwKey.onAdd=()=>{const el=L.DomUtil.create("div","pmw-key");el.id="pmwKey";el.hidden=true;el.innerHTML=`<strong>PMW brightness temperature · ${data.pmw_color_scale.channel}</strong><i></i><span><b>${data.pmw_color_scale.min} K</b><b>${data.pmw_color_scale.mid} K</b><b>${data.pmw_color_scale.max} K</b></span>`;return el};
+  pmwKey.addTo(map);
   layers=L.layerGroup().addTo(map);
   geoLayers=L.layerGroup().addTo(map);
   sarLayers=L.layerGroup().addTo(map);
-  L.control.layers(null,{"SAR wind fields":sarLayers},{collapsed:false,position:"topright"}).addTo(map);
+  pmwLayers=L.layerGroup();
+  L.control.layers(null,{"SAR wind fields":sarLayers,"PMW 89–92 GHz":pmwLayers},{collapsed:false,position:"topright"}).addTo(map);
+  map.on("overlayadd",event=>{if(event.layer===pmwLayers)$("#pmwKey").hidden=false});
+  map.on("overlayremove",event=>{if(event.layer===pmwLayers)$("#pmwKey").hidden=true});
 }
 function switcher(){
   $("#stormSwitcher").innerHTML=`<label><span>Storm</span><select id="stormSelect">${data.storms.map(s=>`<option value="${s.id}" ${s.id===storm.id?"selected":""}>${s.id}${s.name?` · ${s.name}`:""} · ${s.basin}</option>`).join("")}</select></label>`;
@@ -35,8 +42,10 @@ function renderMap(){
   layers.clearLayers();
   geoLayers.clearLayers();
   sarLayers.clearLayers();
+  pmwLayers.clearLayers();
   geoFrames=[];
   sarFrames=[];
+  pmwFrames=[];
   const coords=storm.records.map(r=>[r.lat,r.lon]);
   L.polyline(coords,{color:"#ffffff",weight:8,opacity:.5}).addTo(layers);
   L.polyline(coords,{color:"#e65445",weight:4,opacity:1}).addTo(layers).bindTooltip(`${storm.id} · Storm track`);
@@ -62,6 +71,17 @@ function renderMap(){
     const show=()=>{image.addTo(sarLayers);dot.addTo(sarLayers)};
     const hide=()=>{sarLayers.removeLayer(image);sarLayers.removeLayer(dot)};
     sarFrames.push({record:r,show,hide});
+    if(!$("#animationMode").checked)show();
+  });
+  (storm.pmw_observations||[]).forEach(observation=>{
+    const o=observation.overlay;
+    const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.92,interactive:true,className:"pmw-overlay",pane:"pmwPane"})
+      .bindTooltip(`<strong>PMW · ${o.sensor}</strong><br>${full(observation.time)}<br>${o.channel}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} K<br>Shared color scale: ${data.pmw_color_scale.min}–${data.pmw_color_scale.max} K`,{className:"pmw-tooltip"});
+    const dot=L.circleMarker([observation.lat,observation.lon],{radius:4,color:"#262068",weight:1.5,fillColor:"#2bb3b1",fillOpacity:.9})
+      .bindTooltip(`PMW · ${o.sensor}<br>${full(observation.time)}`);
+    const show=()=>{image.addTo(pmwLayers);dot.addTo(pmwLayers)};
+    const hide=()=>{pmwLayers.removeLayer(image);pmwLayers.removeLayer(dot)};
+    pmwFrames.push({time:dt(observation.time).getTime(),show,hide});
     if(!$("#animationMode").checked)show();
   });
   currentMarker=L.circleMarker(coords[0],{radius:8,color:"#fff",weight:3,fillColor:"#e65445",fillOpacity:1}).addTo(layers);
@@ -135,10 +155,11 @@ function current(){
   const time=dt(r.time).getTime();$$(".cursor-line").forEach(l=>{const start=+l.dataset.start,end=+l.dataset.end,visible=time>=start&&time<=end,xp=C.l+(time-start)/(end-start)*(C.w-C.l-C.r);l.style.display=visible?"":"none";if(visible){l.setAttribute("x1",xp);l.setAttribute("x2",xp)}})
 }
 function stop(){clearInterval(timer);timer=null;$("#playButton").textContent="▶"}
-function resetAnimation(){geoFrames.forEach(frame=>frame.hide());sarFrames.forEach(frame=>frame.hide())}
-function showAnimationFrame(record){geoFrames.find(frame=>frame.record===record)?.show(false);sarFrames.find(frame=>frame.record===record)?.show()}
-function restoreManualLayers(){resetAnimation();sarFrames.forEach(frame=>frame.show())}
-function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=enabled?360:340}
+function resetAnimation(){geoFrames.forEach(frame=>frame.hide());sarFrames.forEach(frame=>frame.hide());pmwFrames.forEach(frame=>frame.hide())}
+function nearestFrame(frames,record,maxGapHours){const target=dt(record.time).getTime(),frame=frames.reduce((best,item)=>!best||Math.abs(item.time-target)<Math.abs(best.time-target)?item:best,null);return frame&&Math.abs(frame.time-target)<=maxGapHours*3600000?frame:null}
+function showAnimationFrame(record){geoFrames.find(frame=>frame.record===record)?.show(false);sarFrames.find(frame=>frame.record===record)?.show();nearestFrame(pmwFrames,record,3)?.show()}
+function restoreManualLayers(){resetAnimation();sarFrames.forEach(frame=>frame.show());pmwFrames.forEach(frame=>frame.show())}
+function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=enabled?360:340;map.getPane("pmwPane").style.zIndex=enabled?355:345}
 function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function selectStorm(id){
   stop();storm=data.storms.find(s=>s.id===id);switcher();renderMap();
@@ -146,11 +167,11 @@ function selectStorm(id){
   graphModel="model_a";$("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;
   $(".model-toolbar").hidden=!inferenceAvailable;$("#inferenceNotice").hidden=inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;$("#methodNote").hidden=!inferenceAvailable;$(".graph-toolbar").hidden=!inferenceAvailable;
   postProcessing=inferenceAvailable&&$("#postProcessing").checked;
-  $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormTitle").textContent=storm.name?`${storm.name} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;
+  $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormTitle").textContent=storm.name?`${storm.name} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;$("#pmwCount").textContent=storm.pmw_matches||0;
   const sl=$("#timeSlider");sl.max=storm.records.length-1;sl.value=0;$("#startDate").textContent=short(storm.start);$("#midDate").textContent=short(storm.records[Math.floor(storm.records.length/2)].time);$("#endDate").textContent=short(storm.end);charts();current()
 }
-$("#timeSlider").oninput=()=>{stop();current()};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
-$("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked);event.target.checked?resetAnimation():restoreManualLayers()};
+$("#timeSlider").oninput=()=>{stop();if($("#animationMode").checked)resetAnimation();current();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value])};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
+$("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked);if(event.target.checked){resetAnimation();showAnimationFrame(storm.records[+$("#timeSlider").value])}else restoreManualLayers()};
 $("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=data.models[graphModel].label;charts();current()};
 $("#showNwp").onchange=event=>{showNwp=event.target.checked;$("#nwpLegend").hidden=!showNwp;charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
