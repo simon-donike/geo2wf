@@ -29,6 +29,7 @@
       <div class="system-summary"><span>Selected system</span><strong id="stormTitle">—</strong></div>
       <div><span>Geostationary</span><strong id="geoCount">—</strong></div>
       <div><span>SAR matches</span><strong id="sarCount">—</strong></div>
+      <div><span>PMW swaths</span><strong id="pmwCount">—</strong></div>
       <div class="category"><span>IBTrACS</span><strong id="categoryValue">—</strong></div>
     </div>
     <div class="model-toolbar"><label for="modelSelector">Graph model</label><select id="modelSelector"><option value="model_a">Model A</option><option value="model_b">Model B</option><option value="model_c">Model C</option></select></div>
@@ -39,7 +40,7 @@
     <div class="graph-toolbar"><label class="postprocess-toggle"><input id="showNwp" type="checkbox"><i></i><span>NWP forecasts</span></label><label class="postprocess-toggle"><input id="postProcessing" type="checkbox" checked><i></i><span>Post-processing</span></label></div>
   </aside>
 </main>
-<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The red series is derived from the selected graph model; the selector does not change the map or summary cards. The black reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. The optional NWP overlay shows each available forecast as a muted gray dashed line. All SAR swaths share a fixed 0–60+ m/s scale. Click a three-hour acquisition dot to show its fixed-scale CMI_C15 image; click it again to hide it. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
+<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The red series is derived from the selected graph model; the selector does not change the map or summary cards. The black reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. The optional NWP overlay shows each available forecast as a muted gray dashed line. All SAR swaths share a fixed 0–60+ m/s scale. PMW imagery uses the comparable vertically polarized 89–92 GHz band from AMSR2, GMI, and SSMIS with a shared 150–300 K scale and transparent no-data pixels. Click a three-hour acquisition dot to show its fixed-scale CMI_C15 image; click it again to hide it. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
 <div class="loading" id="loading"><span></span><p>Preparing storm tracks…</p></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="data-config.js"></script>
