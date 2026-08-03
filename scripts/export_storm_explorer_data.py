@@ -22,6 +22,7 @@ from export_geo_sar_geotiffs import (
     _load_pmw_channels,
     _load_sar_channels,
     _read_manifest,
+    _regrid,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,12 +148,8 @@ def export_pmw_array(
     field = np.asarray(field, dtype=np.float32).squeeze()
     lat = np.asarray(lat, dtype=np.float32).squeeze()
     lon = np.asarray(lon, dtype=np.float32).squeeze()
-    mask = (
-        np.asarray(mask, dtype=bool).squeeze()
-        & np.isfinite(field)
-        & np.isfinite(lat)
-        & np.isfinite(lon)
-    )
+    coordinate_mask = np.isfinite(lat) & np.isfinite(lon)
+    mask = np.asarray(mask, dtype=bool).squeeze() & np.isfinite(field) & coordinate_mask
     valid = field[mask]
     if not valid.size:
         return None
@@ -178,8 +175,14 @@ def export_pmw_array(
     return {
         "image": f"pmw/{filename}",
         "bounds": [
-            [finite_number(np.nanmin(lat[mask])), finite_number(np.nanmin(lon[mask]))],
-            [finite_number(np.nanmax(lat[mask])), finite_number(np.nanmax(lon[mask]))],
+            [
+                finite_number(np.nanmin(lat[coordinate_mask])),
+                finite_number(np.nanmin(lon[coordinate_mask])),
+            ],
+            [
+                finite_number(np.nanmax(lat[coordinate_mask])),
+                finite_number(np.nanmax(lon[coordinate_mask])),
+            ],
         ],
         "min": finite_number(valid.min()),
         "max": finite_number(valid.max()),
@@ -189,9 +192,16 @@ def export_pmw_array(
 
 
 def export_pmw_observations(storm, raw_records):
-    """Export the comparable 89--92 GHz vertical PMW series for one storm."""
+    """Export PMW on the nearest displayed geostationary-image extent."""
     start = pd.Timestamp(storm["start"])
     end = pd.Timestamp(storm["end"])
+    geo_overlays = [
+        (pd.Timestamp(record["time"]), record["geo_overlay"])
+        for record in storm["records"]
+        if record["geo_overlay"] is not None
+    ]
+    if not geo_overlays:
+        raise ValueError(f"Storm {storm['id']} has no geostationary overlay extents")
     observations = []
     for observation in sorted(
         (
@@ -205,13 +215,23 @@ def export_pmw_observations(storm, raw_records):
     ):
         channel = PMW_CHANNELS[observation.sensor][0]
         field, lat, lon = _load_pmw_channels(observation, [channel])[channel]
-        mask = np.isfinite(field) & np.isfinite(lat) & np.isfinite(lon)
+        _, geo_overlay = min(
+            geo_overlays,
+            key=lambda item: abs((item[0] - observation.timestamp).total_seconds()),
+        )
+        (south, west), (north, east) = geo_overlay["bounds"]
+        size = int(geo_overlay["size"])
+        grid_lon, grid_lat = np.meshgrid(
+            np.linspace(west, east, size),
+            np.linspace(north, south, size),
+        )
+        field, mask = _regrid(field, lat, lon, grid_lat, grid_lon)
         overlay = export_pmw_array(
             observation.observation_id,
             field,
             mask,
-            lat,
-            lon,
+            grid_lat,
+            grid_lon,
             observation.sensor,
             channel,
         )
