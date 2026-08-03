@@ -164,3 +164,7 @@ linear transform is therefore a tail-capacity ablation, not a neutral replacemen
    current two-storm in-sample calibration.
 5. Keep the K=10 ensemble for uncertainty reporting, but rank it using robust
    peak, high-wind-bin error, radial structure, and interval coverage together.
+
+## Post-processing follow-up
+
+The completed gain/cap/median sweep is documented in [Model C post-processing ablation](postprocessing-ablation.md), including corrected storm-level calibration folds and machine-readable artifact paths.
