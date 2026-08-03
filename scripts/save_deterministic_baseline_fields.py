@@ -51,6 +51,13 @@ from scripts.run_storm_diffusion_inference import (  # noqa: E402
     _normalize,
 )
 from train import build_model, resolve_runtime_config  # noqa: E402
+from scripts.pmw_conditioning import (
+    nearest_supported_pmw,
+    pmw_audit_row,
+    pmw_condition_settings,
+    prepare_pmw_condition_features,
+    supported_pmw_by_storm,
+)
 from data.dataset import _normalized_distance_to_center, _solar_time_features  # noqa: E402
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
@@ -77,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--stats", type=Path, default=DEFAULT_STATS)
+    parser.add_argument("--stats", type=Path, default=None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
@@ -195,10 +202,14 @@ def main() -> None:
     args = parse_args()
     if args.batch_size < 1:
         raise ValueError("--batch-size must be positive")
-    for path in (args.stats, args.config, args.checkpoint, args.manifest):
+    for path in (args.config, args.checkpoint, args.manifest):
         if not path.is_file():
             raise FileNotFoundError(path)
-    stats = json.loads(args.stats.read_text(encoding="utf-8"))
+    config = resolve_runtime_config(yaml.safe_load(args.config.read_text(encoding="utf-8")))
+    stats_path = args.stats or Path(config["data"]["stats_file"])
+    if not stats_path.is_file():
+        raise FileNotFoundError(stats_path)
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
     records = _read_manifest(args.manifest, args.data_root)
     by_id = {record.observation_id: record for record in records}
     era5_by_storm = {}
@@ -210,7 +221,8 @@ def main() -> None:
             record.path, group="rectilinear", engine="h5netcdf", decode_times=True
         ) as source:
             era5_by_storm[storm] = source[list(ERA5_CHANNELS)].load()
-    config = resolve_runtime_config(yaml.safe_load(args.config.read_text(encoding="utf-8")))
+    pmw_enabled, pmw_max_gap_hours, pmw_include_offset = pmw_condition_settings(config)
+    pmw_records = supported_pmw_by_storm(records)
     model = build_model(config)
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     model.load_state_dict(checkpoint["state_dict"], strict=True)
@@ -227,16 +239,59 @@ def main() -> None:
             storm_dir = output_root / storm / "baseline-fields"
             storm_dir.mkdir(parents=True, exist_ok=True)
             storm_rows = list(reference.itertuples(index=False))
+            audit_rows = []
+            matched_count = 0
             for start in tqdm(
                 range(0, len(storm_rows), args.batch_size),
                 desc=f"baseline {storm}",
                 total=math.ceil(len(storm_rows) / args.batch_size),
             ):
                 chunk = storm_rows[start : start + args.batch_size]
-                prepared = [
-                    _prepare_sample(by_id[row.observation_id], era5_by_storm[storm], stats)
-                    for row in chunk
-                ]
+                prepared = []
+                matched_chunk = []
+                for row in chunk:
+                    geo = by_id[row.observation_id]
+                    selected_pmw = None
+                    selected_gap = None
+                    status = "disabled"
+                    if pmw_enabled:
+                        selected_pmw, selected_gap, status = nearest_supported_pmw(
+                            geo, pmw_records, max_time_gap_hours=pmw_max_gap_hours
+                        )
+                        if status != "matched":
+                            audit_rows.append(
+                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                            )
+                            continue
+                    sample = _prepare_sample(geo, era5_by_storm[storm], stats)
+                    if pmw_enabled:
+                        grid_lat, grid_lon = _make_grid(
+                            geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
+                        )
+                        try:
+                            pmw_features, _, selected_gap = prepare_pmw_condition_features(
+                                geo, selected_pmw, grid_lat, grid_lon, stats,
+                                max_time_gap_hours=pmw_max_gap_hours,
+                                include_time_offset=pmw_include_offset,
+                                crop_size=CROP_SIZE,
+                            )
+                        except (KeyError, OSError, ValueError) as error:
+                            audit_rows.append(
+                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                            )
+                            continue
+                        sample[0]["condition"] = torch.cat(
+                            [sample[0]["condition"], pmw_features.unsqueeze(0)], dim=1
+                        )
+                        audit_rows.append(
+                            pmw_audit_row(geo, selected_pmw, selected_gap, "matched")
+                        )
+                    prepared.append(sample)
+                    matched_chunk.append(row)
+                chunk = matched_chunk
+                if not prepared:
+                    continue
+                matched_count += len(chunk)
                 batch = {
                     key: torch.cat([item[0][key] for item in prepared], dim=0).to(args.device)
                     for key in prepared[0][0]
@@ -264,7 +319,11 @@ def main() -> None:
                             "dtype": "float32",
                         }
                     )
-            counts[storm] = len(storm_rows)
+            if pmw_enabled:
+                pd.DataFrame(audit_rows).to_csv(
+                    output_root / storm / "pmw-inference-audit.csv", index=False
+                )
+            counts[storm] = matched_count
     pd.DataFrame(rows).to_csv(output_root / "baseline-fields-manifest.csv", index=False)
     metadata = {
         "schema_version": 1,

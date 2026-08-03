@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+import yaml
 import xarray as xr
 from tqdm.auto import tqdm
 
@@ -41,10 +42,18 @@ from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     _regrid_continuous,
 )
 from src.ERA5Residual import ERA5ResidualRegressor  # noqa: E402
+from scripts.pmw_conditioning import (
+    nearest_supported_pmw,
+    pmw_audit_row,
+    pmw_condition_settings,
+    prepare_pmw_condition_features,
+    supported_pmw_by_storm,
+)
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
 DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_anna"
 DEFAULT_OUTPUT_ROOT = ROOT / "inference" / "inf_simon"
+DEFAULT_CONFIG = ROOT / "configs" / "config_geo_sar_10bands_era5_residual.yaml"
 DEFAULT_STATS = ROOT / "data" / "geotiff" / "geo_sar_10bands_era5" / "stats.json"
 DEFAULT_CHECKPOINT = (
     ROOT
@@ -70,7 +79,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--stats", type=Path, default=DEFAULT_STATS)
+    parser.add_argument("--stats", type=Path, default=None)
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -274,8 +284,12 @@ def _prepare_sample(
 
 def main() -> None:
     args = parse_args()
-    stats = json.loads(args.stats.read_text(encoding="utf-8"))
+    config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
+    stats_path = args.stats or Path(config["data"]["stats_file"])
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
     records = _read_manifest(args.manifest, args.data_root)
+    pmw_enabled, pmw_max_gap_hours, pmw_include_offset = pmw_condition_settings(config)
+    pmw_records = supported_pmw_by_storm(records)
     by_id = {record.observation_id: record for record in records}
     era5_records = {
         storm: next(
@@ -304,17 +318,55 @@ def main() -> None:
                 table = table.head(args.limit).copy()
             iterator = tqdm(table.itertuples(index=False), total=len(table), desc=storm)
             metric_rows, local_paths = [], []
-            for row in iterator:
+            kept_indices, audit_rows = [], []
+            for table_index, row in enumerate(iterator):
                 geo = by_id[row.observation_id]
+                selected_pmw = None
+                selected_gap = None
+                pmw_features = None
+                if pmw_enabled:
+                    selected_pmw, selected_gap, status = nearest_supported_pmw(
+                        geo, pmw_records, max_time_gap_hours=pmw_max_gap_hours
+                    )
+                    if status != "matched":
+                        audit_rows.append(
+                            pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                        )
+                        continue
+                    grid_lat, grid_lon = _make_grid(
+                        geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
+                    )
+                    try:
+                        pmw_features, _, selected_gap = prepare_pmw_condition_features(
+                            geo, selected_pmw, grid_lat, grid_lon, stats,
+                            max_time_gap_hours=pmw_max_gap_hours,
+                            include_time_offset=pmw_include_offset,
+                            crop_size=CROP_SIZE,
+                        )
+                    except (KeyError, OSError, ValueError) as error:
+                        audit_rows.append(
+                            pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                        )
+                        continue
                 batch, distance_km = _prepare_sample(
                     geo, era5_by_storm[storm], stats
                 )
+                if pmw_features is not None:
+                    batch["condition"] = torch.cat(
+                        [batch["condition"], pmw_features.unsqueeze(0)], dim=1
+                    )
                 batch = {key: value.to(args.device) for key, value in batch.items()}
                 prediction = model.predict_physical(batch)
                 metric_rows.append(
                     _output_metrics(prediction, batch["condition_mask"], distance_km)
                 )
                 local_paths.append(str(geo.path))
+                kept_indices.append(table_index)
+                if pmw_enabled:
+                    audit_rows.append(
+                        pmw_audit_row(geo, selected_pmw, selected_gap, "matched")
+                    )
+            table = table.iloc[kept_indices].copy().reset_index(drop=True)
             table["original_input_path"] = local_paths
             for column, key in {
                 "output_msw_ms": "msw",
@@ -327,6 +379,10 @@ def main() -> None:
                 table[column] = [metrics[key] for metrics in metric_rows]
             storm_dir = args.output_root / storm
             storm_dir.mkdir(parents=True, exist_ok=True)
+            if pmw_enabled:
+                pd.DataFrame(audit_rows).to_csv(
+                    storm_dir / "pmw-inference-audit.csv", index=False
+                )
             output_path = storm_dir / "inference-summary.csv"
             temporary_path = output_path.with_suffix(".csv.tmp")
             table.to_csv(temporary_path, index=False)

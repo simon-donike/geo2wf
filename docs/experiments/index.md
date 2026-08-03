@@ -18,6 +18,8 @@ controlled comparison.
 |---|---|---|---|---:|
 | `config_geo_sar_10bands_era5_residual.yaml` | improve ERA5 toward SAR | 10 GEO + 9 ERA5 + derived | **Stage 1 deterministic baseline** | 1 auto |
 | `config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` | refine frozen Stage 1 | same + Stage 1 field | **Stage 2 residual diffusion** | 2 auto |
+| `config_geo_sar_10bands_era5_pmw_residual.yaml` | Stage 1 with ≤1 h PMW | base + PMW value/mask/offset | PMW deterministic candidate | 2 auto |
+| `config_geo_sar_10bands_era5_pmw_diffusion_residual_deterministic.yaml` | refine PMW Stage 1 | same + PMW Stage 1 field | PMW diffusion candidate | 2 auto |
 | `config_geo_sar_10bands_era5_diffusion_residual.yaml` | refine ERA5 directly | 10 GEO + 9 ERA5 + derived | residual-diffusion ablation | 2 auto |
 | `config_geo_sar_10bands_era5.yaml` | GEO + ERA5 → SAR | 10 GEO + 9 ERA5 + derived | absolute diffusion | 2 auto |
 | `config.yaml` | GEO → SAR | 4 GEO + derived | basic absolute diffusion | 1 auto |

@@ -42,6 +42,9 @@
 | `include_test_in_train` | concatenate test into train |
 | `require_era5` | filter samples without context |
 | `include_pmw` | return PMW tensors and filter rows without a companion; default `false` |
+| `pmw_as_condition` | append normalized PMW, its validity mask, and optional timing to `condition` |
+| `max_pmw_time_gap_hours` | filter missing or stale PMW companions by absolute signed manifest offset |
+| `pmw_include_time_offset` | append the signed PMW offset mapped into `[0,1]` |
 | `include_ibtracs` | return all prefixed IBTrACS manifest metadata; default `false` |
 | `normalization` | `min-max` or `robust-zscore` for conditions |
 | `target_normalization` | optional target-specific method |

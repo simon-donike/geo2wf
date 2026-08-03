@@ -48,6 +48,13 @@ from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     _regrid_continuous,
 )
 from src.ERA5Residual import ERA5ResidualRegressor  # noqa: E402
+from scripts.pmw_conditioning import (
+    nearest_supported_pmw,
+    pmw_audit_row,
+    pmw_condition_settings,
+    prepare_pmw_condition_features,
+    supported_pmw_by_storm,
+)
 from train import build_model, resolve_runtime_config
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
@@ -95,7 +102,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--stats", type=Path, default=DEFAULT_STATS)
+    parser.add_argument("--stats", type=Path, default=None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
@@ -660,7 +667,6 @@ def _prepare_sample(
 def main() -> None:
     args = parse_args()
     started_utc = datetime.now(timezone.utc).isoformat()
-    stats = json.loads(args.stats.read_text(encoding="utf-8"))
     records = _read_manifest(args.manifest, args.data_root)
     by_id = {record.observation_id: record for record in records}
     era5_records = {
@@ -684,6 +690,10 @@ def main() -> None:
     config = resolve_runtime_config(
         yaml.safe_load(args.config.read_text(encoding="utf-8"))
     )
+    stats_path = args.stats or Path(config["data"]["stats_file"])
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
+    pmw_enabled, pmw_max_gap_hours, pmw_include_offset = pmw_condition_settings(config)
+    pmw_records = supported_pmw_by_storm(records)
     baseline_checkpoint_path = (
         config.get("model", {})
         .get("residual", {})
@@ -751,7 +761,7 @@ def main() -> None:
             else None
         ),
         "config": _file_metadata(args.config),
-        "stats": _file_metadata(args.stats),
+        "stats": _file_metadata(stats_path),
         "manifest": _file_metadata(args.manifest, sha256=False),
         "configured_guidance_scale": configured_guidance,
         "sampling": {
@@ -842,6 +852,7 @@ def main() -> None:
             if args.limit is not None:
                 reference_table = reference_table.head(args.limit).copy()
             rows = list(reference_table.itertuples(index=False))
+            audit_rows, matched_indices = [], []
             states: dict[float, dict[str, Any]] = {}
             for guidance in guidance_values:
                 storm_dir = output_roots[guidance] / storm
@@ -862,12 +873,51 @@ def main() -> None:
             )
             for start in iterator:
                 chunk = rows[start : start + args.batch_size]
-                prepared = [
-                    _prepare_sample(
-                        by_id[row.observation_id], era5_by_storm[storm], stats
-                    )
-                    for row in chunk
-                ]
+                prepared = []
+                matched_chunk = []
+                for chunk_index, row in enumerate(chunk):
+                    geo = by_id[row.observation_id]
+                    selected_pmw = None
+                    selected_gap = None
+                    status = "disabled"
+                    if pmw_enabled:
+                        selected_pmw, selected_gap, status = nearest_supported_pmw(
+                            geo, pmw_records, max_time_gap_hours=pmw_max_gap_hours
+                        )
+                        if status != "matched":
+                            audit_rows.append(
+                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=status)
+                            )
+                            continue
+                    sample = _prepare_sample(geo, era5_by_storm[storm], stats)
+                    if pmw_enabled:
+                        grid_lat, grid_lon = _make_grid(
+                            geo.center[0], geo.center[1], GRID_SIZE, GRID_RESOLUTION_DEGREES
+                        )
+                        try:
+                            pmw_features, _, selected_gap = prepare_pmw_condition_features(
+                                geo, selected_pmw, grid_lat, grid_lon, stats,
+                                max_time_gap_hours=pmw_max_gap_hours,
+                                include_time_offset=pmw_include_offset,
+                                crop_size=CROP_SIZE,
+                            )
+                        except (KeyError, OSError, ValueError) as error:
+                            audit_rows.append(
+                                pmw_audit_row(geo, selected_pmw, selected_gap, "skipped", reason=str(error))
+                            )
+                            continue
+                        sample[0]["condition"] = torch.cat(
+                            [sample[0]["condition"], pmw_features.unsqueeze(0)], dim=1
+                        )
+                        audit_rows.append(
+                            pmw_audit_row(geo, selected_pmw, selected_gap, "matched")
+                        )
+                    prepared.append(sample)
+                    matched_chunk.append(row)
+                    matched_indices.append(start + chunk_index)
+                chunk = matched_chunk
+                if not prepared:
+                    continue
                 batch = {
                     key: torch.cat([sample[0][key] for sample in prepared], dim=0).to(
                         args.device
@@ -1047,7 +1097,12 @@ def main() -> None:
 
             for guidance in guidance_values:
                 state = states[guidance]
-                output_table = reference_table.copy()
+                if pmw_enabled:
+                    _atomic_csv(
+                        pd.DataFrame(audit_rows),
+                        state["storm_dir"] / "pmw-inference-audit.csv",
+                    )
+                output_table = reference_table.iloc[matched_indices].copy().reset_index(drop=True)
                 output_table["original_input_path"] = state["local_paths"]
                 if state["summary_rows"]:
                     for column in state["summary_rows"][0]:
