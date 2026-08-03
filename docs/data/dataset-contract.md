@@ -21,6 +21,19 @@
 
 ERA5-enabled SAR samples also return normalized and physical `era5_wind_speed`, plus `era5_wind_speed_mask`.
 
+With `data.include_pmw: true`, SAR exports with a matched passive-microwave
+swath additionally return `pmw`, `pmw_physical`, `pmw_mask`, and `pmw_bounds`.
+Rows without a PMW path are filtered so standard PyTorch collation always sees
+the same keys. The companion is aligned and augmented with the core pair but
+remains separate from `condition`, preserving existing model input-channel
+contracts.
+
+With `data.include_ibtracs: true`, each sample also returns `ibtracs`, a mapping
+containing every `ibtracs_*` manifest column. Numeric columns are returned as
+floating-point scalars (missing values are NaN), while textual columns remain
+strings, allowing the mapping to pass through the default DataLoader collator.
+Both options default to `false`.
+
 !!! important "Center metadata is not a model condition"
     `center` and `target_bounds` establish the coordinate frame for
     storm-centric metrics. Neither model concatenates them to its input
@@ -86,7 +99,7 @@ for `sar_quality_usable_v1`, `sar_well_developed_v1`, `sar_high_intensity_v1`,
 and `sar_weak_v1` are recorded in
 `manifest-metadata-summary.json`.
 
-The local manifests contain the IBTrACS center but not the upstream intensity
-track table, so `ibtracs_msw_ms`, category, and storm-intensity-phase fields are
-reported as unavailable rather than estimated from SAR. Those fields can be
-joined later without changing the raster-derived columns.
+New exports join the nearest complete IBTrACS record directly. Their manifests
+include maximum-wind and pressure convenience fields, the complete prefixed
+source row, and the exact match offset. Legacy manifests remain loadable and
+may omit those fields.

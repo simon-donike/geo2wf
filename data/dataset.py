@@ -58,6 +58,8 @@ class PairedImageDataset(Dataset):
         center_crop_size: tuple[int, int] | None = None,
         augment: bool = False,
         require_era5: bool = False,
+        include_pmw: bool = False,
+        include_ibtracs: bool = False,
         normalization: str | None = None,
         target_normalization: str | None = None,
         robust_clip: float = DEFAULT_ROBUST_CLIP,
@@ -80,6 +82,18 @@ class PairedImageDataset(Dataset):
             ].reset_index(drop=True)
         self.filtered_missing_era5_count = (
             self.manifest_sample_count - len(self.samples)
+        )
+        self.include_pmw = bool(include_pmw)
+        self.filtered_missing_pmw_count = 0
+        if self.include_pmw:
+            has_pmw = _manifest_has_pmw(self.samples)
+            self.filtered_missing_pmw_count = int((~has_pmw).sum())
+            self.samples = self.samples.loc[has_pmw].reset_index(drop=True)
+        self.include_ibtracs = bool(include_ibtracs)
+        self.ibtracs_columns, self.numeric_ibtracs_columns = (
+            _ibtracs_metadata_schema(self.samples)
+            if self.include_ibtracs
+            else ((), frozenset())
         )
         self.max_era5_time_gap_hours = max_era5_time_gap_hours
         self.filtered_stale_era5_count = 0
@@ -146,6 +160,12 @@ class PairedImageDataset(Dataset):
         context_channels = _json_list(
             _row_value(row, "context_channels", row.get("era5_channels", "[]"))
         )
+        pmw_path = _row_value(row, "pmw_path", "") if self.include_pmw else ""
+        pmw_channels = (
+            _json_list(_row_value(row, "pmw_channels", "[]"))
+            if self.include_pmw
+            else []
+        )
 
         condition, condition_mask, condition_bounds = _read_geotiff(
             self.root / condition_path,
@@ -154,6 +174,15 @@ class PairedImageDataset(Dataset):
         condition_channel_mask = condition_mask.expand(
             len(condition_channels), -1, -1
         )
+        pmw = None
+        pmw_physical = None
+        pmw_mask = None
+        pmw_bounds = None
+        if pmw_path:
+            pmw, pmw_mask, pmw_bounds = _read_geotiff(self.root / pmw_path)
+            pmw_physical = torch.nan_to_num(
+                pmw, nan=0.0, posinf=0.0, neginf=0.0
+            ) * pmw_mask.to(pmw.dtype)
         context = None
         context_mask = None
         era5_wind_speed_physical = None
@@ -208,6 +237,15 @@ class PairedImageDataset(Dataset):
             normalization=self.normalization,
             robust_clip=self.robust_clip,
         )
+        if pmw is not None:
+            pmw = _normalize(
+                pmw,
+                "pmw",
+                pmw_channels,
+                self.stats,
+                normalization=self.normalization,
+                robust_clip=self.robust_clip,
+            )
         if context is not None:
             context_zero_values = _normalized_physical_zero(
                 context_source_type,
@@ -235,6 +273,8 @@ class PairedImageDataset(Dataset):
         condition = torch.nan_to_num(condition, nan=0.0)
         if context is not None:
             context = torch.nan_to_num(context, nan=0.0)
+        if pmw is not None:
+            pmw = torch.nan_to_num(pmw, nan=0.0) * pmw_mask.to(pmw.dtype)
         target = torch.nan_to_num(target, nan=0.0)
         condition = condition * condition_mask.to(condition.dtype)
         if context is not None and context_mask is not None:
@@ -317,6 +357,13 @@ class PairedImageDataset(Dataset):
                 era5_wind_speed_mask = _center_crop(
                     era5_wind_speed_mask, self.center_crop_size
                 )
+            if pmw is not None:
+                pmw = _center_crop(pmw, self.center_crop_size)
+                pmw_physical = _center_crop(pmw_physical, self.center_crop_size)
+                pmw_mask = _center_crop(pmw_mask, self.center_crop_size)
+                pmw_bounds = _center_crop_bounds(
+                    pmw_bounds, condition_shape, self.center_crop_size
+                )
         distance_to_center = _normalized_distance_to_center(
             condition_bounds,
             condition.shape[-2:],
@@ -368,6 +415,10 @@ class PairedImageDataset(Dataset):
                     era5_wind_speed_mask = torch.flip(
                         era5_wind_speed_mask, dims=flip_dims
                     )
+                if pmw is not None:
+                    pmw = torch.flip(pmw, dims=flip_dims)
+                    pmw_physical = torch.flip(pmw_physical, dims=flip_dims)
+                    pmw_mask = torch.flip(pmw_mask, dims=flip_dims)
         sample = {
             "condition": condition,
             "target": target,
@@ -397,12 +448,35 @@ class PairedImageDataset(Dataset):
                 "target_channels": target_channels,
             },
         }
+        if self.include_pmw:
+            sample["meta"].update(
+                {
+                    "pmw_channels": pmw_channels,
+                    "pmw_sensor": _row_value(row, "pmw_sensor", ""),
+                    "pmw_dt_minutes": _row_float(row, "pmw_dt_minutes"),
+                }
+            )
+        if self.include_ibtracs:
+            sample["ibtracs"] = _ibtracs_metadata(
+                row,
+                self.ibtracs_columns,
+                self.numeric_ibtracs_columns,
+            )
         if era5_wind_speed is not None:
             sample.update(
                 {
                     "era5_wind_speed": era5_wind_speed,
                     "era5_wind_speed_physical": era5_wind_speed_physical,
                     "era5_wind_speed_mask": era5_wind_speed_mask,
+                }
+            )
+        if pmw is not None:
+            sample.update(
+                {
+                    "pmw": pmw,
+                    "pmw_physical": pmw_physical,
+                    "pmw_mask": pmw_mask,
+                    "pmw_bounds": pmw_bounds,
                 }
             )
         return sample
@@ -1004,6 +1078,52 @@ def _manifest_has_era5(samples: pd.DataFrame) -> pd.Series:
     if "era5_path" in samples.columns:
         has_context |= samples["era5_path"].astype(str).str.strip().ne("")
     return has_context
+
+
+def _manifest_has_pmw(samples: pd.DataFrame) -> pd.Series:
+    """Return rows with a PMW companion path suitable for stable batching."""
+    if "pmw_path" not in samples.columns:
+        return pd.Series(False, index=samples.index, dtype=bool)
+    return samples["pmw_path"].astype(str).str.strip().ne("")
+
+
+def _ibtracs_metadata_schema(
+    samples: pd.DataFrame,
+) -> tuple[tuple[str, ...], frozenset[str]]:
+    """Infer stable, collatable types for all prefixed IBTrACS columns."""
+    columns = tuple(
+        str(column)
+        for column in samples.columns
+        if str(column).startswith("ibtracs_")
+    )
+    numeric = set()
+    for column in columns:
+        values = samples[column].astype(str).str.strip()
+        present = ~values.str.casefold().isin({"", "nan", "none", "null"})
+        if (
+            present.any()
+            and pd.to_numeric(values[present], errors="coerce").notna().all()
+        ):
+            numeric.add(column)
+    return columns, frozenset(numeric)
+
+
+def _ibtracs_metadata(
+    row: pd.Series,
+    columns: tuple[str, ...],
+    numeric_columns: frozenset[str],
+) -> dict[str, float | str]:
+    """Return the complete manifest IBTrACS row with batch-stable value types."""
+    metadata: dict[str, float | str] = {}
+    for column in columns:
+        if column in numeric_columns:
+            metadata[column] = _row_float(row, column)
+        else:
+            value = str(row.get(column, "")).strip()
+            metadata[column] = (
+                "" if value.casefold() in {"nan", "none", "null"} else value
+            )
+    return metadata
 
 
 def _manifest_era5_time_gap_hours(samples: pd.DataFrame) -> pd.Series:

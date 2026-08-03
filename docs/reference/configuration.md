@@ -22,10 +22,11 @@
 | `splits` | partitions to export |
 | `grid_size`, `grid_resolution` | square grid dimensions and degree resolution |
 | `closest_match_hours` | maximum target-to-GEO time difference |
+| `include_pmw`, `pmw_sensors`, `pmw_max_time_gap_hours` | SAR companion matching and freshness limit |
+| `include_ibtracs`, `ibtracs_file`, `ibtracs_max_time_gap_hours` | complete nearest-track-row join |
 | `center` | `image_center` or `ibtracs_center` |
 | `shift_center`, `pad` | crop inclusion and source-read padding |
 | `limit` | successful samples per split, `null` for all |
-| `pmw_sensors` | allowed proxy target platforms |
 | `include_era5`, `era5_channels` | context selection |
 | `era5_max_time_gap_hours` | context freshness limit |
 
@@ -40,6 +41,8 @@
 | `random_flips` | paired, vector-aware augmentation in train |
 | `include_test_in_train` | concatenate test into train |
 | `require_era5` | filter samples without context |
+| `include_pmw` | return PMW tensors and filter rows without a companion; default `false` |
+| `include_ibtracs` | return all prefixed IBTrACS manifest metadata; default `false` |
 | `normalization` | `min-max` or `robust-zscore` for conditions |
 | `target_normalization` | optional target-specific method |
 | `robust_clip`, `target_robust_clip` | symmetric robust range before `[0,1]` mapping |
