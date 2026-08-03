@@ -20,8 +20,8 @@ def log_wandb_reconstruction(
     trainer = getattr(module, "_trainer", None)
     if trainer is None or not trainer.is_global_zero:
         return
-    logger = module.logger
-    if logger is None:
+    experiment = _wandb_experiment(module, trainer)
+    if experiment is None:
         return
 
     try:
@@ -72,6 +72,15 @@ def log_wandb_reconstruction(
                     "era5_wind_speed_mask": _batch_item(
                         batch.get("era5_wind_speed_mask"), index
                     ),
+                    "pmw_physical": _batch_item(
+                        batch.get("pmw_physical"), index
+                    ),
+                    "pmw_mask": _batch_item(batch.get("pmw_mask"), index),
+                    "pmw_bounds": _batch_item(batch.get("pmw_bounds"), index),
+                    "pmw_sensor": _batch_value(meta.get("pmw_sensor"), index),
+                    "pmw_dt_minutes": _batch_value(
+                        meta.get("pmw_dt_minutes"), index
+                    ),
                     "baseline_mask": _batch_item(
                         batch.get("_residual_diffusion_baseline_mask"), index
                     ),
@@ -96,12 +105,24 @@ def log_wandb_reconstruction(
     max_dpi = max_edge_pixels / max(width_inches, height_inches)
     fig.set_dpi(min(float(fig.dpi), max_dpi))
     try:
-        logger.experiment.log(
+        experiment.log(
             {wandb_key: wandb.Image(fig, file_type="jpg")},
             step=module.global_step,
         )
     finally:
         plt.close(fig)
+
+
+def _wandb_experiment(module: Any, trainer: Any) -> Any | None:
+    """Return the W&B experiment when Lightning has multiple loggers."""
+    candidates = getattr(trainer, "loggers", None)
+    if not candidates:
+        candidates = [getattr(module, "logger", None)]
+    for logger in candidates:
+        experiment = getattr(logger, "experiment", None)
+        if callable(getattr(experiment, "log", None)):
+            return experiment
+    return None
 
 
 def _batch_item(value: Any, index: int) -> Any:
@@ -116,6 +137,10 @@ def _batch_item(value: Any, index: int) -> Any:
 def _batch_value(value: Any, index: int) -> str:
     if value is None:
         return ""
+    if torch.is_tensor(value):
+        item = value[index] if value.ndim else value
+        item = item.detach().cpu()
+        return str(item.item()) if item.numel() == 1 else str(item)
     if isinstance(value, (list, tuple)):
         return str(value[index]) if index < len(value) else ""
     return str(value)

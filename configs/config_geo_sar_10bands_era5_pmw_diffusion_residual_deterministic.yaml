@@ -168,7 +168,7 @@ validation:
   probabilistic_score_sharpness_weight: 1.0
   probabilistic_score_peak_weight: 0.25
   probabilistic_peak_fraction: 0.005
-  log_reconstruction_images: false
+  log_reconstruction_images: true
   # Prefer members that retain most, but not all, of SAR's gradient strength.
   probabilistic_score_target_sharpness_ratio: 0.9
 

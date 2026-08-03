@@ -269,13 +269,20 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         and sample.get("target_bounds") is not None
         for sample in samples
     )
+    has_pmw = any(sample.get("pmw_physical") is not None for sample in samples)
     has_era5_wind = any(
         sample.get("era5_wind_speed_physical") is not None
         or _era5_wind_speed_index(sample) is not None
         for sample in samples
     )
     has_baseline = any(sample.get("baseline") is not None for sample in samples)
-    panel_count = 3 + int(has_baseline) + int(has_map) + int(has_era5_wind)
+    panel_count = (
+        3
+        + int(has_pmw)
+        + int(has_baseline)
+        + int(has_map)
+        + int(has_era5_wind)
+    )
     fig, axes = plt.subplots(
         len(samples), panel_count,
         figsize=(4.1 * panel_count, 4 * len(samples)),
@@ -286,6 +293,7 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         _draw_validation_row(
             axes[row],
             sample,
+            has_pmw=has_pmw,
             has_baseline=has_baseline,
             has_map=has_map,
             has_era5_wind=has_era5_wind,
@@ -294,7 +302,7 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
 
 
 def _draw_validation_row(
-    axes, sample, *, has_baseline, has_map, has_era5_wind
+    axes, sample, *, has_pmw, has_baseline, has_map, has_era5_wind
 ):
     condition_array = _as_chw_numpy(sample["condition"])
     prediction_array = _as_chw_numpy(sample["prediction"])
@@ -338,6 +346,30 @@ def _draw_validation_row(
             f"Condition ({band_name})",
         )
     ]
+    if has_pmw:
+        pmw = sample.get("pmw_physical")
+        if pmw is None:
+            panels.append((None, None, None, condition_extent, "PMW 89–92 GHz"))
+        else:
+            pmw_array = _as_chw_numpy(pmw)
+            pmw_valid = _as_2d_mask(sample.get("pmw_mask"), pmw_array.shape[1:])
+            pmw_bounds = sample.get("pmw_bounds")
+            if pmw_bounds is None:
+                pmw_bounds = sample.get("condition_bounds")
+            pmw_extent = _bounds_extent(
+                pmw_bounds,
+                pmw_array.shape[1:],
+            )
+            sensor = str(sample.get("pmw_sensor") or "").strip()
+            offset = str(sample.get("pmw_dt_minutes") or "").strip()
+            detail = " · ".join(
+                value
+                for value in (sensor, offset and f"Δt {offset} min")
+                if value
+            )
+            title = "PMW 89–92 GHz" + (f"\n{detail}" if detail else "")
+            pmw_image = np.ma.masked_where(~pmw_valid, pmw_array[0])
+            panels.append((pmw_image, "magma", pmw_valid, pmw_extent, title))
     if has_baseline:
         baseline = sample.get("baseline")
         if baseline is None:
@@ -377,7 +409,11 @@ def _draw_validation_row(
         if image is None:
             ax.set_axis_off()
             continue
-        is_wind_panel = physical_wind_output and title != panels[0][4]
+        is_pmw_panel = title.startswith("PMW 89–92 GHz")
+        is_wind_panel = physical_wind_output and title in {
+            "Prediction", "Refined prediction", "Target", "Ground truth",
+            "Deterministic baseline",
+        }
         image_artist = ax.imshow(
             image,
             extent=extent,
@@ -386,6 +422,11 @@ def _draw_validation_row(
             vmin=output_ranges[0][0] if is_wind_panel else None,
             vmax=output_ranges[0][1] if is_wind_panel else None,
         )
+        if is_pmw_panel:
+            ax.figure.colorbar(
+                image_artist, ax=ax, shrink=0.76, pad=0.03,
+                label="Brightness temperature (K)",
+            )
         if is_wind_panel:
             ax.figure.colorbar(
                 image_artist,
@@ -394,7 +435,10 @@ def _draw_validation_row(
                 pad=0.03,
                 label=r"Wind speed (m s$^{-1}$)",
             )
-        if title in {"Target", "Ground truth", "Deterministic baseline"}:
+        if (
+            title in {"Target", "Ground truth", "Deterministic baseline"}
+            or is_pmw_panel
+        ):
             _overlay_nodata(ax, valid, extent, alpha=1.0)
         _plot_center(ax, center)
         ax.set_title(title, fontsize=10)
@@ -410,12 +454,12 @@ def _draw_validation_row(
             "bounds": _coerce_bounds(sample["target_bounds"]),
             "mask": target_valid,
         }
-        map_index = 3 + int(has_baseline)
+        map_index = 3 + int(has_pmw) + int(has_baseline)
         _plot_valid_area_map(
             axes[map_index], geo, output, center, title="Valid areas"
         )
     if has_era5_wind:
-        wind_ax = axes[3 + int(has_baseline) + int(has_map)]
+        wind_ax = axes[3 + int(has_pmw) + int(has_baseline) + int(has_map)]
         wind_index = _era5_wind_speed_index(sample)
         physical_wind = sample.get("era5_wind_speed_physical")
         if physical_wind is not None:
