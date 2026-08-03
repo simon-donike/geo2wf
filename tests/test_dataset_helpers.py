@@ -275,3 +275,33 @@ def test_validation_plot_prefers_explicit_physical_era5_wind() -> None:
 
     assert float(wind_axis.images[-1].get_array().mean()) == 20.0
     plt.close(figure)
+
+
+def test_validation_plot_adds_physical_pmw_panel_with_mask() -> None:
+    sample = {
+        "condition": torch.full((3, 4, 4), 0.5),
+        "prediction": torch.full((1, 4, 4), 20.0),
+        "target": torch.full((1, 4, 4), 22.0),
+        "condition_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "condition_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "target_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "pmw_physical": torch.full((1, 4, 4), 278.0),
+        "pmw_mask": torch.tensor(
+            [[[True, True, False, False]]] * 4, dtype=torch.bool
+        ),
+        "pmw_bounds": [-2.0, 2.0, -2.0, 2.0],
+        "pmw_sensor": "GMI_GPM",
+        "pmw_dt_minutes": "15.0",
+        "physical_wind_output": True,
+    }
+
+    figure = plot_validation_reconstruction_batch([sample])
+    pmw_axis = next(
+        axis for axis in figure.axes if axis.get_title().startswith("PMW 89–92 GHz")
+    )
+
+    assert "GMI_GPM" in pmw_axis.get_title()
+    assert "Δt 15.0 min" in pmw_axis.get_title()
+    assert float(pmw_axis.images[0].get_array().mean()) == 278.0
+    plt.close(figure)
