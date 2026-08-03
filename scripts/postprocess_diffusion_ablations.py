@@ -260,6 +260,7 @@ def main() -> None:
                         summary_aggregation=args.summary_aggregation,
                     )
                     frame = source_row.to_frame().T.copy()
+                    frame["storm_id"] = storm
                     frame["postprocess_variant"] = name
                     frame["postprocess_gain"] = float(gain)
                     frame["postprocess_residual_cap_ms"] = None if math.isinf(cap) else float(cap)
