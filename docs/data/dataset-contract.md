@@ -66,3 +66,27 @@ The deterministic residual model handles masks differently: it receives 23 condi
 By default, checked-in configs set `include_test_in_train: true`, concatenating test into training while keeping validation separate. This is intentional in the current experiment presets but is not conventional held-out evaluation. Set it to `false` when the test split must remain untouched for final reporting.
 
 Validation is storm-stratified by round-robin reordering, which matters when `limit_val_batches` observes only a prefix.
+
+## Manifest diagnostics
+
+The exported manifests can be enriched with physical SAR/ERA5 and
+storm-relative diagnostics:
+
+```bash
+.venv/bin/python scripts/enrich_dataset_manifests.py \
+  --root data/geotiff/geo_sar_10bands_era5
+```
+
+The command updates the root and split manifests in place, preserving their
+rows and original columns. It adds SAR and ERA5 maximum wind, robust top-0.5%
+peak, p95/p99, mean, valid-pixel counts, 0--20 km eye, 0--100 km core,
+20--60 km ring, radial-profile/RMW/R64 diagnostics, SAR-minus-ERA5 differences,
+storm-relative sample timing, and versioned quality flags. The thresholds used
+for `sar_quality_usable_v1`, `sar_well_developed_v1`, `sar_high_intensity_v1`,
+and `sar_weak_v1` are recorded in
+`manifest-metadata-summary.json`.
+
+The local manifests contain the IBTrACS center but not the upstream intensity
+track table, so `ibtracs_msw_ms`, category, and storm-intensity-phase fields are
+reported as unavailable rather than estimated from SAR. Those fields can be
+joined later without changing the raster-derived columns.
