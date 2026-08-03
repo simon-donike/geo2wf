@@ -17,9 +17,12 @@ from export_geostat_images import (
     export_geostat_image,
 )
 from export_geo_sar_geotiffs import (
+    PMW_CHANNELS,
     _load_geo_channels,
+    _load_pmw_channels,
     _load_sar_channels,
     _read_manifest,
+    _regrid,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +35,7 @@ RAW_MANIFEST = RAW_INPUT_ROOT / "index-files" / "observation_manifest_v6.csv"
 DATA_ONLY_STORMS = ("EP182023",)
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
+PMW_IMAGE_DIR = OUTPUT_PATH.parent / "pmw"
 GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
 CORE_RADIUS_KM = 100.0
 RMW_BIN_KM = 10.0
@@ -40,6 +44,8 @@ POSTPROCESS_C02_P99_MAX = 0.4
 POSTPROCESS_SMOOTHING_HOURS = 6.0
 POSTPROCESS_EDGE_PADDING_ACQUISITIONS = 1
 SAR_SCALE_MAX_MS = 60.0
+PMW_SCALE_MIN_K = 150.0
+PMW_SCALE_MAX_K = 300.0
 NWP_STORM_ID = "AL082025"
 NWP_LABELS = {
     "aifs": "AIFS",
@@ -126,6 +132,125 @@ def export_sar_array(observation_id, field, mask, lat, lon):
         "min": finite_number(low),
         "max": finite_number(high),
     }
+
+
+def export_pmw_array(
+    observation_id,
+    field,
+    mask,
+    lat,
+    lon,
+    sensor,
+    channel,
+    output_dir=PMW_IMAGE_DIR,
+):
+    """Export one physical high-frequency PMW band on a shared scale."""
+    field = np.asarray(field, dtype=np.float32).squeeze()
+    lat = np.asarray(lat, dtype=np.float32).squeeze()
+    lon = np.asarray(lon, dtype=np.float32).squeeze()
+    coordinate_mask = np.isfinite(lat) & np.isfinite(lon)
+    mask = np.asarray(mask, dtype=bool).squeeze() & np.isfinite(field) & coordinate_mask
+    valid = field[mask]
+    if not valid.size:
+        return None
+    stretched = np.nan_to_num(
+        np.clip(
+            (field - PMW_SCALE_MIN_K) / (PMW_SCALE_MAX_K - PMW_SCALE_MIN_K),
+            0,
+            1,
+        )
+    )
+    cold = np.array([38, 31, 104], dtype=np.float32)
+    middle = np.array([43, 179, 177], dtype=np.float32)
+    warm = np.array([249, 231, 126], dtype=np.float32)
+    lower = cold + stretched[..., None] * 2 * (middle - cold)
+    upper = middle + (stretched[..., None] - 0.5) * 2 * (warm - middle)
+    rgb = np.where((stretched <= 0.5)[..., None], lower, upper).astype(np.uint8)
+    rgba = np.concatenate(
+        [rgb, np.where(mask, 225, 0).astype(np.uint8)[..., None]], axis=-1
+    )
+    filename = re.sub(r"[^a-zA-Z0-9_-]+", "_", observation_id) + ".png"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    iio.imwrite(output_dir / filename, rgba)
+    return {
+        "image": f"pmw/{filename}",
+        "bounds": [
+            [
+                finite_number(np.nanmin(lat[coordinate_mask])),
+                finite_number(np.nanmin(lon[coordinate_mask])),
+            ],
+            [
+                finite_number(np.nanmax(lat[coordinate_mask])),
+                finite_number(np.nanmax(lon[coordinate_mask])),
+            ],
+        ],
+        "min": finite_number(valid.min()),
+        "max": finite_number(valid.max()),
+        "sensor": sensor,
+        "channel": channel,
+    }
+
+
+def export_pmw_observations(storm, raw_records):
+    """Export PMW on the nearest displayed geostationary-image extent."""
+    start = pd.Timestamp(storm["start"])
+    end = pd.Timestamp(storm["end"])
+    geo_overlays = [
+        (pd.Timestamp(record["time"]), record["geo_overlay"])
+        for record in storm["records"]
+        if record["geo_overlay"] is not None
+    ]
+    if not geo_overlays:
+        raise ValueError(f"Storm {storm['id']} has no geostationary overlay extents")
+    observations = []
+    for observation in sorted(
+        (
+            record
+            for record in raw_records
+            if record.storm_id == storm["id"]
+            and record.source_type == "pmw"
+            and start <= record.timestamp <= end
+        ),
+        key=lambda record: record.timestamp,
+    ):
+        channel = PMW_CHANNELS[observation.sensor][0]
+        field, lat, lon = _load_pmw_channels(observation, [channel])[channel]
+        _, geo_overlay = min(
+            geo_overlays,
+            key=lambda item: abs((item[0] - observation.timestamp).total_seconds()),
+        )
+        (south, west), (north, east) = geo_overlay["bounds"]
+        size = int(geo_overlay["size"])
+        grid_lon, grid_lat = np.meshgrid(
+            np.linspace(west, east, size),
+            np.linspace(north, south, size),
+        )
+        field, mask = _regrid(field, lat, lon, grid_lat, grid_lon)
+        overlay = export_pmw_array(
+            observation.observation_id,
+            field,
+            mask,
+            grid_lat,
+            grid_lon,
+            observation.sensor,
+            channel,
+        )
+        if overlay is None:
+            continue
+        center_lat = observation.ibtracs_center_lat
+        center_lon = observation.ibtracs_center_lon
+        if center_lat is None or center_lon is None:
+            center_lat = np.nanmedian(lat[mask])
+            center_lon = np.nanmedian(lon[mask])
+        observations.append(
+            {
+                "time": observation.timestamp.isoformat().replace("+00:00", "Z"),
+                "lat": finite_number(center_lat),
+                "lon": finite_number(center_lon),
+                "overlay": overlay,
+            }
+        )
+    return observations
 
 
 def export_nwp():
@@ -418,10 +543,13 @@ def export_storm(storm_dir):
 
 def main():
     SAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    PMW_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     GEO_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     for existing in GEO_IMAGE_DIR.glob("*.webp"):
         existing.unlink()
     for existing in SAR_IMAGE_DIR.glob("*.png"):
+        existing.unlink()
+    for existing in PMW_IMAGE_DIR.glob("*.png"):
         existing.unlink()
     storms = [
         export_storm(path) for path in sorted(INPUT_ROOT.iterdir()) if path.is_dir()
@@ -441,6 +569,9 @@ def main():
         if storm_id not in existing_storms
     )
     storms.sort(key=lambda storm: storm["id"])
+    for storm in storms:
+        storm["pmw_observations"] = export_pmw_observations(storm, raw_records)
+        storm["pmw_matches"] = len(storm["pmw_observations"])
     payload = {
         "generated_from": "inference/inf_anna",
         "geo_interval_hours": 3,
@@ -463,6 +594,13 @@ def main():
             "mid": 30.0,
             "max": SAR_SCALE_MAX_MS,
             "unit": "m/s",
+        },
+        "pmw_color_scale": {
+            "min": PMW_SCALE_MIN_K,
+            "mid": (PMW_SCALE_MIN_K + PMW_SCALE_MAX_K) / 2,
+            "max": PMW_SCALE_MAX_K,
+            "unit": "K",
+            "channel": "89--92 GHz V",
         },
         "metrics": {
             "max": {"label": "Maximum wind", "unit": "m/s"},
@@ -494,7 +632,7 @@ def main():
     }
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     print(
-        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations and {sum(s['sar_matches'] for s in storms)} SAR overlays"
+        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, and {sum(s['pmw_matches'] for s in storms)} PMW overlays"
     )
 
 
