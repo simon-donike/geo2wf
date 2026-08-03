@@ -538,7 +538,7 @@ def test_deterministic_residual_diffusion_preset_declares_checkpoint() -> None:
     assert config["validation"]["ensemble_size"] == 4
     assert config["validation"]["probabilistic_score_target_sharpness_ratio"] == 0.9
     assert config["model"]["residual"]["loss"]["smoothness_weight"] == 0.02
-    assert config["model"]["sampling"]["guidance_scale"] == 1.5
+    assert config["model"]["sampling"]["guidance_scale"] == 1.2
     assert (
         config["model"]["classifier_free_guidance"]["condition_dropout_probability"]
         == 0.1

@@ -5,6 +5,11 @@ Use the two-stage pair for the main system:
 1. `config_geo_sar_10bands_era5_residual.yaml` trains the deterministic baseline.
 2. `config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` freezes that checkpoint and trains residual diffusion.
 
+The checked-in pair uses the validated peak-aware Stage 1 objective and the
+structured-asinh Stage 2 objective with CFG guidance 1.2. Both presets retain
+`include_test_in_train: true`; use the ablation configs and runner for a
+controlled comparison.
+
 [Read the two-stage workflow before launching the stack.](../models/two-stage.md)
 
 ## Preset matrix

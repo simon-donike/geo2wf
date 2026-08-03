@@ -42,6 +42,12 @@ optimization:
 
 This discourages unconstrained corrections without pretending ERA5 is observed SAR.
 
+The checked-in default uses the selected peak-aware objective: a smooth high-wind
+weight (up to 8x from 25--50 m/s) plus a robust top-0.5% inner-core peak term.
+The radial-profile and exceedance losses remain disabled in this default because
+the ablation improved the combined peak/structure score without the larger tail
+bias seen in the sampling-balanced alternative.
+
 ## Prediction bounds
 
 The default clamps physical wind to at least 0 m/s. `prediction_max_ms` is unset, so Stage 1 has no upper cap. The configured PSNR data range is 79.8 m/s, matching the current target export range.
@@ -56,7 +62,9 @@ The model reports:
 - high-wind MAE and skill for target winds ≥17 m/s; and
 - shared eye, inner-core, radial, RMW, contrast, and eye-displacement metrics.
 
-Validation loader 0 logs physical validation reconstructions. Loader 1 logs a fixed training preview for qualitative comparison only.
+Validation keeps the physical reconstruction and storm-structure metrics, but
+image logging is disabled in the checked-in preset so training and dashboard runs
+produce numeric artifacts without large visualization payloads.
 
 ## Train Stage 1
 

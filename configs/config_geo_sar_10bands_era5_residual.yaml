@@ -44,6 +44,11 @@ data:
     num_workers: 2
     pin_memory: false
     persistent_workers: false
+  sampling:
+    intensity_balanced:
+      # The selected peak-aware objective supplies the tail emphasis; do not
+      # additionally distort the training distribution through resampling.
+      enabled: false
 
 model:
   type: deterministic_residual
@@ -56,6 +61,25 @@ model:
     high_wind_threshold_ms: 17.0
     prediction_min_ms: 0.0
     prediction_max_ms: null
+    loss:
+      # Selected Stage 1 default: smooth high-wind weighting plus a robust
+      # inner-core peak term. Radial/exceedance terms remain ablation knobs.
+      high_wind_weight_max: 8.0
+      high_wind_weight_start_ms: 25.0
+      high_wind_weight_full_ms: 50.0
+      peak_weight: 0.05
+      peak_top_fraction: 0.005
+      peak_min_pixels: 16
+      peak_inner_core_radius_km: 100.0
+      radial_profile_weight: 0.0
+      radial_profile_max_radius_km: 200.0
+      radial_profile_bin_km: 10.0
+      radial_profile_min_bin_pixels: 8
+      exceedance_area_weight: 0.0
+      exceedance_thresholds_ms: [17.0, 33.0, 43.0]
+      exceedance_temperature_ms: 2.0
+      peak_structure_radial_weight: 0.25
+      peak_structure_area_weight: 10.0
     psnr_data_range_ms: 79.8
 
 optimization:
@@ -70,12 +94,13 @@ optimization:
     # Residual reconstruction improves slowly after the initial broad-field fit.
     # Wait through long validation plateaus before reducing its learning rate.
     patience: 100
-    monitor: val/loss
+    monitor: val/peak_structure_score
     cooldown: 5
     min_lr: 0.00002
 
 validation:
   reconstruction_batches: 1
+  log_reconstruction_images: false
 
 trainer:
   max_epochs: 1000
@@ -89,7 +114,7 @@ trainer:
   enable_checkpointing: true
   limit_val_batches: 1.0
   checkpoint:
-    monitor: val/loss
+    monitor: val/peak_structure_score
     mode: min
     save_top_k: 2
     save_last: true

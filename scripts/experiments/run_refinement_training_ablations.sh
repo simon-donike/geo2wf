@@ -304,7 +304,10 @@ if ! run_training \
   exit 1
 fi
 
-STAGE1_RESULT="$RUNS_DIR/stage1_peak_structure_balanced/result.json"
+# Use the selected overall-utility Model B default for every Stage 2 handoff.
+# The peak/structure-balanced run is still trained and reported as an ablation,
+# but its stronger RMW trade-off comes with materially worse peak bias.
+STAGE1_RESULT="$RUNS_DIR/stage1_peak_aware/result.json"
 STAGE1_CHECKPOINT=$("$PYTHON_BIN" - "$STAGE1_RESULT" <<'PY'
 import json
 import sys
