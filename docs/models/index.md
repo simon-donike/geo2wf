@@ -13,6 +13,7 @@ The recommended system is a stack, not a choice between unrelated models:
 | Deterministic baseline only | one dense wind field | GEO, ERA5, derived context, masks | interpretable control and Stage 1 checkpoint |
 | Residual diffusion on ERA5 | ERA5 + sampled residual | GEO, ERA5, derived context, masks | portable generative ablation without Stage 1 |
 | Absolute conditional diffusion | absolute wind sample | GEO, optional ERA5, derived context, masks | standalone research baseline |
+| Single-field intensity correction | corrected maximum wind + derived category | one frozen U-Net field, mask, center distance, current metadata | dashboard-scalar estimation |
 
 ```mermaid
 flowchart LR
@@ -23,13 +24,14 @@ flowchart LR
   S2 --> O[Baseline + sampled correction]
 ```
 
-All paths use the same `PairedDataModule`, physical target conversion, masks, and storm-centric metrics. This keeps comparisons focused on model behavior rather than on different data plumbing.
+The wind-field reconstruction paths use the same `PairedDataModule`, physical target conversion, masks, and storm-centric metrics. The scalar intensity path uses its own cached single-field contract while preserving storm-disjoint evaluation.
 
 ## Main articles
 
 - **[Two-stage baseline + diffusion](two-stage.md)** — the central workflow, exact handoff, channel counts, and training order.
 - **[Stage 1 deterministic baseline](era5-residual.md)** — residual connection to ERA5, physical Huber loss, and zero-initialized head.
 - **[Stage 2 residual diffusion](residual-diffusion.md)** — signed residual transform, frozen baseline, guidance, and ensemble diagnostics.
+- **[Single-field intensity correction](intensity-correction.md)** — correct a frozen U-Net field into USA maximum wind and a wind-derived category.
 
 ## Supporting and ablation articles
 

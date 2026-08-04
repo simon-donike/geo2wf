@@ -1,0 +1,18 @@
+# @package _global_
+defaults:
+  - override /data: unet_intensity_single
+  - override /model: intensity_correction
+
+trainer:
+  max_epochs: 200
+  checkpoint:
+    monitor: val/storm_macro_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    name: unet-single-field-intensity-correction
+    project: geo2wf
+    enabled: true
+    log_model: true

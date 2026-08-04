@@ -10,6 +10,12 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "intensity-correction":
+        sys.argv.pop(1)
+        from scripts.evaluate_intensity_correction import main as intensity_main
+
+        intensity_main()
+        return
     from scripts.evaluate_checkpoint import main as evaluate_main
 
     evaluate_main()

@@ -1,0 +1,12 @@
+_target_: geo2wf.data.intensity.UNetIntensityDataModule
+root: data/unet_intensity
+train_split: train
+val_split: val
+test_split: test
+batch_size: 16
+num_workers: 2
+pin_memory: false
+persistent_workers: false
+expected_unet_checkpoint_sha256: null
+verify_cache: true
+max_category_weight_ratio: 4.0

@@ -13,11 +13,13 @@ if str(ROOT) not in sys.path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("dataset", choices=("geo-sar", "geo-pmw"))
+    parser.add_argument("dataset", choices=("geo-sar", "geo-pmw", "intensity-cache"))
     args, remaining = parser.parse_known_args()
     sys.argv = [sys.argv[0], *remaining]
     if args.dataset == "geo-sar":
         from scripts.export_geo_sar_geotiffs import main as export_main
-    else:
+    elif args.dataset == "geo-pmw":
         from scripts.export_geo_pmw_geotiffs import main as export_main
+    else:
+        from scripts.export_unet_intensity_cache import main as export_main
     export_main()
