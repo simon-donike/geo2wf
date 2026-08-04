@@ -55,6 +55,7 @@ nav:
       - Model overview: models/index.md
       - Stage 1 — deterministic baseline: models/era5-residual.md
       - Stage 2 — residual diffusion: models/residual-diffusion.md
+      - Single-field intensity correction: models/intensity-correction.md
       - Standalone conditional diffusion: models/conditional-diffusion.md
       - Sampling: models/sampling.md
   - Start here:
