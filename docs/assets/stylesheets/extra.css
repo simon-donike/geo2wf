@@ -1,23 +1,32 @@
 :root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #ffffff;
-  --md-primary-fg-color--light: #ffffff;
-  --md-primary-fg-color--dark: #eef1f2;
-  --md-primary-bg-color: #17242b;
-  --md-primary-bg-color--light: #4c5a61;
-  --md-accent-fg-color: #0a7378;
-  --md-default-bg-color: #ffffff;
-  --md-default-fg-color: #17242b;
-  --md-default-fg-color--light: #526068;
-  --md-default-fg-color--lighter: #79848a;
-  --md-typeset-a-color: #086e73;
-  --geo-accent: #0a7378;
-  --geo-accent-soft: #e7f2f2;
-  --geo-red: #c8463d;
-  --geo-ink: #17242b;
-  --geo-muted: #5d6b73;
-  --geo-border: #d8dddf;
-  --geo-surface: #f6f7f7;
+  /* Shared FDL theme API. */
+  --black: #000000;
+  --main: #111427;
+  --secondary: #faf9f5;
+  --highlight: #479ff8;
+  --earth-systems-lab: #019fa2;
+  --lab-highlight: var(--earth-systems-lab);
+
+  --md-primary-fg-color: var(--main);
+  --md-primary-fg-color--light: color-mix(in srgb, var(--main) 88%, var(--secondary));
+  --md-primary-fg-color--dark: var(--black);
+  --md-primary-bg-color: var(--secondary);
+  --md-primary-bg-color--light: color-mix(in srgb, var(--secondary) 72%, var(--main));
+  --md-accent-fg-color: var(--lab-highlight);
+  --md-default-bg-color: var(--secondary);
+  --md-default-fg-color: var(--main);
+  --md-default-fg-color--light: color-mix(in srgb, var(--main) 66%, var(--secondary));
+  --md-default-fg-color--lighter: color-mix(in srgb, var(--main) 46%, var(--secondary));
+  --md-typeset-a-color: color-mix(in srgb, var(--lab-highlight) 78%, var(--main));
+  --geo-accent: var(--lab-highlight);
+  --geo-accent-soft: color-mix(in srgb, var(--lab-highlight) 12%, var(--secondary));
+  --geo-ink: var(--main);
+  --geo-muted: color-mix(in srgb, var(--main) 62%, var(--secondary));
+  --geo-border: color-mix(in srgb, var(--main) 16%, var(--secondary));
+  --geo-border-strong: color-mix(in srgb, var(--main) 30%, var(--secondary));
+  --geo-surface: color-mix(in srgb, var(--main) 4%, var(--secondary));
+  --geo-raised: var(--secondary);
   color-scheme: light;
 }
 
@@ -28,14 +37,22 @@ html {
 
 body {
   color: var(--geo-ink);
-  background: #ffffff;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--secondary);
+  font-family: "Helvetica Neue", "Helvetica New", Helvetica, Arial, sans-serif;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset p {
+  font-family: "Helvetica Neue", "Helvetica New", Helvetica, Arial, sans-serif;
 }
 
 .md-header {
-  color: var(--geo-ink);
-  background: #ffffff;
-  border-bottom: 1px solid var(--geo-border);
+  color: var(--secondary);
+  background: var(--main);
+  border-bottom: 3px solid var(--geo-accent);
   box-shadow: none;
 }
 
@@ -46,7 +63,7 @@ body {
 .md-header__button,
 .md-header__title,
 .md-header__source {
-  color: var(--geo-ink);
+  color: var(--secondary);
 }
 
 .md-header__button.md-logo img,
@@ -55,13 +72,62 @@ body {
   height: 1.7rem;
 }
 
+.md-header__button.md-logo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  background: var(--geo-accent);
+  border-radius: 50%;
+}
+
+.md-header__button.md-logo::before {
+  content: "";
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid var(--secondary);
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-34deg);
+}
+
+.md-header__button.md-logo::after {
+  content: "";
+  position: absolute;
+  width: 0.25rem;
+  height: 0.25rem;
+  background: var(--secondary);
+  border-radius: 50%;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  display: none;
+}
+
 .md-header__source {
   width: auto;
   max-width: 12rem;
 }
 
 .md-source__repository {
-  color: var(--geo-ink);
+  color: var(--secondary);
+}
+
+.docs-lab {
+  margin-left: 0.7rem;
+  color: color-mix(in srgb, var(--secondary) 70%, var(--main));
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.docs-lab b {
+  color: var(--geo-accent);
 }
 
 .dashboard-link {
@@ -70,8 +136,8 @@ body {
   min-height: 2rem;
   margin: 0 0.5rem;
   padding: 0.35rem 0.75rem;
-  color: var(--geo-ink);
-  background: var(--geo-accent-soft);
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--secondary) 5%, var(--main));
   border: 1px solid var(--geo-accent);
   border-radius: 0.25rem;
   font-size: 0.72rem;
@@ -81,7 +147,7 @@ body {
 
 .dashboard-link:hover {
   color: var(--geo-ink);
-  background: #d6e9e9;
+  background: var(--geo-accent);
 }
 
 .md-main__inner {
@@ -129,14 +195,14 @@ body {
 }
 
 .md-typeset code {
-  color: #243239;
-  background: #f0f2f3;
+  color: var(--main);
+  background: var(--geo-surface);
   border-radius: 0.15rem;
 }
 
 .md-typeset pre > code {
-  color: #243239;
-  background: #f4f5f5;
+  color: var(--main);
+  background: var(--geo-surface);
 }
 
 .highlight span {
@@ -146,8 +212,8 @@ body {
 .md-typeset .md-button {
   padding: 0.55em 0.9em;
   color: var(--geo-ink);
-  background: #ffffff;
-  border: 1px solid #aeb8bc;
+  background: var(--geo-raised);
+  border: 1px solid var(--geo-border-strong);
   border-radius: 0.25rem;
   font-weight: 650;
 }
@@ -155,7 +221,7 @@ body {
 .md-typeset .md-button:hover {
   color: var(--geo-ink);
   background: var(--geo-surface);
-  border-color: #7e8d93;
+  border-color: var(--geo-accent);
 }
 
 .md-typeset .md-button--primary {
@@ -166,12 +232,12 @@ body {
 
 .md-typeset .md-button--primary:hover {
   color: var(--geo-ink);
-  background: #d6e9e9;
+  background: color-mix(in srgb, var(--geo-accent) 20%, var(--secondary));
   border-color: var(--geo-accent);
 }
 
 .md-nav__link {
-  color: #38474e;
+  color: var(--geo-muted);
 }
 
 .md-nav__link--active,
@@ -185,12 +251,12 @@ body {
 }
 
 .md-sidebar {
-  background: #ffffff;
+  background: var(--secondary);
 }
 
 .md-typeset .grid.cards > ul > li,
 .md-typeset .grid > .card {
-  background: #ffffff;
+  background: var(--geo-raised);
   border: 1px solid var(--geo-border);
   border-radius: 0.25rem;
   box-shadow: none;
@@ -198,7 +264,7 @@ body {
 
 .md-typeset .admonition,
 .md-typeset details {
-  background: #ffffff;
+  background: var(--geo-raised);
   border: 1px solid var(--geo-border);
   border-radius: 0.25rem;
   box-shadow: none;
@@ -223,7 +289,7 @@ body {
 
 .md-typeset figure img,
 .md-typeset > p > img {
-  background: #ffffff;
+  background: var(--geo-raised);
   border: 1px solid var(--geo-border);
   border-radius: 0.2rem;
   box-shadow: none;
@@ -262,7 +328,7 @@ body {
 
 .geo-intro p {
   margin: 0;
-  color: #38474e;
+  color: var(--geo-muted);
   font-size: 1rem;
 }
 
@@ -283,7 +349,7 @@ body {
 
 .stage-card {
   padding: 1rem;
-  background: #ffffff;
+  background: var(--geo-raised);
   border: 1px solid var(--geo-border);
   border-top: 0.22rem solid var(--geo-accent);
 }
@@ -322,7 +388,7 @@ body {
 .quick-link {
   padding: 0.9rem;
   color: inherit;
-  background: #ffffff;
+  background: var(--geo-raised);
   border: 1px solid var(--geo-border);
   text-decoration: none;
 }
@@ -376,19 +442,19 @@ body {
 
 .mermaid {
   color: var(--geo-ink);
-  background: #ffffff;
+  background: var(--geo-raised);
 }
 
 .md-footer,
 .md-footer-meta {
-  color: var(--geo-ink);
-  background: #f4f5f5;
-  border-top: 1px solid var(--geo-border);
+  color: var(--secondary);
+  background: var(--main);
+  border-top: 3px solid var(--geo-accent);
 }
 
 .md-footer a,
 .md-footer-meta a {
-  color: var(--geo-ink);
+  color: var(--secondary);
 }
 
 @media screen and (max-width: 800px) {
@@ -406,6 +472,10 @@ body {
 
   .dashboard-link {
     margin-left: auto;
+  }
+
+  .docs-lab {
+    display: none;
   }
 
   .md-header__source {

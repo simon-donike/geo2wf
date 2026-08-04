@@ -7,6 +7,7 @@ const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
 const cat=v=>v>=1?`C${v}`:({0:"TS","-1":"TD","-2":"SS","-3":"DB","-4":"EX"}[v]||"—");
 const assetUrl=path=>new URL(path,assetBaseUrl||document.baseURI).href;
+const themeColor=token=>getComputedStyle(document.body).getPropertyValue(token).trim();
 
 function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true,attributionControl:false});
@@ -39,6 +40,7 @@ function switcher(){
   $("#stormSelect").onchange=event=>selectStorm(event.target.value);
 }
 function renderMap(){
+  const colors={main:themeColor("--main"),secondary:themeColor("--secondary"),highlight:themeColor("--highlight"),blue:themeColor("--system-blue")};
   layers.clearLayers();
   geoLayers.clearLayers();
   sarLayers.clearLayers();
@@ -47,17 +49,17 @@ function renderMap(){
   sarFrames=[];
   pmwFrames=[];
   const coords=storm.records.map(r=>[r.lat,r.lon]);
-  L.polyline(coords,{color:"#ffffff",weight:8,opacity:.5}).addTo(layers);
-  L.polyline(coords,{color:"#e65445",weight:4,opacity:1}).addTo(layers).bindTooltip(`${storm.id} · Storm track`);
+  L.polyline(coords,{color:colors.secondary,weight:8,opacity:.65}).addTo(layers);
+  L.polyline(coords,{color:colors.highlight,weight:4,opacity:1}).addTo(layers).bindTooltip(`${storm.id} · Storm track`);
   storm.records.filter(r=>r.geo_overlay).forEach(r=>{
     const o=r.geo_overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:1,interactive:true,className:"geo-overlay",pane:"geoPane"})
       .bindTooltip(`<strong>Geostationary · ${o.channel}</strong><br>${full(r.time)}<br>Shared scale: 190–292 K`,{className:"geo-tooltip"});
-    const dot=L.circleMarker([r.lat,r.lon],{radius:2.1,color:"#dcebee",weight:1,opacity:.65,fillColor:"#173b48",fillOpacity:.48,riseOnHover:true}).addTo(layers)
+    const dot=L.circleMarker([r.lat,r.lon],{radius:2.1,color:colors.secondary,weight:1,opacity:.65,fillColor:colors.main,fillOpacity:.48,riseOnHover:true}).addTo(layers)
       .bindTooltip(`${o.kind} · ${full(r.time)}`);
     const close=L.marker(o.bounds[1],{icon:L.divIcon({className:"geo-close-icon",html:"×",iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:2000,title:"Close Geostationary image"});
-    const hide=()=>{geoLayers.removeLayer(image);layers.removeLayer(close);dot.setStyle({fillColor:"#173b48",fillOpacity:.48})};
-    const show=(showClose=true)=>{image.addTo(geoLayers);if(showClose){close.addTo(layers);close.setZIndexOffset(2000)}else layers.removeLayer(close);dot.setStyle({fillColor:"#f2a654",fillOpacity:1});dot.bringToFront();currentMarker?.bringToFront()};
+    const hide=()=>{geoLayers.removeLayer(image);layers.removeLayer(close);dot.setStyle({fillColor:colors.main,fillOpacity:.48})};
+    const show=(showClose=true)=>{image.addTo(geoLayers);if(showClose){close.addTo(layers);close.setZIndexOffset(2000)}else layers.removeLayer(close);dot.setStyle({fillColor:colors.blue,fillOpacity:1});dot.bringToFront();currentMarker?.bringToFront()};
     close.on("click",hide);
     dot.on("click",()=>geoLayers.hasLayer(image)?hide():show(!$("#animationMode").checked));
     geoFrames.push({record:r,show,hide});
@@ -66,7 +68,7 @@ function renderMap(){
     const o=r.sar_overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"})
       .bindTooltip(`<strong>SAR-derived WF</strong><br>${full(r.time)}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} m/s<br>Shared color scale: 0–60+ m/s`,{className:"sar-tooltip"});
-    const dot=L.circleMarker([r.lat,r.lon],{radius:5,color:"#263f4a",weight:2,fillColor:"#fff",fillOpacity:1})
+    const dot=L.circleMarker([r.lat,r.lon],{radius:5,color:colors.main,weight:2,fillColor:colors.secondary,fillOpacity:1})
       .bindTooltip(`SAR match · ${full(r.time)}`);
     const show=()=>{image.addTo(sarLayers);dot.addTo(sarLayers)};
     const hide=()=>{sarLayers.removeLayer(image);sarLayers.removeLayer(dot)};
@@ -77,14 +79,14 @@ function renderMap(){
     const o=observation.overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.92,interactive:true,className:"pmw-overlay",pane:"pmwPane"})
       .bindTooltip(`<strong>PMW · ${o.sensor}</strong><br>${full(observation.time)}<br>${o.channel}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} K<br>Shared color scale: ${data.pmw_color_scale.min}–${data.pmw_color_scale.max} K`,{className:"pmw-tooltip"});
-    const dot=L.circleMarker([observation.lat,observation.lon],{radius:4,color:"#262068",weight:1.5,fillColor:"#2bb3b1",fillOpacity:.9})
+    const dot=L.circleMarker([observation.lat,observation.lon],{radius:4,color:colors.main,weight:1.5,fillColor:colors.blue,fillOpacity:.9})
       .bindTooltip(`PMW · ${o.sensor}<br>${full(observation.time)}`);
     const show=()=>{image.addTo(pmwLayers);dot.addTo(pmwLayers)};
     const hide=()=>{pmwLayers.removeLayer(image);pmwLayers.removeLayer(dot)};
     pmwFrames.push({time:dt(observation.time).getTime(),show,hide});
     if(!$("#animationMode").checked)show();
   });
-  currentMarker=L.circleMarker(coords[0],{radius:8,color:"#fff",weight:3,fillColor:"#e65445",fillOpacity:1}).addTo(layers);
+  currentMarker=L.circleMarker(coords[0],{radius:8,color:colors.secondary,weight:3,fillColor:colors.highlight,fillOpacity:1}).addTo(layers);
   map.fitBounds(L.latLngBounds(coords).pad(.3),{animate:false,maxZoom:6});
 }
 function chartTimeDomain(){
