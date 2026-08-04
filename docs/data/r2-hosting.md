@@ -4,7 +4,7 @@ The explorer can keep its frontend on GitHub Pages while R2 serves the generated
 
 ## One-time Cloudflare setup
 
-`https://9d9a9d8281d0329e2a5a36456ee7a9ff.r2.cloudflarestorage.com` is the authenticated S3 API endpoint used for uploads. It is **not** the URL the browser should fetch.
+Uploads use the authenticated rclone remote `r2:tcd/explorer`. The authenticated API endpoint is not the URL the browser should fetch.
 
 In the R2 settings for the `tcd` bucket:
 
@@ -23,13 +23,7 @@ In the R2 settings for the `tcd` bucket:
 ]
 ```
 
-Configure AWS CLI credentials locally. Do not commit them:
-
-```bash
-export AWS_ACCESS_KEY_ID="<R2 access key ID>"
-export AWS_SECRET_ACCESS_KEY="<R2 secret access key>"
-export AWS_DEFAULT_REGION="auto"
-```
+Configure the `r2` rclone remote locally with credentials that can write to the `tcd` bucket. Do not commit its configuration. Verify access with `rclone lsd r2:tcd/explorer`.
 
 ## Publish a release
 
@@ -37,11 +31,10 @@ Regenerate the browser data, then sync it. An explicit version makes rollback an
 
 ```bash
 uv run python scripts/export_storm_explorer_data.py
-R2_PUBLIC_BASE_URL=https://data.example.org \
-  ./scripts/sync_explorer_to_r2.sh 2026-07-30
+./scripts/sync_explorer_to_r2.sh 2026-07-30
 ```
 
-This publishes `explorer/releases/2026-07-30/` and then `explorer/latest.json`. Running the same command again synchronizes missing or changed files. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
+This publishes the GEO, SAR, and PMW overlays plus `storm-data.json` under `explorer/releases/2026-07-30/`, then advances `explorer/latest.json`. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
 
 Point the website at the public URL in `docs/explorer/data-config.js`:
 
@@ -54,4 +47,4 @@ Commit and deploy that change once the public domain and CORS policy are active.
 
 ## Optional automation
 
-For CI, store `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, and `R2_PUBLIC_BASE_URL` as secrets, then run the same script after data generation. Large inference inputs are not in this repository, so automatic export belongs on the machine or workflow that produces a completed inference version.
+For CI, provide an rclone configuration containing the `r2` remote, then run the same script after data generation. Large inference inputs are not in this repository, so automatic export belongs on the machine or workflow that produces a completed inference version.

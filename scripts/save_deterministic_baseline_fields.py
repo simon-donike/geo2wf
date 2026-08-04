@@ -64,7 +64,7 @@ from geo2wf.data.features import (
 )  # noqa: E402
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
-DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_anna"
+DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_vit"
 DEFAULT_OUTPUT_ROOT = ROOT / "logs" / "ablation-suites" / "postprocess-baseline"
 DEFAULT_STATS = ROOT / "data" / "geotiff" / "geo_sar_10bands_era5" / "stats.json"
 DEFAULT_CONFIG = ROOT / "configs" / "config_geo_sar_10bands_era5_residual.yaml"
@@ -90,7 +90,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stats", type=Path, default=None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
-    parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
+    parser.add_argument(
+        "--storms",
+        nargs="+",
+        default=None,
+        help="Optional subset of manifest storm IDs (default: all manifest storms).",
+    )
     parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -233,8 +238,25 @@ def _prepare_sample(geo, era5_dataset: xr.Dataset, stats: dict):
     }, valid.squeeze(0)
 
 
+def _manifest_storm_ids(manifest: Path) -> list[str]:
+    """Return every unique non-empty storm ID declared by the manifest."""
+    return sorted(
+        pd.read_csv(manifest, usecols=["storm_id"])["storm_id"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+
+
 def main() -> None:
     args = parse_args()
+    manifest_storms = _manifest_storm_ids(args.manifest)
+    if args.storms is None:
+        args.storms = manifest_storms
+    else:
+        unknown = sorted(set(args.storms) - set(manifest_storms))
+        if unknown:
+            raise ValueError(f"Storms are not present in the manifest: {unknown}")
     if args.batch_size < 1:
         raise ValueError("--batch-size must be positive")
     for path in (args.config, args.checkpoint, args.manifest):
@@ -275,6 +297,13 @@ def main() -> None:
             reference = pd.read_csv(
                 args.reference_root / storm / "inference-summary.csv"
             )
+            available = reference["observation_id"].isin(by_id)
+            if not available.all():
+                print(
+                    f"Skipping {(~available).sum()} stale ViT observations for {storm} "
+                    "that are absent from the current manifest"
+                )
+                reference = reference.loc[available].copy()
             if args.limit is not None:
                 reference = reference.head(args.limit).copy()
             storm_dir = output_root / storm / "baseline-fields"

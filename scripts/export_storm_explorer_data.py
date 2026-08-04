@@ -26,13 +26,12 @@ from export_geo_sar_geotiffs import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT_ROOT = ROOT / "inference" / "inf_anna"
-MODEL_A_ROOT = ROOT / "inference" / "inf_model_a_unet_20260803"
-MODEL_B_ROOT = ROOT / "inference" / "inf_model_b_res_diffusion_20260803"
+VIT_ROOT = ROOT / "inference" / "inf_vit"
+UNET_ROOT = ROOT / "inference" / "inf_unet"
+DIFFUSION_ROOT = ROOT / "inference" / "inf_diffusion"
 NWP_ROOT = ROOT / "inference" / "NWP"
-RAW_INPUT_ROOT = ROOT / "inference" / "inf_data2"
+RAW_INPUT_ROOT = ROOT / "inference" / "inf_data"
 RAW_MANIFEST = RAW_INPUT_ROOT / "index-files" / "observation_manifest_v6.csv"
-DATA_ONLY_STORMS = ("EP182023",)
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
 PMW_IMAGE_DIR = OUTPUT_PATH.parent / "pmw"
@@ -44,9 +43,8 @@ POSTPROCESS_C02_P99_MAX = 0.4
 POSTPROCESS_SMOOTHING_HOURS = 6.0
 POSTPROCESS_EDGE_PADDING_ACQUISITIONS = 1
 SAR_SCALE_MAX_MS = 60.0
-PMW_SCALE_MIN_K = 150.0
-PMW_SCALE_MAX_K = 300.0
-NWP_STORM_ID = "AL082025"
+PMW_SCALE_MIN_K = GEOSTAT_SCALE_MIN_K
+PMW_SCALE_MAX_K = GEOSTAT_SCALE_MAX_K
 NWP_LABELS = {
     "aifs": "AIFS",
     "aifs2": "AIFS2",
@@ -160,12 +158,9 @@ def export_pmw_array(
             1,
         )
     )
-    cold = np.array([38, 31, 104], dtype=np.float32)
-    middle = np.array([43, 179, 177], dtype=np.float32)
-    warm = np.array([249, 231, 126], dtype=np.float32)
-    lower = cold + stretched[..., None] * 2 * (middle - cold)
-    upper = middle + (stretched[..., None] - 0.5) * 2 * (warm - middle)
-    rgb = np.where((stretched <= 0.5)[..., None], lower, upper).astype(np.uint8)
+    cold = np.array([255, 255, 255], dtype=np.float32)
+    warm = np.array([22, 82, 180], dtype=np.float32)
+    rgb = (cold + stretched[..., None] * (warm - cold)).astype(np.uint8)
     rgba = np.concatenate(
         [rgb, np.where(mask, 225, 0).astype(np.uint8)[..., None]], axis=-1
     )
@@ -253,10 +248,15 @@ def export_pmw_observations(storm, raw_records):
     return observations
 
 
-def export_nwp():
+def export_nwp(storm_id):
     """Return NWP maximum-wind tracks in the browser format."""
     series = []
-    for path in sorted(NWP_ROOT.glob("*.csv")):
+    storm_root = NWP_ROOT / storm_id
+    if not storm_root.is_dir():
+        raise ValueError(
+            f"Missing NWP directory for manifest storm {storm_id}: {storm_root}"
+        )
+    for path in sorted(storm_root.glob("*.csv")):
         key = path.stem.lower()
         if key not in NWP_LABELS:
             continue
@@ -396,8 +396,9 @@ def export_raw_storm(storm_id, raw_records, raw_metadata):
                     if wind_kt is not None
                     else None
                 ),
-                "model_a_prediction": None,
-                "model_b_prediction": None,
+                "vit_prediction": None,
+                "unet_prediction": None,
+                "diffusion_prediction": None,
                 "c02_p99": None,
                 "postprocess_excluded": False,
                 "geo_overlay": geo_overlay,
@@ -423,26 +424,72 @@ def export_raw_storm(storm_id, raw_records, raw_metadata):
     }
 
 
-def export_storm(storm_dir):
+METRIC_COLUMNS = {
+    "max": "output_msw_ms",
+    "p90": "output_p90_ms",
+    "mean": "output_mean_ms",
+    "core_mean": "output_core_mean_ms",
+    "rmw": "output_rmw_km",
+    "r64": "output_r64_km",
+}
+
+
+def manifest_storm_ids():
+    """Return the sorted unique storm IDs declared by the input manifest."""
+    return sorted(
+        pd.read_csv(RAW_MANIFEST, usecols=["storm_id"])["storm_id"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+
+
+def load_prediction_table(root, storm_id):
+    path = root / storm_id / "inference-summary.csv"
+    if not path.is_file():
+        return None
+    return pd.read_csv(path).set_index("observation_id")
+
+
+def tabular_prediction(table, observation_id):
+    if table is None or observation_id not in table.index:
+        return None
+    row = table.loc[observation_id]
+    return {
+        metric: finite_number(row.get(column, math.nan))
+        for metric, column in METRIC_COLUMNS.items()
+    }
+
+
+def export_storm(storm_id):
+    storm_dir = VIT_ROOT / storm_id
+    summary_path = storm_dir / "inference-summary.csv"
+    if not summary_path.is_file():
+        raise ValueError(
+            f"Missing ViT summary for manifest storm {storm_id}: {summary_path}"
+        )
     summary = (
-        pd.read_csv(storm_dir / "inference-summary.csv")
+        pd.read_csv(summary_path)
         .sort_values("observation_timestamp")
         .reset_index(drop=True)
     )
-    model_a_path = MODEL_A_ROOT / storm_dir.name / "inference-summary.csv"
-    model_a = pd.read_csv(model_a_path).set_index("observation_id")
-    model_b_path = MODEL_B_ROOT / storm_dir.name / "inference-summary.csv"
-    model_b = pd.read_csv(model_b_path).set_index("observation_id")
-    missing_model_a = set(summary["observation_id"]) - set(model_a.index)
-    if missing_model_a:
-        raise ValueError(
-            f"{model_a_path} is missing {len(missing_model_a)} explorer observations"
-        )
-    missing_model_b = set(summary["observation_id"]) - set(model_b.index)
-    if missing_model_b:
-        raise ValueError(
-            f"{model_b_path} is missing {len(missing_model_b)} explorer observations"
-        )
+    unet = load_prediction_table(UNET_ROOT, storm_id)
+    diffusion = load_prediction_table(DIFFUSION_ROOT, storm_id)
+    for label, table in (("UNet", unet), ("Diffusion", diffusion)):
+        if table is None:
+            continue
+        missing = set(summary["observation_id"]) - set(table.index)
+        if missing:
+            print(
+                f"{label} has no result for {len(missing)} stale ViT "
+                f"observations in {storm_id}; exporting them as unavailable"
+            )
+    available_models = ["vit"]
+    if unet is not None:
+        available_models.append("unet")
+    if diffusion is not None:
+        available_models.append("diffusion")
+
     timestamps = pd.to_datetime(summary["observation_timestamp"])
     targets = pd.date_range(timestamps.iloc[0], timestamps.iloc[-1], freq="3h")
     geo_indices = {int((timestamps - target).abs().argmin()) for target in targets}
@@ -451,36 +498,21 @@ def export_storm(storm_dir):
         bundle = torch.load(
             storm_dir / row.inference_path, map_location="cpu", weights_only=False
         )
-        c02 = bundle["input"][bundle["input_channels"].index("CMI_C02")]
-        c02_valid = c02[bundle["input_mask"].bool() & torch.isfinite(c02)]
-        c02_p99 = (
-            finite_number(torch.quantile(c02_valid, 0.99))
-            if c02_valid.numel()
-            else None
-        )
+        c02_p99 = None
+        if "CMI_C02" in bundle["input_channels"]:
+            c02 = bundle["input"][bundle["input_channels"].index("CMI_C02")]
+            c02_valid = c02[bundle["input_mask"].bool() & torch.isfinite(c02)]
+            if c02_valid.numel():
+                c02_p99 = finite_number(torch.quantile(c02_valid, 0.99))
         geo_overlay = (
             export_geostat_image(row.observation_id, bundle, GEO_IMAGE_DIR)
             if index in geo_indices
             else None
         )
-        model_a_row = model_a.loc[row.observation_id]
-        model_a_prediction = {
-            "max": finite_number(model_a_row.output_msw_ms),
-            "p90": finite_number(model_a_row.output_p90_ms),
-            "mean": finite_number(model_a_row.output_mean_ms),
-            "core_mean": finite_number(model_a_row.output_core_mean_ms),
-            "rmw": finite_number(model_a_row.output_rmw_km),
-            "r64": finite_number(model_a_row.output_r64_km),
-        }
-        model_b_row = model_b.loc[row.observation_id]
-        model_b_prediction = {
-            "max": finite_number(model_b_row.output_msw_ms),
-            "p90": finite_number(model_b_row.output_p90_ms),
-            "mean": finite_number(model_b_row.output_mean_ms),
-            "core_mean": finite_number(model_b_row.output_core_mean_ms),
-            "rmw": finite_number(model_b_row.output_rmw_km),
-            "r64": finite_number(model_b_row.output_r64_km),
-        }
+        vit_prediction = field_metrics(
+            bundle["output"], bundle["input_mask"], bundle["distance_to_center"]
+        )
+        vit_prediction["r64"] = finite_number(row.output_r64_km)
         sar = None
         sar_overlay = None
         if bundle["sar_data"] is not None:
@@ -499,8 +531,11 @@ def export_storm(storm_dir):
                 "lon": finite_number(meta["ibtracs_center_lon"]),
                 "category": int(row.ibtracs_category),
                 "ibtracs_msw": finite_number(row.ibtracs_msw_ms),
-                "model_a_prediction": model_a_prediction,
-                "model_b_prediction": model_b_prediction,
+                "vit_prediction": vit_prediction,
+                "unet_prediction": tabular_prediction(unet, row.observation_id),
+                "diffusion_prediction": tabular_prediction(
+                    diffusion, row.observation_id
+                ),
                 "c02_p99": c02_p99,
                 "postprocess_excluded": c02_p99 is not None
                 and c02_p99 > POSTPROCESS_C02_P99_MAX,
@@ -519,20 +554,18 @@ def export_storm(storm_dir):
         start = max(0, index - POSTPROCESS_EDGE_PADDING_ACQUISITIONS)
         end = min(len(records), index + POSTPROCESS_EDGE_PADDING_ACQUISITIONS + 1)
         record["postprocess_excluded"] = any(base_exclusions[start:end])
-    storm = {
-        "id": storm_dir.name,
-        "basin": (
-            "North Atlantic" if storm_dir.name.startswith("AL") else "Eastern Pacific"
-        ),
+    return {
+        "id": storm_id,
+        "name": "OTIS" if storm_id == "EP182023" else None,
+        "basin": "North Atlantic" if storm_id.startswith("AL") else "Eastern Pacific",
         "start": records[0]["time"],
         "end": records[-1]["time"],
         "sar_matches": sum(record["sar"] is not None for record in records),
         "inference_available": True,
+        "available_models": available_models,
+        "nwp": export_nwp(storm_id),
         "records": records,
     }
-    if storm_dir.name == NWP_STORM_ID:
-        storm["nwp"] = export_nwp()
-    return storm
 
 
 def main():
@@ -545,29 +578,19 @@ def main():
         existing.unlink()
     for existing in PMW_IMAGE_DIR.glob("*.png"):
         existing.unlink()
-    storms = [
-        export_storm(path) for path in sorted(INPUT_ROOT.iterdir()) if path.is_dir()
-    ]
-    raw_frame = pd.read_csv(RAW_MANIFEST, keep_default_na=False, low_memory=False)
-    raw_metadata = {
-        str(row.observation_id): (
-            json.loads(row.metadata_ibtracs) if row.metadata_ibtracs else {}
-        )
-        for row in raw_frame.itertuples(index=False)
-    }
+    storm_ids = manifest_storm_ids()
+    storms = [export_storm(storm_id) for storm_id in storm_ids]
     raw_records = _read_manifest(RAW_MANIFEST, RAW_INPUT_ROOT)
-    existing_storms = {storm["id"] for storm in storms}
-    storms.extend(
-        export_raw_storm(storm_id, raw_records, raw_metadata)
-        for storm_id in DATA_ONLY_STORMS
-        if storm_id not in existing_storms
-    )
-    storms.sort(key=lambda storm: storm["id"])
     for storm in storms:
         storm["pmw_observations"] = export_pmw_observations(storm, raw_records)
         storm["pmw_matches"] = len(storm["pmw_observations"])
     payload = {
-        "generated_from": "inference/inf_anna",
+        "generated_from": [
+            "inference/inf_vit",
+            "inference/inf_unet",
+            "inference/inf_diffusion",
+            "inference/NWP",
+        ],
         "geo_interval_hours": 3,
         "postprocessing": {
             "enabled_default": True,
@@ -609,12 +632,16 @@ def main():
             "r64": {"label": "Radius of 64-knot winds", "unit": "km"},
         },
         "models": {
-            "model_a": {
-                "label": "Model A (UNet)",
+            "vit": {
+                "label": "ViT",
                 "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
             },
-            "model_b": {
-                "label": "Model B (Res. Diffusion)",
+            "unet": {
+                "label": "UNet",
+                "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
+            },
+            "diffusion": {
+                "label": "Diffusion",
                 "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
             },
         },

@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=true,showNwp=false,graphModel="model_a",assetBaseUrl="";
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=true,showNwp=false,graphModel="vit",assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
@@ -105,8 +105,8 @@ function domain(metric,start,end){
 }
 function nwpPoints(start,end){return showNwp?(storm.nwp||[]).map(series=>({...series,points:series.points.filter(point=>{const time=dt(point.time).getTime();return time>=start&&time<=end&&Number.isFinite(point.max)})})).filter(series=>series.points.length):[]}
 function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!sorted.length)return null;const m=Math.floor(sorted.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2}
-function graphPrediction(record){if(graphModel==="model_b")return record.model_b_prediction;if(graphModel==="model_c")return record.model_c_prediction;return record.prediction}
-function postprocessExcluded(record){return graphModel==="model_a"&&record.postprocess_excluded}
+function graphPrediction(record){return record[`${graphModel}_prediction`]}
+function postprocessExcluded(record){return false}
 function smoothedValidValue(metric,record){
   const halfWindow=data.postprocessing.smoothing_hours*3600000/2,target=dt(record.time).getTime();
   return median(storm.records.filter(r=>!postprocessExcluded(r)&&Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r)?.[metric]));
@@ -163,8 +163,11 @@ function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=ena
 function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function selectStorm(id){
   stop();storm=data.storms.find(s=>s.id===id);switcher();renderMap();
-  const inferenceAvailable=storm.inference_available!==false;
-  graphModel="model_a";$("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;
+  const availableModels=storm.available_models||[];
+  const inferenceAvailable=availableModels.length>0;
+  graphModel=availableModels.includes("vit")?"vit":availableModels[0];
+  $$("#modelSelector option").forEach(option=>{const available=availableModels.includes(option.value);option.disabled=!available;option.textContent=data.models[option.value].label+(available?"":" (pending)")});
+  $("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;$("#predictionLegend").textContent=inferenceAvailable?data.models[graphModel].label:"";
   $(".model-toolbar").hidden=!inferenceAvailable;$("#inferenceNotice").hidden=inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;$("#methodNote").hidden=!inferenceAvailable;$(".graph-toolbar").hidden=!inferenceAvailable;
   postProcessing=inferenceAvailable&&$("#postProcessing").checked;
   $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormTitle").textContent=storm.name?`${storm.name} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;$("#pmwCount").textContent=storm.pmw_matches||0;

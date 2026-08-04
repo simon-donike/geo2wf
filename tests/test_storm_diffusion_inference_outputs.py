@@ -74,6 +74,10 @@ def test_member_metric_aggregation_retains_quantiles_and_field_diagnostics() -> 
     assert summary["output_msw_ms_member_median"] == 30.0
     assert summary["output_msw_ms_member_p10"] == 14.0
     assert summary["output_msw_ms_member_p90"] == 46.0
+    assert math.isclose(summary["output_msw_ms_member_std"], 16.32993161855452)
+    assert summary["output_msw_ms_member_min"] == 10.0
+    assert summary["output_msw_ms_member_max"] == 50.0
+    assert summary["output_msw_ms_member_range"] == 40.0
     assert summary["output_msw_ms_medoid"] == 30.0
     assert summary["output_msw_ms_mean_field"] == 12.0
     assert summary["output_robust_peak_ms_member_p90"] == 46.0

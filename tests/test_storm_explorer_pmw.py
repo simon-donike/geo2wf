@@ -3,10 +3,17 @@ from pathlib import Path
 
 import imageio.v3 as iio
 import numpy as np
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import export_storm_explorer_data as explorer  # noqa: E402
 
-from export_storm_explorer_data import export_pmw_array  # noqa: E402
+from export_geostat_images import GEOSTAT_SCALE_MAX_K, GEOSTAT_SCALE_MIN_K  # noqa: E402
+from export_storm_explorer_data import (  # noqa: E402
+    PMW_SCALE_MAX_K,
+    PMW_SCALE_MIN_K,
+    export_pmw_array,
+)
 
 
 def test_pmw_export_uses_shared_scale_and_transparent_no_data(tmp_path) -> None:
@@ -45,3 +52,45 @@ def test_pmw_export_uses_shared_scale_and_transparent_no_data(tmp_path) -> None:
     assert one["max"] == 225.0
     assert one["bounds"] == [[10.0, -50.0], [11.0, -49.0]]
     assert two["sensor"] == "AMSR2_GCOMW1"
+
+
+def test_pmw_uses_geostationary_brightness_temperature_scale() -> None:
+    assert (PMW_SCALE_MIN_K, PMW_SCALE_MAX_K) == (
+        GEOSTAT_SCALE_MIN_K,
+        GEOSTAT_SCALE_MAX_K,
+    )
+
+
+def test_manifest_storm_ids_are_the_dashboard_source_of_truth(
+    tmp_path, monkeypatch
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame({"storm_id": ["EP182023", "AL082025", "EP182023", None]}).to_csv(
+        manifest, index=False
+    )
+    monkeypatch.setattr(explorer, "RAW_MANIFEST", manifest)
+
+    assert explorer.manifest_storm_ids() == ["AL082025", "EP182023"]
+
+
+def test_nwp_export_reads_the_selected_storm_directory(
+    tmp_path, monkeypatch
+) -> None:
+    nwp_root = tmp_path / "NWP"
+    storm_root = nwp_root / "EP182023"
+    storm_root.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "valid_time": ["2023-10-24T00:00:00+00:00"],
+            "max_wind_ms": [25.1254],
+        }
+    ).to_csv(storm_root / "gfs.csv", index=False)
+    monkeypatch.setattr(explorer, "NWP_ROOT", nwp_root)
+
+    assert explorer.export_nwp("EP182023") == [
+        {
+            "id": "gfs",
+            "label": "GFS",
+            "points": [{"time": "2023-10-24T00:00:00Z", "max": 25.125}],
+        }
+    ]
