@@ -181,7 +181,9 @@ class PairedImageDataset(Dataset):
             condition_channels=tuple(metadata["condition_channels"]),
             target_channels=tuple(metadata["target_channels"]),
             spatial_shape=tuple(int(value) for value in sample["target"].shape[-2:]),
-            target_units="m s-1",
+            target_units=(
+                "K" if metadata.get("target_source_type") == "pmw" else "m s-1"
+            ),
             companions=companions,
         )
 
@@ -534,6 +536,7 @@ class PairedImageDataset(Dataset):
                 "context_source_type": context_source_type,
                 "context_channels": context_channels,
                 "target_channels": target_channels,
+                "pmw_source_channel": _row_value(row, "pmw_source_channel", ""),
             },
         }
         if self.include_pmw:

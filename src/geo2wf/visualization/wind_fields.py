@@ -320,15 +320,20 @@ def _draw_validation_row(
     # Derive the display stretch exclusively from valid ground-truth pixels,
     # then apply those same per-channel limits to prediction and target.
     output_ranges = _channel_ranges(target_array, target_valid)
-    physical_wind_output = (
-        bool(sample.get("physical_wind_output"))
+    physical_output_units = sample.get("physical_output_units")
+    if physical_output_units is None and sample.get("physical_wind_output"):
+        physical_output_units = "m s-1"
+    physical_scalar_output = (
+        bool(physical_output_units)
         and prediction_array.shape[0] == 1
         and target_array.shape[0] == 1
     )
+    physical_wind_output = physical_output_units == "m s-1"
     prediction_valid = np.ones(prediction_array.shape[1:], dtype=bool)
-    if physical_wind_output:
-        prediction_image, prediction_cmap = prediction_array[0], "turbo"
-        target_image, target_cmap = target_array[0], "turbo"
+    if physical_scalar_output:
+        scalar_cmap = "turbo" if physical_wind_output else "magma"
+        prediction_image, prediction_cmap = prediction_array[0], scalar_cmap
+        target_image, target_cmap = target_array[0], scalar_cmap
     else:
         prediction_image, prediction_cmap = _output_plot_view(
             prediction_array, prediction_valid, output_ranges
@@ -380,8 +385,8 @@ def _draw_validation_row(
             baseline_valid = _as_2d_mask(
                 sample.get("baseline_mask"), baseline_array.shape[1:]
             )
-            if physical_wind_output and baseline_array.shape[0] == 1:
-                baseline_image, baseline_cmap = baseline_array[0], "turbo"
+            if physical_scalar_output and baseline_array.shape[0] == 1:
+                baseline_image, baseline_cmap = baseline_array[0], scalar_cmap
             else:
                 baseline_image, baseline_cmap = _output_plot_view(
                     baseline_array, baseline_valid, output_ranges
@@ -409,7 +414,7 @@ def _draw_validation_row(
             ax.set_axis_off()
             continue
         is_pmw_panel = title.startswith("PMW 89–92 GHz")
-        is_wind_panel = physical_wind_output and title in {
+        is_physical_output_panel = physical_scalar_output and title in {
             "Prediction",
             "Refined prediction",
             "Target",
@@ -421,8 +426,8 @@ def _draw_validation_row(
             extent=extent,
             origin="upper",
             cmap=cmap,
-            vmin=output_ranges[0][0] if is_wind_panel else None,
-            vmax=output_ranges[0][1] if is_wind_panel else None,
+            vmin=output_ranges[0][0] if is_physical_output_panel else None,
+            vmax=output_ranges[0][1] if is_physical_output_panel else None,
         )
         if is_pmw_panel:
             ax.figure.colorbar(
@@ -432,13 +437,14 @@ def _draw_validation_row(
                 pad=0.03,
                 label="Brightness temperature (K)",
             )
-        if is_wind_panel:
+        if is_physical_output_panel:
+            unit_label = (
+                r"Wind speed (m s$^{-1}$)"
+                if physical_wind_output
+                else "Brightness temperature (K)"
+            )
             ax.figure.colorbar(
-                image_artist,
-                ax=ax,
-                shrink=0.76,
-                pad=0.03,
-                label=r"Wind speed (m s$^{-1}$)",
+                image_artist, ax=ax, shrink=0.76, pad=0.03, label=unit_label
             )
         if (
             title in {"Target", "Ground truth", "Deterministic baseline"}

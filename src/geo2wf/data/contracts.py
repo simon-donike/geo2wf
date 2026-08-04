@@ -25,6 +25,7 @@ class SampleMetadata(TypedDict, total=False):
     pmw_channels: list[str]
     pmw_sensor: str
     pmw_dt_minutes: float
+    pmw_source_channel: str
 
 
 class WindFieldBatch(TypedDict):

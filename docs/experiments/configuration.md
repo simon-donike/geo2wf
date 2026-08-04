@@ -21,11 +21,11 @@ A choice is the YAML filename without `.yaml`.
 
 | Group | Checked-in choices | Owns |
 |---|---|---|
-| `data` | `geo_sar_common4`, `geo_sar_common10_era5` | export root, splits, normalization, companions, loader, sampling |
-| `model` | `conditional_diffusion`, `deterministic_residual`, `residual_diffusion`, `residual_diffusion_deterministic_baseline` | constructor, architecture, objective, optimizer, sampling |
+| `data` | `geo_sar_common4`, `geo_sar_common10_era5`, `geo_pmw_near89_common10_era5` | export root, splits, normalization, companions, loader, sampling |
+| `model` | `conditional_diffusion`, `deterministic_residual`, `direct_unet`, `residual_diffusion`, `residual_diffusion_deterministic_baseline` | constructor, architecture, objective, optimizer, sampling |
 | `trainer` | `default` | devices, precision, loop bounds, checkpoint policy |
 | `logging` | `default` | optional W&B adapter |
-| `experiment` | `ablations/stage1_peak_aware` | focused cross-group overrides only |
+| `experiment` | `ablations/stage1_peak_aware`, `geo_pmw_near89_unet` | focused cross-group overrides only |
 
 List filenames below `configs/<group>/` to discover new choices. Each data and
 model config has a local `_target_`; adding one does not require a central

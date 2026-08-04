@@ -1,0 +1,18 @@
+export:
+  data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
+  manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
+  output_root: data/geotiff/geo_pmw_near89_10bands_era5
+  geo_channel_set: common10
+  include_era5: true
+  era5_max_time_gap_hours: 3.1
+  era5_channels: [precipitable_water, sst, pressure_msl, temperature_2m, dewpoint_2m, u_wind_10m, v_wind_10m]
+  splits: [train, val, test]
+  grid_size: 256
+  grid_resolution: 0.027
+  closest_match_hours: 0.5
+  center: image_center
+  shift_center: true
+  pad: 8
+  limit: null
+  pmw_resampling: linear
+  pmw_sensors: [AMSR2_GCOMW1, GMI_GPM, SSMIS_F16, SSMIS_F17, SSMIS_F18, ATMS_NPP, ATMS_NOAA20, ATMS_NOAA21, MHS_METOPB, MHS_METOPC, MHS_NOAA19]
