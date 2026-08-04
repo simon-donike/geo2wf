@@ -1,5 +1,9 @@
 """Run deterministic-baseline residual diffusion for the explorer storms.
 
+All raw GEO, ERA5, PMW, and manifest inputs come from ``inference/inf_data``;
+the ViT summaries only define the dashboard observation IDs. Results are written
+to ``inference/inf_diffusion``.
+
 The legacy ``inference-summary.csv`` contract is retained, but ensemble
 diagnostics are computed member-by-member before aggregation. Every run also
 writes long-form member metrics and reproducibility metadata. Full member
@@ -34,6 +38,7 @@ from geo2wf.data.features import (  # noqa: E402
     solar_time_features as _solar_time_features,
 )
 from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
+from geo2wf.diffusion.samplers import DDIM_Sampler  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
     GEO_CHANNEL_SETS,
@@ -58,8 +63,8 @@ from scripts.pmw_conditioning import (
 from geo2wf.training import build_model, resolve_runtime_config
 
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
-DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_anna"
-DEFAULT_OUTPUT_ROOT = ROOT / "inference" / "inf_model_c"
+DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_vit"
+DEFAULT_OUTPUT_ROOT = ROOT / "inference" / "inf_diffusion"
 DEFAULT_STATS = ROOT / "data" / "geotiff" / "geo_sar_10bands_era5" / "stats.json"
 DEFAULT_CONFIG = (
     ROOT
@@ -105,7 +110,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stats", type=Path, default=None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
-    parser.add_argument("--storms", nargs="+", default=["AL082025", "EP112025"])
+    parser.add_argument(
+        "--storms",
+        nargs="+",
+        default=None,
+        help="Optional subset of manifest storm IDs (default: all manifest storms).",
+    )
     parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -163,7 +173,8 @@ def parse_args() -> argparse.Namespace:
         "--save-member-fields",
         action="store_true",
         help=(
-            "Save members, mean/median fields, medoid field, mask, and distance "
+            "Save every member plus mean, median, standard deviation, variance, "
+            "range, quantile, medoid, ERA5 baseline, mask, and distance fields "
             "as one compressed NPZ per observation."
         ),
     )
@@ -388,6 +399,13 @@ def _aggregate_member_metrics(
         )
         finite = np.asarray(values, dtype=np.float64)
         finite = finite[np.isfinite(finite)]
+        member_std = float(np.std(finite, ddof=0)) if finite.size else math.nan
+        member_min = float(np.min(finite)) if finite.size else math.nan
+        member_max = float(np.max(finite)) if finite.size else math.nan
+        summary[_metric_column(metric, "member_std")] = member_std
+        summary[_metric_column(metric, "member_min")] = member_min
+        summary[_metric_column(metric, "member_max")] = member_max
+        summary[_metric_column(metric, "member_range")] = member_max - member_min
         for quantile in quantiles:
             value = (
                 float(np.quantile(finite, quantile, method="linear"))
@@ -435,6 +453,8 @@ def _summarize_ensemble(
         summary_aggregation=summary_aggregation,
     )
     finite_distances = [value for value in medoid_distances if math.isfinite(value)]
+    pixel_std = torch.std(member_fields.float(), dim=0, correction=0)
+    valid_pixel_std = pixel_std[valid.squeeze().bool()]
     summary.update(
         {
             "medoid_member_index": medoid_index,
@@ -442,11 +462,12 @@ def _summarize_ensemble(
             "ensemble_consensus_rmse_mean_ms": (
                 float(np.mean(finite_distances)) if finite_distances else math.nan
             ),
-            "ensemble_pixel_std_mean_ms": float(
-                torch.std(member_fields.float(), dim=0, correction=0)[
-                    valid.squeeze().bool()
-                ].mean()
+            "ensemble_pixel_std_mean_ms": float(valid_pixel_std.mean()),
+            "ensemble_pixel_std_median_ms": float(valid_pixel_std.median()),
+            "ensemble_pixel_std_p90_ms": float(
+                torch.quantile(valid_pixel_std, 0.9, interpolation="linear")
             ),
+            "ensemble_pixel_std_max_ms": float(valid_pixel_std.max()),
         }
     )
     return (
@@ -664,8 +685,25 @@ def _prepare_sample(
     return batch, _physical_distance_km(bounds, geo.ibtracs_center)
 
 
+def _manifest_storm_ids(manifest: Path) -> list[str]:
+    """Return every unique non-empty storm ID declared by the manifest."""
+    return sorted(
+        pd.read_csv(manifest, usecols=["storm_id"])["storm_id"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+
+
 def main() -> None:
     args = parse_args()
+    manifest_storms = _manifest_storm_ids(args.manifest)
+    if args.storms is None:
+        args.storms = manifest_storms
+    else:
+        unknown = sorted(set(args.storms) - set(manifest_storms))
+        if unknown:
+            raise ValueError(f"Storms are not present in the manifest: {unknown}")
     started_utc = datetime.now(timezone.utc).isoformat()
     records = _read_manifest(args.manifest, args.data_root)
     by_id = {record.observation_id: record for record in records}
@@ -706,6 +744,12 @@ def main() -> None:
     if args.sampling_seed is not None:
         model.validation_seed = int(args.sampling_seed)
     model.eval().to(args.device)
+    sampler = model.model.sampler
+    if not isinstance(sampler, DDIM_Sampler):
+        raise RuntimeError(
+            "Storm diffusion inference requires DDIM; configured sampler is "
+            f"{sampler.__class__.__name__}"
+        )
 
     configured_guidance = float(model.guidance_scale)
     guidance_values = (
@@ -765,9 +809,12 @@ def main() -> None:
         "manifest": _file_metadata(args.manifest, sha256=False),
         "configured_guidance_scale": configured_guidance,
         "sampling": {
-            "method": getattr(model, "sampling_method", None),
-            "timesteps": getattr(model, "sampling_timesteps", None),
-            "eta": getattr(model, "sampling_eta", None),
+            "method": "ddim",
+            "sampler_class": sampler.__class__.__name__,
+            "timesteps": int(sampler.num_timesteps),
+            "train_timesteps": int(sampler.train_timesteps),
+            "eta": float(sampler.eta),
+            "clip_sample": bool(sampler.clip_sample),
         },
         "seeding": {
             "base_seed": base_seed,
@@ -781,6 +828,20 @@ def main() -> None:
             "member_statistics": [
                 "mean",
                 "median",
+                "standard_deviation",
+                "minimum",
+                "maximum",
+                "range",
+                *[_quantile_label(value) for value in args.member_quantiles],
+            ],
+            "pixel_statistics": [
+                "mean",
+                "median",
+                "standard_deviation",
+                "variance",
+                "minimum",
+                "maximum",
+                "range",
                 *[_quantile_label(value) for value in args.member_quantiles],
             ],
             "medoid": "minimum valid-pixel RMSE to pixel-wise member median",
@@ -849,6 +910,13 @@ def main() -> None:
             reference_table = pd.read_csv(
                 args.reference_root / storm / "inference-summary.csv"
             )
+            available = reference_table["observation_id"].isin(by_id)
+            if not available.all():
+                print(
+                    f"Skipping {(~available).sum()} stale ViT observations for {storm} "
+                    "that are absent from the current manifest"
+                )
+                reference_table = reference_table.loc[available].copy()
             if args.limit is not None:
                 reference_table = reference_table.head(args.limit).copy()
             rows = list(reference_table.itertuples(index=False))
@@ -1031,6 +1099,38 @@ def main() -> None:
                                 median_field,
                                 torch.full_like(median_field, torch.nan),
                             )
+                            field_std = torch.std(
+                                member_fields.float(), dim=0, correction=0
+                            )
+                            field_variance = field_std.square()
+                            field_min = torch.amin(member_fields, dim=0)
+                            field_max = torch.amax(member_fields, dim=0)
+                            uncertainty_fields = {
+                                "std_field_ms": field_std,
+                                "variance_field_ms2": field_variance,
+                                "min_field_ms": field_min,
+                                "max_field_ms": field_max,
+                                "range_field_ms": field_max - field_min,
+                            }
+                            for quantile in args.member_quantiles:
+                                uncertainty_fields[
+                                    f"member_{_quantile_label(quantile)}_field_ms"
+                                ] = torch.quantile(
+                                    member_fields.float(),
+                                    quantile,
+                                    dim=0,
+                                    interpolation="linear",
+                                )
+                            masked_uncertainty = {
+                                name: torch.where(
+                                    mask,
+                                    field,
+                                    torch.full_like(field, torch.nan),
+                                )
+                                .numpy()
+                                .astype(np.float32, copy=False)
+                                for name, field in uncertainty_fields.items()
+                            }
                             _atomic_npz(
                                 field_path,
                                 observation_id=np.asarray(observation_id),
@@ -1055,10 +1155,20 @@ def main() -> None:
                                 medoid_member_index=np.asarray(
                                     medoid_index, dtype=np.int32
                                 ),
+                                era5_baseline_field_ms=torch.where(
+                                    mask,
+                                    batch["era5_wind_speed_physical"][index, 0]
+                                    .detach()
+                                    .cpu(),
+                                    torch.full_like(mean_field, torch.nan),
+                                )
+                                .numpy()
+                                .astype(np.float32, copy=False),
                                 valid_mask=mask.numpy().astype(np.uint8, copy=False),
                                 distance_km=distance_km.numpy().astype(
                                     np.float32, copy=False
                                 ),
+                                **masked_uncertainty,
                             )
                             field_relative_path = str(
                                 field_path.relative_to(output_roots[guidance])
@@ -1075,6 +1185,9 @@ def main() -> None:
                                     "medoid_member_index": medoid_index,
                                     "npz_path": field_relative_path,
                                     "member_array": "member_fields_ms",
+                                    "standard_deviation_array": "std_field_ms",
+                                    "variance_array": "variance_field_ms2",
+                                    "baseline_array": "era5_baseline_field_ms",
                                     "member_shape": "x".join(
                                         str(value) for value in member_fields.shape
                                     ),

@@ -78,7 +78,7 @@ nav:
       - Commands & environment: reference/commands.md
       - Troubleshooting: reference/troubleshooting.md
       - Glossary: reference/glossary.md
-  - Dashboard: explorer.md
+  - StormSense: explorer.md
 
 plugins:
   - search:

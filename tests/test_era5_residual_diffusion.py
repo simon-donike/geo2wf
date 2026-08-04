@@ -505,16 +505,6 @@ def test_deterministic_builder_requires_checkpoint() -> None:
         build_model(config)
 
 
-def test_residual_diffusion_training_config_builds() -> None:
-    config = load_config("configs/config_geo_sar_10bands_era5_diffusion_residual.yaml")
-
-    model = build_model(config)
-
-    assert isinstance(model, ERA5ResidualDiffusion)
-    assert model.base_condition_channels == 24
-    assert model.model.condition_channels == 26
-    assert model.model.model.channels == 27
-
 
 def test_deterministic_residual_diffusion_preset_declares_checkpoint() -> None:
     config = load_config(

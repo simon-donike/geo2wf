@@ -13,7 +13,7 @@ geo2wf reconstructs SAR-like surface wind fields from geostationary satellite im
 <div class="geo-actions" markdown>
 [Read the two-stage workflow](models/two-stage.md){ .md-button .md-button--primary }
 [Understand the data](data/index.md){ .md-button }
-[Open the dashboard](explorer/dashboard.html){ .md-button }
+[Open StormSense](explorer/dashboard.html){ .md-button }
 </div>
 </div>
 
