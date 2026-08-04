@@ -1,30 +1,32 @@
 :root {
-  /* FDL brand palette. Change --spot to theme another lab or case study. */
-  --fdl-black: #000000;
-  --fdl-space: #111427;
-  --lab-heliolab: #e83e4d;
-  --lab-earth-systems: #019fa2;
-  --lab-lunar: #808080;
-  --lab-fdl-med: #99d7db;
-  --lab-flight: #3a7ba3;
-  --lab-nio: #7853c9;
-  --spot: var(--lab-earth-systems);
+  /* FDL core theme API: component colors derive from these tokens. */
+  --black: #000000;
+  --main: #111427;
+  --secondary: #faf9f5;
+  --highlight: #479ff8;
+  --earth-systems-lab: #019fa2;
 
-  --ink: var(--fdl-space);
-  --muted: #66747b;
-  --surface: #ffffff;
-  --surface-alt: #f4f6f6;
-  --border: #d7dddf;
-  --accent: var(--spot);
-  --accent-ink: color-mix(in srgb, var(--spot) 70%, var(--fdl-space));
-  --accent-soft: color-mix(in srgb, var(--spot) 12%, white);
-  --red: #c8463d;
-  --sar: #707d83;
+  --ink: var(--main);
+  --muted: color-mix(in srgb, var(--main) 58%, var(--secondary));
+  --surface: var(--secondary);
+  --surface-raised: var(--secondary);
+  --surface-alt: color-mix(in srgb, var(--main) 4%, var(--secondary));
+  --border: color-mix(in srgb, var(--main) 16%, var(--secondary));
+  --border-strong: color-mix(in srgb, var(--main) 30%, var(--secondary));
+  --accent: var(--highlight);
+  --accent-ink: color-mix(in srgb, var(--highlight) 72%, var(--main));
+  --accent-soft: color-mix(in srgb, var(--highlight) 12%, var(--secondary));
+  --system-blue: #479ff8;
+  --sar: color-mix(in srgb, var(--main) 70%, var(--secondary));
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface);
   color-scheme: light;
   font-family: "Helvetica Neue", "Helvetica New", Helvetica, Arial, sans-serif;
   text-rendering: optimizeLegibility;
+}
+
+body.earth-systems-lab {
+  --highlight: var(--earth-systems-lab);
 }
 
 * {
@@ -40,7 +42,14 @@ body {
   height: 100%;
   margin: 0;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface);
+}
+
+h1,
+h2,
+h3,
+p {
+  font-family: "Helvetica Neue", "Helvetica New", Helvetica, Arial, sans-serif;
 }
 
 button,
@@ -69,9 +78,9 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: var(--ink);
-  background: #ffffff;
-  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
+  background: var(--main);
+  border-bottom: 3px solid var(--accent);
 }
 
 .brand,
@@ -82,31 +91,60 @@ a:focus-visible {
 }
 
 .brand {
-  color: var(--ink);
+  color: var(--secondary);
   font-size: 14px;
   text-decoration: none;
 }
 
 .brand-mark {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  color: var(--ink);
-  background: var(--accent-soft);
-  border-radius: 3px;
-  font-size: 19px;
-  font-weight: 800;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
 }
 
-.brand i {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
+.brand-mark::before {
+  content: "";
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--secondary);
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-34deg);
 }
 
-.brand span:last-child {
-  color: var(--muted);
+.brand-mark i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: var(--secondary);
+  border-radius: 50%;
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1;
+}
+
+.brand-copy strong {
+  letter-spacing: -0.01em;
+}
+
+.brand-copy small {
+  color: color-mix(in srgb, var(--secondary) 68%, var(--main));
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand-copy b {
+  color: var(--accent);
 }
 
 .data-badge {
@@ -114,8 +152,9 @@ a:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 6px 9px;
-  color: var(--muted);
-  border: 1px solid var(--border);
+  color: color-mix(in srgb, var(--secondary) 72%, var(--main));
+  background: color-mix(in srgb, var(--secondary) 5%, var(--main));
+  border: 1px solid color-mix(in srgb, var(--secondary) 20%, var(--main));
   border-radius: 3px;
   font-size: 9px;
   font-weight: 700;
@@ -137,8 +176,8 @@ a:focus-visible {
   margin: 0;
   padding: 9px 11px;
   color: var(--muted);
-  background: #fff8e8;
-  border: 1px solid #ead9aa;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--secondary));
   border-radius: 3px;
   font-size: 11px;
 }
@@ -149,10 +188,17 @@ a:focus-visible {
 
 .icon-button,
 .docs-link {
-  color: var(--ink);
-  background: #ffffff;
-  border: 1px solid var(--border);
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--secondary) 5%, var(--main));
+  border: 1px solid color-mix(in srgb, var(--secondary) 24%, var(--main));
   border-radius: 3px;
+}
+
+.icon-button:hover,
+.docs-link:hover {
+  color: var(--main);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .icon-button {
@@ -179,7 +225,7 @@ a:focus-visible {
   padding: 20px 22px 16px;
   display: flex;
   flex-direction: column;
-  background: var(--surface-alt);
+  background: var(--surface);
   border-right: 1px solid var(--border);
 }
 
@@ -241,7 +287,7 @@ p {
   width: 100%;
   padding: 17px 32px 6px 9px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 3px;
   outline: 0;
@@ -264,8 +310,8 @@ p {
   flex: 1;
   min-height: 330px;
   overflow: hidden;
-  background: #e9eeee;
-  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
 }
 
@@ -313,7 +359,7 @@ p {
 }
 
 .timeline footer {
-  color: #829097;
+  color: var(--muted);
   font-size: 8px;
 }
 
@@ -347,7 +393,7 @@ p {
   position: relative;
   width: 26px;
   height: 13px;
-  background: #cad2d5;
+  background: var(--border-strong);
   border-radius: 99px;
 }
 
@@ -359,7 +405,7 @@ p {
   top: 2px;
   width: 9px;
   height: 9px;
-  background: #ffffff;
+  background: var(--secondary);
   border-radius: 50%;
   transition: transform 0.15s;
 }
@@ -377,7 +423,7 @@ p {
   min-width: 60px;
   padding: 5px 18px 5px 7px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 3px;
   font-size: 9px;
@@ -387,7 +433,7 @@ p {
 .analytics {
   padding: 22px clamp(20px, 3vw, 34px) 28px;
   overflow-y: auto;
-  background: #ffffff;
+  background: var(--surface-alt);
 }
 
 .category {
@@ -399,7 +445,8 @@ p {
   align-items: center;
   justify-content: center;
   color: var(--ink);
-  background: #f5dfdc;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
   border-radius: 3px;
 }
 
@@ -466,7 +513,7 @@ p {
   min-width: 92px;
   padding: 6px 24px 6px 8px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 3px;
   font-size: 9px;
@@ -496,7 +543,7 @@ p {
 }
 
 .geo-line {
-  background: var(--red);
+  background: var(--accent);
 }
 
 .sar-line {
@@ -505,21 +552,21 @@ p {
 
 .legend small {
   margin-left: auto;
-  color: #849198;
+  color: var(--muted);
   text-align: right;
 }
 
 .nwp-line {
-  border-top: 2px dashed #748188;
+  border-top: 2px dashed var(--system-blue);
 }
 
 .ibtracs-line {
-  border-top: 2px solid #27343a;
+  border-top: 2px solid var(--black);
 }
 
 .ibtracs-path {
   fill: none;
-  stroke: #27343a;
+  stroke: var(--black);
   stroke-width: 1.5;
 }
 
@@ -534,7 +581,7 @@ p {
 
 .chart-card {
   padding: 11px 13px 7px;
-  background: #ffffff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
 }
 
@@ -567,31 +614,31 @@ p {
 }
 
 .chart-grid {
-  stroke: #e2e6e8;
+  stroke: var(--border);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-axis {
-  fill: #7d8a90;
+  fill: var(--muted);
   font-size: 7px;
 }
 
 .geo-dot {
-  fill: #ffffff;
-  stroke: var(--red);
+  fill: var(--surface-raised);
+  stroke: var(--accent);
   stroke-width: 2;
 }
 
 .geo-path {
   fill: none;
-  stroke: var(--red);
+  stroke: var(--accent);
   stroke-width: 2.2;
 }
 
 .nwp-path {
   fill: none;
-  stroke: #748188;
+  stroke: var(--system-blue);
   stroke-width: 1.2;
   opacity: .7;
 }
@@ -604,13 +651,13 @@ p {
 }
 
 .sar-dot {
-  fill: #ffffff;
+  fill: var(--surface-raised);
   stroke: var(--sar);
   stroke-width: 2;
 }
 
 .cursor-line {
-  stroke: #748188;
+  stroke: var(--accent-ink);
   stroke-width: 1;
   stroke-dasharray: 2 3;
 }
@@ -653,9 +700,11 @@ p {
   display: none;
   min-width: 128px;
   padding: 8px 10px;
-  color: var(--ink);
-  background: #ffffff;
+  color: var(--secondary);
+  background: var(--main);
+  border: 1px solid color-mix(in srgb, var(--secondary) 18%, var(--main));
   border-radius: 3px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--main) 24%, transparent);
   font-size: 8px;
   line-height: 1.55;
   pointer-events: none;
@@ -665,13 +714,13 @@ dialog {
   width: min(440px, calc(100% - 30px));
   padding: 26px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 3px;
 }
 
 dialog::backdrop {
-  background: rgb(17 20 39 / 40%);
+  background: color-mix(in srgb, var(--main) 46%, transparent);
 }
 
 .dialog-close {
@@ -710,8 +759,8 @@ dialog #confirmDialog {
   display: grid;
   place-content: center;
   justify-items: center;
-  color: var(--ink);
-  background: #ffffff;
+  color: var(--secondary);
+  background: var(--main);
   transition: opacity 0.2s;
 }
 
@@ -723,7 +772,7 @@ dialog #confirmDialog {
 .loading span {
   width: 28px;
   height: 28px;
-  border: 3px solid #d9dfe1;
+  border: 3px solid color-mix(in srgb, var(--secondary) 20%, var(--main));
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -742,7 +791,7 @@ dialog #confirmDialog {
 
 .leaflet-container {
   color: var(--ink);
-  background: #e8eeee;
+  background: var(--surface-alt);
   font-family: inherit;
 }
 
@@ -764,7 +813,7 @@ dialog #confirmDialog {
   z-index: 800;
   left: 5px;
   bottom: 2px;
-  color: #425159 !important;
+  color: var(--main) !important;
   font-size: 7px;
   text-decoration: none;
 }
@@ -791,7 +840,7 @@ dialog #confirmDialog {
 .geostat-key,
 .leaflet-control-layers {
   color: var(--ink);
-  background: #fffffff2;
+  background: color-mix(in srgb, var(--secondary) 94%, transparent);
   border: 1px solid var(--border) !important;
   border-radius: 3px !important;
   box-shadow: none !important;
@@ -846,8 +895,8 @@ dialog #confirmDialog {
   width: 24px !important;
   height: 24px !important;
   color: var(--ink);
-  background: #ffffff;
-  border: 2px solid #ffffff;
+  background: var(--secondary);
+  border: 2px solid var(--secondary);
   border-radius: 50%;
   font-size: 18px;
   font-weight: 700;
@@ -917,8 +966,7 @@ dialog #confirmDialog {
     padding: 0 12px;
   }
 
-  .brand i,
-  .brand span:last-child,
+  .brand-copy small,
   .data-badge {
     display: none;
   }
@@ -1010,7 +1058,7 @@ body {
   height: auto;
   padding: 10px 12px;
   display: block;
-  background: #f5dfdc;
+  background: var(--accent-soft);
   border-radius: 0;
 }
 
