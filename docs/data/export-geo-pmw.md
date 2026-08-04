@@ -4,13 +4,17 @@
 
 ## Supported PMW channels
 
-| Sensor | Selected target | Swath |
-|---|---|---|
-| AMSR2 on GCOM-W1 | `TB_A89.0V` | `S5` |
-| GMI on GPM | `TB_89.0V` | `S1` |
-| SSMIS F16/F17/F18 | `TB_91.665V` | `S4` |
+All platforms are harmonized to the canonical one-channel target `TB_near89V`; the source channel remains in `pmw_source_channel` provenance.
 
-Each target remains **one channel**, even in 10-band GEO experiments. That preserves model output dimensionality between proxy pretraining and SAR fine-tuning.
+| Platforms | Source channel | Swath |
+|---|---|---|
+| AMSR2 GCOM-W1 | `TB_A89.0V` | `S5` |
+| GMI GPM | `TB_89.0V` | `S1` |
+| SSMIS F16/F17/F18 | `TB_91.665V` | `S4` |
+| ATMS NPP/NOAA-20/NOAA-21 | `TB_88.2QV` | `S3` |
+| MHS Metop-B/Metop-C/NOAA-19 | `TB_89.0V` | `S1` |
+
+Statistics are pooled under `TB_near89V`, producing one sensor-independent Kelvin scale. Each target remains **one channel**.
 
 ## Export
 
@@ -36,6 +40,25 @@ Each target remains **one channel**, even in 10-band GEO experiments. That prese
     ```
 
 The exporter is PMW-anchored: it finds a closest GEO occurrence for each acceptable PMW observation, builds the same geographic crop contract as the SAR exporter, and writes generic `condition_path` and `target_path` columns. This is why `PairedImageDataset` can load either task without a separate class.
+
+## Direct near-89 GHz regression
+
+Export the 10-band GEO + ERA5 dataset with linearly interpolated PMW supervision:
+
+```bash
+uv run geo2wf-export geo-pmw \
+  --config configs/export/geo_pmw_near89_common10_era5.yaml
+```
+
+The output is a 256 x 256 EPSG:4326 grid at 0.027 degrees per pixel. Linear interpolation is limited to the native swath convex hull and pixels within 1.5 source spacings of a real footprint, so loss never uses extrapolated or gap-bridged values. The loader adds ERA5 wind speed and relative vorticity plus storm-distance and solar-time fields, yielding 23 condition fields. The direct U-Net appends one validity mask internally.
+
+Train the deterministic experiment with:
+
+```bash
+uv run geo2wf-train experiment=geo_pmw_near89_unet
+```
+
+It predicts bounded normalized brightness temperature, optimizes masked Huber loss in Kelvin, and checkpoints on `val/rmse_k`.
 
 ## Moving from pretraining to SAR
 

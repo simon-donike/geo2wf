@@ -39,12 +39,16 @@ GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
 CORE_RADIUS_KM = 100.0
 RMW_BIN_KM = 10.0
 SAR_SCALE_MIN_MS = 0.0
-POSTPROCESS_C02_P99_MAX = 0.4
 POSTPROCESS_SMOOTHING_HOURS = 6.0
-POSTPROCESS_EDGE_PADDING_ACQUISITIONS = 1
 SAR_SCALE_MAX_MS = 60.0
 PMW_SCALE_MIN_K = GEOSTAT_SCALE_MIN_K
 PMW_SCALE_MAX_K = GEOSTAT_SCALE_MAX_K
+STORM_NAMES = {
+    "AL082025": "HUMBERTO",
+    "EP112025": "KIKO",
+    "EP182023": "OTIS",
+}
+
 NWP_LABELS = {
     "aifs": "AIFS",
     "aifs2": "AIFS2",
@@ -399,8 +403,6 @@ def export_raw_storm(storm_id, raw_records, raw_metadata):
                 "vit_prediction": None,
                 "unet_prediction": None,
                 "diffusion_prediction": None,
-                "c02_p99": None,
-                "postprocess_excluded": False,
                 "geo_overlay": geo_overlay,
                 "sar": sar,
                 "sar_overlay": sar_overlay,
@@ -414,7 +416,7 @@ def export_raw_storm(storm_id, raw_records, raw_metadata):
 
     return {
         "id": storm_id,
-        "name": "OTIS" if storm_id == "EP182023" else storm_id,
+        "name": STORM_NAMES.get(storm_id, storm_id),
         "basin": "North Atlantic" if storm_id.startswith("AL") else "Eastern Pacific",
         "start": records[0]["time"],
         "end": records[-1]["time"],
@@ -518,12 +520,6 @@ def export_storm(storm_id):
         bundle = torch.load(
             storm_dir / row.inference_path, map_location="cpu", weights_only=False
         )
-        c02_p99 = None
-        if "CMI_C02" in bundle["input_channels"]:
-            c02 = bundle["input"][bundle["input_channels"].index("CMI_C02")]
-            c02_valid = c02[bundle["input_mask"].bool() & torch.isfinite(c02)]
-            if c02_valid.numel():
-                c02_p99 = finite_number(torch.quantile(c02_valid, 0.99))
         geo_overlay = (
             export_geostat_image(row.observation_id, bundle, GEO_IMAGE_DIR)
             if index in geo_indices
@@ -556,9 +552,6 @@ def export_storm(storm_id):
                 "diffusion_prediction": tabular_prediction(
                     diffusion, row.observation_id, include_uncertainty=True
                 ),
-                "c02_p99": c02_p99,
-                "postprocess_excluded": c02_p99 is not None
-                and c02_p99 > POSTPROCESS_C02_P99_MAX,
                 "geo_overlay": geo_overlay,
                 "sar": sar,
                 "sar_overlay": sar_overlay,
@@ -569,14 +562,9 @@ def export_storm(storm_id):
                 ),
             }
         )
-    base_exclusions = [record["postprocess_excluded"] for record in records]
-    for index, record in enumerate(records):
-        start = max(0, index - POSTPROCESS_EDGE_PADDING_ACQUISITIONS)
-        end = min(len(records), index + POSTPROCESS_EDGE_PADDING_ACQUISITIONS + 1)
-        record["postprocess_excluded"] = any(base_exclusions[start:end])
     return {
         "id": storm_id,
-        "name": "OTIS" if storm_id == "EP182023" else None,
+        "name": STORM_NAMES.get(storm_id),
         "basin": "North Atlantic" if storm_id.startswith("AL") else "Eastern Pacific",
         "start": records[0]["time"],
         "end": records[-1]["time"],
@@ -613,11 +601,9 @@ def main():
         ],
         "geo_interval_hours": 3,
         "postprocessing": {
-            "enabled_default": True,
-            "c02_p99_max": POSTPROCESS_C02_P99_MAX,
+            "enabled_default": False,
             "smoothing_hours": POSTPROCESS_SMOOTHING_HOURS,
-            "edge_padding_acquisitions": POSTPROCESS_EDGE_PADDING_ACQUISITIONS,
-            "method": "centered median + cubic smoothstep interpolation",
+            "method": "centered median",
         },
         "geostat_color_scale": {
             "min": GEOSTAT_SCALE_MIN_K,

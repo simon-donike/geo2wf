@@ -1,0 +1,25 @@
+_target_: geo2wf.config.loading.build_paired_datamodule
+root: ${oc.env:GEO2WF_NEAR89_DATA_ROOT,data/geotiff/geo_pmw_near89_10bands_era5}
+stats_file: ${.root}/stats.json
+train_split: train
+val_split: val
+test_split: test
+target_size: [256, 256]
+center_crop_size: null
+random_flips: true
+include_test_in_train: false
+require_era5: true
+include_pmw: false
+include_ibtracs: false
+normalization: robust-zscore
+target_normalization: min-max
+robust_clip: 4.0
+max_era5_time_gap_hours: 3.1
+loader:
+  batch_size: 4
+  num_workers: 2
+  pin_memory: false
+  persistent_workers: false
+sampling:
+  intensity_balanced:
+    enabled: false

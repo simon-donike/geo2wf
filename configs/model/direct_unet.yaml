@@ -1,0 +1,14 @@
+_target_: geo2wf.models.direct_unet.DirectUNetRegressor
+condition_channels: 23
+base_channels: 32
+channel_mults: [1, 2, 4, 8]
+huber_delta_k: 2.0
+lr: 0.0002
+weight_decay: 0.0001
+lr_scheduler_factor: 0.5
+lr_scheduler_patience: 25
+lr_scheduler_monitor: val/rmse_k
+lr_scheduler_cooldown: 0
+lr_scheduler_min_lr: 0.0
+validation_reconstruction_batches: 1
+log_reconstruction_images: true

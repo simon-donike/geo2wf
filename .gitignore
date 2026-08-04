@@ -43,6 +43,7 @@ share/python-wheels/
 MANIFEST
 wandb
 *.gif
+playground
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
