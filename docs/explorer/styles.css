@@ -874,10 +874,14 @@ dialog #confirmDialog {
   background: linear-gradient(90deg, #238b69, #f9cd43, #d53e30);
 }
 
-.geostat-key i,
-.pmw-key i {
+.geostat-key i {
   background: linear-gradient(90deg, #ffffff, #8ba9d9, #1652b4);
   border: 1px solid #ccd8e5;
+}
+
+.pmw-key i {
+  background: linear-gradient(90deg, #2d004b, #cc4778, #f0f921);
+  border: 1px solid #9b547b;
 }
 .intensity-key span,
 .pmw-key span,

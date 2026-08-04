@@ -56,7 +56,7 @@ function renderMap(){
   storm.records.filter(r=>r.geo_overlay).forEach(r=>{
     const o=r.geo_overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:1,interactive:true,className:"geo-overlay",pane:"geoPane"})
-      .bindTooltip(`<strong>Geostationary · ${o.channel}</strong><br>${full(r.time)}<br>Shared scale: 190–292 K`,{className:"geo-tooltip"});
+      .bindTooltip(`<strong>Geostationary · ${o.channel}</strong><br>${full(r.time)}<br>Fixed GeoStat scale: ${data.geostat_color_scale.min}–${data.geostat_color_scale.max} K`,{className:"geo-tooltip"});
     const show=()=>image.addTo(geoLayers);
     const hide=()=>geoLayers.removeLayer(image);
     geoFrames.push({record:r,show,hide});
@@ -76,7 +76,7 @@ function renderMap(){
   (storm.pmw_observations||[]).forEach(observation=>{
     const o=observation.overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.92,interactive:true,className:"pmw-overlay",pane:"pmwPane"})
-      .bindTooltip(`<strong>PMW · ${o.sensor}</strong><br>${full(observation.time)}<br>${o.channel}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} K<br>Shared color scale: ${data.pmw_color_scale.min}–${data.pmw_color_scale.max} K`,{className:"pmw-tooltip"});
+      .bindTooltip(`<strong>PMW · ${o.sensor}</strong><br>${full(observation.time)}<br>${o.channel}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} K<br>Fixed PMW scale: ${data.pmw_color_scale.min}–${data.pmw_color_scale.max} K`,{className:"pmw-tooltip"});
     const dot=L.circleMarker([observation.lat,observation.lon],{radius:4,color:colors.main,weight:1.5,fillColor:colors.blue,fillOpacity:.9})
       .bindTooltip(`PMW · ${o.sensor}<br>${full(observation.time)}`);
     const show=()=>{image.addTo(pmwLayers);dot.addTo(pmwLayers)};

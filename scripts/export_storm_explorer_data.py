@@ -43,6 +43,9 @@ POSTPROCESS_SMOOTHING_HOURS = 6.0
 SAR_SCALE_MAX_MS = 60.0
 PMW_SCALE_MIN_K = GEOSTAT_SCALE_MIN_K
 PMW_SCALE_MAX_K = GEOSTAT_SCALE_MAX_K
+PMW_COLOR_LOW = np.array([45, 0, 75], dtype=np.float32)
+PMW_COLOR_MID = np.array([204, 71, 120], dtype=np.float32)
+PMW_COLOR_HIGH = np.array([240, 249, 33], dtype=np.float32)
 STORM_NAMES = {
     "AL082025": "HUMBERTO",
     "EP112025": "KIKO",
@@ -162,9 +165,13 @@ def export_pmw_array(
             1,
         )
     )
-    cold = np.array([255, 255, 255], dtype=np.float32)
-    warm = np.array([22, 82, 180], dtype=np.float32)
-    rgb = (cold + stretched[..., None] * (warm - cold)).astype(np.uint8)
+    lower = PMW_COLOR_LOW + stretched[..., None] * 2 * (
+        PMW_COLOR_MID - PMW_COLOR_LOW
+    )
+    upper = PMW_COLOR_MID + (stretched[..., None] - 0.5) * 2 * (
+        PMW_COLOR_HIGH - PMW_COLOR_MID
+    )
+    rgb = np.where((stretched <= 0.5)[..., None], lower, upper).astype(np.uint8)
     rgba = np.concatenate(
         [rgb, np.where(mask, 225, 0).astype(np.uint8)[..., None]], axis=-1
     )

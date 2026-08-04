@@ -10,6 +10,9 @@ import export_storm_explorer_data as explorer  # noqa: E402
 
 from export_geostat_images import GEOSTAT_SCALE_MAX_K, GEOSTAT_SCALE_MIN_K  # noqa: E402
 from export_storm_explorer_data import (  # noqa: E402
+    PMW_COLOR_HIGH,
+    PMW_COLOR_LOW,
+    PMW_COLOR_MID,
     PMW_SCALE_MAX_K,
     PMW_SCALE_MIN_K,
     export_pmw_array,
@@ -54,11 +57,39 @@ def test_pmw_export_uses_shared_scale_and_transparent_no_data(tmp_path) -> None:
     assert two["sensor"] == "AMSR2_GCOMW1"
 
 
-def test_pmw_uses_geostationary_brightness_temperature_scale() -> None:
+def test_pmw_uses_fixed_brightness_temperature_bounds() -> None:
     assert (PMW_SCALE_MIN_K, PMW_SCALE_MAX_K) == (
         GEOSTAT_SCALE_MIN_K,
         GEOSTAT_SCALE_MAX_K,
     )
+
+
+def test_pmw_uses_a_distinct_color_map(tmp_path) -> None:
+    values = np.array(
+        [
+            [PMW_SCALE_MIN_K, (PMW_SCALE_MIN_K + PMW_SCALE_MAX_K) / 2, PMW_SCALE_MAX_K],
+            [PMW_SCALE_MIN_K, (PMW_SCALE_MIN_K + PMW_SCALE_MAX_K) / 2, PMW_SCALE_MAX_K],
+        ],
+        dtype=np.float32,
+    )
+    coordinates = np.ones_like(values)
+
+    export_pmw_array(
+        "palette",
+        values,
+        np.ones_like(values, dtype=bool),
+        coordinates,
+        coordinates,
+        "GMI_GPM",
+        "TB_89.0V",
+        tmp_path,
+    )
+
+    image = iio.imread(tmp_path / "palette.png")
+    assert np.array_equal(image[0, 0, :3], PMW_COLOR_LOW)
+    assert np.array_equal(image[0, 1, :3], PMW_COLOR_MID)
+    assert np.array_equal(image[0, 2, :3], PMW_COLOR_HIGH)
+    assert not np.array_equal(image[0, 0, :3], [255, 255, 255])
 
 
 def test_manifest_storm_ids_are_the_dashboard_source_of_truth(
