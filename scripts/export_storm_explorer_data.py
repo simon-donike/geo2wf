@@ -451,14 +451,34 @@ def load_prediction_table(root, storm_id):
     return pd.read_csv(path).set_index("observation_id")
 
 
-def tabular_prediction(table, observation_id):
+def tabular_prediction(table, observation_id, *, include_uncertainty=False):
     if table is None or observation_id not in table.index:
         return None
     row = table.loc[observation_id]
-    return {
+    prediction = {
         metric: finite_number(row.get(column, math.nan))
         for metric, column in METRIC_COLUMNS.items()
     }
+    if include_uncertainty:
+        prediction["uncertainty"] = {
+            "ensemble_size": int(row["ensemble_size"]),
+            "pixel_std": {
+                statistic: finite_number(
+                    row.get(f"ensemble_pixel_std_{statistic}_ms", math.nan)
+                )
+                for statistic in ("mean", "median", "p90", "max")
+            },
+            "metrics": {
+                metric: {
+                    statistic: finite_number(
+                        row.get(f"{column}_member_{statistic}", math.nan)
+                    )
+                    for statistic in ("std", "min", "max", "range", "p10", "p90")
+                }
+                for metric, column in METRIC_COLUMNS.items()
+            },
+        }
+    return prediction
 
 
 def export_storm(storm_id):
@@ -534,7 +554,7 @@ def export_storm(storm_id):
                 "vit_prediction": vit_prediction,
                 "unet_prediction": tabular_prediction(unet, row.observation_id),
                 "diffusion_prediction": tabular_prediction(
-                    diffusion, row.observation_id
+                    diffusion, row.observation_id, include_uncertainty=True
                 ),
                 "c02_p99": c02_p99,
                 "postprocess_excluded": c02_p99 is not None
