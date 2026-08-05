@@ -112,6 +112,7 @@ function smoothedValidValue(metric,record){
   return median(storm.records.filter(r=>Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r)?.[metric]));
 }
 function predictionValue(metric,record){
+  if(!data.models[graphModel].metrics.includes(metric))return null;
   const raw=graphPrediction(record)?.[metric];
   if(!Number.isFinite(raw))return null;
   if(!postProcessing)return raw;
@@ -130,7 +131,7 @@ function chart(metric,def){
   [hi,(lo+hi)/2,lo].forEach(v=>{const yp=y(v);s.append(svg("line",{class:"chart-grid",x1:C.l,y1:yp,x2:C.w-C.r,y2:yp}));const t=svg("text",{class:"chart-axis",x:2,y:yp+3});t.textContent=v>=100?Math.round(v):v.toFixed(v<10?1:0);s.append(t)});
   [[short(start),C.l],[short(end),C.w-36]].forEach(([v,xp])=>{const t=svg("text",{class:"chart-axis",x:xp,y:C.h-2});t.textContent=v;s.append(t)});
   nwp.forEach((series,index)=>s.append(svg("path",{class:"nwp-path",d:path(series.points,r=>r.max),"stroke-dasharray":NWP_DASHES[index%NWP_DASHES.length],"aria-label":series.label})));
-  s.append(svg("path",{class:"geo-path",d:path(pred,r=>r.plot)}));
+  if(pred.length)s.append(svg("path",{class:"geo-path",d:path(pred,r=>r.plot)}));
   if(pred.length===1)s.append(svg("circle",{class:"geo-dot",cx:x(pred[0].time),cy:y(pred[0].plot),r:3.2}));
   if(sar.length)s.append(svg("path",{class:"sar-path",d:path(sar,r=>r.sar[metric])}));
   sar.forEach(r=>s.append(svg("circle",{class:"sar-dot",cx:x(r.time),cy:y(r.sar[metric]),r:3.5})));
@@ -140,7 +141,7 @@ function chart(metric,def){
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function charts(){
-  $("#charts").replaceChildren(...DISPLAY_METRICS.filter(m=>data.models[graphModel].metrics.includes(m)).map(m=>chart(m,data.metrics[m])));
+  $("#charts").replaceChildren(...DISPLAY_METRICS.map(m=>chart(m,data.metrics[m])));
   if(!$("#tooltip")){const t=document.createElement("div");t.id="tooltip";t.className="tooltip";document.body.append(t)}
 }
 function current(){
