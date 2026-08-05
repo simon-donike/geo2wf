@@ -10,6 +10,12 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "intensity-forecast":
+        sys.argv.pop(1)
+        from scripts.evaluate_intensity_forecast import main as forecast_main
+
+        forecast_main()
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "intensity-correction":
         sys.argv.pop(1)
         from scripts.evaluate_intensity_correction import main as intensity_main

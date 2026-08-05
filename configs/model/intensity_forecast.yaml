@@ -1,0 +1,11 @@
+_target_: geo2wf.models.intensity_forecast.IntensityForecastMLP
+feature_count: 5
+hidden_features: [32, 16]
+dropout: 0.1
+huber_delta_ms: 5.0
+lr: 0.0003
+weight_decay: 0.0001
+lr_scheduler_factor: 0.5
+lr_scheduler_patience: 10
+lr_scheduler_min_lr: 0.000001
+log_wandb_ri_media: true

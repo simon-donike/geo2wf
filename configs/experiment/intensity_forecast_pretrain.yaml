@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - override /data: intensity_forecast_pretrain
+  - override /model: intensity_forecast
+
+model:
+  log_wandb_ri_media: false
+trainer:
+  max_epochs: 100
+  checkpoint:
+    monitor: val/storm_macro_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    name: intensity-forecast-ibtracs-pretrain
+    project: geo2wf
+    enabled: true
+    log_model: true
