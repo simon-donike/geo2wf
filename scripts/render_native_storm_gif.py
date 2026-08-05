@@ -12,6 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT/'scripts'))
 from export_geo_sar_geotiffs import PMW_CHANNELS,_make_grid,_load_geo_channels,_load_pmw_channels,_load_sar_channels,_read_manifest,_regrid
 from export_geostat_images import GEOSTAT_SCALE_MIN_K as TMIN,GEOSTAT_SCALE_MAX_K as TMAX
 S,HH,LH=256,72,24; BLACK=(0,0,0); PAPER=(245,247,250)
+PMW_LOW=np.array([45,0,75],np.float32); PMW_MID=np.array([204,71,120],np.float32); PMW_HIGH=np.array([240,249,33],np.float32)
 DATA=ROOT/'inference/inf_data'; MAN=DATA/'index-files/observation_manifest_v6.csv'
 OUT=ROOT/'docs/assets/images/longest-storm-native.gif'; WORLD=ROOT/'scripts/assets/naturalearth-lowres.geojson'
 def args():
@@ -22,6 +23,8 @@ def font(n):
  return ImageFont.load_default()
 def temp_panel(f,m):
  f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); v=np.nan_to_num(np.clip((f-TMIN)/(TMAX-TMIN),0,1)); rgb=np.array([255,255,255],np.float32)+v[...,None]*(np.array([22,82,180])-np.array([255,255,255])); rgb[~m]=BLACK; return Image.fromarray(rgb.astype(np.uint8)).resize((S,S),Image.Resampling.LANCZOS)
+def pmw_panel(f,m):
+ f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); v=np.nan_to_num(np.clip((f-TMIN)/(TMAX-TMIN),0,1)); low=PMW_LOW+v[...,None]*2*(PMW_MID-PMW_LOW); high=PMW_MID+(v[...,None]-.5)*2*(PMW_HIGH-PMW_MID); rgb=np.where((v<=.5)[...,None],low,high).astype(np.uint8); rgb[~m]=BLACK; return Image.fromarray(rgb).resize((S,S),Image.Resampling.LANCZOS)
 def sar_panel(f,m,sar_max):
  f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); weight=gaussian_filter(m.astype(np.float32),1.0); f=np.divide(gaussian_filter(np.where(m,f,0.0),1.0),weight,out=np.zeros_like(f),where=weight>1e-4); m=weight>0.2; v=np.nan_to_num(np.clip(f/sar_max,0,1)); g=np.array([0,150,0]); y=np.array([255,210,0]); r=np.array([255,0,0]); rgb=np.where((v<=.5)[...,None],g+v[...,None]*2*(y-g),y+(v[...,None]-.5)*2*(r-y)).astype(np.uint8); rgb[~m]=BLACK; return Image.fromarray(rgb).resize((S,S),Image.Resampling.LANCZOS)
 def center_crop(*arrays,size):
@@ -30,8 +33,22 @@ def mark_center(panel,grid_lat,grid_lon,center):
  distance=(np.asarray(grid_lat)-center[0])**2+(np.asarray(grid_lon)-center[1])**2; y,x=np.unravel_index(np.nanargmin(distance),distance.shape); image=panel.copy(); draw=ImageDraw.Draw(image); draw.line((x-5,y-5,x+5,y+5),fill=(255,0,0),width=2); draw.line((x-5,y+5,x+5,y-5),fill=(255,0,0),width=2); return image
 def track_center_at(timestamp,geos):
  times=np.array([g.timestamp.value for g in geos],dtype=np.float64); value=float(timestamp.value); return (float(np.interp(value,times,[g.ibtracs_center_lat for g in geos])),float(np.interp(value,times,[g.ibtracs_center_lon for g in geos])))
-def dense_pmw_field(row,root):
- tensor=torch.load(root/Path(row.path).name,map_location='cpu',weights_only=False); variables=json.loads(row.variables); index=variables.index('TB_A89.0V'); field=np.asarray(tensor[index],dtype=np.float32); resolution=json.loads(row.resolution)[index]; dy,dx=float(resolution[0]),float(resolution[1]); h,w=field.shape; y=(np.arange(h)-(h-1)/2)*dy; x=(np.arange(w)-(w-1)/2)*dx; lat_axis=float(row.ibtracs_center_lat)-y/111.32; lon_axis=float(row.ibtracs_center_lon)+x/(111.32*np.cos(np.deg2rad(float(row.ibtracs_center_lat)))); lon,lat=np.meshgrid(lon_axis,lat_axis); return field,lat,lon,(float(row.ibtracs_center_lat),float(row.ibtracs_center_lon))
+def dense_pmw_table(root,storm):
+ candidates=(root/'index-files/shards'/f'{storm}.csv',root/storm/f'{storm}.csv',root/f'{storm}.csv')
+ path=next((candidate for candidate in candidates if candidate.exists()),None)
+ if path is None: raise FileNotFoundError(f'No densified PMW manifest found for {storm} under {root}')
+ table=pd.read_csv(path); table['parsed_time']=pd.to_datetime(table.timestamp,utc=True); return table.sort_values('parsed_time').reset_index(drop=True)
+def dense_pmw_path(row,root,storm):
+ path=Path(row.path)
+ if path.is_absolute() and path.exists(): return path
+ candidates=(root/path,root/storm/path,root/storm/path.name,root/path.name)
+ resolved=next((candidate for candidate in candidates if candidate.exists()),None)
+ if resolved is None: raise FileNotFoundError(f'Densified PMW tensor not found: {path}')
+ return resolved
+def dense_pmw_field(row,root,storm):
+ tensor=torch.load(dense_pmw_path(row,root,storm),map_location='cpu',weights_only=False); variables=json.loads(row.variables); channel=next((name for name in variables if name.endswith(('89.0V','91.665V'))),None)
+ if channel is None: raise ValueError(f'No supported high-frequency V-polarized PMW channel in {variables}')
+ index=variables.index(channel); field=np.asarray(tensor[index],dtype=np.float32); resolution=json.loads(row.resolution)[index]; dy,dx=float(resolution[0]),float(resolution[1]); h,w=field.shape; y=(np.arange(h)-(h-1)/2)*dy; x=(np.arange(w)-(w-1)/2)*dx; lat_axis=float(row.ibtracs_center_lat)-y/111.32; lon_axis=float(row.ibtracs_center_lon)+x/(111.32*np.cos(np.deg2rad(float(row.ibtracs_center_lat)))); lon,lat=np.meshgrid(lon_axis,lat_axis); return field,lat,lon,(float(row.ibtracs_center_lat),float(row.ibtracs_center_lon))
 def fixed_map(lat,lon,path):
  ok=np.isfinite(lat)&np.isfinite(lon); lat=np.asarray(lat)[ok]; lon=np.asarray(lon)[ok]; midx=(lon.min()+lon.max())/2; midy=(lat.min()+lat.max())/2; span=max(np.ptp(lon),np.ptp(lat),1)*1.25; west,east,south,north=midx-span/2,midx+span/2,midy-span/2,midy+span/2
  def xy(x,y): return ((float(x)-west)/(east-west)*(S-1),(north-float(y))/(north-south)*(S-1))
@@ -58,7 +75,7 @@ def main():
  storm=a.storm.upper() if a.storm else max(by,key=lambda k:(by[k][-1].timestamp-by[k][0].timestamp,len(by[k]))); geos=by[storm]; ids=np.linspace(0,len(geos)-1,n).round().astype(int); selected=[geos[i] for i in ids]; sparse={k:sorted([r for r in records if r.storm_id==storm and r.source_type==k and r.timestamp is not None],key=lambda x:x.timestamp) for k in ('pmw','sar')}; pos={'pmw':0,'sar':0}; raw={'pmw':None,'sar':None}; base,track,xy=fixed_map(np.array([g.ibtracs_center_lat for g in geos]),np.array([g.ibtracs_center_lon for g in geos]),a.world_map); black=Image.new('RGB',(S,S),BLACK); frames=[]
  dense=None; dense_pos=0
  if a.dense_pmw_root is not None:
-  dense_root=a.dense_pmw_root/storm; dense=pd.read_csv(dense_root/(storm+'.csv')); dense['parsed_time']=pd.to_datetime(dense.timestamp,utc=True); dense=dense.sort_values('parsed_time').reset_index(drop=True)
+  dense=dense_pmw_table(a.dense_pmw_root,storm)
  wind=None; wind_pos=0
  if a.dense_wind_root is not None:
   wind=pd.read_csv(a.dense_wind_root/'dense-unet-fields-manifest.csv'); wind=wind[wind.storm_id==storm].copy(); wind['parsed_time']=pd.to_datetime(wind.timestamp,utc=True); wind=wind.sort_values('parsed_time').reset_index(drop=True); by_id={r.observation_id:r for r in records}; wind_values=[]
@@ -82,7 +99,7 @@ def main():
   panels['dense_pmw']=dense is not None
   if dense is not None:
    while dense_pos<len(dense) and dense.iloc[dense_pos].parsed_time<=g.timestamp:
-    raw['pmw']=dense_pmw_field(dense.iloc[dense_pos],dense_root); dense_pos+=1
+    raw['pmw']=dense_pmw_field(dense.iloc[dense_pos],a.dense_pmw_root,storm); dense_pos+=1
   panels['dense_wind']=wind is not None
   if wind is not None:
    while wind_pos<len(wind) and wind.iloc[wind_pos].parsed_time<=g.timestamp:
@@ -99,14 +116,15 @@ def main():
     else: field,lat,lon=_load_sar_channels(r,['wind_speed'])['wind_speed']
     raw[k]=(field,lat,lon,track_center_at(r.timestamp,geos))
    if raw[k] is None: panels[k]=black
-   else: f,lat,lon,source_center=raw[k]; shifted_lat=lat+(g.ibtracs_center_lat-source_center[0]); shifted_lon=lon+(g.ibtracs_center_lon-source_center[1]); f,m=_regrid(f,shifted_lat,shifted_lon,glat,glon); panels[k]=temp_panel(f,m) if k=='pmw' else sar_panel(f,m,wind_scale if wind is not None else sar_max)
+   else: f,lat,lon,source_center=raw[k]; shifted_lat=lat+(g.ibtracs_center_lat-source_center[0]); shifted_lon=lon+(g.ibtracs_center_lon-source_center[1]); f,m=_regrid(f,shifted_lat,shifted_lon,glat,glon); panels[k]=pmw_panel(f,m) if k=='pmw' else sar_panel(f,m,wind_scale if wind is not None else sar_max)
   center=(g.ibtracs_center_lat,g.ibtracs_center_lon)
   for kind in ('geo','pmw','sar'): panels[kind]=mark_center(panels[kind],glat,glon,center)
   footprint=[(glat[0,0],glon[0,0]),(glat[0,-1],glon[0,-1]),(glat[-1,-1],glon[-1,-1]),(glat[-1,0],glon[-1,0])]
   frames.append(compose(storm,g,metadata.get(g.observation_id),panels,base,track,xy,int(track_i),selected[0].timestamp,selected[-1].timestamp,footprint))
  sheet=Image.new('RGB',(1280,int(np.ceil(n/10))*44))
  for i,f in enumerate(frames): sheet.paste(f.resize((128,44),Image.Resampling.BILINEAR),((i%10)*128,(i//10)*44))
- general=sheet.quantize(colors=160,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE); colors=general.getpalette()[:480]; ramp=[]; green=np.array([0,150,0]); yellow=np.array([255,210,0]); red=np.array([255,0,0]);
- for value in np.linspace(0,1,96): ramp.extend((green+value*2*(yellow-green) if value<=.5 else yellow+(value-.5)*2*(red-yellow)).round().astype(int).tolist())
- pal=Image.new('P',(1,1)); pal.putpalette(colors+ramp); q=[f.quantize(palette=pal,dither=Image.Dither.NONE) for f in frames]; a.output.parent.mkdir(parents=True,exist_ok=True); q[0].save(a.output,save_all=True,append_images=q[1:],duration=round(1000/a.fps),loop=0,optimize=True,disposal=1); print(f'Rendered {n} frames for {storm}: {a.output} ({a.output.stat().st_size/1e6:.1f} MB)')
+ general=sheet.quantize(colors=128,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE); colors=general.getpalette()[:384]; pmw_ramp=[]; wind_ramp=[]; green=np.array([0,150,0]); yellow=np.array([255,210,0]); red=np.array([255,0,0]);
+ for value in np.linspace(0,1,64):
+  pmw_ramp.extend((PMW_LOW+value*2*(PMW_MID-PMW_LOW) if value<=.5 else PMW_MID+(value-.5)*2*(PMW_HIGH-PMW_MID)).round().astype(int).tolist()); wind_ramp.extend((green+value*2*(yellow-green) if value<=.5 else yellow+(value-.5)*2*(red-yellow)).round().astype(int).tolist())
+ pal=Image.new('P',(1,1)); pal.putpalette(colors+pmw_ramp+wind_ramp); q=[f.quantize(palette=pal,dither=Image.Dither.NONE) for f in frames]; a.output.parent.mkdir(parents=True,exist_ok=True); q[0].save(a.output,save_all=True,append_images=q[1:],duration=round(1000/a.fps),loop=0,optimize=True,disposal=1); print(f'Rendered {n} frames for {storm}: {a.output} ({a.output.stat().st_size/1e6:.1f} MB)')
 if __name__=='__main__': main()

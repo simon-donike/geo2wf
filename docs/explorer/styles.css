@@ -1214,6 +1214,234 @@ dialog #confirmDialog:hover {
   }
 }
 
+/* Template-style project and sponsor welcome panel. */
+dialog.welcome-banner {
+  position: fixed;
+  inset: auto 22px 22px;
+  width: min(1180px, calc(100% - 44px));
+  max-width: none;
+  margin: 0 auto;
+  padding: 24px 26px;
+  color: var(--tint-20);
+  background:
+    radial-gradient(circle at 0 100%, color-mix(in srgb, var(--accent) 20%, transparent) 0 18%, transparent 18.5%),
+    var(--tint-90);
+  border: 1px solid var(--divider);
+  border-top: 3px solid var(--accent);
+  border-radius: 24px;
+  box-shadow: 0 26px 90px rgb(0 0 0 / 50%);
+}
+
+dialog.welcome-banner[open] {
+  display: grid;
+  grid-template-columns: 138px minmax(300px, 1fr) minmax(280px, 0.82fr);
+  align-items: center;
+  gap: clamp(20px, 3vw, 38px);
+  animation: welcome-rise 0.35s ease-out both;
+}
+
+dialog.welcome-banner::backdrop {
+  background: rgb(8 10 22 / 54%);
+  backdrop-filter: blur(3px);
+}
+
+.welcome-banner__badge {
+  display: block;
+  width: 138px;
+  max-height: 132px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgb(0 0 0 / 30%));
+}
+
+.welcome-banner__intro {
+  min-width: 0;
+}
+
+.welcome-banner__intro h2 {
+  max-width: 24ch;
+  margin: 5px 0 9px;
+  font-size: clamp(1.45rem, 2.6vw, 2.15rem);
+}
+
+.welcome-banner__intro > p:not(.eyebrow) {
+  max-width: 61ch;
+  margin-bottom: 15px;
+  color: var(--tint-30);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.welcome-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px 15px;
+  flex-wrap: wrap;
+}
+
+.welcome-banner__actions button {
+  min-width: 190px;
+  padding: 12px 22px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: 0.2s ease;
+}
+
+.welcome-banner__actions button:hover {
+  color: var(--main);
+  background: var(--accent);
+}
+
+.welcome-banner__actions a {
+  color: var(--tint-30);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.18em;
+  text-transform: uppercase;
+}
+
+.welcome-banner__actions a:hover {
+  color: var(--accent);
+}
+
+.welcome-banner__sponsor {
+  min-width: 0;
+  padding-left: clamp(18px, 2vw, 28px);
+  border-left: 1px solid var(--divider);
+}
+
+.welcome-banner__sponsor > a {
+  display: block;
+  width: 100%;
+  max-width: 330px;
+}
+
+.welcome-banner__sponsor img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.welcome-banner__sponsor p {
+  margin: 13px 0 6px;
+  color: var(--tint-40);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.welcome-banner__sponsor p a {
+  color: var(--tint-20);
+  text-decoration-color: var(--accent);
+}
+
+.welcome-banner__sponsor small {
+  color: var(--tint-60);
+  font-size: 7px;
+}
+
+@keyframes welcome-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 880px) {
+  dialog.welcome-banner {
+    padding: 20px 22px;
+  }
+
+  dialog.welcome-banner[open] {
+    grid-template-columns: 105px minmax(0, 1fr);
+    gap: 18px 24px;
+  }
+
+  .welcome-banner__badge {
+    width: 105px;
+    max-height: 105px;
+  }
+
+  .welcome-banner__sponsor {
+    grid-column: 1 / -1;
+    padding: 16px 0 0;
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1fr);
+    align-items: center;
+    gap: 8px 22px;
+    border-top: 1px solid var(--divider);
+    border-left: 0;
+  }
+
+  .welcome-banner__sponsor p {
+    margin: 0;
+  }
+
+  .welcome-banner__sponsor small {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  dialog.welcome-banner {
+    inset: auto 10px 10px;
+    width: calc(100% - 20px);
+    max-height: calc(100% - 20px);
+    padding: 18px;
+    overflow-y: auto;
+    border-radius: 20px;
+  }
+
+  dialog.welcome-banner[open] {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 13px 16px;
+  }
+
+  .welcome-banner__badge {
+    width: 72px;
+    max-height: 76px;
+  }
+
+  .welcome-banner__intro h2 {
+    font-size: 1.3rem;
+  }
+
+  .welcome-banner__intro > p:not(.eyebrow) {
+    grid-column: 1 / -1;
+    font-size: 10px;
+  }
+
+  .welcome-banner__actions {
+    grid-column: 1 / -1;
+  }
+
+  .welcome-banner__actions button {
+    width: 100%;
+  }
+
+  .welcome-banner__sponsor {
+    display: block;
+  }
+
+  .welcome-banner__sponsor > a {
+    max-width: 300px;
+  }
+
+  .welcome-banner__sponsor p {
+    margin-top: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
