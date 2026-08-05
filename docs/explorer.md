@@ -11,7 +11,7 @@ StormSense follows complete tropical-cyclone tracks and compares model-derived w
 
 Solid teal lines show the selected ViT, UNet, UNet+MLP, or Diffusion inference series; a model remains marked pending until its inference folder contains results. Gray dots mark matched SAR observations, and dashed gray segments only connect those sparse acquisitions visually. The optional NWP overlay reads the forecast series stored for each manifest storm.
 
-UNet+MLP is the scalar-only intensity product: it takes one frozen U-Net wind field plus current-time metadata, predicts a signed maximum-wind correction, and derives TD through C5 from the corrected wind. It therefore exposes only Maximum wind in StormSense; spatial diagnostics such as RMW and R64 remain properties of image-producing models.
+UNet+MLP is the scalar-only intensity product: it takes one frozen U-Net wind field plus current-time metadata, predicts a signed maximum-wind correction, and derives TD through C5 from the corrected wind. It supplies the corrected Maximum wind series in StormSense; when selected, the remaining spatial-diagnostic charts use values calculated from its upstream frozen U-Net wind-field output.
 
 StormSense is plain HTML, CSS, JavaScript, and compact JSON. It deploys with the documentation and does not require a runtime server or API key.
 

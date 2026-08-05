@@ -129,14 +129,18 @@ function domain(metric,start,end,predictionStart,predictionEnd){
 }
 function nwpPoints(start,end){return showNwp?(storm.nwp||[]).map(series=>({...series,points:series.points.filter(point=>{const time=dt(point.time).getTime();return time>=start&&time<=end&&Number.isFinite(point.max)})})).filter(series=>series.points.length):[]}
 function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!sorted.length)return null;const m=Math.floor(sorted.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2}
-function graphPrediction(record){return record[`${graphModel}_prediction`]}
+function predictionSourceModel(metric){return graphModel==="unet_mlp"&&metric!=="max"?"unet":graphModel}
+function predictionSourceLabel(metric){return data.models[predictionSourceModel(metric)].label}
+function predictionLegendLabel(){return graphModel==="unet_mlp"?"UNet+MLP max · UNet spatial diagnostics":data.models[graphModel].label}
+function graphPrediction(record,metric){return record[`${predictionSourceModel(metric)}_prediction`]}
 function smoothedValidValue(metric,record){
   const halfWindow=data.postprocessing.smoothing_hours*3600000/2,target=dt(record.time).getTime();
-  return median(storm.records.filter(r=>Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r)?.[metric]));
+  return median(storm.records.filter(r=>Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r,metric)?.[metric]));
 }
 function predictionValue(metric,record){
-  if(!data.models[graphModel].metrics.includes(metric))return null;
-  const raw=graphPrediction(record)?.[metric];
+  const sourceModel=predictionSourceModel(metric);
+  if(!data.models[sourceModel].metrics.includes(metric))return null;
+  const raw=graphPrediction(record,metric)?.[metric];
   if(!Number.isFinite(raw))return null;
   if(!postProcessing)return raw;
   return smoothedValidValue(metric,record);
@@ -162,7 +166,7 @@ function chart(metric,def){
   sar.forEach(r=>s.append(svg("circle",{class:"sar-dot",cx:x(r.time),cy:y(r.sar[metric]),r:3.5})));
   if(ibtracs.length)s.append(svg("path",{class:"ibtracs-path",d:path(ibtracs,r=>r.ibtracs_msw)}));
   s.append(svg("line",{class:"cursor-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}));
-  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=inPredictionWindow(r)?predictionValue(metric,r):null,raw=graphPrediction(r)?.[metric],tip=$("#tooltip"),predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" (smoothed"+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable",modelCategory=graphModel==="unet_mlp"&&Number.isFinite(pv)?categoryFromWind(pv):null,modelCategoryLabel=metric==="max"&&Number.isFinite(modelCategory)?` · ${cat(modelCategory)}`:"",riActive=riIntervals.some(([begin,finish])=>dt(r.time).getTime()>=begin&&dt(r.time).getTime()<=finish),ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${r.ibtracs_msw.toFixed(1)} m/s · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${data.models[graphModel].label} ${predictionLabel}${modelCategoryLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}${ibtracsLabel}${riActive?`<br>IBTrACS rapid intensification · ≥30 kt in 24 h`:""}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
+  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=inPredictionWindow(r)?predictionValue(metric,r):null,raw=graphPrediction(r,metric)?.[metric],tip=$("#tooltip"),predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" (smoothed"+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable",modelCategory=graphModel==="unet_mlp"&&metric==="max"&&Number.isFinite(pv)?categoryFromWind(pv):null,modelCategoryLabel=metric==="max"&&Number.isFinite(modelCategory)?` · ${cat(modelCategory)}`:"",riActive=riIntervals.some(([begin,finish])=>dt(r.time).getTime()>=begin&&dt(r.time).getTime()<=finish),ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${r.ibtracs_msw.toFixed(1)} m/s · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${predictionSourceLabel(metric)} ${predictionLabel}${modelCategoryLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}${ibtracsLabel}${riActive?`<br>IBTrACS rapid intensification · ≥30 kt in 24 h`:""}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function charts(){
@@ -188,7 +192,7 @@ function selectStorm(id){
   const inferenceAvailable=availableModels.length>0;
   graphModel=availableModels.includes(graphModel)?graphModel:(availableModels.includes("vit")?"vit":availableModels[0]);
   $$("#modelSelector option").forEach(option=>{const definition=data.models[option.value],available=Boolean(definition&&availableModels.includes(option.value));option.hidden=!definition;option.disabled=!available;if(definition)option.textContent=definition.label+(available?"":" (pending)")});
-  $("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;$("#predictionLegend").textContent=inferenceAvailable?data.models[graphModel].label:"";
+  $("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;$("#predictionLegend").textContent=inferenceAvailable?predictionLegendLabel():"";
   $(".model-toolbar").hidden=!inferenceAvailable;$("#inferenceNotice").hidden=inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;$("#methodNote").hidden=!inferenceAvailable;$(".graph-toolbar").hidden=!inferenceAvailable;
   postProcessing=inferenceAvailable&&$("#postProcessing").checked;
   $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormHeading").textContent=storm.name?`${displayStormName(storm.name)} Storm track`:"Storm track";$("#stormTitle").textContent=storm.name?`${displayStormName(storm.name)} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;$("#pmwCount").textContent=storm.pmw_matches||0;
@@ -196,7 +200,7 @@ function selectStorm(id){
 }
 $("#timeSlider").oninput=()=>{stop();if($("#animationMode").checked)resetAnimation();current();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value])};$("#playButton").onclick=play;$("#speedSelector").onchange=()=>{if(timer){stop();play()}};
 $("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked);if(event.target.checked){resetAnimation();showAnimationFrame(storm.records[+$("#timeSlider").value])}else restoreManualLayers()};
-$("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=data.models[graphModel].label;charts();current()};
+$("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=predictionLegendLabel();charts();current()};
 $("#showNwp").onchange=event=>{showNwp=event.target.checked;$("#nwpLegend").hidden=!showNwp;charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 const dialog=$("#aboutDialog");$("#helpButton").onclick=()=>dialog.showModal();$("#closeDialog").onclick=$("#confirmDialog").onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close()};
