@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="vit",assetBaseUrl="";
+const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const PREDICTION_EDGE_HOURS=6;
@@ -104,10 +104,12 @@ function interpolatedIbtracsWind(time){
   return left.ibtracs_msw+fraction*(right.ibtracs_msw-left.ibtracs_msw)
 }
 function rapidIntensificationIntervals(start,end){
-  const candidates=storm.records.flatMap(record=>{
-    const finish=dt(record.time).getTime(),begin=finish-RI_WINDOW_MS,finishWind=record.ibtracs_msw,beginWind=interpolatedIbtracsWind(begin);
-    return Number.isFinite(finishWind)&&Number.isFinite(beginWind)&&finishWind-beginWind>=RI_THRESHOLD_MS?[[Math.max(start,begin),Math.min(end,finish)]]:[]
-  }).filter(([begin,finish])=>finish>begin).sort((a,b)=>a[0]-b[0]);
+  const candidates=storm.records.flatMap((record,index)=>{
+    const finish=dt(record.time).getTime(),finishWind=record.ibtracs_msw,beginWind=interpolatedIbtracsWind(finish-RI_WINDOW_MS);
+    if(!Number.isFinite(finishWind)||!Number.isFinite(beginWind)||finishWind-beginWind<RI_THRESHOLD_MS)return[];
+    const previous=index?dt(storm.records[index-1].time).getTime():finish;
+    return[[Math.max(start,previous),Math.min(end,finish)]]
+  }).filter(([begin,finish])=>finish>begin);
   return candidates.reduce((merged,interval)=>{
     const previous=merged[merged.length-1];
     if(previous&&interval[0]<=previous[1])previous[1]=Math.max(previous[1],interval[1]);else merged.push(interval);
