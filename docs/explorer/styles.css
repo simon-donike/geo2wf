@@ -600,6 +600,12 @@ a:focus-visible {
   border-top: 2px dashed var(--system-blue);
 }
 
+.ri-swatch {
+  height: 8px !important;
+  border: 1px solid color-mix(in srgb, var(--highlight) 65%, transparent);
+  background: repeating-linear-gradient(135deg, transparent 0 3px, var(--highlight) 3px 4px);
+}
+
 .ibtracs-line {
   border-top: 2px solid var(--ibtracs);
 }
@@ -663,6 +669,16 @@ a:focus-visible {
   height: 100%;
   display: block;
   overflow: visible;
+}
+
+.ri-region {
+  fill-opacity: 0.13;
+}
+
+.ri-hatch-line {
+  stroke: var(--highlight);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 
 .chart-grid {
