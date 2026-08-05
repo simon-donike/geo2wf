@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",assetBaseUrl="";
+const C={w:600,h:220,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","rmw"];
 const PREDICTION_EDGE_HOURS=6;
@@ -177,7 +177,7 @@ function chart(metric,def){
   const pred=storm.records.filter(inPredictionWindow).map(r=>({...r,plot:predictionValue(metric,r)})).filter(r=>Number.isFinite(r.plot)),sar=storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.sar?.[metric])),ibtracs=metric==="max"?storm.records.filter(r=>inWindow(r)&&Number.isFinite(r.ibtracs_msw)):[],nwp=metric==="max"?nwpPoints(start,end):[];
   const headingKey=metric==="max"?`<span class="category-key">${CATEGORIES.map(c=>`<b style="--cat:${c.color}">${c.label} ${Math.round(c.value)}</b>`).join("")}</span>`:`<span>${def.note||""} · ${def.unit}</span>`;
   const path=(rows,get)=>rows.map((r,i)=>`${i?"L":"M"}${x(r.time).toFixed(1)},${y(get(r)).toFixed(1)}`).join(" ");
-  const card=document.createElement("article");card.className="chart-card";card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3>${headingKey}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="none"></svg></div>`;
+  const card=document.createElement("article");card.className="chart-card";card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3>${headingKey}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
   const s=card.querySelector("svg");
   const defs=svg("defs"),pattern=svg("pattern",{id:`ri-hatch-${metric}`,width:8,height:8,patternUnits:"userSpaceOnUse",patternTransform:"rotate(45)"});pattern.append(svg("line",{class:"ri-hatch-line",x1:0,y1:0,x2:0,y2:8}));defs.append(pattern);s.append(defs);
   riIntervals.forEach(([begin,finish])=>s.append(svg("rect",{class:"ri-region",x:x(begin),y:C.t,width:Math.max(0,x(finish)-x(begin)),height:C.h-C.t-C.b,fill:`url(#ri-hatch-${metric})`})));
