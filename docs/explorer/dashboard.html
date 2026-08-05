@@ -5,16 +5,19 @@
   <meta name="description" content="Explore tropical-cyclone tracks and wind-field inference with StormSense.">
   <title>StormSense</title>
   <link rel="icon" href="../assets/images/mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="earth-systems-lab">
 <header class="topbar">
-  <a class="brand" href="../">
-    <span class="brand-mark" aria-hidden="true"><i></i></span>
-    <span class="brand-copy"><strong>StormSense</strong><small>Earth Systems Lab <b>/FDL</b></small></span>
-  </a>
-  <div class="top-actions"><span class="data-badge"><i></i> Inference data</span><button class="icon-button" id="helpButton" aria-label="About this dashboard">?</button><a class="docs-link" href="../">Back to docs ↗</a></div>
+  <div class="brand-lockup">
+    <a class="fdl-logo" href="https://eslab.ai/" aria-label="Earth Systems Lab"><img src="../assets/branding/FDL_ESL_white.png" alt="Frontier Development Lab Earth Systems Lab"></a>
+    <a class="brand" href="./"><span class="brand-copy"><strong>StormSense</strong><small>Tropical-cyclone wind explorer</small></span></a>
+  </div>
+  <div class="top-actions"><span class="data-badge"><i></i> Inference data</span><button class="icon-button" id="helpButton" aria-label="About this dashboard">?</button><a class="docs-link" href="../">Documentation ↗</a></div>
 </header>
 <main class="workspace">
   <section class="map-panel">
@@ -35,15 +38,15 @@
       <div><span>PMW swaths</span><strong id="pmwCount">—</strong></div>
       <div class="category"><span>IBTrACS</span><strong id="categoryValue">—</strong></div>
     </div>
-    <div class="model-toolbar"><label for="modelSelector">Inference model</label><select id="modelSelector"><option value="vit">ViT</option><option value="unet">UNet</option><option value="diffusion">Diffusion (pending)</option></select></div>
+    <div class="model-toolbar"><label for="modelSelector">Inference model</label><select id="modelSelector"><option value="vit">ViT</option><option value="unet">UNet</option><option value="unet_mlp">UNet+MLP</option><option value="diffusion">Diffusion (pending)</option></select></div>
     <p class="inference-notice" id="inferenceNotice" hidden><strong>Observations available</strong><span>Model inference is pending for this storm.</span></p>
     <div class="legend"><span id="predictionLegendItem"><i class="geo-line"></i> <b id="predictionLegend">ViT</b></span><span><i class="sar-line"></i> SAR-derived WF</span><span><i class="ibtracs-line"></i> IBTrACS MSW / class</span><span id="nwpLegend" hidden><i class="nwp-line"></i> NWP forecasts</span><small>IBTrACS is shown on Maximum wind; dashed gray segments interpolate between SAR observations</small></div>
     <section id="charts" class="charts"></section>
-    <p class="method-note" id="methodNote">The model selector changes graph series only; unavailable inference folders are shown as pending. The IBTrACS maximum sustained wind and classification are included as a reference on the Maximum wind chart. Prediction metrics use the selected model output; SAR metrics use valid pixels inside each SAR swath. RMW and R64 use approximate grid-resolution radial bins. Charts span each complete storm record; model predictions are plotted from six hours after its start until six hours before its end. When enabled, post-processing applies a centered six-hour median to model predictions.</p>
+    <p class="method-note" id="methodNote">The model selector changes graph series only; unavailable inference folders are shown as pending. The IBTrACS maximum sustained wind and classification are included as a reference on the Maximum wind chart. UNet+MLP reports only its corrected maximum wind and derived class. Prediction metrics use the selected model output; SAR metrics use valid pixels inside each SAR swath. RMW and R64 use approximate grid-resolution radial bins. Charts span each complete storm record; model predictions are plotted from six hours after its start until six hours before its end. When enabled, post-processing applies a centered six-hour median to model predictions.</p>
     <div class="graph-toolbar"><label class="postprocess-toggle"><input id="showNwp" type="checkbox"><i></i><span>NWP forecasts</span></label><label class="postprocess-toggle"><input id="postProcessing" type="checkbox"><i></i><span>Post-processing</span></label></div>
   </aside>
 </main>
-<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close" aria-label="Close dialog">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The highlighted series is derived from the selected inference model; the selector does not change the map or summary cards. The dark reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. The optional NWP overlay shows each available forecast as a muted dashed line. All SAR swaths share a fixed 0–60+ m/s scale. PMW imagery uses the comparable vertically polarized 89–92 GHz band from AMSR2, GMI, and SSMIS. PMW and geostationary imagery use distinct color maps because they represent different physical measurements, while each retains fixed 190–292 K bounds; PMW no-data pixels are transparent. Use the map layer toggle to show or hide all fixed-scale CMI_C15 geostationary images together. Dark chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
+<dialog id="aboutDialog"><button id="closeDialog" class="dialog-close" aria-label="Close dialog">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>The highlighted series is derived from the selected inference model; the selector does not change the map or summary cards. The cream reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. The optional NWP overlay shows each available forecast as a muted dashed line. All SAR swaths share a fixed 0–60+ m/s scale. PMW imagery uses the comparable vertically polarized 89–92 GHz band from AMSR2, GMI, and SSMIS. PMW and geostationary imagery use distinct color maps because they represent different physical measurements, while each retains fixed 190–292 K bounds; PMW no-data pixels are transparent. Use the map layer toggle to show or hide all fixed-scale CMI_C15 geostationary images together. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
 <div class="loading" id="loading"><span></span><p>Preparing storm tracks…</p></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="data-config.js"></script>

@@ -104,9 +104,7 @@ def test_manifest_storm_ids_are_the_dashboard_source_of_truth(
     assert explorer.manifest_storm_ids() == ["AL082025", "EP182023"]
 
 
-def test_nwp_export_reads_the_selected_storm_directory(
-    tmp_path, monkeypatch
-) -> None:
+def test_nwp_export_reads_the_selected_storm_directory(tmp_path, monkeypatch) -> None:
     nwp_root = tmp_path / "NWP"
     storm_root = nwp_root / "EP182023"
     storm_root.mkdir(parents=True)
@@ -125,3 +123,22 @@ def test_nwp_export_reads_the_selected_storm_directory(
             "points": [{"time": "2023-10-24T00:00:00Z", "max": 25.125}],
         }
     ]
+
+
+def test_intensity_prediction_exports_corrected_scalar_and_category() -> None:
+    table = pd.DataFrame(
+        {
+            "observation_id": ["storm:geo:one"],
+            "output_msw_ms": [42.1236],
+            "output_category": [2],
+            "raw_unet_max_wind_ms": [37.0],
+            "correction_ms": [5.1236],
+        }
+    ).set_index("observation_id")
+    assert explorer.intensity_prediction(table, "storm:geo:one") == {
+        "max": 42.124,
+        "category": 2,
+        "raw_unet_max_wind_ms": 37.0,
+        "correction_ms": 5.124,
+    }
+    assert explorer.intensity_prediction(table, "missing") is None

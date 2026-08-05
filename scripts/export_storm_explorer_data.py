@@ -28,6 +28,7 @@ from export_geo_sar_geotiffs import (
 ROOT = Path(__file__).resolve().parents[1]
 VIT_ROOT = ROOT / "inference" / "inf_vit"
 UNET_ROOT = ROOT / "inference" / "inf_unet"
+UNET_MLP_ROOT = ROOT / "inference" / "inf_unet_mlp"
 DIFFUSION_ROOT = ROOT / "inference" / "inf_diffusion"
 NWP_ROOT = ROOT / "inference" / "NWP"
 RAW_INPUT_ROOT = ROOT / "inference" / "inf_data"
@@ -165,9 +166,7 @@ def export_pmw_array(
             1,
         )
     )
-    lower = PMW_COLOR_LOW + stretched[..., None] * 2 * (
-        PMW_COLOR_MID - PMW_COLOR_LOW
-    )
+    lower = PMW_COLOR_LOW + stretched[..., None] * 2 * (PMW_COLOR_MID - PMW_COLOR_LOW)
     upper = PMW_COLOR_MID + (stretched[..., None] - 0.5) * 2 * (
         PMW_COLOR_HIGH - PMW_COLOR_MID
     )
@@ -490,6 +489,22 @@ def tabular_prediction(table, observation_id, *, include_uncertainty=False):
     return prediction
 
 
+def intensity_prediction(table, observation_id):
+    """Return scalar-only corrected intensity and its diagnostic components."""
+    if table is None or observation_id not in table.index:
+        return None
+    row = table.loc[observation_id]
+    category = pd.to_numeric(row.get("output_category"), errors="coerce")
+    return {
+        "max": finite_number(row.get("output_msw_ms", math.nan)),
+        "category": int(category) if pd.notna(category) else None,
+        "raw_unet_max_wind_ms": finite_number(
+            row.get("raw_unet_max_wind_ms", math.nan)
+        ),
+        "correction_ms": finite_number(row.get("correction_ms", math.nan)),
+    }
+
+
 def export_storm(storm_id):
     storm_dir = VIT_ROOT / storm_id
     summary_path = storm_dir / "inference-summary.csv"
@@ -503,8 +518,13 @@ def export_storm(storm_id):
         .reset_index(drop=True)
     )
     unet = load_prediction_table(UNET_ROOT, storm_id)
+    unet_mlp = load_prediction_table(UNET_MLP_ROOT, storm_id)
     diffusion = load_prediction_table(DIFFUSION_ROOT, storm_id)
-    for label, table in (("UNet", unet), ("Diffusion", diffusion)):
+    for label, table in (
+        ("UNet", unet),
+        ("UNet+MLP", unet_mlp),
+        ("Diffusion", diffusion),
+    ):
         if table is None:
             continue
         missing = set(summary["observation_id"]) - set(table.index)
@@ -516,6 +536,8 @@ def export_storm(storm_id):
     available_models = ["vit"]
     if unet is not None:
         available_models.append("unet")
+    if unet_mlp is not None:
+        available_models.append("unet_mlp")
     if diffusion is not None:
         available_models.append("diffusion")
 
@@ -556,6 +578,9 @@ def export_storm(storm_id):
                 "ibtracs_msw": finite_number(row.ibtracs_msw_ms),
                 "vit_prediction": vit_prediction,
                 "unet_prediction": tabular_prediction(unet, row.observation_id),
+                "unet_mlp_prediction": intensity_prediction(
+                    unet_mlp, row.observation_id
+                ),
                 "diffusion_prediction": tabular_prediction(
                     diffusion, row.observation_id, include_uncertainty=True
                 ),
@@ -603,6 +628,7 @@ def main():
         "generated_from": [
             "inference/inf_vit",
             "inference/inf_unet",
+            "inference/inf_unet_mlp",
             "inference/inf_diffusion",
             "inference/NWP",
         ],
@@ -652,6 +678,10 @@ def main():
             "unet": {
                 "label": "UNet",
                 "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
+            },
+            "unet_mlp": {
+                "label": "UNet+MLP",
+                "metrics": ["max"],
             },
             "diffusion": {
                 "label": "Diffusion",
