@@ -6,7 +6,7 @@ hide:
 <div class="geo-intro" markdown>
 <span class="geo-eyebrow">Tropical-cyclone wind reconstruction</span>
 
-# A baseline first. Diffusion second.
+# Two-stage wind-field reconstruction
 
 geo2wf reconstructs SAR-like surface wind fields from geostationary satellite imagery and ERA5 context. The main system is deliberately two-stage: a deterministic model commits to a broad physical field, then diffusion models the signed correction that remains.
 
