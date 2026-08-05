@@ -3,6 +3,7 @@ const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayer
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
 const PREDICTION_EDGE_HOURS=6;
+const MIN_VALID_RMW_KM=10;
 const RI_WINDOW_MS=24*3600000,RI_THRESHOLD_MS=30*.514444;
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
@@ -134,15 +135,24 @@ function median(values){const sorted=values.filter(Number.isFinite).sort((a,b)=>
 function predictionSourceModel(metric){return graphModel==="unet_mlp"&&metric!=="max"?"unet":graphModel}
 function predictionSourceLabel(metric){return data.models[predictionSourceModel(metric)].label}
 function predictionLegendLabel(){return graphModel==="unet_mlp"?"UNet+MLP max · UNet spatial diagnostics":data.models[graphModel].label}
+function basePredictionValue(metric,record){
+  const raw=graphPrediction(record,metric)?.[metric];
+  if(metric!=="rmw"||!Number.isFinite(raw)||raw>=MIN_VALID_RMW_KM)return Number.isFinite(raw)?raw:null;
+  const target=dt(record.time).getTime(),valid=storm.records.filter(r=>{const value=graphPrediction(r,metric)?.[metric];return Number.isFinite(value)&&value>=MIN_VALID_RMW_KM});
+  const rightIndex=valid.findIndex(r=>dt(r.time).getTime()>target);
+  if(rightIndex<=0)return null;
+  const left=valid[rightIndex-1],right=valid[rightIndex],leftTime=dt(left.time).getTime(),rightTime=dt(right.time).getTime(),fraction=(target-leftTime)/(rightTime-leftTime);
+  return graphPrediction(left,metric)[metric]+fraction*(graphPrediction(right,metric)[metric]-graphPrediction(left,metric)[metric])
+}
 function graphPrediction(record,metric){return record[`${predictionSourceModel(metric)}_prediction`]}
 function smoothedValidValue(metric,record){
   const halfWindow=data.postprocessing.smoothing_hours*3600000/2,target=dt(record.time).getTime();
-  return median(storm.records.filter(r=>Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>graphPrediction(r,metric)?.[metric]));
+  return median(storm.records.filter(r=>Math.abs(dt(r.time).getTime()-target)<=halfWindow).map(r=>basePredictionValue(metric,r)));
 }
 function predictionValue(metric,record){
   const sourceModel=predictionSourceModel(metric);
   if(!data.models[sourceModel].metrics.includes(metric))return null;
-  const raw=graphPrediction(record,metric)?.[metric];
+  const raw=basePredictionValue(metric,record);
   if(!Number.isFinite(raw))return null;
   if(!postProcessing)return raw;
   return smoothedValidValue(metric,record);
