@@ -161,7 +161,7 @@ function selectStorm(id){
   stop();storm=data.storms.find(s=>s.id===id);switcher();renderMap();
   const availableModels=storm.available_models||[];
   const inferenceAvailable=availableModels.length>0;
-  graphModel=availableModels.includes("vit")?"vit":availableModels[0];
+  graphModel=availableModels.includes(graphModel)?graphModel:(availableModels.includes("vit")?"vit":availableModels[0]);
   $$("#modelSelector option").forEach(option=>{const definition=data.models[option.value],available=Boolean(definition&&availableModels.includes(option.value));option.hidden=!definition;option.disabled=!available;if(definition)option.textContent=definition.label+(available?"":" (pending)")});
   $("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;$("#predictionLegend").textContent=inferenceAvailable?data.models[graphModel].label:"";
   $(".model-toolbar").hidden=!inferenceAvailable;$("#inferenceNotice").hidden=inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;$("#methodNote").hidden=!inferenceAvailable;$(".graph-toolbar").hidden=!inferenceAvailable;
