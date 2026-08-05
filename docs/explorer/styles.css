@@ -677,7 +677,7 @@ a:focus-visible {
 
 .ri-hatch-line {
   stroke: var(--highlight);
-  stroke-width: 2;
+  stroke-width: 3.5;
   vector-effect: non-scaling-stroke;
 }
 
