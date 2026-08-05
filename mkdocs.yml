@@ -9,7 +9,7 @@ copyright: Copyright &copy; 2026 geo2wf contributors
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/images/mark.svg
+  logo: assets/branding/FDL_ESL_white.png
   favicon: assets/images/mark.svg
   font: false
   icon:

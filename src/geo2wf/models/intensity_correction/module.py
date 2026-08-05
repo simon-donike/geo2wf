@@ -103,8 +103,12 @@ class WindFieldEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         features = self.stages(self.stem(inputs))
-        average = F.adaptive_avg_pool2d(features, 1).flatten(1)
-        maximum = F.adaptive_max_pool2d(features, 1).flatten(1)
+        # Reductions over the flattened spatial axes are exactly equivalent to
+        # adaptive pooling to a 1x1 output. Unlike adaptive_max_pool2d CUDA
+        # backward, amax supports deterministic training.
+        spatial_features = features.flatten(2)
+        average = spatial_features.mean(dim=2)
+        maximum = spatial_features.amax(dim=2)
         return torch.cat([average, maximum], dim=1)
 
 

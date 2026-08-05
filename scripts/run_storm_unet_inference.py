@@ -3,11 +3,14 @@
 All raw GEO, ERA5, PMW, and manifest inputs come from ``inference/inf_data``;
 the ViT summaries only define the dashboard observation IDs. The output mirrors
 their CSV contract under ``inference/inf_unet``; tensor bundles are not written.
+When a correction checkpoint is supplied, the maximum-wind column and category
+are written as a distinct UNet+MLP result series.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -29,6 +32,7 @@ from geo2wf.data.features import (  # noqa: E402
     solar_time_features as _solar_time_features,
 )
 from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
+from geo2wf.data.intensity import encode_intensity_metadata  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
     GEO_CHANNEL_SETS,
@@ -43,6 +47,7 @@ from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     _regrid_continuous,
 )
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
+from geo2wf.models.intensity_correction import UNetIntensityCorrection  # noqa: E402
 from scripts.pmw_conditioning import (
     nearest_supported_pmw,
     pmw_audit_row,
@@ -62,6 +67,10 @@ DEFAULT_CHECKPOINT = (
     / "20260730-132206_config_geo_sar_10bands_era5_residual"
     / "checkpoints"
     / "epoch=038-step=4758.ckpt"
+)
+DEFAULT_IBTRACS_FILE = ROOT / "data" / "IBTrACs" / "ibtracs.ALL.list.v04r01.csv"
+DEFAULT_INTENSITY_CACHE_METADATA = (
+    ROOT / "data" / "unet_intensity_geostat_nopmw_v2" / "cache-metadata.json"
 )
 GRID_SIZE = 256
 GRID_RESOLUTION_DEGREES = 0.027
@@ -84,6 +93,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument(
+        "--correction-checkpoint",
+        type=Path,
+        default=None,
+        help="Optional single-field intensity correction checkpoint.",
+    )
+    parser.add_argument(
+        "--intensity-cache-metadata",
+        type=Path,
+        default=DEFAULT_INTENSITY_CACHE_METADATA,
+        help=(
+            "Cache provenance used to verify the frozen U-Net used for "
+            "correction training."
+        ),
+    )
+    parser.add_argument("--ibtracs-file", type=Path, default=DEFAULT_IBTRACS_FILE)
+    parser.add_argument(
         "--storms",
         nargs="+",
         default=None,
@@ -96,6 +121,99 @@ def parse_args() -> argparse.Namespace:
         "--limit", type=int, default=None, help="Debug: rows per storm."
     )
     return parser.parse_args()
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _validate_correction_provenance(
+    unet_checkpoint: Path, cache_metadata_path: Path
+) -> dict:
+    metadata = json.loads(cache_metadata_path.read_text(encoding="utf-8"))
+    expected = str(metadata.get("unet_checkpoint", {}).get("sha256", ""))
+    actual = _sha256(unet_checkpoint)
+    if not expected or actual != expected:
+        raise ValueError(
+            "correction U-Net provenance mismatch: cache expects "
+            f"{expected or 'no hash'}, selected checkpoint is {actual}"
+        )
+    return metadata
+
+
+def _storm_intensity_context(
+    ibtracs_file: Path, storm_ids: list[str]
+) -> dict[str, dict[str, object]]:
+    tracks = pd.read_csv(
+        ibtracs_file,
+        skiprows=[1],
+        usecols=["USA_ATCF_ID", "ISO_TIME", "BASIN"],
+        keep_default_na=False,
+        low_memory=False,
+    )
+    tracks["storm_id"] = tracks["USA_ATCF_ID"].astype(str).str.strip().str.upper()
+    tracks["timestamp"] = pd.to_datetime(tracks["ISO_TIME"], errors="coerce", utc=True)
+    tracks["basin"] = tracks["BASIN"].astype(str).str.strip().str.upper()
+    tracks = tracks.loc[
+        tracks["storm_id"].isin(storm_ids) & tracks["timestamp"].notna()
+    ].sort_values(["storm_id", "timestamp"])
+    context = {
+        storm_id: {
+            "start": frame.iloc[0]["timestamp"],
+            "basin": frame.loc[frame["basin"].ne(""), "basin"].iloc[0],
+        }
+        for storm_id, frame in tracks.groupby("storm_id")
+    }
+    missing = sorted(set(storm_ids) - set(context))
+    if missing:
+        raise ValueError(f"IBTrACS has no track context for storms: {missing}")
+    return context
+
+
+def _corrected_intensity(
+    correction_model: UNetIntensityCorrection,
+    wind_field: torch.Tensor,
+    valid_mask: torch.Tensor,
+    geo,
+    context: dict[str, object],
+):
+    bounds = _bounds(*geo.center)
+    normalized_distance = _normalized_distance_to_center(
+        bounds, (CROP_SIZE, CROP_SIZE), torch.tensor(geo.ibtracs_center)
+    ).to(device=wind_field.device, dtype=wind_field.dtype)
+    finite_valid = (
+        valid_mask.squeeze(1).bool()
+        & torch.isfinite(wind_field.squeeze(1))
+        & torch.isfinite(normalized_distance)
+    )
+    valid_fraction = float(finite_valid.float().mean())
+    elapsed_hours = max(
+        0.0,
+        (pd.Timestamp(geo.timestamp) - pd.Timestamp(context["start"])).total_seconds()
+        / 3600.0,
+    )
+    metadata = encode_intensity_metadata(
+        {
+            "observation_timestamp": geo.timestamp,
+            "center_lat": geo.ibtracs_center[0],
+            "center_lon": geo.ibtracs_center[1],
+            "basin": context["basin"],
+            "storm_elapsed_hours": elapsed_hours,
+            "valid_fraction": valid_fraction,
+        }
+    ).unsqueeze(0)
+    return correction_model.predict_intensity(
+        {
+            "wind_field": wind_field.squeeze(1),
+            "valid_mask": finite_valid,
+            "distance_to_center": normalized_distance,
+            "metadata": metadata.to(wind_field.device),
+        }
+    )
 
 
 def _bounds(center_lat: float, center_lon: float) -> torch.Tensor:
@@ -316,6 +434,22 @@ def main() -> None:
         unknown = sorted(set(args.storms) - set(manifest_storms))
         if unknown:
             raise ValueError(f"Storms are not present in the manifest: {unknown}")
+    correction_model = None
+    correction_provenance = None
+    intensity_context = {}
+    if args.correction_checkpoint is not None:
+        for required in (
+            args.checkpoint,
+            args.correction_checkpoint,
+            args.intensity_cache_metadata,
+            args.ibtracs_file,
+        ):
+            if not required.is_file():
+                raise FileNotFoundError(required)
+        correction_provenance = _validate_correction_provenance(
+            args.checkpoint, args.intensity_cache_metadata
+        )
+        intensity_context = _storm_intensity_context(args.ibtracs_file, args.storms)
     config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
     stats_path = args.stats or Path(config["data"]["stats_file"])
     stats = json.loads(stats_path.read_text(encoding="utf-8"))
@@ -342,6 +476,14 @@ def main() -> None:
         .eval()
         .to(args.device)
     )
+    if args.correction_checkpoint is not None:
+        correction_model = (
+            UNetIntensityCorrection.load_from_checkpoint(
+                args.correction_checkpoint, map_location="cpu"
+            )
+            .eval()
+            .to(args.device)
+        )
     args.output_root.mkdir(parents=True, exist_ok=True)
 
     with torch.inference_mode():
@@ -412,9 +554,28 @@ def main() -> None:
                     )
                 batch = {key: value.to(args.device) for key, value in batch.items()}
                 prediction = model.predict_physical(batch)
-                metric_rows.append(
-                    _output_metrics(prediction, batch["condition_mask"], distance_km)
+                metrics = _output_metrics(
+                    prediction, batch["condition_mask"], distance_km
                 )
+                if correction_model is not None:
+                    corrected = _corrected_intensity(
+                        correction_model,
+                        prediction,
+                        batch["condition_mask"],
+                        geo,
+                        intensity_context[storm],
+                    )
+                    metrics.update(
+                        {
+                            "raw_unet_max_wind_ms": float(
+                                corrected.raw_unet_max_wind_ms.item()
+                            ),
+                            "correction_ms": float(corrected.correction_ms.item()),
+                            "msw": float(corrected.output_msw_ms.item()),
+                            "category": int(corrected.output_category.item()),
+                        }
+                    )
+                metric_rows.append(metrics)
                 local_paths.append(str(geo.path))
                 kept_indices.append(table_index)
                 if pmw_enabled:
@@ -423,17 +584,69 @@ def main() -> None:
                     )
             table = table.iloc[kept_indices].copy().reset_index(drop=True)
             table["original_input_path"] = local_paths
-            for column, key in {
-                "output_msw_ms": "msw",
-                "output_r64_km": "r64",
-                "output_p90_ms": "p90",
-                "output_core_mean_ms": "core_mean",
-                "output_rmw_km": "rmw",
-                "output_mean_ms": "mean",
-            }.items():
+            output_columns = {"output_msw_ms": "msw"}
+            if correction_model is None:
+                output_columns.update(
+                    {
+                        "output_r64_km": "r64",
+                        "output_p90_ms": "p90",
+                        "output_core_mean_ms": "core_mean",
+                        "output_rmw_km": "rmw",
+                        "output_mean_ms": "mean",
+                    }
+                )
+            else:
+                table = table.drop(
+                    columns=[
+                        "output_r64_km",
+                        "output_p90_ms",
+                        "output_core_mean_ms",
+                        "output_rmw_km",
+                        "output_mean_ms",
+                    ],
+                    errors="ignore",
+                )
+                output_columns.update(
+                    {
+                        "raw_unet_max_wind_ms": "raw_unet_max_wind_ms",
+                        "correction_ms": "correction_ms",
+                        "output_category": "category",
+                    }
+                )
+            for column, key in output_columns.items():
                 table[column] = [metrics[key] for metrics in metric_rows]
             storm_dir = args.output_root / storm
             storm_dir.mkdir(parents=True, exist_ok=True)
+            if correction_model is not None:
+                provenance_path = storm_dir / "correction-provenance.json"
+                provenance_path.write_text(
+                    json.dumps(
+                        {
+                            "model": "UNet+MLP",
+                            "storm_id": storm,
+                            "samples": len(table),
+                            "unet_checkpoint": {
+                                "path": str(args.checkpoint.resolve()),
+                                "sha256": _sha256(args.checkpoint),
+                            },
+                            "correction_checkpoint": {
+                                "path": str(args.correction_checkpoint.resolve()),
+                                "sha256": _sha256(args.correction_checkpoint),
+                            },
+                            "intensity_cache_metadata": str(
+                                args.intensity_cache_metadata.resolve()
+                            ),
+                            "scientific_evaluation": correction_provenance.get(
+                                "scientific_evaluation", "unspecified"
+                            ),
+                            "single_timestep": True,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
             if pmw_enabled:
                 pd.DataFrame(audit_rows).to_csv(
                     storm_dir / "pmw-inference-audit.csv", index=False
@@ -442,7 +655,12 @@ def main() -> None:
             temporary_path = output_path.with_suffix(".csv.tmp")
             table.to_csv(temporary_path, index=False)
             temporary_path.replace(output_path)
-            print(f"Wrote {output_path.relative_to(ROOT)} ({len(table)} rows)")
+            display_path = (
+                output_path.relative_to(ROOT)
+                if output_path.is_relative_to(ROOT)
+                else output_path
+            )
+            print(f"Wrote {display_path} ({len(table)} rows)")
 
 
 if __name__ == "__main__":
