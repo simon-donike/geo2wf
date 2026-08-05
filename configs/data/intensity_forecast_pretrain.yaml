@@ -1,0 +1,11 @@
+_target_: geo2wf.data.intensity_forecast.IntensityForecastDataModule
+root: data/intensity_forecast
+train_split: pretrain_train
+val_split: pretrain_val
+test_split: pretrain_val
+batch_size: 256
+num_workers: 2
+pin_memory: false
+persistent_workers: false
+maximum_delta_weight_ratio: 4.0
+ri_storm_ids: []

@@ -14,6 +14,7 @@ The recommended system is a stack, not a choice between unrelated models:
 | Residual diffusion on ERA5 | ERA5 + sampled residual | GEO, ERA5, derived context, masks | portable generative ablation without Stage 1 |
 | Absolute conditional diffusion | absolute wind sample | GEO, optional ERA5, derived context, masks | standalone research baseline |
 | Single-field intensity correction | corrected maximum wind + derived category | one frozen U-Net field, mask, center distance, current metadata | dashboard-scalar estimation |
+| Six-hour intensity forecast | maximum wind at +6 h | current UNet+MLP scalar, IBTrACS winds at −6 h and −12 h | short-range scalar forecast |
 
 ```mermaid
 flowchart LR
@@ -32,6 +33,7 @@ The wind-field reconstruction paths use the same `PairedDataModule`, physical ta
 - **[Stage 1 deterministic baseline](era5-residual.md)** — residual connection to ERA5, physical Huber loss, and zero-initialized head.
 - **[Stage 2 residual diffusion](residual-diffusion.md)** — signed residual transform, frozen baseline, guidance, and ensemble diagnostics.
 - **[Single-field intensity correction](intensity-correction.md)** — correct a frozen U-Net field into USA maximum wind and a wind-derived category.
+- **[Six-hour scalar intensity forecast](intensity-forecast.md)** — forecast maximum wind from the current UNet+MLP scalar and 12 hours of IBTrACS history.
 
 ## Supporting and ablation articles
 

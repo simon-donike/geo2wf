@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - override /data: intensity_forecast_matched
+  - override /model: intensity_forecast
+
+model:
+  lr: 0.0001
+trainer:
+  max_epochs: 100
+  checkpoint:
+    monitor: val/storm_macro_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    name: intensity-forecast-unet-mlp-finetune
+    project: geo2wf
+    enabled: true
+    log_model: true

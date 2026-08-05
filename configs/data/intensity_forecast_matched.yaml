@@ -1,0 +1,11 @@
+_target_: geo2wf.data.intensity_forecast.IntensityForecastDataModule
+root: data/intensity_forecast
+train_split: train
+val_split: val
+test_split: test
+batch_size: 32
+num_workers: 2
+pin_memory: false
+persistent_workers: false
+maximum_delta_weight_ratio: 4.0
+ri_storm_ids: [WP282025, WP112024, AL092024]
