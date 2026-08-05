@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT))
 from geo2wf.training import build_model,resolve_runtime_config
 from scripts.export_geo_sar_geotiffs import ERA5_CHANNELS,_read_manifest
 from scripts.save_deterministic_baseline_fields import _prepare_sample
-DATA=ROOT/'inference/inf_data'; DENSE=ROOT/'inference/pmw_pred'; OUTPUT=ROOT/'inference/dense_unet'
+DATA=ROOT/'inference/inf_data'; DENSE=ROOT/'inference/synthetic_pmw'; OUTPUT=ROOT/'inference/dense_unet'
 CONFIG=ROOT/'configs/config_geo_sar_10bands_era5_residual.yaml'
 CHECKPOINT=ROOT/'logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt'
 STATS=ROOT/'data/geotiff/geo_sar_10bands_era5/stats.json'
@@ -23,11 +23,22 @@ def sha256(path):
  with path.open('rb') as f:
   while block:=f.read(8*1024*1024): h.update(block)
  return h.hexdigest()
+def dense_manifest(root,storm):
+ candidates=(root/'index-files/shards'/f'{storm}.csv',root/storm/f'{storm}.csv',root/f'{storm}.csv')
+ path=next((candidate for candidate in candidates if candidate.exists()),None)
+ if path is None: raise FileNotFoundError(f'No densified PMW manifest found for {storm} under {root}')
+ return path
+def update_storm_table(path,storm,rows,columns=None):
+ current=pd.DataFrame(rows,columns=columns)
+ if path.exists():
+  previous=pd.read_csv(path); previous=previous[previous.storm_id.astype(str)!=storm] if 'storm_id' in previous else previous.iloc[0:0]
+  current=pd.concat([previous,current],ignore_index=True)
+ current.to_csv(path,index=False)
 def main():
  a=args(); storm=a.storm.upper()
  for path in (a.config,a.checkpoint,a.stats):
   if not path.is_file(): raise FileNotFoundError(path)
- dense=pd.read_csv(a.dense_root/storm/f'{storm}.csv'); dense['parsed_time']=pd.to_datetime(dense.timestamp,utc=True); dense=dense.sort_values('parsed_time').reset_index(drop=True)
+ dense_source=dense_manifest(a.dense_root,storm); dense=pd.read_csv(dense_source); dense['parsed_time']=pd.to_datetime(dense.timestamp,utc=True); dense=dense.sort_values('parsed_time').reset_index(drop=True)
  if a.limit is not None: dense=dense.head(a.limit)
  records=_read_manifest(a.data_root/'index-files/observation_manifest_v6.csv',a.data_root); geos=sorted([r for r in records if r.storm_id==storm and r.source_type=='geo'],key=lambda r:r.timestamp); era5_record=next(r for r in records if r.storm_id==storm and r.source_type=='era5')
  with xr.open_dataset(era5_record.path,group='rectilinear',engine='h5netcdf',decode_times=True) as source: era5=source[list(ERA5_CHANNELS)].load()
@@ -44,7 +55,7 @@ def main():
    for field,(row,geo,_,valid,gap) in zip(fields,chunk):
     filename=str(row.observation_id).replace(':','_')+'.npz'; path=output_dir/filename; np.savez_compressed(path,wind_field_ms=field.astype(np.float32),valid_mask=valid.numpy().astype(np.uint8),timeline_observation_id=np.asarray(row.observation_id),timeline_timestamp=np.asarray(row.timestamp),geo_observation_id=np.asarray(geo.observation_id),geo_timestamp=np.asarray(geo.timestamp.isoformat()))
     rows.append({'storm_id':storm,'observation_id':row.observation_id,'timestamp':row.timestamp,'geo_observation_id':geo.observation_id,'geo_timestamp':geo.timestamp.isoformat(),'geo_gap_minutes':gap,'npz_path':str(path.relative_to(a.output_root)),'array':'wind_field_ms','shape':'x'.join(map(str,field.shape)),'dtype':'float32'})
- a.output_root.mkdir(parents=True,exist_ok=True); pd.DataFrame(rows).to_csv(a.output_root/'dense-unet-fields-manifest.csv',index=False); pd.DataFrame(skipped).to_csv(a.output_root/'dense-unet-skipped.csv',index=False)
- metadata={'schema_version':1,'completed_utc':datetime.now(timezone.utc).isoformat(),'storm':storm,'fields':len(rows),'skipped':len(skipped),'checkpoint':{'path':str(a.checkpoint.resolve()),'sha256':sha256(a.checkpoint)},'config':str(a.config.resolve()),'stats':str(a.stats.resolve()),'timeline_source':str((a.dense_root/storm/f'{storm}.csv').resolve()),'model_inputs':['geostationary','era5'],'dense_pmw_used_as_input':False,'device':a.device}
- (a.output_root/'dense-unet-run-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n'); print(f'Saved {len(rows)} GEO+ERA5 UNet fields; skipped {len(skipped)}')
+ a.output_root.mkdir(parents=True,exist_ok=True); update_storm_table(a.output_root/'dense-unet-fields-manifest.csv',storm,rows); update_storm_table(a.output_root/'dense-unet-skipped.csv',storm,[{'storm_id':storm,**row} for row in skipped],columns=['storm_id','observation_id','timestamp','reason','geo_gap_minutes'])
+ run={'completed_utc':datetime.now(timezone.utc).isoformat(),'fields':len(rows),'skipped':len(skipped),'checkpoint':{'path':str(a.checkpoint.resolve()),'sha256':sha256(a.checkpoint)},'config':str(a.config.resolve()),'stats':str(a.stats.resolve()),'timeline_source':str(dense_source.resolve()),'model_inputs':['geostationary','era5'],'dense_pmw_used_as_input':False,'device':a.device}
+ metadata_path=a.output_root/'dense-unet-run-metadata.json'; metadata=json.loads(metadata_path.read_text()) if metadata_path.exists() else {}; runs=metadata.get('runs',{}); runs[storm]=run; metadata={'schema_version':2,'runs':runs}; metadata_path.write_text(json.dumps(metadata,indent=2)+'\n'); print(f'Saved {len(rows)} GEO+ERA5 UNet fields; skipped {len(skipped)}')
 if __name__=='__main__': main()
