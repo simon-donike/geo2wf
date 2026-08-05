@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
 const C={w:600,h:112,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
-const DISPLAY_METRICS=["max","p90","core_mean","rmw"];
+const DISPLAY_METRICS=["max","rmw"];
 const PREDICTION_EDGE_HOURS=6;
 const MIN_VALID_RMW_KM=10;
 const RI_WINDOW_MS=24*3600000,RI_THRESHOLD_MS=30*.514444;
@@ -105,8 +105,15 @@ function interpolatedIbtracsWind(time){
   return left.ibtracs_msw+fraction*(right.ibtracs_msw-left.ibtracs_msw)
 }
 function rapidIntensificationIntervals(start,end){
+  const first=storm.records.find(record=>Number.isFinite(record.ibtracs_msw));
+  if(!first)return[];
+  const firstTime=dt(first.time).getTime(),firstWind=first.ibtracs_msw;
   const candidates=storm.records.flatMap((record,index)=>{
-    const finish=dt(record.time).getTime(),finishWind=record.ibtracs_msw,beginWind=interpolatedIbtracsWind(finish-RI_WINDOW_MS);
+    const finish=dt(record.time).getTime(),finishWind=record.ibtracs_msw,baselineTime=finish-RI_WINDOW_MS;
+    // Some displayed tracks begin less than 24 hours before RI. Extend their
+    // first IBTrACS wind backward only for this calculation so the visible rise
+    // can still cross the 30 kt threshold.
+    const beginWind=baselineTime<firstTime?firstWind:interpolatedIbtracsWind(baselineTime);
     if(!Number.isFinite(finishWind)||!Number.isFinite(beginWind)||finishWind-beginWind<RI_THRESHOLD_MS)return[];
     const previous=index?dt(storm.records[index-1].time).getTime():finish;
     return[[Math.max(start,previous),Math.min(end,finish)]]
@@ -115,7 +122,13 @@ function rapidIntensificationIntervals(start,end){
     const previous=merged[merged.length-1];
     if(previous&&interval[0]<=previous[1])previous[1]=Math.max(previous[1],interval[1]);else merged.push(interval);
     return merged
-  },[])
+  },[]).map(([begin,finish])=>{
+    // A trailing 24-hour gain can remain above 30 kt after weakening starts.
+    // Shade only through the strongest IBTrACS point in the detected episode.
+    const episode=storm.records.filter(record=>{const time=dt(record.time).getTime();return time>=begin&&time<=finish&&Number.isFinite(record.ibtracs_msw)});
+    const peak=episode.reduce((best,record)=>!best||record.ibtracs_msw>best.ibtracs_msw?record:best,null);
+    return[begin,peak?dt(peak.time).getTime():finish]
+  }).filter(([begin,finish])=>finish>begin)
 }
 
 function predictionTimeDomain(){
