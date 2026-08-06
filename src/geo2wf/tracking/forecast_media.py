@@ -130,13 +130,17 @@ def log_wandb_ri_forecasts(
             label="UNet+MLP anchor",
         )
         axis.axvline(init, color="#555555", linewidth=1, alpha=0.7)
-        axis.axvspan(
-            onset,
-            init + timedelta(hours=12),
-            color="#E69F00",
-            alpha=0.14,
-            label="RI period",
-        )
+        plot_start = init - timedelta(hours=12)
+        plot_end = init + timedelta(hours=12)
+        shade_start = max(onset, plot_start)
+        if shade_start < plot_end:
+            axis.axvspan(
+                shade_start,
+                plot_end,
+                color="#E69F00",
+                alpha=0.14,
+                label="RI period",
+            )
         axis.set_title(f"{case['storm_id']} · initialization {init:%Y-%m-%d %H:%M UTC}")
         axis.set_ylabel("Maximum wind (m/s)")
         axis.grid(alpha=0.25)
@@ -145,7 +149,7 @@ def log_wandb_ri_forecasts(
         )
     axes[0, 0].legend(loc="best", ncol=3)
     axes[-1, 0].set_xlabel("UTC")
-    figure.suptitle("Recursive +6 h / +12 h forecasts before rapid intensification")
+    figure.suptitle("Recursive +6 h / +12 h forecasts around rapid intensification")
     figure.tight_layout()
 
     table_data = [
