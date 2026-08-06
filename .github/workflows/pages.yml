@@ -33,6 +33,11 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build documentation
+        env:
+          # Material for MkDocs 9.7.2+ emits an informational notice about
+          # MkDocs 2.0. The lockfile keeps this site on the compatible MkDocs
+          # 1.x line, so acknowledge the notice without hiding real warnings.
+          NO_MKDOCS_2_WARNING: "1"
         run: uv run --frozen --only-group docs mkdocs build --strict
 
       - name: Upload Pages artifact
