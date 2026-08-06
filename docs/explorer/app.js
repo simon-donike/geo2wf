@@ -204,6 +204,13 @@ function chart(metric,def){
 function forecastValue(point,source,metric){
   const value=point[source]?.[metric];return Number.isFinite(value)?value:null
 }
+function forecastReferenceAtTime(metric,time){
+  const rows=forecastPoints().map(point=>({time:dt(point.valid_time).getTime(),value:forecastValue(point,"ibtracs",metric)})).filter(point=>Number.isFinite(point.value));
+  if(!rows.length||time<rows[0].time||time>rows[rows.length-1].time)return null;
+  const rightIndex=rows.findIndex(point=>point.time>=time),right=rows[rightIndex];
+  if(right.time===time||rightIndex===0)return right.value;
+  const left=rows[rightIndex-1],fraction=(time-left.time)/(right.time-left.time);return left.value+fraction*(right.value-left.value)
+}
 function forecastPoints(){
   if(!forecastData?.points)return[];
   const start=dt(storm.start).getTime(),end=dt(storm.end).getTime();
@@ -255,12 +262,12 @@ function forecastChart(metric){
   if(metric==="max")nwpPoints(start,end).forEach((series,index)=>s.append(svg("path",{class:"nwp-path",d:segmentedForecastPath(series.points,point=>point.max,t=>x(t),y,point=>point.time),"stroke-dasharray":NWP_DASHES[index%NWP_DASHES.length],"aria-label":series.label})));
   const forecastPath=segmentedForecastPath(points,point=>forecastValue(point,"predicted",metric),x,y);if(forecastPath)s.append(svg("path",{class:"forecast-path",d:forecastPath}));
   const referencePath=segmentedForecastPath(points,point=>forecastValue(point,"ibtracs",metric),x,y);if(referencePath)s.append(svg("path",{class:"forecast-reference-path",d:referencePath}));
-  const issueLine=svg("line",{class:"cursor-line forecast-issue-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}),validLine=svg("line",{class:"forecast-valid-line",x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b,hidden:""}),activeReference=svg("circle",{class:"forecast-active-reference",r:4,hidden:""}),activeForecast=svg("circle",{class:"forecast-active-dot",r:4.5,hidden:""});s.append(issueLine,validLine,activeReference,activeForecast);
-  forecastChartState.push({metric,start,end,x,y,leadBand,validLine,activeReference,activeForecast});
+  const issueLine=svg("line",{class:"cursor-line forecast-issue-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}),validLine=svg("line",{class:"forecast-valid-line",x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b,hidden:""}),activeSegment=svg("line",{class:"forecast-active-segment",hidden:""}),hoverLine=svg("line",{class:"forecast-hover-line",x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b,hidden:""}),activeReference=svg("circle",{class:"forecast-active-reference",r:4,hidden:""}),activeForecast=svg("circle",{class:"forecast-active-dot",r:4.5,hidden:""});s.append(issueLine,validLine,activeSegment,hoverLine,activeReference,activeForecast);
+  forecastChartState.push({metric,start,end,x,y,leadBand,validLine,activeSegment,hoverLine,activeReference,activeForecast});
   card.querySelector(".chart").onpointermove=event=>{
-    const fraction=Math.max(0,Math.min(1,(chartPointerX(event.currentTarget,event)-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),point=points.reduce((best,item)=>Math.abs(dt(item.valid_time).getTime()-target)<Math.abs(dt(best.valid_time).getTime()-target)?item:best,points[0]);
+    const pointerX=Math.max(C.l,Math.min(C.w-C.r,chartPointerX(event.currentTarget,event))),fraction=(pointerX-C.l)/(C.w-C.l-C.r),target=start+fraction*(end-start),point=points.reduce((best,item)=>Math.abs(dt(item.valid_time).getTime()-target)<Math.abs(dt(best.valid_time).getTime()-target)?item:best,points[0]);
     if(!point)return;
-    const issue=dt(point.issue_time).getTime(),index=storm.records.reduce((best,record,i)=>Math.abs(dt(record.time).getTime()-issue)<Math.abs(dt(storm.records[best].time).getTime()-issue)?i:best,0);$("#timeSlider").value=index;current();updateForecastFocus(point);
+    const issue=dt(point.issue_time).getTime(),index=storm.records.reduce((best,record,i)=>Math.abs(dt(record.time).getTime()-issue)<Math.abs(dt(storm.records[best].time).getTime()-issue)?i:best,0);$("#timeSlider").value=index;current();updateForecastFocus(point,pointerX);
     const tip=$("#tooltip");tip.innerHTML=forecastTooltip(point,metric,def);tip.style.display="block";tip.style.left=Math.min(event.clientX+12,innerWidth-190)+"px";tip.style.top=event.clientY-70+"px"
   };
   card.querySelector(".chart").onpointerleave=()=>{$("#tooltip").style.display="none";current()};
@@ -271,17 +278,19 @@ function nearestForecastIssue(time){
   const point=forecastData.points.reduce((best,item)=>Math.abs(dt(item.issue_time).getTime()-time)<Math.abs(dt(best.issue_time).getTime()-time)?item:best,forecastData.points[0]);
   return Math.abs(dt(point.issue_time).getTime()-time)<=FORECAST_MATCH_MS?point:null
 }
-function updateForecastFocus(preferredPoint=null){
+function updateForecastFocus(preferredPoint=null,hoverX=null){
   if(graphMode!=="forecast"||!forecastData||!forecastChartState.length)return;
-  const hovered=Boolean(preferredPoint),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),point=preferredPoint||nearestForecastIssue(issueTime);
-  forecastChartState.forEach(state=>{state.validLine.classList.toggle("is-hovered",hovered);state.activeForecast.classList.toggle("is-hovered",hovered)});
-  if(!point){forecastChartState.forEach(state=>{state.validLine.hidden=true;state.leadBand.hidden=true;state.activeForecast.hidden=true;state.activeReference.hidden=true});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${forecastData.lead_hours} h forecast for ${full(record.time)}`;return}
+  const hovered=Boolean(preferredPoint)&&Number.isFinite(hoverX),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),point=preferredPoint||nearestForecastIssue(issueTime);
+  forecastChartState.forEach(state=>{state.hoverLine.hidden=!hovered;if(hovered){state.hoverLine.setAttribute("x1",hoverX);state.hoverLine.setAttribute("x2",hoverX)}});
+  if(!point){forecastChartState.forEach(state=>{state.validLine.hidden=true;state.leadBand.hidden=true;state.activeSegment.hidden=true;state.activeForecast.hidden=true;state.activeReference.hidden=true});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${forecastData.lead_hours} h forecast for ${full(record.time)}`;return}
   const validTime=dt(point.valid_time).getTime();
   forecastChartState.forEach(state=>{
     const validX=state.x(validTime),issueX=Math.max(C.l,Math.min(C.w-C.r,state.x(dt(point.issue_time).getTime()))),inside=validTime>=state.start&&validTime<=state.end;
     state.validLine.hidden=!inside;state.leadBand.hidden=!inside;
     if(inside){state.validLine.setAttribute("x1",validX);state.validLine.setAttribute("x2",validX);state.leadBand.setAttribute("x",Math.min(issueX,validX));state.leadBand.setAttribute("width",Math.abs(validX-issueX))}
-    [[state.activeForecast,"predicted"],[state.activeReference,"ibtracs"]].forEach(([dot,source])=>{const value=forecastValue(point,source,state.metric);dot.hidden=!inside||!Number.isFinite(value);if(!dot.hidden){dot.setAttribute("cx",validX);dot.setAttribute("cy",state.y(value))}})
+    [[state.activeForecast,"predicted"],[state.activeReference,"ibtracs"]].forEach(([dot,source])=>{const value=forecastValue(point,source,state.metric);dot.hidden=!inside||!Number.isFinite(value);if(!dot.hidden){dot.setAttribute("cx",validX);dot.setAttribute("cy",state.y(value))}});
+    const predicted=forecastValue(point,"predicted",state.metric),reference=forecastReferenceAtTime(state.metric,dt(point.issue_time).getTime());state.activeSegment.hidden=!inside||!Number.isFinite(predicted);
+    if(!state.activeSegment.hidden){state.activeSegment.setAttribute("x1",issueX);state.activeSegment.setAttribute("y1",state.y(Number.isFinite(reference)?reference:predicted));state.activeSegment.setAttribute("x2",validX);state.activeSegment.setAttribute("y2",state.y(predicted))}
   });
   $("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`Issued ${full(point.issue_time)} → Valid ${full(point.valid_time)} · +${forecastData.lead_hours} h`
 }
