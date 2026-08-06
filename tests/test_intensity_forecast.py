@@ -18,7 +18,13 @@ from geo2wf.data.intensity_forecast import (
     IntensityForecastDataSpec,
     forecast_features,
 )
-from geo2wf.models.intensity_forecast import IntensityForecastMLP
+from geo2wf.models.intensity_forecast import (
+    IntensityForecastMLP,
+    summarize_forecast_rows,
+)
+from geo2wf.tracking.forecast_full_storm_media import (
+    log_wandb_full_storm_forecasts,
+)
 from geo2wf.tracking.forecast_media import (
     log_wandb_ri_forecasts,
     recursive_ri_rows,
@@ -171,7 +177,7 @@ def _ri_cases() -> list[dict[str, object]]:
     return cases
 
 
-def test_ri_onset_and_case_selection_are_exact_and_bounded() -> None:
+def test_ri_onset_and_case_selection_prefers_latest_pre_onset() -> None:
     tracks = _ri_tracks()
     assert earliest_ri_onset(tracks, "WP282025") == pd.Timestamp("2025-01-01T00:00:00Z")
     rows = []
@@ -190,6 +196,24 @@ def test_ri_onset_and_case_selection_are_exact_and_bounded() -> None:
         "WP112024",
         "AL092024",
     ]
+    assert all(
+        case["initialization_selection"] == "latest_at_or_before_ri_onset"
+        for case in selected
+    )
+
+
+def test_ri_case_selection_falls_back_to_earliest_row_after_onset() -> None:
+    tracks = _ri_tracks()
+    row = {
+        **_ri_cases()[0],
+        "sample_id": "later-sample",
+        "init_timestamp": "2025-01-01T06:00:00+00:00",
+        "split": "val",
+        "target_wind_ms": 24.0,
+    }
+    selected = select_ri_validation_cases([row], tracks, storm_ids=("WP282025",))
+    assert selected[0]["sample_id"] == "later-sample"
+    assert selected[0]["initialization_selection"] == "earliest_after_ri_onset"
 
 
 def test_wandb_ri_media_logs_three_storms_and_two_horizons(monkeypatch) -> None:
@@ -228,6 +252,56 @@ def test_wandb_ri_media_logs_three_storms_and_two_horizons(monkeypatch) -> None:
     assert set(plt.get_fignums()) == before
     rows = recursive_ri_rows(model, _ri_cases())
     assert {row["horizon_hours"] for row in rows} == {6, 12}
+
+
+def test_wandb_full_storm_media_logs_every_validation_row(monkeypatch) -> None:
+    model = IntensityForecastMLP(hidden_features=(8, 4), dropout=0.0)
+    logged = []
+
+    class Experiment:
+        def log(self, payload, step):
+            logged.append((payload, step))
+
+    class Image:
+        def __init__(self, figure):
+            self.figure = figure
+
+    class Table:
+        def __init__(self, *, columns, data):
+            self.columns = columns
+            self.data = data
+
+    monkeypatch.setitem(sys.modules, "wandb", SimpleNamespace(Image=Image, Table=Table))
+    model._trainer = SimpleNamespace(
+        is_global_zero=True,
+        sanity_checking=False,
+        loggers=[SimpleNamespace(experiment=Experiment())],
+    )
+    rows = [
+        {
+            "storm_id": storm,
+            "sample_id": f"{storm}-{index}",
+            "init_timestamp": f"2025-01-0{index + 1}T00:00:00Z",
+            "prediction_ms": 21.0 + index,
+            "target_ms": 22.0 + index,
+            "persistence_ms": 20.0 + index,
+            "trend_ms": 23.0 + index,
+            "predicted_delta_ms": 1.0,
+        }
+        for index, storm in enumerate(("AL012025", "WP012025"))
+    ]
+    before = set(plt.get_fignums())
+    log_wandb_full_storm_forecasts(model, rows, summarize_forecast_rows(rows))
+    assert len(logged) == 1
+    payload, _ = logged[0]
+    assert set(payload) == {
+        "val/full_storm_forecasts",
+        "val/full_storm_predictions",
+        "val/per_storm_metrics",
+    }
+    assert len(payload["val/full_storm_predictions"].data) == len(rows)
+    assert len(payload["val/per_storm_metrics"].data) == 2
+    assert set(plt.get_fignums()) == before
 
 
 def _write_cache_split(root: Path, split: str, storm: str) -> None:

@@ -300,24 +300,27 @@ def select_ri_validation_cases(
     matched_val_rows: list[dict[str, Any]],
     tracks: pd.DataFrame,
     storm_ids: Iterable[str] = RI_STORM_IDS,
-    maximum_lead_hours: float = 6.0,
 ) -> list[dict[str, Any]]:
     frame = pd.DataFrame(matched_val_rows)
     frame["_init"] = pd.to_datetime(frame["init_timestamp"], utc=True)
     cases = []
     for storm_id in storm_ids:
         onset = earliest_ri_onset(tracks, storm_id)
-        candidates = frame.loc[
-            (frame["storm_id"] == storm_id) & (frame["_init"] <= onset)
-        ].sort_values("_init")
+        storm_rows = frame.loc[frame["storm_id"] == storm_id].sort_values("_init")
+        target_12_values = pd.to_numeric(
+            storm_rows["target_plus_12h_wind_ms"], errors="coerce"
+        )
+        storm_rows = storm_rows.loc[np.isfinite(target_12_values)]
+        candidates = storm_rows.loc[storm_rows["_init"] <= onset]
         if candidates.empty:
-            raise ValueError(f"{storm_id} has no matched validation row before RI")
-        row = candidates.iloc[-1]
-        gap_hours = (onset - row["_init"]).total_seconds() / 3600.0
-        if gap_hours > maximum_lead_hours:
-            raise ValueError(
-                f"{storm_id} nearest pre-RI row is {gap_hours:.1f} h before onset"
-            )
+            candidates = storm_rows.loc[storm_rows["_init"] > onset]
+            if candidates.empty:
+                raise ValueError(f"{storm_id} has no matched validation row")
+            row = candidates.iloc[0]
+            initialization_selection = "earliest_after_ri_onset"
+        else:
+            row = candidates.iloc[-1]
+            initialization_selection = "latest_at_or_before_ri_onset"
         target_12 = pd.to_numeric(row["target_plus_12h_wind_ms"], errors="coerce")
         if not np.isfinite(target_12):
             raise ValueError(f"{storm_id} RI row has no +12 h wind target")
@@ -327,6 +330,7 @@ def select_ri_validation_cases(
                 "sample_id": str(row["sample_id"]),
                 "init_timestamp": row["_init"].isoformat(),
                 "ri_onset_timestamp": onset.isoformat(),
+                "initialization_selection": initialization_selection,
                 "anchor_wind_ms": float(row["anchor_wind_ms"]),
                 "current_ibtracs_wind_ms": float(row["current_ibtracs_wind_ms"]),
                 "wind_minus_6h_ms": float(row["wind_minus_6h_ms"]),
@@ -417,7 +421,10 @@ def export_forecast_cache(args: argparse.Namespace) -> dict[str, Any]:
         "ri_definition": {
             "threshold_kt": RI_THRESHOLD_KT,
             "window_hours": RI_WINDOW_HOURS,
-            "maximum_pre_onset_gap_hours": 6.0,
+            "initialization_policy": (
+                "latest matched row at or before RI onset; otherwise earliest "
+                "matched row after onset"
+            ),
         },
         "ri_validation_cases": ri_cases,
         "ibtracs": {

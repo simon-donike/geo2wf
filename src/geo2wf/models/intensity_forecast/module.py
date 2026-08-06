@@ -17,6 +17,9 @@ from geo2wf.data.intensity_forecast import (
     FORECAST_FEATURE_NAMES,
     IntensityForecastDataSpec,
 )
+from geo2wf.tracking.forecast_full_storm_media import (
+    log_wandb_full_storm_forecasts,
+)
 from geo2wf.tracking.forecast_media import log_wandb_ri_forecasts
 
 
@@ -94,6 +97,7 @@ class IntensityForecastMLP(pl.LightningModule):
         lr_scheduler_factor: float = 0.5,
         lr_scheduler_patience: int = 10,
         lr_scheduler_min_lr: float = 1.0e-6,
+        log_wandb_full_storm_media: bool = True,
         log_wandb_ri_media: bool = True,
     ) -> None:
         super().__init__()
@@ -110,6 +114,7 @@ class IntensityForecastMLP(pl.LightningModule):
         self.lr_scheduler_factor = float(lr_scheduler_factor)
         self.lr_scheduler_patience = int(lr_scheduler_patience)
         self.lr_scheduler_min_lr = float(lr_scheduler_min_lr)
+        self.log_wandb_full_storm_media = bool(log_wandb_full_storm_media)
         self.log_wandb_ri_media = bool(log_wandb_ri_media)
         self.register_buffer("feature_mean", torch.zeros(self.feature_count))
         self.register_buffer("feature_std", torch.ones(self.feature_count))
@@ -333,6 +338,8 @@ class IntensityForecastMLP(pl.LightningModule):
                 prog_bar=name in {"mae_ms", "storm_macro_mae_ms"},
                 sync_dist=False,
             )
+        if prefix == "val" and self.log_wandb_full_storm_media:
+            log_wandb_full_storm_forecasts(self, rows, summary, prefix=prefix)
         if prefix == "val" and self.log_wandb_ri_media:
             datamodule = getattr(self.trainer, "datamodule", None)
             cases = getattr(datamodule, "ri_rollout_cases", [])

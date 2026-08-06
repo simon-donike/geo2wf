@@ -6,7 +6,7 @@ defaults:
 model:
   lr: 0.0001
 trainer:
-  max_epochs: 100
+  max_epochs: 1000
   checkpoint:
     monitor: val/storm_macro_mae_ms
     mode: min
@@ -17,4 +17,4 @@ logging:
     name: intensity-forecast-unet-mlp-finetune
     project: geo2wf
     enabled: true
-    log_model: true
+    log_model: false

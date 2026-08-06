@@ -41,9 +41,12 @@ the two consecutive six-hour changes. Validation reports MAE, RMSE, bias,
 storm-macro MAE, persistence, and recent-trend baselines.
 
 Each fine-tuning validation epoch also performs a recursive +6 h/+12 h rollout
-for `WP282025`, `WP112024`, and `AL092024`. W&B receives a three-panel RI plot
-and a six-row forecast table. The observed +6 h intensity is never fed into the
-second forecast step.
+for `WP282025`, `WP112024`, and `AL092024`. For each storm, initialization is
+the latest usable matched sample at or before RI onset. If no pre-onset sample
+exists, selection falls back to the earliest usable sample after onset, so the
+two-step diagnostic can begin inside the RI period. W&B receives a three-panel
+RI plot and a six-row forecast table. The observed +6 h intensity is never fed
+into the second forecast step.
 
 ## Evaluate and infer
 
