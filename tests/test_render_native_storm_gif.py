@@ -1,9 +1,11 @@
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -17,7 +19,10 @@ from scripts.render_native_storm_gif import (  # noqa: E402
     dense_pmw_field,
     dense_pmw_table,
     pmw_panel,
+    recenter_geolocation,
+    synthetic_pmw_grid,
 )
+import scripts.render_native_storm_gif as renderer  # noqa: E402
 
 
 def test_pmw_panel_uses_purple_to_yellow_palette() -> None:
@@ -54,10 +59,92 @@ def test_dense_pmw_loader_reads_sharded_synthetic_layout(tmp_path: Path) -> None
             }
         ]
     ).to_csv(manifest_path, index=False)
+    sidecar_path = tmp_path / "geolocation" / storm / "frame.npz"
+    sidecar_path.parent.mkdir(parents=True)
+    expected_lat = np.array([[11.0, 11.1, 11.2], [10.0, 10.1, 10.2]])
+    expected_lon = np.array([[-51.0, -50.0, -49.0], [-50.9, -49.9, -48.9]])
+    np.savez_compressed(
+        sidecar_path,
+        grid_lat=expected_lat,
+        grid_lon=expected_lon,
+        observation_id=np.asarray("synthetic-frame"),
+        template_observation_id=np.asarray("template-frame"),
+        target_center=np.asarray([10.0, -50.0]),
+    )
 
     table = dense_pmw_table(tmp_path, storm)
+    table.loc[0, "observation_id"] = "synthetic-frame"
     field, lat, lon, center = dense_pmw_field(table.iloc[0], tmp_path, storm)
 
     assert np.array_equal(field, np.full((2, 3), 3, dtype=np.float32))
-    assert lat.shape == lon.shape == field.shape
+    assert np.array_equal(lat, expected_lat)
+    assert np.array_equal(lon, expected_lon)
     assert center == (10.0, -50.0)
+
+
+def test_dense_pmw_loader_does_not_invent_geolocation(tmp_path: Path) -> None:
+    storm = "EP182023"
+    tensor_path = tmp_path / "observations" / storm / "frame.pt"
+    tensor_path.parent.mkdir(parents=True)
+    torch.save(torch.zeros((4, 2, 3)), tensor_path)
+    row = pd.Series(
+        {
+            "observation_id": "synthetic-frame",
+            "path": str(tensor_path.relative_to(tmp_path)),
+            "variables": json.dumps(
+                ["TB_36.5H", "TB_36.5V", "TB_A89.0H", "TB_A89.0V"]
+            ),
+            "target_grid_template_observation_id": "template-frame",
+            "ibtracs_center_lat": 10.0,
+            "ibtracs_center_lon": -50.0,
+        }
+    )
+
+    with pytest.raises(KeyError, match="template observation is unavailable"):
+        dense_pmw_field(row, tmp_path, storm)
+
+
+def test_template_swath_orientation_is_preserved(monkeypatch) -> None:
+    template_lat = np.array([[12.0, 11.4, 10.7], [11.1, 10.2, 9.3]])
+    template_lon = np.array([[-52.0, -50.5, -49.0], [-51.6, -50.1, -48.7]])
+    template = SimpleNamespace(
+        observation_id="template-frame",
+        sensor="AMSR2_GCOMW1",
+        ibtracs_center=(10.0, -50.0),
+    )
+    row = SimpleNamespace(
+        observation_id="synthetic-frame",
+        target_grid_template_observation_id="template-frame",
+        ibtracs_center_lat=10.0,
+        ibtracs_center_lon=-50.0,
+    )
+
+    monkeypatch.setattr(
+        renderer,
+        "_load_pmw_channels",
+        lambda observation, channels: {
+            channels[0]: (np.zeros_like(template_lat), template_lat, template_lon)
+        },
+    )
+    lat, lon, center, template_id = synthetic_pmw_grid(
+        row, {"template-frame": template}, {}
+    )
+
+    assert np.array_equal(lat, template_lat)
+    assert np.array_equal(lon, template_lon)
+    assert center == (10.0, -50.0)
+    assert template_id == "template-frame"
+
+
+def test_recenter_geolocation_moves_center_without_flipping_grid() -> None:
+    lat = np.array([[11.0, 11.0], [9.0, 9.0]])
+    lon = np.array([[-51.0, -49.0], [-51.0, -49.0]])
+
+    moved_lat, moved_lon = recenter_geolocation(
+        lat, lon, (10.0, -50.0), (20.0, -70.0)
+    )
+
+    assert moved_lat[0].mean() > moved_lat[1].mean()
+    assert moved_lon[:, 0].mean() < moved_lon[:, 1].mean()
+    assert moved_lat.mean() == pytest.approx(20.0, abs=0.02)
+    assert moved_lon.mean() == pytest.approx(-70.0, abs=0.02)

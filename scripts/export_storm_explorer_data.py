@@ -31,12 +31,14 @@ UNET_ROOT = ROOT / "inference" / "inf_unet"
 UNET_MLP_ROOT = ROOT / "inference" / "inf_unet_mlp"
 DIFFUSION_ROOT = ROOT / "inference" / "inf_diffusion"
 NWP_ROOT = ROOT / "inference" / "NWP"
+FORECAST_ROOT = ROOT / "inference" / "forecasts"
 RAW_INPUT_ROOT = ROOT / "inference" / "inf_data"
 RAW_MANIFEST = RAW_INPUT_ROOT / "index-files" / "observation_manifest_v6.csv"
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
 PMW_IMAGE_DIR = OUTPUT_PATH.parent / "pmw"
 GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
+FORECAST_OUTPUT_DIR = OUTPUT_PATH.parent / "forecasts"
 CORE_RADIUS_KM = 100.0
 RMW_BIN_KM = 10.0
 SAR_SCALE_MIN_MS = 0.0
@@ -62,10 +64,197 @@ NWP_LABELS = {
     "pangu": "Pangu",
 }
 
+FORECAST_QUADRANTS = ("ne", "se", "sw", "nw")
+FORECAST_RADII = ("r34", "r50", "r64")
+
 
 def finite_number(value):
     value = float(value)
     return round(value, 3) if math.isfinite(value) else None
+
+
+def utc_isoformat(value):
+    """Return a browser-safe UTC timestamp and reject unusable source values."""
+    timestamp = pd.Timestamp(value)
+    if pd.isna(timestamp):
+        raise ValueError(f"Invalid forecast timestamp: {value!r}")
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.tz_localize("UTC")
+    else:
+        timestamp = timestamp.tz_convert("UTC")
+    return timestamp.isoformat().replace("+00:00", "Z")
+
+
+def _forecast_valid(row, column):
+    value = row[column]
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    return str(value).strip().lower() == "true"
+
+
+def _forecast_value(row, prefix, metric):
+    value_column = f"{prefix}_{metric}"
+    valid_column = f"{value_column}_valid"
+    if not _forecast_valid(row, valid_column) or pd.isna(row[value_column]):
+        return None
+    return finite_number(row[value_column])
+
+
+def _forecast_metrics(row, prefix, *, filter_predicted_rmw=False):
+    metrics = {
+        "max": _forecast_value(row, prefix, "max_wind_m_s"),
+        "rmw": _forecast_value(row, prefix, "rmw_km"),
+    }
+    if filter_predicted_rmw and (metrics["rmw"] is None or metrics["rmw"] < 10.0):
+        metrics["rmw"] = None
+    for radius in FORECAST_RADII:
+        metrics[radius] = {
+            quadrant: _forecast_value(row, prefix, f"{radius}_{quadrant}_km")
+            for quadrant in FORECAST_QUADRANTS
+        }
+    return metrics
+
+
+def _forecast_columns():
+    columns = {
+        "storm_id",
+        "reference_timestamp",
+        "target_timestamp",
+        "target_provenance",
+    }
+    metric_names = ["max_wind_m_s", "rmw_km"] + [
+        f"{radius}_{quadrant}_km"
+        for radius in FORECAST_RADII
+        for quadrant in FORECAST_QUADRANTS
+    ]
+    for prefix in ("predicted", "ibtracs", "sar_derived"):
+        for metric in metric_names:
+            columns.add(f"{prefix}_{metric}")
+            columns.add(f"{prefix}_{metric}_valid")
+    return columns
+
+
+def build_forecast_export(storm_id):
+    """Build compact browser forecast data, or return ``(None, None)``."""
+    storm_dir = FORECAST_ROOT / storm_id
+    if not storm_dir.exists():
+        return None, None
+    samples_path = storm_dir / "samples.csv"
+    summary_path = storm_dir / "summary.json"
+    if not samples_path.is_file() or not summary_path.is_file():
+        raise ValueError(
+            f"Forecast directory for {storm_id} must contain samples.csv and summary.json"
+        )
+
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as error:
+        raise ValueError(f"Could not read forecast summary for {storm_id}") from error
+    required_summary = {
+        "storm_id",
+        "split",
+        "evaluated_samples",
+        "window_hours",
+        "window_length",
+        "forecast_lead_hours",
+    }
+    missing_summary = required_summary - set(summary)
+    if missing_summary:
+        raise ValueError(
+            f"Forecast summary for {storm_id} is missing {sorted(missing_summary)}"
+        )
+    if summary["storm_id"] != storm_id:
+        raise ValueError(
+            f"Forecast summary storm {summary['storm_id']} does not match {storm_id}"
+        )
+
+    table = pd.read_csv(samples_path)
+    missing_columns = _forecast_columns() - set(table.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Forecast samples for {storm_id} are missing {sorted(missing_columns)}"
+        )
+    if table.empty:
+        raise ValueError(f"Forecast samples for {storm_id} are empty")
+    sample_storms = set(table["storm_id"].dropna().astype(str))
+    if sample_storms != {storm_id}:
+        raise ValueError(
+            f"Forecast samples for {storm_id} contain storm IDs {sorted(sample_storms)}"
+        )
+    if int(summary["evaluated_samples"]) != len(table):
+        raise ValueError(
+            f"Forecast summary for {storm_id} reports {summary['evaluated_samples']} "
+            f"samples but samples.csv contains {len(table)}"
+        )
+
+    lead_hours = finite_number(summary["forecast_lead_hours"])
+    window_hours = finite_number(summary["window_hours"])
+    window_length = int(summary["window_length"])
+    if lead_hours != 12.0 or window_hours != 12.0 or window_length != 12:
+        raise ValueError(
+            f"Forecast bundle for {storm_id} must use a 12-hour lead and "
+            "12-observation context window"
+        )
+
+    points = []
+    for _, row in table.iterrows():
+        issue_time = utc_isoformat(row["reference_timestamp"])
+        valid_time = utc_isoformat(row["target_timestamp"])
+        actual_lead_hours = (
+            pd.Timestamp(valid_time) - pd.Timestamp(issue_time)
+        ).total_seconds() / 3600.0
+        if not math.isclose(actual_lead_hours, lead_hours, abs_tol=1 / 3600):
+            raise ValueError(
+                f"Forecast sample for {storm_id} has a {actual_lead_hours:g}-hour "
+                f"lead instead of {lead_hours:g} hours"
+            )
+        sar = _forecast_metrics(row, "sar_derived")
+        if not any(
+            value is not None for key, value in sar.items() if key in ("max", "rmw")
+        ) and not any(
+            value is not None
+            for radius in FORECAST_RADII
+            for value in sar[radius].values()
+        ):
+            sar = None
+        points.append(
+            {
+                "issue_time": issue_time,
+                "valid_time": valid_time,
+                "target_source": str(row["target_provenance"]).lower(),
+                "predicted": _forecast_metrics(
+                    row, "predicted", filter_predicted_rmw=True
+                ),
+                "ibtracs": _forecast_metrics(row, "ibtracs"),
+                "sar": sar,
+            }
+        )
+    points.sort(key=lambda point: point["valid_time"])
+
+    payload = {
+        "storm_id": storm_id,
+        "lead_hours": lead_hours,
+        "points": points,
+    }
+    metadata = {
+        "file": f"forecasts/{storm_id}.json",
+        "lead_hours": lead_hours,
+        "window_hours": window_hours,
+        "window_length": window_length,
+        "split": str(summary["split"]),
+        "count": len(points),
+    }
+    return metadata, payload
+
+
+def export_forecast(storm_id):
+    metadata, payload = build_forecast_export(storm_id)
+    if metadata is None:
+        return None
+    FORECAST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = FORECAST_OUTPUT_DIR / f"{storm_id}.json"
+    output_path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    return metadata
 
 
 def field_metrics(field, mask, distance):
@@ -612,11 +801,14 @@ def main():
     SAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     PMW_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     GEO_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    FORECAST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for existing in GEO_IMAGE_DIR.glob("*.webp"):
         existing.unlink()
     for existing in SAR_IMAGE_DIR.glob("*.png"):
         existing.unlink()
     for existing in PMW_IMAGE_DIR.glob("*.png"):
+        existing.unlink()
+    for existing in FORECAST_OUTPUT_DIR.glob("*.json"):
         existing.unlink()
     storm_ids = manifest_storm_ids()
     storms = [export_storm(storm_id) for storm_id in storm_ids]
@@ -624,6 +816,9 @@ def main():
     for storm in storms:
         storm["pmw_observations"] = export_pmw_observations(storm, raw_records)
         storm["pmw_matches"] = len(storm["pmw_observations"])
+        forecast = export_forecast(storm["id"])
+        if forecast is not None:
+            storm["forecast"] = forecast
     payload = {
         "generated_from": [
             "inference/inf_vit",
@@ -631,6 +826,7 @@ def main():
             "inference/inf_unet_mlp",
             "inference/inf_diffusion",
             "inference/NWP",
+            "inference/forecasts",
         ],
         "geo_interval_hours": 3,
         "postprocessing": {
@@ -692,7 +888,7 @@ def main():
     }
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     print(
-        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, and {sum(s['pmw_matches'] for s in storms)} PMW overlays"
+        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, {sum(s['pmw_matches'] for s in storms)} PMW overlays, and {sum(s.get('forecast', {}).get('count', 0) for s in storms)} forecasts"
     )
 
 
