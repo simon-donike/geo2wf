@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20260806-2">
+  <link rel="stylesheet" href="styles.css?v=20260806-3">
 </head>
 <body class="earth-systems-lab">
 <header class="topbar">
@@ -47,7 +47,7 @@
     <p class="inference-notice" id="inferenceNotice" hidden><strong>Observations available</strong><span>Model inference is pending for this storm.</span></p>
     <p class="forecast-notice" id="forecastNotice" hidden><strong>Forecast unavailable</strong><span id="forecastNoticeText">Could not load forecast data.</span><button id="retryForecast" type="button">Retry</button></p>
     <div class="legend" id="nowcastLegend"><span id="predictionLegendItem"><i class="geo-line"></i> <b id="predictionLegend">ViT</b></span><span><i class="sar-line"></i> SAR-derived WF</span><span><i class="ibtracs-line"></i> IBTrACS MSW / class</span><span class="nwp-legend-item" hidden><i class="nwp-line"></i> NWP forecasts</span><span><i class="ri-swatch"></i> IBTrACS rapid intensification</span><small>Hatching: IBTrACS rise ≥30 kt/24 h · Gray dashes: SAR interpolation</small></div>
-    <div class="legend" id="forecastLegend" hidden><span><i class="forecast-line-key"></i> <b id="forecastPredictionLegend">ConvLSTM +12 h</b></span><span><i class="ibtracs-line"></i> IBTrACS</span><span class="nwp-legend-item" hidden><i class="nwp-line"></i> NWP full-track run</span><small>Map time is issue time · highlight is valid 12 hours later</small></div>
+    <div class="legend" id="forecastLegend" hidden><span><i class="forecast-line-key"></i> <b id="forecastPredictionLegend">ConvLSTM +12 h</b></span><span><i class="ibtracs-line"></i> IBTrACS</span><span><i class="ri-swatch"></i> IBTrACS rapid intensification</span><span class="nwp-legend-item" hidden><i class="nwp-line"></i> NWP full-track run</span><small>Map time is issue time · highlight is valid 12 hours later</small></div>
     <p class="forecast-status" id="forecastStatus" aria-live="polite" hidden>Loading forecast data…</p>
     <section id="charts" class="charts"></section>
     <p class="method-note" id="nowcastMethodNote">Graphs compare the selected model with SAR and IBTrACS. RMW below 10 km is omitted; post-processing applies a six-hour median.</p>
