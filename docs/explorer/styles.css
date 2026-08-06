@@ -277,6 +277,12 @@ a:focus-visible {
   letter-spacing: -0.03em;
 }
 
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .storm-switcher {
   min-width: 230px;
 }
@@ -550,6 +556,10 @@ a:focus-visible {
   color: var(--secondary);
   background: var(--accent);
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.map-controls .mode-switch {
+  margin: 0;
 }
 
 .mode-switch button:disabled {
@@ -1366,9 +1376,26 @@ dialog #confirmDialog:hover {
     font-size: 19px;
   }
 
+  .map-heading {
+    flex-wrap: wrap;
+  }
+
+  .map-controls {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .map-controls .mode-switch {
+    width: auto;
+    grid-template-columns: repeat(2, minmax(60px, 1fr));
+  }
+
   .storm-switcher {
-    width: 50%;
-    min-width: 145px;
+    width: auto;
+    min-width: 0;
+    flex: 1;
   }
 
   .storm-switcher select {
