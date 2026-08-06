@@ -520,6 +520,99 @@ a:focus-visible {
   font-weight: 600;
 }
 
+.mode-switch {
+  width: fit-content;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(78px, 1fr));
+  align-self: center;
+  flex: none;
+  margin: -2px 0 8px;
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+}
+
+.mode-switch button {
+  padding: 6px 14px;
+  color: var(--tint-40);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mode-switch button[aria-selected="true"] {
+  color: var(--secondary);
+  background: var(--accent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.mode-switch button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.forecast-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.forecast-toolbar span {
+  padding: 6px 9px;
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--system-blue) 16%, var(--tint-90));
+  border: 1px solid color-mix(in srgb, var(--system-blue) 35%, var(--divider));
+  border-radius: 999px;
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.forecast-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  color: var(--tint-30);
+  background: color-mix(in srgb, #db604e 12%, var(--tint-90));
+  border: 1px solid color-mix(in srgb, #db604e 45%, var(--divider));
+  border-radius: 13px;
+  font-size: 8px;
+}
+
+.forecast-notice strong {
+  color: var(--secondary);
+}
+
+.forecast-notice button {
+  margin-left: auto;
+  padding: 5px 9px;
+  color: var(--secondary);
+  background: var(--tint-80);
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  font-size: 7px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.forecast-status {
+  flex: none;
+  margin: 0 0 6px;
+  color: var(--system-blue);
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .model-toolbar,
 .graph-toolbar {
   display: flex;
@@ -671,6 +764,42 @@ a:focus-visible {
   overflow: visible;
 }
 
+.structure-selector {
+  padding: 2px;
+  display: flex;
+  background: var(--main);
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+}
+
+.structure-selector button {
+  padding: 3px 7px;
+  color: var(--tint-40);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 6px;
+  font-weight: 750;
+}
+
+.structure-selector button[aria-selected="true"] {
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--system-blue) 32%, var(--tint-90));
+}
+
+.forecast-placeholder {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--tint-40);
+  font-size: 9px;
+  text-align: center;
+}
+
+.forecast-placeholder strong {
+  color: var(--secondary);
+}
+
 .ri-region {
   fill-opacity: 0.13;
 }
@@ -703,6 +832,70 @@ a:focus-visible {
   fill: none;
   stroke: var(--accent);
   stroke-width: 2.2;
+}
+
+.forecast-line-key {
+  background: var(--system-blue);
+}
+
+.forecast-band-key {
+  height: 8px !important;
+  background: color-mix(in srgb, var(--system-blue) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--system-blue) 65%, transparent);
+}
+
+.forecast-lead-band {
+  fill: var(--system-blue);
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+.forecast-quadrant-band {
+  fill: var(--system-blue);
+  fill-opacity: 0.16;
+  stroke: none;
+  pointer-events: none;
+}
+
+.forecast-path {
+  fill: none;
+  stroke: var(--system-blue);
+  stroke-width: 2.2;
+}
+
+.forecast-reference-path {
+  fill: none;
+  stroke: var(--ibtracs);
+  stroke-width: 1.5;
+}
+
+.forecast-sar-dot {
+  fill: var(--tint-90);
+  stroke: var(--sar);
+  stroke-width: 2;
+}
+
+.forecast-valid-line {
+  stroke: var(--system-blue);
+  stroke-width: 1.3;
+  stroke-dasharray: 5 3;
+}
+
+.forecast-active-dot {
+  fill: var(--tint-90);
+  stroke: var(--system-blue);
+  stroke-width: 2.5;
+}
+
+.forecast-active-reference {
+  fill: var(--ibtracs);
+  stroke: var(--main);
+  stroke-width: 1.5;
+}
+
+.forecast-issue-line {
+  stroke: var(--accent);
+  stroke-width: 1.2;
 }
 
 .nwp-path {

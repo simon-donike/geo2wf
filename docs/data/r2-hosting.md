@@ -34,7 +34,7 @@ uv run python scripts/export_storm_explorer_data.py
 ./scripts/sync_explorer_to_r2.sh 2026-07-30
 ```
 
-This publishes the GEO, SAR, and PMW overlays plus `storm-data.json` under `explorer/releases/2026-07-30/`, then advances `explorer/latest.json`. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
+This publishes the GEO, SAR, and PMW overlays, lazy-loaded per-storm forecast JSON, and `storm-data.json` under `explorer/releases/2026-07-30/`, then advances `explorer/latest.json`. Forecast files are uploaded before the manifest that references them, and `latest.json` is advanced last. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
 
 Point the website at the public URL in `docs/explorer/data-config.js`:
 

@@ -14,7 +14,7 @@ if [[ ! "${version}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "error: version may contain only letters, numbers, dot, underscore, and dash" >&2
   exit 1
 fi
-for required in storm-data.json geo sar pmw; do
+for required in storm-data.json geo sar pmw forecasts; do
   if [[ ! -e "${source_dir}/${required}" ]]; then
     echo "error: missing ${source_dir}/${required}" >&2
     exit 1
@@ -28,6 +28,7 @@ echo "Uploading explorer data to ${destination}"
 rclone copy "${source_dir}/geo" "${destination}/geo" --include "*.webp"
 rclone copy "${source_dir}/sar" "${destination}/sar" --include "*.png"
 rclone copy "${source_dir}/pmw" "${destination}/pmw" --include "*.png"
+rclone copy "${source_dir}/forecasts" "${destination}/forecasts" --include "*.json"
 rclone copyto "${source_dir}/storm-data.json" "${destination}/storm-data.json"
 
 pointer_file="$(mktemp)"
