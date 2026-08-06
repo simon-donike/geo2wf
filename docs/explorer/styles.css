@@ -902,21 +902,23 @@ a:focus-visible {
 }
 
 .forecast-active-dot {
-  fill: var(--tint-90);
-  stroke: var(--accent);
-  stroke-width: 2.5;
-}
-.forecast-valid-line.is-hovered {
-  stroke: var(--forecast-hover);
-  stroke-width: 1.9;
-  stroke-dasharray: none;
-}
-
-.forecast-active-dot.is-hovered {
   fill: var(--forecast-hover);
   stroke: var(--secondary);
   stroke-width: 2;
   filter: drop-shadow(0 0 4px var(--forecast-hover));
+}
+
+.forecast-active-segment {
+  stroke: var(--forecast-hover);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.forecast-hover-line {
+  stroke: var(--forecast-hover);
+  stroke-width: 1.4;
+  pointer-events: none;
 }
 
 
