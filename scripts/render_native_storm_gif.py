@@ -18,7 +18,7 @@ PMW_LOW=np.array([45,0,75],np.float32); PMW_MID=np.array([204,71,120],np.float32
 DATA=ROOT/'inference/inf_data'; MAN=DATA/'index-files/observation_manifest_v6.csv'
 OUT=ROOT/'docs/assets/images/longest-storm-native.gif'; WORLD=ROOT/'scripts/assets/naturalearth-lowres.geojson'
 def args():
- p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=DATA); p.add_argument('--manifest',type=Path,default=MAN); p.add_argument('--output',type=Path,default=OUT); p.add_argument('--world-map',type=Path,default=WORLD); p.add_argument('--storm',default='EP182023'); p.add_argument('--fps',type=float,default=10); p.add_argument('--duration',type=float,default=15); p.add_argument('--geo-crop-size',type=int,default=256); p.add_argument('--sar-max',type=float); p.add_argument('--dense-pmw-root',type=Path); p.add_argument('--dense-pmw-geolocation-root',type=Path,help='Directory containing explicit grid_lat/grid_lon sidecars. Defaults to DENSE_PMW_ROOT/geolocation.'); p.add_argument('--dense-wind-root',type=Path); p.add_argument('--vit-wind-root',type=Path); return p.parse_args()
+ p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=DATA); p.add_argument('--manifest',type=Path,default=MAN); p.add_argument('--output',type=Path,default=OUT); p.add_argument('--world-map',type=Path,default=WORLD); p.add_argument('--storm',default='EP182023'); p.add_argument('--fps',type=float,default=10); p.add_argument('--duration',type=float,default=15); p.add_argument('--geo-crop-size',type=int,default=256); p.add_argument('--sar-max',type=float); p.add_argument('--dense-pmw-root',type=Path); p.add_argument('--dense-pmw-geolocation-root',type=Path,help='Directory containing explicit grid_lat/grid_lon sidecars. Defaults to DENSE_PMW_ROOT/geolocation.'); p.add_argument('--match-sar-footprint',action=argparse.BooleanOptionalAction,default=True,help='Clip PMW to the regridded SAR support wherever SAR is available.'); p.add_argument('--dense-wind-root',type=Path); p.add_argument('--vit-wind-root',type=Path); return p.parse_args()
 def font(n):
  for p in ('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf','/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf'):
   if Path(p).exists(): return ImageFont.truetype(p,n)
@@ -27,6 +27,10 @@ def temp_panel(f,m):
  f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); v=np.nan_to_num(np.clip((f-TMIN)/(TMAX-TMIN),0,1)); rgb=np.array([255,255,255],np.float32)+v[...,None]*(np.array([22,82,180])-np.array([255,255,255])); rgb[~m]=BLACK; return Image.fromarray(rgb.astype(np.uint8)).resize((S,S),Image.Resampling.LANCZOS)
 def pmw_panel(f,m):
  f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); v=np.nan_to_num(np.clip((f-TMIN)/(TMAX-TMIN),0,1)); low=PMW_LOW+v[...,None]*2*(PMW_MID-PMW_LOW); high=PMW_MID+(v[...,None]-.5)*2*(PMW_HIGH-PMW_MID); rgb=np.where((v<=.5)[...,None],low,high).astype(np.uint8); rgb[~m]=BLACK; return Image.fromarray(rgb).resize((S,S),Image.Resampling.LANCZOS)
+def shared_footprint_mask(source_mask,reference_mask):
+ source_mask=np.asarray(source_mask,bool); reference_mask=np.asarray(reference_mask,bool)
+ if source_mask.shape!=reference_mask.shape: raise ValueError(f'Shared footprint masks differ in shape: {source_mask.shape} != {reference_mask.shape}')
+ return source_mask&reference_mask
 def sar_panel(f,m,sar_max):
  f=np.asarray(f,np.float32).squeeze(); m=np.asarray(m,bool).squeeze()&np.isfinite(f); weight=gaussian_filter(m.astype(np.float32),1.0); f=np.divide(gaussian_filter(np.where(m,f,0.0),1.0),weight,out=np.zeros_like(f),where=weight>1e-4); m=weight>0.2; v=np.nan_to_num(np.clip(f/sar_max,0,1)); g=np.array([0,150,0]); y=np.array([255,210,0]); r=np.array([255,0,0]); rgb=np.where((v<=.5)[...,None],g+v[...,None]*2*(y-g),y+(v[...,None]-.5)*2*(r-y)).astype(np.uint8); rgb[~m]=BLACK; return Image.fromarray(rgb).resize((S,S),Image.Resampling.LANCZOS)
 def center_crop(*arrays,size):
@@ -102,7 +106,7 @@ def fixed_map(lat,lon,path):
 def compose(storm,g,meta,panels,base,track,xy,track_i,start,end,footprint):
  w=4*S; im=Image.new('RGB',(w,HH+LH+S),PAPER); d=ImageDraw.Draw(im); val=json.loads(meta).get('usa_sshs') if isinstance(meta,str) else None; cat='unavailable' if val is None else str(int(val)); name='OTIS (EP182023)' if storm=='EP182023' else storm; title=f'{name}  |  IBTrACS category: {cat}  |  {g.timestamp:%Y-%m-%d %H:%M UTC}'; b=d.textbbox((0,0),title,font=font(18)); d.text(((w-b[2]+b[0])/2,7),title,fill=(20,27,38),font=font(18)); a,z,y=78,w-78,43; d.line((a,y,z,y),fill=(117,126,140),width=3); x=a+float((g.timestamp-start)/(end-start))*(z-a); d.ellipse((x-6,y-6,x+6,y+6),fill=(239,111,43),outline=(104,42,20),width=2); d.text((a,52),f'{start:%b %d}',fill=(88,97,110),font=font(11)); t=f'{end:%b %d}'; b=d.textbbox((0,0),t,font=font(11)); d.text((z-b[2]+b[0],52),t,fill=(88,97,110),font=font(11))
  mp=base.convert('RGBA'); overlay=Image.new('RGBA',mp.size,(0,0,0,0)); od=ImageDraw.Draw(overlay); od.polygon([xy(lon,lat) for lat,lon in footprint],fill=(255,255,255,58),outline=(174,31,44,230),width=2); mp=Image.alpha_composite(mp,overlay).convert('RGB'); md=ImageDraw.Draw(mp); md.line(track[:track_i+1],fill=(239,111,43),width=4); x,y=xy(g.ibtracs_center_lon,g.ibtracs_center_lat); md.ellipse((x-6,y-6,x+6,y+6),fill='white',outline=(174,31,44),width=3)
- for i,(label,panel) in enumerate(zip(('Storm track','Geostationary','Predicted PMW' if panels.get('dense_pmw') else 'Passive microwave','Predicted Wind Field' if panels.get('dense_wind') else 'SAR'),(mp,panels['geo'],panels['pmw'],panels['sar']))):
+ for i,(label,panel) in enumerate(zip(('Storm track','Geostationary',('Predicted PMW' if panels.get('dense_pmw') else 'Passive microwave')+(' (SAR crop)' if panels.get('sar_footprint') else ''),'Predicted Wind Field' if panels.get('dense_wind') else 'SAR'),(mp,panels['geo'],panels['pmw'],panels['sar']))):
   b=d.textbbox((0,0),label,font=font(15)); d.text((i*S+(S-b[2]+b[0])/2,HH+3),label,fill=(37,45,57),font=font(15)); im.paste(panel,(i*S,HH+LH))
  return im
 def main():
@@ -147,14 +151,20 @@ def main():
     else:
      bundle=np.load(a.dense_wind_root/item.npz_path); field=bundle['wind_field_ms'].copy(); valid=bundle['valid_mask'].astype(bool); field[~valid]=np.nan; bundle.close(); source_geo=by_id[item.geo_observation_id]; source_lat,source_lon=_make_grid(source_geo.center[0],source_geo.center[1],256,0.027); source_lat,source_lon=center_crop(source_lat,source_lon,size=field.shape[-1])
     raw['sar']=(field,source_lat,source_lon,track_center_at(item.parsed_time,geos)); wind_pos+=1
+  regridded={}
   for k in ('pmw','sar'):
    while (k!='pmw' or dense is None) and (k!='sar' or wind is None) and pos[k]<len(sparse[k]) and sparse[k][pos[k]].timestamp<=g.timestamp:
     r=sparse[k][pos[k]]; pos[k]+=1
     if k=='pmw': ch=PMW_CHANNELS[r.sensor][0]; field,lat,lon=_load_pmw_channels(r,[ch])[ch]
     else: field,lat,lon=_load_sar_channels(r,['wind_speed'])['wind_speed']
     raw[k]=(field,lat,lon,r.ibtracs_center if r.ibtracs_center is not None else track_center_at(r.timestamp,geos))
-   if raw[k] is None: panels[k]=black
-   else: f,lat,lon,source_center=raw[k]; aligned_lat,aligned_lon=recenter_geolocation(lat,lon,source_center,center); f,m=_regrid(f,aligned_lat,aligned_lon,target_lat,target_lon); panels[k]=pmw_panel(f,m) if k=='pmw' else sar_panel(f,m,wind_scale if wind is not None else sar_max)
+   if raw[k] is None: regridded[k]=None
+   else: f,lat,lon,source_center=raw[k]; aligned_lat,aligned_lon=recenter_geolocation(lat,lon,source_center,center); regridded[k]=_regrid(f,aligned_lat,aligned_lon,target_lat,target_lon)
+  sar_footprint=regridded['sar'][1] if a.match_sar_footprint and regridded['sar'] is not None else None; panels['sar_footprint']=sar_footprint is not None
+  if regridded['pmw'] is None: panels['pmw']=black
+  else: f,m=regridded['pmw']; panels['pmw']=pmw_panel(f,m if sar_footprint is None else shared_footprint_mask(m,sar_footprint))
+  if regridded['sar'] is None: panels['sar']=black
+  else: f,m=regridded['sar']; panels['sar']=sar_panel(f,m,wind_scale if wind is not None else sar_max)
   for kind in ('geo','pmw','sar'): panels[kind]=mark_center(panels[kind],target_lat,target_lon,center)
   footprint=[(target_lat[0,0],target_lon[0,0]),(target_lat[0,-1],target_lon[0,-1]),(target_lat[-1,-1],target_lon[-1,-1]),(target_lat[-1,0],target_lon[-1,0])]
   frames.append(compose(storm,g,metadata.get(g.observation_id),panels,base,track,xy,int(track_i),selected[0].timestamp,selected[-1].timestamp,footprint))

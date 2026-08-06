@@ -1072,12 +1072,12 @@ dialog #confirmDialog:hover {
 
 .leaflet-container {
   color: var(--main);
-  background: var(--surface-alt);
+  background: #090e14;
   font-family: var(--font-main);
 }
 
 .leaflet-tile-pane {
-  filter: saturate(0.7) contrast(0.96) brightness(0.88);
+  filter: saturate(0.72) contrast(1.04) brightness(0.88);
 }
 
 .leaflet-bar a,
@@ -1102,10 +1102,18 @@ dialog #confirmDialog:hover {
   z-index: 800;
   left: 7px;
   bottom: 4px;
-  color: var(--secondary) !important;
-  font-size: 7px;
-  text-decoration-color: var(--accent);
-  text-shadow: 0 1px 3px var(--main);
+  padding: 2px 5px;
+  color: #b6c3cf;
+  background: rgb(7 12 18 / 76%);
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1.2;
+  backdrop-filter: blur(3px);
+}
+
+.map-credit a {
+  color: inherit;
+  text-decoration-color: rgb(182 195 207 / 55%);
 }
 
 .sar-overlay,

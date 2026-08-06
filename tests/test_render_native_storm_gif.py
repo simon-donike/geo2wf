@@ -20,6 +20,7 @@ from scripts.render_native_storm_gif import (  # noqa: E402
     dense_pmw_table,
     pmw_panel,
     recenter_geolocation,
+    shared_footprint_mask,
     synthetic_pmw_grid,
 )
 import scripts.render_native_storm_gif as renderer  # noqa: E402
@@ -148,3 +149,16 @@ def test_recenter_geolocation_moves_center_without_flipping_grid() -> None:
     assert moved_lon[:, 0].mean() < moved_lon[:, 1].mean()
     assert moved_lat.mean() == pytest.approx(20.0, abs=0.02)
     assert moved_lon.mean() == pytest.approx(-70.0, abs=0.02)
+
+
+def test_pmw_is_clipped_to_exact_sar_support() -> None:
+    pmw_mask = np.array([[True, True, False], [True, True, True]])
+    sar_mask = np.array([[False, True, True], [True, False, False]])
+
+    matched = shared_footprint_mask(pmw_mask, sar_mask)
+
+    assert np.array_equal(
+        matched,
+        np.array([[False, True, False], [True, False, False]]),
+    )
+    assert not np.any(matched & ~sar_mask)
