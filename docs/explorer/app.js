@@ -279,9 +279,13 @@ function nearestForecastIssue(time){
   const point=forecastData.points.reduce((best,item)=>Math.abs(dt(item.issue_time).getTime()-time)<Math.abs(dt(best.issue_time).getTime()-time)?item:best,forecastData.points[0]);
   return Math.abs(dt(point.issue_time).getTime()-time)<=FORECAST_MATCH_MS?point:null
 }
+function activeForecastIssue(time){
+  if(!forecastData?.points?.length)return null;
+  return forecastData.points.reduce((latest,item)=>{const issue=dt(item.issue_time).getTime();return issue<=time&&(!latest||issue>dt(latest.issue_time).getTime())?item:latest},null)
+}
 function updateForecastFocus(preferredPoint=null,hoverX=null){
   if(graphMode!=="forecast"||!forecastData||!forecastChartState.length)return;
-  const hovered=Boolean(preferredPoint)&&Number.isFinite(hoverX),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),point=preferredPoint||nearestForecastIssue(issueTime);
+  const hovered=Boolean(preferredPoint)&&Number.isFinite(hoverX),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),animating=Boolean(timer)&&$("#animationMode").checked,point=preferredPoint||(animating?activeForecastIssue(issueTime):nearestForecastIssue(issueTime));
   if(!point){forecastChartState.forEach(state=>{setSvgHidden(state.validLine,true);setSvgHidden(state.leadBand,true);setSvgHidden(state.activeSegment,true);setSvgHidden(state.activeForecast,true);setSvgHidden(state.activeReference,true)});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${forecastData.lead_hours} h forecast for ${full(record.time)}`;return}
   const validTime=dt(point.valid_time).getTime();
   forecastChartState.forEach(state=>{
