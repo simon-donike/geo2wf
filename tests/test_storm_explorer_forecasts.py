@@ -72,12 +72,20 @@ def test_forecast_export_normalizes_and_compacts_browser_data(
     point = payload["points"][0]
 
     assert metadata == {
+        "id": "convlstm",
+        "label": "ConvLSTM",
+        "metrics": ["max", "rmw"],
         "file": "forecasts/AL082025.json",
         "lead_hours": 12.0,
         "window_hours": 12.0,
         "window_length": 12,
         "split": "val",
         "count": 1,
+    }
+    assert payload["model"] == {
+        "id": "convlstm",
+        "label": "ConvLSTM",
+        "metrics": ["max", "rmw"],
     }
     assert payload["lead_hours"] == 12.0
     assert point["issue_time"] == "2025-09-27T04:54:49Z"
@@ -102,6 +110,38 @@ def test_forecast_export_keeps_valid_sparse_sar_metrics(tmp_path, monkeypatch) -
 
     assert payload["points"][0]["sar"]["max"] == 1.0
     assert payload["points"][0]["sar"]["r64"]["nw"] is None
+
+
+def test_mlp_forecast_export_and_multi_model_manifest(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    output = tmp_path / "output"
+    write_forecast(source)
+    write_forecast(
+        source / "mlp",
+        summary={
+            "storm_id": "AL082025",
+            "split": "retrospective",
+            "evaluated_samples": 1,
+            "window_hours": 12,
+            "window_length": 3,
+            "forecast_lead_hours": 12,
+            "model_style": "mlp",
+        },
+    )
+    monkeypatch.setattr(explorer, "FORECAST_ROOT", source)
+    monkeypatch.setattr(explorer, "FORECAST_OUTPUT_DIR", output)
+
+    metadata = explorer.export_forecasts("AL082025")
+
+    assert metadata["default_model"] == "convlstm"
+    assert metadata["file"] == "forecasts/AL082025.json"
+    assert [model["label"] for model in metadata["models"]] == [
+        "ConvLSTM",
+        "MLP",
+    ]
+    assert metadata["models"][1]["metrics"] == ["max"]
+    mlp_payload = json.loads((output / "AL082025-mlp.json").read_text(encoding="utf-8"))
+    assert mlp_payload["model"]["id"] == "mlp"
 
 
 def test_present_forecast_directory_requires_complete_summary(

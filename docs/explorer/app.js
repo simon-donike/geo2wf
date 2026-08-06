@@ -1,12 +1,10 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:220,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",graphMode="nowcast",forecastMetric="rmw",forecastData=null,forecastRequestId=0,forecastChartState=[],assetBaseUrl="";
+const C={w:600,h:220,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",graphMode="nowcast",forecastModel="convlstm",forecastData=null,forecastRequestId=0,forecastChartState=[],assetBaseUrl="";
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","rmw"];
 const PREDICTION_EDGE_HOURS=6;
 const MIN_VALID_RMW_KM=10;
 const FORECAST_MATCH_MS=11*60*1000;
-const FORECAST_METRICS=["rmw","r34","r50","r64"];
-const QUADRANTS=["ne","se","sw","nw"];
 const forecastCache=new Map();
 const RI_WINDOW_MS=24*3600000,RI_THRESHOLD_MS=30*.514444;
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
@@ -17,6 +15,11 @@ const categoryFromWind=v=>v>=137*.514444?5:v>=113*.514444?4:v>=96*.514444?3:v>=8
 const assetUrl=path=>new URL(path,assetBaseUrl||document.baseURI).href;
 const displayStormName=name=>name?name.charAt(0).toUpperCase()+name.slice(1).toLowerCase():"";
 const themeColor=token=>getComputedStyle(document.body).getPropertyValue(token).trim();
+function chartPointerX(chart,event){
+  const chartSvg=chart.querySelector("svg"),matrix=chartSvg?.getScreenCTM?.();
+  if(chartSvg?.createSVGPoint&&matrix){const point=chartSvg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;return point.matrixTransform(matrix.inverse()).x}
+  const rect=chartSvg.getBoundingClientRect();return(event.clientX-rect.left)/rect.width*C.w
+}
 
 function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true,attributionControl:false});
@@ -198,15 +201,8 @@ function chart(metric,def){
   card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=inPredictionWindow(r)?predictionValue(metric,r):null,raw=graphPrediction(r,metric)?.[metric],tip=$("#tooltip"),predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" (smoothed"+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable",modelCategory=graphModel==="unet_mlp"&&metric==="max"&&Number.isFinite(pv)?categoryFromWind(pv):null,modelCategoryLabel=metric==="max"&&Number.isFinite(modelCategory)?` · ${cat(modelCategory)}`:"",riActive=riIntervals.some(([begin,finish])=>dt(r.time).getTime()>=begin&&dt(r.time).getTime()<=finish),ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${r.ibtracs_msw.toFixed(1)} m/s · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${predictionSourceLabel(metric)} ${predictionLabel}${modelCategoryLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}${ibtracsLabel}${riActive?`<br>IBTrACS rapid intensification · ≥30 kt in 24 h`:""}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
-function forecastStats(source,metric){
-  const values=QUADRANTS.map(quadrant=>source?.[metric]?.[quadrant]).filter(Number.isFinite);
-  if(!values.length)return null;
-  return{mean:values.reduce((sum,value)=>sum+value,0)/values.length,min:Math.min(...values),max:Math.max(...values)}
-}
 function forecastValue(point,source,metric){
-  const values=point[source];
-  if(metric==="max"||metric==="rmw")return Number.isFinite(values?.[metric])?values[metric]:null;
-  return forecastStats(values,metric)?.mean??null
+  const value=point[source]?.[metric];return Number.isFinite(value)?value:null
 }
 function forecastPoints(){
   if(!forecastData?.points)return[];
@@ -220,11 +216,9 @@ function forecastTimeDomain(points){
 function forecastDomain(metric,points,start,end){
   const values=[];
   points.forEach(point=>{
-    ["predicted","ibtracs","sar"].forEach(source=>{
+    ["predicted","ibtracs"].forEach(source=>{
       const value=forecastValue(point,source,metric);
       if(Number.isFinite(value))values.push(value);
-      const stats=metric.startsWith("r")&&metric!=="rmw"?forecastStats(point[source],metric):null;
-      if(stats)values.push(stats.min,stats.max)
     })
   });
   if(metric==="max")nwpPoints(start,end).forEach(series=>series.points.forEach(point=>values.push(point.max)));
@@ -238,35 +232,20 @@ function segmentedForecastPath(rows,get,x,y,getTime=row=>row.valid_time){
   if(segment.length)segments.push(segment);
   return segments.map(points=>points.map(([xp,yp],index)=>`${index?"L":"M"}${xp.toFixed(1)},${yp.toFixed(1)}`).join(" ")).join(" ")
 }
-function forecastBandPath(rows,metric,x,y){
-  const segments=[];let segment=[];
-  rows.forEach(row=>{const stats=forecastStats(row.predicted,metric);if(stats)segment.push({row,...stats});else if(segment.length){segments.push(segment);segment=[]}});
-  if(segment.length)segments.push(segment);
-  return segments.map(points=>{
-    const upper=points.map((item,index)=>`${index?"L":"M"}${x(item.row.valid_time).toFixed(1)},${y(item.max).toFixed(1)}`).join(" ");
-    const lower=[...points].reverse().map(item=>`L${x(item.row.valid_time).toFixed(1)},${y(item.min).toFixed(1)}`).join(" ");
-    return`${upper} ${lower} Z`
-  }).join(" ")
-}
 function forecastNumber(value,unit){return Number.isFinite(value)?`${value.toFixed(1)} ${unit}`:"Unavailable"}
 function signedForecastError(predicted,observed,unit){
   if(!Number.isFinite(predicted)||!Number.isFinite(observed))return"Unavailable";
   const error=predicted-observed;return`${error>=0?"+":""}${error.toFixed(1)} ${unit}`
 }
-function quadrantTooltip(source,metric,label){
-  if(metric==="max"||metric==="rmw")return"";
-  const values=QUADRANTS.map(quadrant=>`${quadrant.toUpperCase()} ${Number.isFinite(source?.[metric]?.[quadrant])?source[metric][quadrant].toFixed(1):"—"}`).join(" · ");
-  return`<br>${label} quadrants ${values} km`
-}
 function forecastTooltip(point,metric,def){
-  const predicted=forecastValue(point,"predicted",metric),observed=forecastValue(point,"ibtracs",metric),sar=forecastValue(point,"sar",metric),predictedCategory=metric==="max"&&Number.isFinite(predicted)?` · ${cat(categoryFromWind(predicted))}`:"",observedCategory=metric==="max"&&Number.isFinite(observed)?` · ${cat(categoryFromWind(observed))}`:"";
-  return`<strong>Issued ${full(point.issue_time)}</strong><br>Valid ${full(point.valid_time)} · +${forecastData.lead_hours} h<br>Processor ${forecastNumber(predicted,def.unit)}${predictedCategory}<br>IBTrACS ${forecastNumber(observed,def.unit)}${observedCategory}<br>Error ${signedForecastError(predicted,observed,def.unit)}<br>SAR-derived WF ${forecastNumber(sar,def.unit)}<br>Target source ${point.target_source.toUpperCase()}${quadrantTooltip(point.predicted,metric,"Forecast")}${quadrantTooltip(point.ibtracs,metric,"IBTrACS")}`
+  const predicted=forecastValue(point,"predicted",metric),observed=forecastValue(point,"ibtracs",metric),predictedCategory=metric==="max"&&Number.isFinite(predicted)?` · ${cat(categoryFromWind(predicted))}`:"",observedCategory=metric==="max"&&Number.isFinite(observed)?` · ${cat(categoryFromWind(observed))}`:"";
+  return`<strong>Issued ${full(point.issue_time)}</strong><br>Valid ${full(point.valid_time)} · +${forecastData.lead_hours} h<br>${forecastData.model?.label||"Forecast"} ${forecastNumber(predicted,def.unit)}${predictedCategory}<br>IBTrACS ${forecastNumber(observed,def.unit)}${observedCategory}<br>Error ${signedForecastError(predicted,observed,def.unit)}<br>Target source ${point.target_source.toUpperCase()}`
 }
 function forecastChart(metric){
-  const points=forecastPoints(),[start,end]=forecastTimeDomain(points),[lo,hi]=forecastDomain(metric,points,start,end),riIntervals=rapidIntensificationIntervals(start,end),def=metric==="max"?data.metrics.max:{label:metric==="rmw"?"Radius of maximum wind":`Radius of ${metric.slice(1)}-knot winds`,unit:"km"};
+  const points=forecastPoints(),[start,end]=forecastTimeDomain(points),[lo,hi]=forecastDomain(metric,points,start,end),riIntervals=rapidIntensificationIntervals(start,end),def=data.metrics[metric];
   const x=t=>C.l+(dt(t).getTime()-start)/(end-start)*(C.w-C.l-C.r),y=v=>Math.max(C.t,Math.min(C.h-C.b,C.t+(hi-v)/(hi-lo)*(C.h-C.t-C.b)));
-  const selector=metric==="max"?`<span class="category-key">${CATEGORIES.map(c=>`<b style="--cat:${c.color}">${c.label} ${Math.round(c.value)}</b>`).join("")}</span>`:`<div class="structure-selector" role="tablist" aria-label="Wind-field structure metric">${FORECAST_METRICS.map(value=>`<button type="button" role="tab" tabindex="${value===metric?0:-1}" data-metric="${value}" aria-selected="${value===metric}">${value.toUpperCase()}</button>`).join("")}</div>`;
-  const card=document.createElement("article");card.className="chart-card forecast-chart-card";card.innerHTML=`<div class="chart-heading"><h3>${metric==="max"?"Maximum wind · +12 h":"Wind-field structure · +12 h"}</h3>${selector}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
+  const headingKey=metric==="max"?`<span class="category-key">${CATEGORIES.map(c=>`<b style="--cat:${c.color}">${c.label} ${Math.round(c.value)}</b>`).join("")}</span>`:`<span>${def.note||""} · ${def.unit}</span>`;
+  const card=document.createElement("article");card.className="chart-card forecast-chart-card";card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3>${headingKey}</div><div class="chart"><svg viewBox="0 0 ${C.w} ${C.h}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
   const s=card.querySelector("svg"),defs=svg("defs"),pattern=svg("pattern",{id:`forecast-ri-${metric}`,width:8,height:8,patternUnits:"userSpaceOnUse",patternTransform:"rotate(45)"});pattern.append(svg("line",{class:"ri-hatch-line",x1:0,y1:0,x2:0,y2:8}));defs.append(pattern);s.append(defs);
   riIntervals.forEach(([begin,finish])=>s.append(svg("rect",{class:"ri-region",x:x(begin),y:C.t,width:Math.max(0,x(finish)-x(begin)),height:C.h-C.t-C.b,fill:`url(#forecast-ri-${metric})`})));
   if(metric==="max")CATEGORIES.forEach(c=>{if(c.value>=lo&&c.value<=hi)s.append(svg("line",{class:"category-threshold",x1:C.l,y1:y(c.value),x2:C.w-C.r,y2:y(c.value),stroke:c.color}))});
@@ -274,21 +253,17 @@ function forecastChart(metric){
   [[short(start),C.l],[short(end),C.w-36]].forEach(([value,xp])=>{const text=svg("text",{class:"chart-axis",x:xp,y:C.h-2});text.textContent=value;s.append(text)});
   const leadBand=svg("rect",{class:"forecast-lead-band",y:C.t,height:C.h-C.t-C.b,hidden:""});s.append(leadBand);
   if(metric==="max")nwpPoints(start,end).forEach((series,index)=>s.append(svg("path",{class:"nwp-path",d:segmentedForecastPath(series.points,point=>point.max,t=>x(t),y,point=>point.time),"stroke-dasharray":NWP_DASHES[index%NWP_DASHES.length],"aria-label":series.label})));
-  if(metric!=="max"&&metric!=="rmw"){const band=forecastBandPath(points,metric,x,y);if(band)s.append(svg("path",{class:"forecast-quadrant-band",d:band}))}
   const forecastPath=segmentedForecastPath(points,point=>forecastValue(point,"predicted",metric),x,y);if(forecastPath)s.append(svg("path",{class:"forecast-path",d:forecastPath}));
   const referencePath=segmentedForecastPath(points,point=>forecastValue(point,"ibtracs",metric),x,y);if(referencePath)s.append(svg("path",{class:"forecast-reference-path",d:referencePath}));
-  points.filter(point=>Number.isFinite(forecastValue(point,"sar",metric))).forEach(point=>s.append(svg("circle",{class:"forecast-sar-dot",cx:x(point.valid_time),cy:y(forecastValue(point,"sar",metric)),r:3.2})));
   const issueLine=svg("line",{class:"cursor-line forecast-issue-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}),validLine=svg("line",{class:"forecast-valid-line",x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b,hidden:""}),activeReference=svg("circle",{class:"forecast-active-reference",r:4,hidden:""}),activeForecast=svg("circle",{class:"forecast-active-dot",r:4.5,hidden:""});s.append(issueLine,validLine,activeReference,activeForecast);
   forecastChartState.push({metric,start,end,x,y,leadBand,validLine,activeReference,activeForecast});
-  card.querySelectorAll(".structure-selector button").forEach(button=>button.onclick=()=>{forecastMetric=button.dataset.metric;charts();current()});
-  const structureSelector=card.querySelector(".structure-selector");if(structureSelector)structureSelector.onkeydown=event=>{if(!["ArrowLeft","ArrowRight"].includes(event.key))return;event.preventDefault();const currentIndex=FORECAST_METRICS.indexOf(forecastMetric),offset=event.key==="ArrowRight"?1:-1;forecastMetric=FORECAST_METRICS[(currentIndex+offset+FORECAST_METRICS.length)%FORECAST_METRICS.length];charts();current();document.querySelector(`.structure-selector button[data-metric="${forecastMetric}"]`)?.focus()};
   card.querySelector(".chart").onpointermove=event=>{
-    const rect=event.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((event.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),point=points.reduce((best,item)=>Math.abs(dt(item.valid_time).getTime()-target)<Math.abs(dt(best.valid_time).getTime()-target)?item:best,points[0]);
+    const fraction=Math.max(0,Math.min(1,(chartPointerX(event.currentTarget,event)-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),point=points.reduce((best,item)=>Math.abs(dt(item.valid_time).getTime()-target)<Math.abs(dt(best.valid_time).getTime()-target)?item:best,points[0]);
     if(!point)return;
     const issue=dt(point.issue_time).getTime(),index=storm.records.reduce((best,record,i)=>Math.abs(dt(record.time).getTime()-issue)<Math.abs(dt(storm.records[best].time).getTime()-issue)?i:best,0);$("#timeSlider").value=index;current();updateForecastFocus(point);
     const tip=$("#tooltip");tip.innerHTML=forecastTooltip(point,metric,def);tip.style.display="block";tip.style.left=Math.min(event.clientX+12,innerWidth-190)+"px";tip.style.top=event.clientY-70+"px"
   };
-  card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";
+  card.querySelector(".chart").onpointerleave=()=>{$("#tooltip").style.display="none";current()};
   return card
 }
 function nearestForecastIssue(time){
@@ -298,8 +273,9 @@ function nearestForecastIssue(time){
 }
 function updateForecastFocus(preferredPoint=null){
   if(graphMode!=="forecast"||!forecastData||!forecastChartState.length)return;
-  const record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),point=preferredPoint||nearestForecastIssue(issueTime);
-  if(!point){forecastChartState.forEach(state=>{state.validLine.hidden=true;state.leadBand.hidden=true;state.activeForecast.hidden=true;state.activeReference.hidden=true});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${storm.forecast.lead_hours} h forecast for ${full(record.time)}`;return}
+  const hovered=Boolean(preferredPoint),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),point=preferredPoint||nearestForecastIssue(issueTime);
+  forecastChartState.forEach(state=>{state.validLine.classList.toggle("is-hovered",hovered);state.activeForecast.classList.toggle("is-hovered",hovered)});
+  if(!point){forecastChartState.forEach(state=>{state.validLine.hidden=true;state.leadBand.hidden=true;state.activeForecast.hidden=true;state.activeReference.hidden=true});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${forecastData.lead_hours} h forecast for ${full(record.time)}`;return}
   const validTime=dt(point.valid_time).getTime();
   forecastChartState.forEach(state=>{
     const validX=state.x(validTime),issueX=Math.max(C.l,Math.min(C.w-C.r,state.x(dt(point.issue_time).getTime()))),inside=validTime>=state.start&&validTime<=state.end;
@@ -309,10 +285,36 @@ function updateForecastFocus(preferredPoint=null){
   });
   $("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`Issued ${full(point.issue_time)} → Valid ${full(point.valid_time)} · +${forecastData.lead_hours} h`
 }
+function forecastModelsForStorm(selectedStorm=storm){
+  const definition=selectedStorm?.forecast;
+  if(!definition)return[];
+  if(Array.isArray(definition.models))return definition.models;
+  return definition.file?[{...definition,id:"convlstm",label:"ConvLSTM",metrics:["max","rmw"]}]:[]
+}
+function currentForecastMetadata(){
+  const models=forecastModelsForStorm();
+  return models.find(model=>model.id===forecastModel)||models[0]||null
+}
+function forecastSupports(metric){
+  const metadata=currentForecastMetadata();
+  return Boolean(metadata&&(metadata.metrics||["max","rmw"]).includes(metric))
+}
+function updateForecastModelChrome(){
+  const metadata=currentForecastMetadata();if(!metadata)return;
+  $("#forecastModelSelector").value=metadata.id;
+  $("#forecastLeadBadge").textContent=`+${metadata.lead_hours} h`;
+  $("#forecastPredictionLegend").textContent=`${metadata.label} +${metadata.lead_hours} h`;
+  $("#forecastMethodNote").textContent=forecastSupports("rmw")?"Deterministic +12 h retrospective validation. Map time is issue time; the highlight is valid time.":`${metadata.label} predicts maximum wind only; RMW is unavailable.`
+}
+function unavailableForecastChart(metric){
+  const def=data.metrics[metric],card=document.createElement("article");card.className="chart-card forecast-metric-unavailable";
+  card.innerHTML=`<div class="chart-heading"><h3>${def.label}</h3><span>${def.note||""} · ${def.unit}</span></div><div><strong>Not available for ${forecastData.model?.label||"this model"}</strong><span>Select ConvLSTM to view this metric.</span></div>`;
+  return card
+}
 function forecastCharts(){
   forecastChartState=[];
   if(!forecastData){const card=document.createElement("article"),failed=!$("#forecastNotice").hidden;card.className="chart-card forecast-placeholder";card.innerHTML=failed?"<strong>Forecast data unavailable</strong><span>Use Retry above or return to Nowcast.</span>":"<strong>Loading forecast data…</strong><span>The map and timeline remain available.</span>";$("#charts").replaceChildren(card);return}
-  $("#charts").replaceChildren(forecastChart("max"),forecastChart(forecastMetric))
+  $("#charts").replaceChildren(forecastChart("max"),forecastSupports("rmw")?forecastChart("rmw"):unavailableForecastChart("rmw"))
 }
 function charts(){
   if(!$("#tooltip")){const t=document.createElement("div");t.id="tooltip";t.className="tooltip";document.body.append(t)}
@@ -333,45 +335,50 @@ function restoreManualLayers(){resetAnimation();geoFrames.forEach(frame=>frame.s
 function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=enabled?360:340;map.getPane("pmwPane").style.zIndex=enabled?355:345}
 function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function updateModeChrome(){
-  const nowcast=graphMode==="nowcast",inferenceAvailable=(storm.available_models||[]).length>0,forecastAvailable=Boolean(storm.forecast);
+  const nowcast=graphMode==="nowcast",inferenceAvailable=(storm.available_models||[]).length>0,forecastAvailable=forecastModelsForStorm().length>0;
   $("#nowcastMode").setAttribute("aria-selected",nowcast);$("#forecastMode").setAttribute("aria-selected",!nowcast);$("#nowcastMode").tabIndex=nowcast?0:-1;$("#forecastMode").tabIndex=nowcast?-1:0;$("#forecastMode").disabled=!forecastAvailable;$("#forecastMode").title=forecastAvailable?"Show +12 h forecast graphs":"Forecast data unavailable for this storm";
   $(".model-toolbar").hidden=!nowcast||!inferenceAvailable;$("#forecastToolbar").hidden=nowcast;$("#inferenceNotice").hidden=!nowcast||inferenceAvailable;$("#predictionLegendItem").hidden=!inferenceAvailable;
   $("#nowcastLegend").hidden=!nowcast;$("#forecastLegend").hidden=nowcast;$("#nowcastMethodNote").hidden=!nowcast||!inferenceAvailable;$("#forecastMethodNote").hidden=nowcast;$("#postProcessingControl").hidden=!nowcast;$(".graph-toolbar").hidden=nowcast?!inferenceAvailable:!forecastAvailable;
   if(nowcast){$("#forecastStatus").hidden=true;$("#forecastNotice").hidden=true}else $("#forecastStatus").hidden=$("#forecastNotice").hidden===false;
-  $$(".nwp-legend-item").forEach(item=>item.hidden=!showNwp)
+  $$(".nwp-legend-item").forEach(item=>item.hidden=!showNwp);
+  if(forecastAvailable)updateForecastModelChrome()
 }
-function validForecastPayload(payload,selectedStorm){
-  return payload&&payload.storm_id===selectedStorm.id&&Number.isFinite(payload.lead_hours)&&Array.isArray(payload.points)&&payload.points.every(point=>point.issue_time&&point.valid_time&&point.predicted&&point.ibtracs)
+function validForecastPayload(payload,selectedStorm,metadata){
+  return payload&&payload.storm_id===selectedStorm.id&&(!payload.model||payload.model.id===metadata.id)&&Number.isFinite(payload.lead_hours)&&Array.isArray(payload.points)&&payload.points.every(point=>point.issue_time&&point.valid_time&&point.predicted&&point.ibtracs)
 }
 async function loadForecast(force=false){
-  const selectedStorm=storm,metadata=selectedStorm.forecast;if(!metadata)return;
+  const selectedStorm=storm,selectedModel=forecastModel,metadata=currentForecastMetadata();if(!metadata)return;
   const requestId=++forecastRequestId,url=assetUrl(metadata.file);forecastData=null;$("#forecastNotice").hidden=true;$("#forecastStatus").hidden=false;$("#forecastStatus").textContent="Loading forecast data…";forecastCharts();
   if(force)forecastCache.delete(url);
   let pending=forecastCache.get(url);
   if(!pending){pending=fetch(url).then(response=>{if(!response.ok)throw Error(`Could not load forecast data (${response.status})`);return response.json()});forecastCache.set(url,pending)}
   try{
-    const payload=await pending;if(requestId!==forecastRequestId||storm!==selectedStorm||graphMode!=="forecast")return;
-    if(!validForecastPayload(payload,selectedStorm))throw Error("Forecast data has an invalid schema");
+    const payload=await pending;if(requestId!==forecastRequestId||storm!==selectedStorm||forecastModel!==selectedModel||graphMode!=="forecast")return;
+    if(!validForecastPayload(payload,selectedStorm,metadata))throw Error("Forecast data has an invalid schema");
     forecastData=payload;$("#forecastNotice").hidden=true;charts();current()
   }catch(error){
     if(forecastCache.get(url)===pending)forecastCache.delete(url);
-    if(requestId!==forecastRequestId||storm!==selectedStorm||graphMode!=="forecast")return;
+    if(requestId!==forecastRequestId||storm!==selectedStorm||forecastModel!==selectedModel||graphMode!=="forecast")return;
     forecastData=null;$("#forecastStatus").hidden=true;$("#forecastNoticeText").textContent=error.message;$("#forecastNotice").hidden=false;forecastCharts();console.error(error)
   }
 }
 function setGraphMode(mode){
-  if(mode==="forecast"&&!storm.forecast)return;
+  if(mode==="forecast"&&!forecastModelsForStorm().length)return;
   graphMode=mode;updateModeChrome();charts();current();
   if(mode==="forecast"&&!forecastData)loadForecast()
 }
 function selectStorm(id){
-  stop();forecastRequestId++;forecastData=null;storm=data.storms.find(s=>s.id===id);if(graphMode==="forecast"&&!storm.forecast)graphMode="nowcast";switcher();renderMap();
+  stop();forecastRequestId++;forecastData=null;storm=data.storms.find(s=>s.id===id);if(graphMode==="forecast"&&!forecastModelsForStorm().length)graphMode="nowcast";switcher();renderMap();
   const availableModels=storm.available_models||[];
   const inferenceAvailable=availableModels.length>0;
   graphModel=availableModels.includes(graphModel)?graphModel:(availableModels.includes("vit")?"vit":availableModels[0]);
   $$("#modelSelector option").forEach(option=>{const definition=data.models[option.value],available=Boolean(definition&&availableModels.includes(option.value));option.hidden=!definition;option.disabled=!available;if(definition)option.textContent=definition.label+(available?"":" (pending)")});
   $("#modelSelector").value=graphModel;$("#modelSelector").disabled=!inferenceAvailable;$("#predictionLegend").textContent=inferenceAvailable?predictionLegendLabel():"";
   postProcessing=inferenceAvailable&&$("#postProcessing").checked;
+  const forecastModels=forecastModelsForStorm(),defaultForecast=storm.forecast?.default_model||forecastModels[0]?.id;
+  forecastModel=forecastModels.some(model=>model.id===forecastModel)?forecastModel:defaultForecast;
+  const forecastSelector=$("#forecastModelSelector");forecastSelector.replaceChildren(...forecastModels.map(model=>{const option=document.createElement("option");option.value=model.id;option.textContent=model.label;return option}));
+  forecastSelector.value=forecastModel;forecastSelector.disabled=forecastModels.length<2;
   $("#basinLabel").textContent=`${storm.basin} · ${dt(storm.start).getUTCFullYear()}`;$("#stormHeading").textContent=storm.name?`${displayStormName(storm.name)} Storm track`:"Storm track";$("#stormTitle").textContent=storm.name?`${displayStormName(storm.name)} · ${storm.id}`:storm.id;$("#geoCount").textContent=storm.records.length;$("#sarCount").textContent=storm.sar_matches;$("#pmwCount").textContent=storm.pmw_matches||0;
   const sl=$("#timeSlider");sl.max=storm.records.length-1;sl.value=0;$("#startDate").textContent=short(storm.start);$("#midDate").textContent=short(storm.records[Math.floor(storm.records.length/2)].time);$("#endDate").textContent=short(storm.end);updateModeChrome();charts();current();if(graphMode==="forecast")loadForecast()
 }
@@ -380,6 +387,7 @@ $("#animationMode").onchange=event=>{setAnimationLayerOrder(event.target.checked
 $("#nowcastMode").onclick=()=>setGraphMode("nowcast");$("#forecastMode").onclick=()=>setGraphMode("forecast");
 $(".mode-switch").onkeydown=event=>{if(!["ArrowLeft","ArrowRight"].includes(event.key))return;event.preventDefault();const mode=event.key==="ArrowRight"?"forecast":"nowcast";if(mode==="forecast"&&$("#forecastMode").disabled)return;setGraphMode(mode);$(mode==="forecast"?"#forecastMode":"#nowcastMode").focus()};
 $("#modelSelector").onchange=event=>{graphModel=event.target.value;$("#predictionLegend").textContent=predictionLegendLabel();charts();current()};
+$("#forecastModelSelector").onchange=event=>{stop();forecastRequestId++;forecastModel=event.target.value;forecastData=null;updateForecastModelChrome();forecastCharts();loadForecast()};
 $("#showNwp").onchange=event=>{showNwp=event.target.checked;$$(".nwp-legend-item").forEach(item=>item.hidden=!showNwp);charts();current()};
 $("#postProcessing").onchange=event=>{postProcessing=event.target.checked;charts();current()};
 $("#retryForecast").onclick=()=>loadForecast(true);

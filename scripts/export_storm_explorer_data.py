@@ -66,6 +66,20 @@ NWP_LABELS = {
 
 FORECAST_QUADRANTS = ("ne", "se", "sw", "nw")
 FORECAST_RADII = ("r34", "r50", "r64")
+FORECAST_MODEL_SPECS = {
+    "convlstm": {
+        "label": "ConvLSTM",
+        "directory": "",
+        "metrics": ("max", "rmw"),
+        "window_length": 12,
+    },
+    "mlp": {
+        "label": "MLP",
+        "directory": "mlp",
+        "metrics": ("max",),
+        "window_length": 3,
+    },
+}
 
 
 def finite_number(value):
@@ -134,9 +148,12 @@ def _forecast_columns():
     return columns
 
 
-def build_forecast_export(storm_id):
+def build_forecast_export(storm_id, model_id="convlstm"):
     """Build compact browser forecast data, or return ``(None, None)``."""
-    storm_dir = FORECAST_ROOT / storm_id
+    if model_id not in FORECAST_MODEL_SPECS:
+        raise ValueError(f"Unknown forecast model {model_id!r}")
+    spec = FORECAST_MODEL_SPECS[model_id]
+    storm_dir = FORECAST_ROOT / spec["directory"] / storm_id
     if not storm_dir.exists():
         return None, None
     samples_path = storm_dir / "samples.csv"
@@ -190,10 +207,20 @@ def build_forecast_export(storm_id):
     lead_hours = finite_number(summary["forecast_lead_hours"])
     window_hours = finite_number(summary["window_hours"])
     window_length = int(summary["window_length"])
-    if lead_hours != 12.0 or window_hours != 12.0 or window_length != 12:
+    if (
+        lead_hours != 12.0
+        or window_hours != 12.0
+        or window_length != spec["window_length"]
+    ):
         raise ValueError(
             f"Forecast bundle for {storm_id} must use a 12-hour lead and "
-            "12-observation context window"
+            f"the {spec['label']} context contract"
+        )
+    summary_model_style = str(summary.get("model_style", model_id)).lower()
+    if summary_model_style != model_id:
+        raise ValueError(
+            f"Forecast summary for {storm_id} declares model style "
+            f"{summary_model_style!r}, expected {model_id!r}"
         )
 
     points = []
@@ -233,11 +260,22 @@ def build_forecast_export(storm_id):
 
     payload = {
         "storm_id": storm_id,
+        "model": {
+            "id": model_id,
+            "label": spec["label"],
+            "metrics": list(spec["metrics"]),
+        },
         "lead_hours": lead_hours,
         "points": points,
     }
+    filename = (
+        f"{storm_id}.json" if model_id == "convlstm" else f"{storm_id}-{model_id}.json"
+    )
     metadata = {
-        "file": f"forecasts/{storm_id}.json",
+        "id": model_id,
+        "label": spec["label"],
+        "metrics": list(spec["metrics"]),
+        "file": f"forecasts/{filename}",
         "lead_hours": lead_hours,
         "window_hours": window_hours,
         "window_length": window_length,
@@ -247,14 +285,35 @@ def build_forecast_export(storm_id):
     return metadata, payload
 
 
-def export_forecast(storm_id):
-    metadata, payload = build_forecast_export(storm_id)
+def export_forecast(storm_id, model_id="convlstm"):
+    metadata, payload = build_forecast_export(storm_id, model_id)
     if metadata is None:
         return None
     FORECAST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = FORECAST_OUTPUT_DIR / f"{storm_id}.json"
+    output_path = FORECAST_OUTPUT_DIR / Path(metadata["file"]).name
     output_path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     return metadata
+
+
+def export_forecasts(storm_id):
+    models = [
+        metadata
+        for model_id in FORECAST_MODEL_SPECS
+        if (metadata := export_forecast(storm_id, model_id)) is not None
+    ]
+    if not models:
+        return None
+    default_model = (
+        "convlstm"
+        if any(model["id"] == "convlstm" for model in models)
+        else models[0]["id"]
+    )
+    default_metadata = next(model for model in models if model["id"] == default_model)
+    return {
+        **default_metadata,
+        "default_model": default_model,
+        "models": models,
+    }
 
 
 def field_metrics(field, mask, distance):
@@ -816,7 +875,7 @@ def main():
     for storm in storms:
         storm["pmw_observations"] = export_pmw_observations(storm, raw_records)
         storm["pmw_matches"] = len(storm["pmw_observations"])
-        forecast = export_forecast(storm["id"])
+        forecast = export_forecasts(storm["id"])
         if forecast is not None:
             storm["forecast"] = forecast
     payload = {
@@ -888,7 +947,7 @@ def main():
     }
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     print(
-        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, {sum(s['pmw_matches'] for s in storms)} PMW overlays, and {sum(s.get('forecast', {}).get('count', 0) for s in storms)} forecasts"
+        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, {sum(s['pmw_matches'] for s in storms)} PMW overlays, and {sum(model['count'] for s in storms for model in s.get('forecast', {}).get('models', []))} forecasts"
     )
 
 
