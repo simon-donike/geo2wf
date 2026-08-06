@@ -915,12 +915,6 @@ a:focus-visible {
   pointer-events: none;
 }
 
-.forecast-hover-line {
-  stroke: var(--forecast-hover);
-  stroke-width: 1.4;
-  pointer-events: none;
-}
-
 
 .forecast-active-reference {
   fill: var(--ibtracs);
