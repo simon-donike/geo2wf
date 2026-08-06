@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render GEO, direct-PMW, and predicted-SAR fields on the GEO model footprint."""
+"""Render PMW-U-Net and predicted-SAR fields on the native GEO footprint."""
 
 from __future__ import annotations
 
@@ -14,11 +14,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import scripts.render_native_storm_gif as renderer
-
-GRID_SIZE = 256
-GRID_RESOLUTION_DEGREES = 0.027
-_native_geo_loader = renderer._load_geo_channels
-
 
 def pmw_unet_table(root: Path, storm: str) -> pd.DataFrame:
     path = root / "dense-pmw-unet-manifest.csv"
@@ -43,49 +38,23 @@ def pmw_unet_field(row, root: Path, storm: str, **kwargs):
     return field, lat, lon, center
 
 
-def model_footprint_geo(record, channels):
-    """Put displayed GEO channels on the direct-PMW model's full input grid."""
-    native = _native_geo_loader(record, channels)
-    grid_lat, grid_lon = renderer._make_grid(
-        record.center[0],
-        record.center[1],
-        GRID_SIZE,
-        GRID_RESOLUTION_DEGREES,
-    )
-    result = {}
-    for channel in channels:
-        field, valid = renderer._regrid(*native[channel], grid_lat, grid_lon)
-        field = np.asarray(field, dtype=np.float32)
-        field[~valid] = np.nan
-        result[channel] = field, grid_lat, grid_lon
-    return result
-
-
-def _force_full_geo_grid() -> None:
-    try:
-        index = sys.argv.index("--geo-crop-size")
-    except ValueError:
-        sys.argv.extend(["--geo-crop-size", str(GRID_SIZE)])
-    else:
-        try:
-            sys.argv[index + 1] = str(GRID_SIZE)
-        except IndexError as error:
-            raise SystemExit("--geo-crop-size requires a value") from error
-
-
 def main() -> None:
     try:
         root_index = sys.argv.index("--pmw-unet-root")
         root = sys.argv[root_index + 1]
     except (ValueError, IndexError) as error:
         raise SystemExit("--pmw-unet-root PATH is required") from error
-    if "--dense-wind-root" not in sys.argv:
-        raise SystemExit("--dense-wind-root PATH is required for predicted SAR")
+    if "--dense-wind-root" not in sys.argv and "--vit-wind-root" not in sys.argv:
+        raise SystemExit(
+            "--dense-wind-root or --vit-wind-root is required for predicted SAR"
+        )
     sys.argv[root_index : root_index + 2] = ["--dense-pmw-root", root]
-    _force_full_geo_grid()
+    if "--pmw-unet-panel" not in sys.argv:
+        sys.argv.append("--pmw-unet-panel")
+    if "--vit-wind-root" in sys.argv and "--fit-vit-to-geo-footprint" not in sys.argv:
+        sys.argv.append("--fit-vit-to-geo-footprint")
     renderer.dense_pmw_table = pmw_unet_table
     renderer.dense_pmw_field = pmw_unet_field
-    renderer._load_geo_channels = model_footprint_geo
     renderer.main()
 
 

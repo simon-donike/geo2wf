@@ -279,13 +279,19 @@ function nearestForecastIssue(time){
   const point=forecastData.points.reduce((best,item)=>Math.abs(dt(item.issue_time).getTime()-time)<Math.abs(dt(best.issue_time).getTime()-time)?item:best,forecastData.points[0]);
   return Math.abs(dt(point.issue_time).getTime()-time)<=FORECAST_MATCH_MS?point:null
 }
-function activeForecastIssue(time){
+function interpolatedForecastIssue(time){
   if(!forecastData?.points?.length)return null;
-  return forecastData.points.reduce((latest,item)=>{const issue=dt(item.issue_time).getTime();return issue<=time&&(!latest||issue>dt(latest.issue_time).getTime())?item:latest},null)
+  const points=forecastData.points.slice().sort((a,b)=>dt(a.issue_time)-dt(b.issue_time)),rightIndex=points.findIndex(point=>dt(point.issue_time).getTime()>=time);
+  if(rightIndex<0||rightIndex===0&&dt(points[0].issue_time).getTime()>time)return null;
+  const right=points[rightIndex];if(dt(right.issue_time).getTime()===time)return right;
+  const left=points[rightIndex-1],leftTime=dt(left.issue_time).getTime(),rightTime=dt(right.issue_time).getTime(),fraction=(time-leftTime)/(rightTime-leftTime),mix=(source,metric)=>{
+    const a=forecastValue(left,source,metric),b=forecastValue(right,source,metric);return Number.isFinite(a)&&Number.isFinite(b)?a+fraction*(b-a):null
+  },metrics=new Set([...Object.keys(left.predicted||{}),...Object.keys(right.predicted||{}),...Object.keys(left.ibtracs||{}),...Object.keys(right.ibtracs||{})]),interpolateSource=source=>Object.fromEntries([...metrics].map(metric=>[metric,mix(source,metric)]));
+  return{...left,issue_time:new Date(time).toISOString(),valid_time:new Date(time+forecastData.lead_hours*3600000).toISOString(),predicted:interpolateSource("predicted"),ibtracs:interpolateSource("ibtracs"),target_source:"interpolated"}
 }
 function updateForecastFocus(preferredPoint=null,hoverX=null){
   if(graphMode!=="forecast"||!forecastData||!forecastChartState.length)return;
-  const hovered=Boolean(preferredPoint)&&Number.isFinite(hoverX),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),animating=Boolean(timer)&&$("#animationMode").checked,point=preferredPoint||(animating?activeForecastIssue(issueTime):nearestForecastIssue(issueTime));
+  const hovered=Boolean(preferredPoint)&&Number.isFinite(hoverX),record=storm.records[+$("#timeSlider").value],issueTime=dt(record.time).getTime(),playing=Boolean(timer),point=preferredPoint||(playing?interpolatedForecastIssue(issueTime):nearestForecastIssue(issueTime));
   if(!point){forecastChartState.forEach(state=>{setSvgHidden(state.validLine,true);setSvgHidden(state.leadBand,true);setSvgHidden(state.activeSegment,true);setSvgHidden(state.activeForecast,true);setSvgHidden(state.activeReference,true)});$("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`No +${forecastData.lead_hours} h forecast for ${full(record.time)}`;return}
   const validTime=dt(point.valid_time).getTime();
   forecastChartState.forEach(state=>{
