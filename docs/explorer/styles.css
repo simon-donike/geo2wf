@@ -28,6 +28,7 @@
   --accent-ink: var(--highlight);
   --accent-soft: color-mix(in srgb, var(--highlight) 18%, var(--tint-90));
   --system-blue: #479ff8;
+  --forecast-hover: #ff5967;
   --sar: var(--tint-40);
   --ibtracs: var(--secondary);
   --header-height: 70px;
@@ -558,9 +559,28 @@ a:focus-visible {
 
 .forecast-toolbar {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
   margin: 0 0 8px;
+}
+
+.forecast-toolbar label {
+  margin-right: auto;
+  color: var(--tint-40);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.forecast-toolbar select {
+  min-width: 90px;
+  padding: 6px 24px 6px 9px;
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  font-size: 9px;
 }
 
 .forecast-toolbar span {
@@ -800,6 +820,23 @@ a:focus-visible {
   color: var(--secondary);
 }
 
+.forecast-metric-unavailable > div:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--tint-40);
+  font-size: 9px;
+  text-align: center;
+}
+
+.forecast-metric-unavailable > div:last-child strong {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
 .ri-region {
   fill-opacity: 0.13;
 }
@@ -835,31 +872,19 @@ a:focus-visible {
 }
 
 .forecast-line-key {
-  background: var(--system-blue);
+  background: var(--accent);
 }
 
-.forecast-band-key {
-  height: 8px !important;
-  background: color-mix(in srgb, var(--system-blue) 30%, transparent);
-  border: 1px solid color-mix(in srgb, var(--system-blue) 65%, transparent);
-}
 
 .forecast-lead-band {
-  fill: var(--system-blue);
+  fill: var(--accent);
   opacity: 0.07;
-  pointer-events: none;
-}
-
-.forecast-quadrant-band {
-  fill: var(--system-blue);
-  fill-opacity: 0.16;
-  stroke: none;
   pointer-events: none;
 }
 
 .forecast-path {
   fill: none;
-  stroke: var(--system-blue);
+  stroke: var(--accent);
   stroke-width: 2.2;
 }
 
@@ -869,23 +894,31 @@ a:focus-visible {
   stroke-width: 1.5;
 }
 
-.forecast-sar-dot {
-  fill: var(--tint-90);
-  stroke: var(--sar);
-  stroke-width: 2;
-}
 
 .forecast-valid-line {
-  stroke: var(--system-blue);
+  stroke: var(--accent);
   stroke-width: 1.3;
   stroke-dasharray: 5 3;
 }
 
 .forecast-active-dot {
   fill: var(--tint-90);
-  stroke: var(--system-blue);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
+.forecast-valid-line.is-hovered {
+  stroke: var(--forecast-hover);
+  stroke-width: 1.9;
+  stroke-dasharray: none;
+}
+
+.forecast-active-dot.is-hovered {
+  fill: var(--forecast-hover);
+  stroke: var(--secondary);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px var(--forecast-hover));
+}
+
 
 .forecast-active-reference {
   fill: var(--ibtracs);
@@ -894,7 +927,7 @@ a:focus-visible {
 }
 
 .forecast-issue-line {
-  stroke: var(--accent);
+  stroke: var(--system-blue);
   stroke-width: 1.2;
 }
 
