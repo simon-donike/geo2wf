@@ -49,6 +49,13 @@ def dense_pmw_path(row,root,storm):
  resolved=next((candidate for candidate in candidates if candidate.exists()),None)
  if resolved is None: raise FileNotFoundError(f'Densified PMW tensor not found: {path}')
  return resolved
+def dense_pmw_coordinates_path(row,root,storm):
+ value=getattr(row,'coordinates_path',None)
+ if not isinstance(value,str) or not value.strip(): return None
+ path=Path(value)
+ if path.is_absolute() and path.exists(): return path
+ candidates=(root/path,root/storm/path,root/storm/path.name,root/path.name)
+ return next((candidate for candidate in candidates if candidate.exists()),None)
 def _aeqd_crs(center):
  return CRS.from_string(f'+proj=aeqd +lat_0={float(center[0]):.12f} +lon_0={float(center[1]):.12f} +datum=WGS84 +units=m +no_defs')
 def recenter_geolocation(lat,lon,source_center,target_center):
@@ -88,7 +95,12 @@ def dense_pmw_field(row,root,storm,records_by_id=None,geometry_cache=None,geoloc
  tensor=torch.load(dense_pmw_path(row,root,storm),map_location='cpu',weights_only=False); variables=json.loads(row.variables); channel=next((name for name in variables if name.endswith(('89.0V','91.665V'))),None)
  if channel is None: raise ValueError(f'No supported high-frequency V-polarized PMW channel in {variables}')
  index=variables.index(channel); field=np.asarray(tensor[index],dtype=np.float32); sidecar_root=Path(geolocation_root) if geolocation_root is not None else Path(root)/'geolocation'; sidecar=sidecar_root/storm/f'{Path(row.path).stem}.npz'
- if sidecar.is_file(): lat,lon,center,_=_load_dense_pmw_sidecar(sidecar,row,field.shape)
+ coordinates_path=dense_pmw_coordinates_path(row,root,storm)
+ if coordinates_path is not None:
+  coordinates=torch.load(coordinates_path,map_location='cpu',weights_only=False); lat=np.asarray(coordinates['latitude'],dtype=np.float64); lon=np.asarray(coordinates['longitude'],dtype=np.float64); center=(float(row.ibtracs_center_lat),float(row.ibtracs_center_lon))
+  if lat.shape!=field.shape or lon.shape!=field.shape: raise ValueError(f'Synthetic PMW coordinate shape {lat.shape}/{lon.shape} does not match tensor {field.shape} for {row.observation_id}')
+  if not np.isfinite(lat).any() or not np.isfinite(lon).any(): raise ValueError(f'Synthetic PMW coordinates have no finite values: {coordinates_path}')
+ elif sidecar.is_file(): lat,lon,center,_=_load_dense_pmw_sidecar(sidecar,row,field.shape)
  else:
   lat,lon,center,_=synthetic_pmw_grid(row,records_by_id,geometry_cache)
   if lat.shape!=field.shape: raise ValueError(f'Synthetic PMW tensor {field.shape} does not match template swath {lat.shape} for {row.observation_id}')
@@ -108,7 +120,7 @@ def fixed_map(lat,lon,path):
 def compose(storm,g,meta,panels,base,track,xy,track_i,start,end,footprint):
  w=4*S; im=Image.new('RGB',(w,HH+LH+S),PAPER); d=ImageDraw.Draw(im); val=json.loads(meta).get('usa_sshs') if isinstance(meta,str) else None; cat='unavailable' if val is None else str(int(val)); name='OTIS (EP182023)' if storm=='EP182023' else storm; title=f'{name}  |  IBTrACS category: {cat}  |  {g.timestamp:%Y-%m-%d %H:%M UTC}'; b=d.textbbox((0,0),title,font=font(18)); d.text(((w-b[2]+b[0])/2,7),title,fill=(20,27,38),font=font(18)); a,z,y=78,w-78,43; d.line((a,y,z,y),fill=(117,126,140),width=3); x=a+float((g.timestamp-start)/(end-start))*(z-a); d.ellipse((x-6,y-6,x+6,y+6),fill=(239,111,43),outline=(104,42,20),width=2); d.text((a,52),f'{start:%b %d}',fill=(88,97,110),font=font(11)); t=f'{end:%b %d}'; b=d.textbbox((0,0),t,font=font(11)); d.text((z-b[2]+b[0],52),t,fill=(88,97,110),font=font(11))
  mp=base.convert('RGBA'); overlay=Image.new('RGBA',mp.size,(0,0,0,0)); od=ImageDraw.Draw(overlay); od.polygon([xy(lon,lat) for lat,lon in footprint],fill=(255,255,255,58),outline=(174,31,44,230),width=2); mp=Image.alpha_composite(mp,overlay).convert('RGB'); md=ImageDraw.Draw(mp); md.line(track[:track_i+1],fill=(239,111,43),width=4); x,y=xy(g.ibtracs_center_lon,g.ibtracs_center_lat); md.ellipse((x-6,y-6,x+6,y+6),fill='white',outline=(174,31,44),width=3)
- for i,(label,panel) in enumerate(zip(('Storm track','Geostationary','PMW Prediction' if panels.get('pmw_unet') else 'Predicted PMW' if panels.get('dense_pmw') else 'Passive microwave','Windfield Prediction' if panels.get('vit_wind') else 'Predicted Wind Field' if panels.get('dense_wind') else 'SAR'),(mp,panels['geo'],panels['pmw'],panels['sar']))):
+ for i,(label,panel) in enumerate(zip(('Storm track','Geostationary','PMW Prediction' if panels.get('dense_pmw') else 'Passive microwave','Windfield Prediction' if panels.get('vit_wind') else 'Predicted Wind Field' if panels.get('dense_wind') else 'SAR'),(mp,panels['geo'],panels['pmw'],panels['sar']))):
   b=d.textbbox((0,0),label,font=font(15)); d.text((i*S+(S-b[2]+b[0])/2,HH+3),label,fill=(37,45,57),font=font(15)); im.paste(panel,(i*S,HH+LH))
  return im
 def main():
