@@ -133,8 +133,8 @@ def test_mlp_forecast_export_and_multi_model_manifest(tmp_path, monkeypatch) -> 
 
     metadata = explorer.export_forecasts("AL082025")
 
-    assert metadata["default_model"] == "convlstm"
-    assert metadata["file"] == "forecasts/AL082025.json"
+    assert metadata["default_model"] == "mlp"
+    assert metadata["file"] == "forecasts/AL082025-mlp.json"
     assert [model["label"] for model in metadata["models"]] == [
         "ConvLSTM",
         "MLP",
