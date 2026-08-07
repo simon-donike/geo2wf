@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20260806-3">
+  <link rel="stylesheet" href="styles.css?v=20260807-2">
 </head>
 <body class="earth-systems-lab">
 <header class="topbar">
@@ -60,6 +60,7 @@
     <p id="welcomeDescription">Explore complete tropical-cyclone tracks and compare geostationary, PMW, and SAR observations with model-derived wind diagnostics.</p>
     <div class="welcome-banner__actions">
       <button id="dismissWelcome" autofocus>Explore StormSense</button>
+      <button id="startGuidedTour" class="tour-launch" type="button">Take the guided tour</button>
       <a href="../">Read the documentation</a>
       <a href="https://github.com/FrontierDevelopmentLab/2026-ESL-Tropical-Cyclone-Dynamics">View the code</a>
     </div>
@@ -70,10 +71,21 @@
     <small>Copyright Trillium Technologies Inc. (2015–2026). All rights reserved.</small>
   </div>
 </dialog>
+<div id="guidedTour" class="guided-tour" hidden>
+  <div id="tourSpotlight" class="tour-spotlight" aria-hidden="true"></div>
+  <section id="tourCard" class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourDescription" tabindex="-1">
+    <header><span id="tourProgress">Guided tour</span><button id="closeTour" type="button" aria-label="Close guided tour">×</button></header>
+    <p id="tourKicker" class="tour-kicker"></p>
+    <h2 id="tourTitle"></h2>
+    <p id="tourDescription"></p>
+    <div id="tourDots" class="tour-dots" aria-hidden="true"></div>
+    <footer><button id="tourBack" type="button">Back</button><button id="tourNext" type="button">Next</button></footer>
+  </section>
+</div>
 <dialog id="aboutDialog"><button id="closeDialog" class="dialog-close" aria-label="Close dialog">×</button><p class="eyebrow">About the data</p><h2>Prediction and observation, together</h2><p>Nowcast shows inference at observation time; Forecast shows deterministic retrospective validation results at a fixed +12-hour lead. In Forecast animation, map time is the issue time and the blue highlighted point is valid 12 hours later. The highlighted Nowcast series is derived from the selected inference model; for UNet+MLP, Maximum wind is the corrected scalar while the remaining diagnostics come from the upstream UNet wind field. The selector does not change the map or summary cards. The cream reference on Maximum wind is the IBTrACS maximum sustained wind, with its classification shown in the hover details. The optional NWP overlay shows each available full-track forecast as a muted dashed line. All SAR swaths share a fixed 0–60+ m/s scale. PMW imagery uses the comparable vertically polarized 89–92 GHz band from AMSR2, GMI, and SSMIS. PMW and geostationary imagery use distinct color maps because they represent different physical measurements, while each retains fixed 190–292 K bounds; PMW no-data pixels are transparent. Use the map layer toggle to show or hide all fixed-scale CMI_C15 geostationary images together. Gray chart dots mark matched SAR fields; dashed lines interpolate visually between those sparse observations.</p><button id="confirmDialog">Got it</button></dialog>
 <div class="loading" id="loading"><span></span><p>Preparing storm tracks…</p></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="welcome.js"></script>
+<script src="welcome.js?v=20260807-1"></script>
 <script src="data-config.js"></script>
-<script src="app.js?v=20260806-2"></script>
+<script src="app.js?v=20260807-2"></script>
 </body></html>

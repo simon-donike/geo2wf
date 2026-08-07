@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],NS="http://www.w3.org/2000/svg";
-const C={w:600,h:220,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",graphMode="nowcast",forecastModel="convlstm",forecastData=null,forecastRequestId=0,forecastChartState=[],assetBaseUrl="";
+const C={w:600,h:220,l:36,r:8,t:8,b:18};let data,storm,timer,map,layers,geoLayers,sarLayers,pmwLayers,currentMarker,geoFrames=[],sarFrames=[],pmwFrames=[],postProcessing=false,showNwp=false,graphModel="unet_mlp",graphMode="nowcast",forecastModel="convlstm",forecastData=null,forecastRequestId=0,forecastChartState=[],assetBaseUrl="",layerOrderControl;
 const NWP_DASHES=["2 2","5 2","8 2","3 2 1 2","10 3","6 2 1 2"];
 const DISPLAY_METRICS=["max","rmw"];
 const PREDICTION_EDGE_HOURS=6;
@@ -20,6 +20,29 @@ function chartPointerX(chart,event){
   const chartSvg=chart.querySelector("svg"),matrix=chartSvg?.getScreenCTM?.();
   if(chartSvg?.createSVGPoint&&matrix){const point=chartSvg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;return point.matrixTransform(matrix.inverse()).x}
   const rect=chartSvg.getBoundingClientRect();return(event.clientX-rect.left)/rect.width*C.w
+}
+
+const IMAGE_LAYER_META=[{id:"geo",label:"Geostationary imagery",pane:"geoPane"},{id:"pmw",label:"PMW 89–92 GHz",pane:"pmwPane"},{id:"sar",label:"SAR wind fields",pane:"sarPane"}];
+function applyImageLayerOrder(){
+  const rows=layerOrderControl?.getContainer()?.querySelectorAll(".imagery-layer-row");
+  rows?.forEach((row,index)=>{map.getPane(IMAGE_LAYER_META.find(item=>item.id===row.dataset.layer).pane).style.zIndex=350-index*10});
+}
+function setupLayerOrderControl(control){
+  layerOrderControl=control;
+  const overlays=control.getContainer().querySelector(".leaflet-control-layers-overlays");
+  const labels=[...overlays.querySelectorAll("label")];
+  const instruction=document.createElement("p");instruction.className="imagery-layer-instruction";instruction.id="imageryLayerInstruction";instruction.textContent="Drag to set drawing order · top draws above";overlays.prepend(instruction);
+  IMAGE_LAYER_META.forEach(meta=>{
+    const label=labels.find(item=>item.textContent.includes(meta.label));if(!label)return;
+    const row=document.createElement("div");row.className="imagery-layer-row";row.dataset.layer=meta.id;
+    const handle=document.createElement("button");handle.type="button";handle.className="imagery-layer-handle";handle.draggable=true;handle.setAttribute("aria-label",`Reorder ${meta.label}. Use up and down arrow keys.`);handle.setAttribute("aria-describedby",instruction.id);handle.textContent="⠿";
+    row.append(handle,label);overlays.append(row);
+    handle.addEventListener("dragstart",event=>{row.classList.add("is-dragging");event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",meta.id)});
+    handle.addEventListener("dragend",()=>{row.classList.remove("is-dragging");applyImageLayerOrder()});
+    row.addEventListener("dragover",event=>{const dragged=overlays.querySelector(".is-dragging");if(!dragged||dragged===row)return;event.preventDefault();const before=event.clientY<row.getBoundingClientRect().top+row.offsetHeight/2;overlays.insertBefore(dragged,before?row:row.nextSibling)});
+    handle.addEventListener("keydown",event=>{if(!["ArrowUp","ArrowDown"].includes(event.key))return;event.preventDefault();const sibling=event.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;if(!sibling?.classList.contains("imagery-layer-row"))return;if(event.key==="ArrowUp")overlays.insertBefore(row,sibling);else overlays.insertBefore(sibling,row);applyImageLayerOrder();handle.focus()});
+  });
+  applyImageLayerOrder();
 }
 
 function initMap(){
@@ -44,7 +67,7 @@ function initMap(){
   geoLayers=L.layerGroup().addTo(map);
   sarLayers=L.layerGroup().addTo(map);
   pmwLayers=L.layerGroup();
-  L.control.layers(null,{"Geostationary imagery":geoLayers,"SAR wind fields":sarLayers,"PMW 89–92 GHz":pmwLayers},{collapsed:false,position:"topright"}).addTo(map);
+  const layerControl=L.control.layers(null,{"Geostationary imagery":geoLayers,"SAR wind fields":sarLayers,"PMW 89–92 GHz":pmwLayers},{collapsed:false,position:"topright"}).addTo(map);setupLayerOrderControl(layerControl);
   map.on("overlayadd",event=>{if(event.layer===geoLayers)$("#geostatKey").hidden=false;if(event.layer===pmwLayers)$("#pmwKey").hidden=false});
   map.on("overlayremove",event=>{if(event.layer===geoLayers)$("#geostatKey").hidden=true;if(event.layer===pmwLayers)$("#pmwKey").hidden=true});
 }
@@ -351,7 +374,7 @@ function resetAnimation(){geoFrames.forEach(frame=>frame.hide());sarFrames.forEa
 function nearestFrame(frames,record,maxGapHours){const target=dt(record.time).getTime(),frame=frames.reduce((best,item)=>!best||Math.abs(item.time-target)<Math.abs(best.time-target)?item:best,null);return frame&&Math.abs(frame.time-target)<=maxGapHours*3600000?frame:null}
 function showAnimationFrame(record){geoFrames.find(frame=>frame.record===record)?.show();sarFrames.find(frame=>frame.record===record)?.show();nearestFrame(pmwFrames,record,3)?.show()}
 function restoreManualLayers(){resetAnimation();geoFrames.forEach(frame=>frame.show());sarFrames.forEach(frame=>frame.show());pmwFrames.forEach(frame=>frame.show())}
-function setAnimationLayerOrder(enabled){map.getPane("sarPane").style.zIndex=enabled?360:340;map.getPane("pmwPane").style.zIndex=enabled?355:345}
+function setAnimationLayerOrder(){applyImageLayerOrder()}
 function play(){if(timer)return stop();if($("#animationMode").checked)showAnimationFrame(storm.records[+$("#timeSlider").value]);$("#playButton").textContent="Ⅱ";timer=setInterval(()=>{const s=$("#timeSlider"),next=(+s.value+1)%storm.records.length;if($("#animationMode").checked&&next===0)resetAnimation();s.value=next;current();if($("#animationMode").checked)showAnimationFrame(storm.records[next])},+$("#speedSelector").value)}
 function updateModeChrome(){
   const nowcast=graphMode==="nowcast",inferenceAvailable=(storm.available_models||[]).length>0,forecastAvailable=forecastModelsForStorm().length>0;
@@ -422,6 +445,20 @@ async function loadRelease(releaseUrl){
   assetBaseUrl=new URL(".",manifestUrl).href;
   return response.json()
 }
+function focusTourRapidIntensification(){
+  const intervals=rapidIntensificationIntervals(...chartTimeDomain());
+  if(!intervals.length)return null;
+  const [begin,finish]=intervals.reduce((best,item)=>item[1]-item[0]>best[1]-best[0]?item:best,intervals[0]);
+  const lead=graphMode==="forecast"?(forecastData?.lead_hours||12)*3600000:0,target=finish-lead;
+  const index=storm.records.reduce((best,record,i)=>Math.abs(dt(record.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?i:best,0);
+  const slider=$("#timeSlider");slider.value=index;current();
+  return{begin,finish,index};
+}
+function exposeTourControls(){
+  window.StormSenseTour={setMode:setGraphMode,focusRapidIntensification:focusTourRapidIntensification};
+  window.dispatchEvent(new CustomEvent("stormsense:ready"));
+}
+
 async function loadData(){
   const configuredUrls=window.GEO2WF_EXPLORER_RELEASE_URLS;
   const releaseUrls=Array.isArray(configuredUrls)
@@ -444,4 +481,4 @@ async function loadData(){
   }
   throw Error(`All explorer data sources failed (${failures.join("; ")})`)
 }
-loadData().then(d=>{data=d;initMap();storm=data.storms[0];selectStorm(storm.id);$("#loading").classList.add("hidden")}).catch(e=>{$("#loading").innerHTML=`<p>Could not load explorer data.<br><small>${e.message}</small></p>`;console.error(e)});
+loadData().then(d=>{data=d;initMap();storm=data.storms[0];selectStorm(storm.id);$("#loading").classList.add("hidden");exposeTourControls()}).catch(e=>{$("#loading").innerHTML=`<p>Could not load explorer data.<br><small>${e.message}</small></p>`;console.error(e)});
