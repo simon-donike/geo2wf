@@ -46,94 +46,55 @@ const focusRapidIntensification = async () => {
 
 const tourSteps = [
   {
-    kicker: "Our central challenge",
-    title: "Rapid intensification, made visible",
-    description: "Rapid intensification—an IBTrACS wind increase of at least 30 knots in 24 hours—is the event we care about most. We are especially proud that our nowcasting and forecasting results retain this fast-changing signal. StormSense places hatched RI periods behind every wind chart so you can inspect that performance directly.",
+    kicker: "Why StormSense",
+    title: "Rapid intensification, captured",
+    description: "Hatching marks an IBTrACS rise of at least 30 knots in 24 hours. We are proud that both our nowcasts and forecasts retain this sharp signal.",
     target: () => visible("#charts .chart-card:first-child") || document.querySelector(".analytics"),
     enter: async () => { await setTourMode("nowcast"); await focusRapidIntensification(); }
   },
   {
-    kicker: "Choose the question",
-    title: "Storm and analysis mode",
-    description: "Mode switches between Nowcast—an estimate at the observation time—and Forecast—a prediction verified 12 hours later. Storm selects the tropical-cyclone track you want to investigate.",
+    kicker: "Choose a view",
+    title: "Storm and mode",
+    description: "Storm chooses the track. Mode switches between inference at observation time and a prediction verified 12 hours later.",
     target: () => document.querySelector(".map-controls")
   },
   {
-    kicker: "Explore the track",
-    title: "Map navigation",
-    description: "Drag to pan, scroll or pinch to zoom, and use the +/− buttons for precise zooming. The highlighted marker follows the selected timeline observation along the complete storm track.",
-    target: () => document.querySelector("#map")
-  },
-  {
-    kicker: "Build the visual stack",
-    title: "Imagery visibility and drawing order",
-    description: "The checkboxes show or hide geostationary, PMW, and SAR imagery. Drag the dotted handles to change their drawing order—the top item is drawn above the others. Arrow keys also move a focused handle.",
+    kicker: "Explore the evidence",
+    title: "Map and imagery stack",
+    description: "Pan or zoom the map. Use the imagery checkboxes for visibility, then drag the dotted grips—the top layer draws above the others.",
     target: () => document.querySelector(".leaflet-control-layers")
   },
   {
-    kicker: "Move through the event",
-    title: "Timeline and animation",
-    description: "Play starts or pauses the sequence. Drag the time slider to inspect an exact observation. Animation limits imagery to the current frame, while Speed controls playback from 0.5× to 4×. The date and observation counter update together.",
+    kicker: "Move through time",
+    title: "Timeline and storm summary",
+    description: "Play, scrub, animate, and set playback speed here. The summary cards report available imagery and the current IBTrACS class.",
     target: () => document.querySelector(".timeline")
   },
   {
-    kicker: "Read the current state",
-    title: "Observation summary",
-    description: "These cards identify the selected storm, count the available geostationary frames, SAR matches, and PMW swaths, and report the IBTrACS intensity class at the current time.",
-    target: () => document.querySelector(".summary-strip")
-  },
-  {
     kicker: "Nowcasting",
-    title: "Compare inference models",
-    description: "The inference selector changes the highlighted nowcast curve. UNet+MLP supplies its corrected maximum-wind estimate while its upstream UNet supplies spatial diagnostics; the other available models expose their own wind-field diagnostics.",
-    target: () => visible(".model-toolbar"),
+    title: "Inspect the rise as it happens",
+    description: "Choose an inference model, then compare its curve with SAR and IBTrACS. Hover the chart for exact values inside the RI interval.",
+    target: () => document.querySelector(".analytics"),
     enter: async () => { await setTourMode("nowcast"); await focusRapidIntensification(); }
   },
   {
-    kicker: "Nowcasting rapid intensification",
-    title: "Following the sharp rise now",
-    description: "The colored prediction curve can be compared directly with SAR-derived wind and the cream IBTrACS reference. We are especially proud of how closely the nowcast follows the sharp upward structure inside the hatched RI interval instead of smoothing away the event. Hover anywhere on a chart for exact values and classification.",
-    target: () => visible("#charts .chart-card:first-child"),
-    enter: focusRapidIntensification
-  },
-  {
     kicker: "Add context",
-    title: "NWP and post-processing controls",
-    description: "NWP forecasts adds available full-track weather-model runs as muted dashed curves. Post-processing applies a six-hour centered median to the selected nowcast, letting you compare a steadier signal with the raw model response.",
+    title: "NWP and post-processing",
+    description: "NWP adds full-track forecast baselines. Post-processing applies a six-hour median to the selected nowcast.",
     target: () => visible(".graph-toolbar"),
     enter: async () => { await setTourMode("nowcast"); }
   },
   {
     kicker: "Forecasting",
-    title: "Look 12 hours ahead",
-    description: "Forecast changes the charts from current-time inference to retrospective +12-hour prediction. Map time becomes issue time; the highlighted chart target is the valid time 12 hours later.",
-    target: () => document.querySelector(".mode-switch"),
+    title: "Anticipate rapid intensification",
+    description: "Select a forecast model and compare its +12-hour curve with later IBTrACS verification. Issue and valid-time markers expose the lead directly.",
+    target: () => document.querySelector(".analytics"),
     enter: async () => { await setTourMode("forecast"); await focusRapidIntensification(); }
-  },
-  {
-    kicker: "Forecast configuration",
-    title: "Model and lead time",
-    description: "Choose among the available forecast models here. The lead badge states how far ahead each prediction is evaluated, so model output and the later IBTrACS observation are compared at the same valid time. If forecast data cannot load, the notice provides a Retry control.",
-    target: () => visible("#forecastToolbar") || document.querySelector(".mode-switch"),
-    enter: async () => { await setTourMode("forecast"); }
-  },
-  {
-    kicker: "Forecasting rapid intensification",
-    title: "Anticipating the rise",
-    description: "The forecast curve is plotted against its later IBTrACS verification inside the same hatched RI window. We are especially proud that the model captures the rapid rise 12 hours ahead. The issue line, valid-time line, and connecting lead band make that result directly inspectable.",
-    target: () => visible("#charts .chart-card:first-child") || document.querySelector(".analytics"),
-    enter: async () => { await setTourMode("forecast"); await focusRapidIntensification(); }
-  },
-  {
-    kicker: "Decode the evidence",
-    title: "Legends and optional comparisons",
-    description: "The active legend identifies model prediction, IBTrACS verification, RI hatching, valid-time behavior, and optional NWP runs. Toggle NWP forecasts below the charts whenever you want that broader baseline comparison.",
-    target: () => visible("#forecastLegend") || visible("#nowcastLegend")
   },
   {
     kicker: "Keep exploring",
-    title: "Help, status, and documentation",
-    description: "Inference data confirms the dashboard is using model output. The ? button explains methods and visual encodings, while Documentation opens the deeper scientific and technical reference. You can restart this tour from the welcome screen after reloading the page.",
+    title: "Legends, help, and documentation",
+    description: "Legends decode every line and RI hatch. Use ? for methodology, Retry if a forecast fails, and Documentation for the full reference.",
     target: () => document.querySelector(".top-actions")
   }
 ];

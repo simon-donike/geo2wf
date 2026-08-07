@@ -31,18 +31,30 @@ function setupLayerOrderControl(control){
   layerOrderControl=control;
   const overlays=control.getContainer().querySelector(".leaflet-control-layers-overlays");
   const labels=[...overlays.querySelectorAll("label")];
-  const instruction=document.createElement("p");instruction.className="imagery-layer-instruction";instruction.id="imageryLayerInstruction";instruction.textContent="Drag to set drawing order · top draws above";overlays.prepend(instruction);
+  const labelsByLayer=new Map(["geo","sar","pmw"].map((id,index)=>[id,labels[index]]));
+  const instruction=document.createElement("div");instruction.className="imagery-layer-instruction";instruction.id="imageryLayerInstruction";instruction.setAttribute("aria-live","polite");instruction.innerHTML="<strong>Imagery stack</strong><span>Drag a grip · top draws above</span>";overlays.prepend(instruction);
+  const refreshOrder=()=>{
+    [...overlays.querySelectorAll(".imagery-layer-row")].forEach((row,index)=>{row.querySelector(".imagery-layer-rank").textContent=index===0?"TOP":String(index+1)});
+    applyImageLayerOrder();
+  };
   IMAGE_LAYER_META.forEach(meta=>{
-    const label=labels.find(item=>item.textContent.includes(meta.label));if(!label)return;
+    const label=labelsByLayer.get(meta.id);if(!label)return;
     const row=document.createElement("div");row.className="imagery-layer-row";row.dataset.layer=meta.id;
-    const handle=document.createElement("button");handle.type="button";handle.className="imagery-layer-handle";handle.draggable=true;handle.setAttribute("aria-label",`Reorder ${meta.label}. Use up and down arrow keys.`);handle.setAttribute("aria-describedby",instruction.id);handle.textContent="⠿";
-    row.append(handle,label);overlays.append(row);
-    handle.addEventListener("dragstart",event=>{row.classList.add("is-dragging");event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",meta.id)});
-    handle.addEventListener("dragend",()=>{row.classList.remove("is-dragging");applyImageLayerOrder()});
-    row.addEventListener("dragover",event=>{const dragged=overlays.querySelector(".is-dragging");if(!dragged||dragged===row)return;event.preventDefault();const before=event.clientY<row.getBoundingClientRect().top+row.offsetHeight/2;overlays.insertBefore(dragged,before?row:row.nextSibling)});
-    handle.addEventListener("keydown",event=>{if(!["ArrowUp","ArrowDown"].includes(event.key))return;event.preventDefault();const sibling=event.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;if(!sibling?.classList.contains("imagery-layer-row"))return;if(event.key==="ArrowUp")overlays.insertBefore(row,sibling);else overlays.insertBefore(sibling,row);applyImageLayerOrder();handle.focus()});
+    const handle=document.createElement("button");handle.type="button";handle.className="imagery-layer-handle";handle.setAttribute("aria-label",`Reorder ${meta.label}. Drag, or use up and down arrow keys.`);handle.setAttribute("aria-describedby",instruction.id);handle.title="Drag to reorder";
+    const rank=document.createElement("span");rank.className="imagery-layer-rank";rank.setAttribute("aria-hidden","true");
+    row.append(handle,label,rank);overlays.append(row);
+    let pointerId=null,startY=0,lastY=0;
+    const finishDrag=()=>{
+      if(pointerId===null)return;
+      const siblings=[...overlays.querySelectorAll(".imagery-layer-row")].filter(item=>item!==row),before=siblings.find(item=>lastY<item.getBoundingClientRect().top+item.offsetHeight/2);
+      overlays.insertBefore(row,before||null);pointerId=null;row.style.removeProperty("--drag-offset");row.classList.remove("is-dragging");document.body.classList.remove("is-reordering-imagery");refreshOrder();
+    };
+    handle.addEventListener("pointerdown",event=>{if(event.button!==0)return;event.preventDefault();pointerId=event.pointerId;startY=lastY=event.clientY;handle.setPointerCapture(pointerId);row.classList.add("is-dragging");document.body.classList.add("is-reordering-imagery")});
+    handle.addEventListener("pointermove",event=>{if(event.pointerId!==pointerId)return;event.preventDefault();lastY=event.clientY;row.style.setProperty("--drag-offset",`${lastY-startY}px`)});
+    handle.addEventListener("pointerup",finishDrag);handle.addEventListener("pointercancel",finishDrag);handle.addEventListener("lostpointercapture",finishDrag);
+    handle.addEventListener("keydown",event=>{if(!["ArrowUp","ArrowDown"].includes(event.key))return;event.preventDefault();const sibling=event.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;if(!sibling?.classList.contains("imagery-layer-row"))return;if(event.key==="ArrowUp")overlays.insertBefore(row,sibling);else overlays.insertBefore(sibling,row);refreshOrder();handle.focus()});
   });
-  applyImageLayerOrder();
+  refreshOrder();
 }
 
 function initMap(){
