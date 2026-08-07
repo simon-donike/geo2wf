@@ -1526,6 +1526,40 @@ dialog.welcome-banner::backdrop {
   backdrop-filter: blur(5px);
 }
 
+.welcome-banner__close {
+  position: absolute;
+  top: clamp(14px, 2vw, 24px);
+  right: clamp(14px, 2vw, 24px);
+  z-index: 2;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  place-items: center;
+  color: var(--tint-30);
+  background: color-mix(in srgb, var(--tint-80) 82%, transparent);
+  border: 1px solid var(--divider);
+  border-radius: 50%;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  font: inherit;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.welcome-banner__close:hover {
+  color: var(--main);
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.welcome-banner__close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 3px;
+}
+
 .welcome-banner__badge {
   grid-area: badge;
   display: block;

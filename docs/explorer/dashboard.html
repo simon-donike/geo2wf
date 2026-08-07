@@ -21,7 +21,7 @@
 </header>
 <main class="workspace">
   <section class="map-panel">
-    <div class="map-heading"><div><p class="eyebrow" id="basinLabel">Loading storm data</p><h1 id="stormHeading">Storm track</h1></div><div class="map-controls"><div class="storm-switcher" id="stormSwitcher"></div><div class="mode-switch" role="tablist" aria-label="Graph mode"><button id="nowcastMode" type="button" role="tab" aria-selected="true" aria-controls="charts">Nowcast</button><button id="forecastMode" type="button" role="tab" aria-selected="false" aria-controls="charts">Forecast</button></div></div></div>
+    <div class="map-heading"><div><p class="eyebrow" id="basinLabel">Loading storm data</p><h1 id="stormHeading">Storm track</h1></div><div class="map-controls"><div class="mode-switch" role="tablist" aria-label="Graph mode"><button id="nowcastMode" type="button" role="tab" aria-selected="true" aria-controls="charts">Nowcast</button><button id="forecastMode" type="button" role="tab" aria-selected="false" aria-controls="charts">Forecast</button></div><div class="storm-switcher" id="stormSwitcher"></div></div></div>
     <div class="map" id="map"></div>
     <div class="timeline">
       <button id="playButton">▶</button>
@@ -52,6 +52,7 @@
   </aside>
 </main>
 <dialog id="welcomeBanner" class="welcome-banner" aria-labelledby="welcomeTitle" aria-describedby="welcomeDescription">
+  <button id="closeWelcome" class="welcome-banner__close" type="button" aria-label="Close welcome popup">×</button>
   <img class="welcome-banner__badge" src="../assets/branding/team-badge.webp" alt="Tropical Cyclone Dynamics team badge">
   <div class="welcome-banner__intro">
     <p class="eyebrow">Welcome to StormSense</p>
@@ -60,7 +61,7 @@
     <div class="welcome-banner__actions">
       <button id="dismissWelcome" autofocus>Explore StormSense</button>
       <a href="../">Read the documentation</a>
-      <a href="https://github.com/simon-donike/geo2wf">View the code</a>
+      <a href="https://github.com/FrontierDevelopmentLab/2026-ESL-Tropical-Cyclone-Dynamics">View the code</a>
     </div>
   </div>
   <div class="welcome-banner__sponsor">
