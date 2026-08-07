@@ -111,6 +111,40 @@ def test_dense_pmw_loader_reads_sharded_synthetic_layout(tmp_path: Path) -> None
     assert center == (10.0, -50.0)
 
 
+def test_dense_pmw_loader_prefers_explicit_coordinate_tensor(tmp_path: Path) -> None:
+    storm = "EP182023"
+    tensor_path = tmp_path / "observations" / storm / "frame.pt"
+    coordinate_path = tmp_path / "coordinates" / storm / "frame.pt"
+    tensor_path.parent.mkdir(parents=True)
+    coordinate_path.parent.mkdir(parents=True)
+    torch.save(torch.stack([torch.full((2, 3), value) for value in range(4)]), tensor_path)
+    expected_lat = np.array([[11.0, 11.0, 11.0], [9.0, 9.0, 9.0]])
+    expected_lon = np.array([[-51.0, -50.0, -49.0], [-51.0, -50.0, -49.0]])
+    torch.save(
+        {"latitude": torch.from_numpy(expected_lat), "longitude": torch.from_numpy(expected_lon)},
+        coordinate_path,
+    )
+    row = pd.Series(
+        {
+            "observation_id": "synthetic-frame",
+            "path": str(tensor_path.relative_to(tmp_path)),
+            "coordinates_path": str(coordinate_path.relative_to(tmp_path)),
+            "variables": json.dumps(
+                ["TB_36.5H", "TB_36.5V", "TB_A89.0H", "TB_A89.0V"]
+            ),
+            "ibtracs_center_lat": 10.0,
+            "ibtracs_center_lon": -50.0,
+        }
+    )
+
+    field, lat, lon, center = dense_pmw_field(row, tmp_path, storm)
+
+    assert np.array_equal(field, np.full((2, 3), 3, dtype=np.float32))
+    assert np.array_equal(lat, expected_lat)
+    assert np.array_equal(lon, expected_lon)
+    assert center == (10.0, -50.0)
+
+
 def test_dense_pmw_loader_does_not_invent_geolocation(tmp_path: Path) -> None:
     storm = "EP182023"
     tensor_path = tmp_path / "observations" / storm / "frame.pt"

@@ -205,8 +205,8 @@ function chart(metric,def){
 function forecastValue(point,source,metric){
   const value=point[source]?.[metric];return Number.isFinite(value)?value:null
 }
-function forecastReferenceAtTime(metric,time){
-  const rows=forecastPoints().map(point=>({time:dt(point.valid_time).getTime(),value:forecastValue(point,"ibtracs",metric)})).filter(point=>Number.isFinite(point.value));
+function forecastPredictionAtTime(metric,time){
+  const rows=forecastPoints().map(point=>({time:dt(point.valid_time).getTime(),value:forecastValue(point,"predicted",metric)})).filter(point=>Number.isFinite(point.value));
   if(!rows.length||time<rows[0].time||time>rows[rows.length-1].time)return null;
   const rightIndex=rows.findIndex(point=>point.time>=time),right=rows[rightIndex];
   if(right.time===time||rightIndex===0)return right.value;
@@ -299,8 +299,8 @@ function updateForecastFocus(preferredPoint=null,hoverX=null){
     state.issueLine.setAttribute("x1",cursorX);state.issueLine.setAttribute("x2",cursorX);setSvgHidden(state.validLine,!inside);setSvgHidden(state.leadBand,!inside);
     if(inside){state.validLine.setAttribute("x1",validX);state.validLine.setAttribute("x2",validX);state.leadBand.setAttribute("x",Math.min(cursorX,validX));state.leadBand.setAttribute("width",Math.abs(validX-cursorX))}
     [[state.activeForecast,"predicted"],[state.activeReference,"ibtracs"]].forEach(([dot,source])=>{const value=forecastValue(point,source,state.metric),hidden=!inside||!Number.isFinite(value);setSvgHidden(dot,hidden);if(!hidden){dot.setAttribute("cx",validX);dot.setAttribute("cy",state.y(value))}});
-    const predicted=forecastValue(point,"predicted",state.metric),reference=forecastReferenceAtTime(state.metric,dt(point.issue_time).getTime()),segmentHidden=!inside||!Number.isFinite(predicted);setSvgHidden(state.activeSegment,segmentHidden);
-    if(!segmentHidden){state.activeSegment.setAttribute("x1",cursorX);state.activeSegment.setAttribute("y1",state.y(Number.isFinite(reference)?reference:predicted));state.activeSegment.setAttribute("x2",validX);state.activeSegment.setAttribute("y2",state.y(predicted))}
+    const predicted=forecastValue(point,"predicted",state.metric),predictionAtIssue=forecastPredictionAtTime(state.metric,dt(point.issue_time).getTime()),segmentHidden=!inside||!Number.isFinite(predicted);setSvgHidden(state.activeSegment,segmentHidden);
+    if(!segmentHidden){state.activeSegment.setAttribute("x1",cursorX);state.activeSegment.setAttribute("y1",state.y(Number.isFinite(predictionAtIssue)?predictionAtIssue:predicted));state.activeSegment.setAttribute("x2",validX);state.activeSegment.setAttribute("y2",state.y(predicted))}
   });
   $("#forecastStatus").hidden=false;$("#forecastStatus").textContent=`Issued ${full(point.issue_time)} → Valid ${full(point.valid_time)} · +${forecastData.lead_hours} h`
 }
