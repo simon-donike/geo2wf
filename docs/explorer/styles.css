@@ -1173,12 +1173,12 @@ dialog #confirmDialog:hover {
 }
 
 .imagery-stack-control {
-  width: 248px;
-  padding: 10px;
+  width: 224px;
+  padding: 8px;
   color: var(--tint-20);
   background: color-mix(in srgb, var(--main) 96%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--divider));
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: 0 10px 30px rgb(0 0 0 / 24%);
   font-family: var(--font-main);
   backdrop-filter: blur(7px);
@@ -1188,27 +1188,27 @@ dialog #confirmDialog:hover {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
-  margin: 0 2px 8px;
-  padding-bottom: 7px;
+  gap: 8px;
+  margin: 0 2px 6px;
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--divider);
 }
 
 .imagery-stack-control > header strong {
   color: var(--secondary);
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
 .imagery-stack-control > header span {
   color: var(--tint-40);
-  font-size: 8px;
+  font-size: 7px;
 }
 
 .imagery-stack-list {
   display: grid;
-  gap: 5px;
+  gap: 3px;
 }
 
 .imagery-layer-row {
@@ -1216,13 +1216,13 @@ dialog #confirmDialog:hover {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 43px;
-  padding: 5px 7px 5px 5px;
+  gap: 5px;
+  min-height: 36px;
+  padding: 3px 5px 3px 4px;
   background: color-mix(in srgb, var(--tint-80) 48%, transparent);
   border: 1px solid color-mix(in srgb, var(--divider) 74%, transparent);
-  border-left: 3px solid var(--layer-color);
-  border-radius: 10px;
+  border-left: 2px solid var(--layer-color);
+  border-radius: 8px;
   transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 
@@ -1249,24 +1249,35 @@ dialog #confirmDialog:hover {
 }
 
 .imagery-layer-handle {
-  flex: 0 0 29px;
-  width: 29px;
-  height: 31px;
+  position: relative;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 27px;
   padding: 0;
-  background-color: color-mix(in srgb, var(--main) 68%, transparent);
-  background-image: radial-gradient(circle, var(--tint-30) 1.5px, transparent 1.8px);
-  background-position: center;
-  background-size: 6px 6px;
+  color: var(--tint-30);
+  background: color-mix(in srgb, var(--main) 68%, transparent);
   border: 1px solid var(--divider);
-  border-radius: 7px;
+  border-radius: 6px;
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
 
+.imagery-layer-handle::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 7px 0 currentColor, 0 7px currentColor, 7px 7px currentColor, 0 14px currentColor, 7px 14px currentColor;
+}
+
 .imagery-layer-handle:hover {
-  background-color: color-mix(in srgb, var(--layer-color) 17%, var(--main));
-  background-image: radial-gradient(circle, var(--layer-color) 1.5px, transparent 1.8px);
+  color: var(--layer-color);
+  background: color-mix(in srgb, var(--layer-color) 17%, var(--main));
   border-color: var(--layer-color);
 }
 
@@ -1284,7 +1295,7 @@ dialog #confirmDialog:hover {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   cursor: pointer;
 }
@@ -1298,12 +1309,12 @@ dialog #confirmDialog:hover {
 
 .imagery-layer-toggle > i {
   position: relative;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
   background: var(--main);
   border: 1px solid var(--tint-60);
-  border-radius: 5px;
+  border-radius: 4px;
 }
 
 .imagery-layer-toggle input:checked + i {
@@ -1314,10 +1325,10 @@ dialog #confirmDialog:hover {
 .imagery-layer-toggle input:checked + i::after {
   content: "";
   position: absolute;
-  left: 5px;
-  top: 2px;
-  width: 5px;
-  height: 9px;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
   border: solid var(--main);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
@@ -1343,22 +1354,22 @@ dialog #confirmDialog:hover {
 
 .imagery-layer-copy strong {
   color: var(--secondary);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 750;
 }
 
 .imagery-layer-copy small {
-  margin-top: 2px;
+  margin-top: 1px;
   color: var(--tint-50);
-  font-size: 7px;
+  font-size: 6px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .imagery-layer-rank {
-  min-width: 22px;
+  min-width: 18px;
   color: var(--tint-40);
-  font-size: 7px;
+  font-size: 6px;
   font-weight: 850;
   letter-spacing: 0.06em;
   text-align: right;
