@@ -62,7 +62,7 @@ const tourSteps = [
     kicker: "Explore the evidence",
     title: "Map and imagery stack",
     description: "Pan or zoom the map. Use the imagery checkboxes for visibility, then drag the dotted grips—the top layer draws above the others.",
-    target: () => document.querySelector(".leaflet-control-layers")
+    target: () => document.querySelector(".imagery-stack-control")
   },
   {
     kicker: "Move through time",
@@ -71,9 +71,16 @@ const tourSteps = [
     target: () => document.querySelector(".timeline")
   },
   {
+    kicker: "Model controls",
+    title: "Choose an inference model",
+    description: "Use this selector to switch the nowcast curve among whichever ViT, UNet, UNet+MLP, and diffusion outputs are available.",
+    target: () => visible(".model-toolbar") || document.querySelector(".analytics"),
+    enter: async () => { await setTourMode("nowcast"); }
+  },
+  {
     kicker: "Nowcasting",
     title: "Inspect the rise as it happens",
-    description: "Choose an inference model, then compare its curve with SAR and IBTrACS. Hover the chart for exact values inside the RI interval.",
+    description: "Compare the selected model curve with SAR and IBTrACS. Hover the chart for exact values inside the RI interval.",
     target: () => document.querySelector(".analytics"),
     enter: async () => { await setTourMode("nowcast"); await focusRapidIntensification(); }
   },
