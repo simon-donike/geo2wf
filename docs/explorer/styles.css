@@ -1174,64 +1174,85 @@ dialog #confirmDialog:hover {
 }
 
 .leaflet-control-layers-overlays {
-  min-width: 205px;
+  min-width: 225px;
 }
 
 .imagery-layer-instruction {
-  margin: 2px 4px 7px;
-  color: var(--tint-50);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 1px 3px 7px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.imagery-layer-instruction strong {
+  color: var(--secondary);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.imagery-layer-instruction span {
+  color: var(--tint-40);
   font-size: 8px;
-  letter-spacing: 0.03em;
 }
 
 .imagery-layer-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: 27px;
-  padding: 2px 3px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+  gap: 7px;
+  min-height: 34px;
+  margin: 3px 0;
+  padding: 3px 5px 3px 3px;
+  background: color-mix(in srgb, var(--tint-80) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--divider) 70%, transparent);
+  border-radius: 9px;
+  transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 
 .imagery-layer-row:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--tint-90));
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--divider));
 }
 
 .imagery-layer-row.is-dragging {
-  opacity: 0.55;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  z-index: 1;
+  opacity: 0.72;
+  background: color-mix(in srgb, var(--accent) 20%, var(--tint-90));
   border-color: var(--accent);
+  box-shadow: 0 7px 18px rgb(0 0 0 / 28%);
+  transform: translateY(var(--drag-offset, 0)) scale(1.02);
 }
 
 .imagery-layer-row label {
   flex: 1;
   margin: 0;
+  color: var(--tint-20);
   cursor: pointer;
 }
 
 .imagery-layer-handle {
-  display: grid;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
   padding: 0;
-  place-items: center;
-  color: var(--tint-50);
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1;
+  background-color: color-mix(in srgb, var(--main) 64%, transparent);
+  background-image: radial-gradient(circle, var(--tint-40) 1.4px, transparent 1.7px);
+  background-position: center;
+  background-size: 6px 6px;
+  border: 1px solid var(--divider);
+  border-radius: 7px;
   cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .imagery-layer-handle:hover {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background-color: color-mix(in srgb, var(--accent) 16%, var(--main));
+  background-image: radial-gradient(circle, var(--accent) 1.4px, transparent 1.7px);
+  border-color: var(--accent);
 }
 
 .imagery-layer-handle:active {
@@ -1239,9 +1260,22 @@ dialog #confirmDialog:hover {
 }
 
 .imagery-layer-handle:focus-visible {
-  color: var(--accent);
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+
+.imagery-layer-rank {
+  min-width: 22px;
+  color: var(--tint-50);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+
+body.is-reordering-imagery {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .intensity-key,
