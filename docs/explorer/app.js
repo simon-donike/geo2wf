@@ -22,39 +22,42 @@ function chartPointerX(chart,event){
   const rect=chartSvg.getBoundingClientRect();return(event.clientX-rect.left)/rect.width*C.w
 }
 
-const IMAGE_LAYER_META=[{id:"geo",label:"Geostationary imagery",pane:"geoPane"},{id:"pmw",label:"PMW 89–92 GHz",pane:"pmwPane"},{id:"sar",label:"SAR wind fields",pane:"sarPane"}];
-function applyImageLayerOrder(){
-  const rows=layerOrderControl?.getContainer()?.querySelectorAll(".imagery-layer-row");
-  rows?.forEach((row,index)=>{map.getPane(IMAGE_LAYER_META.find(item=>item.id===row.dataset.layer).pane).style.zIndex=350-index*10});
+const IMAGE_LAYER_META=[
+  {id:"geo",label:"Geostationary",detail:"CMI_C15",pane:"geoPane"},
+  {id:"pmw",label:"Passive microwave",detail:"89–92 GHz",pane:"pmwPane"},
+  {id:"sar",label:"SAR wind fields",detail:"Surface wind",pane:"sarPane"}
+];
+function imageryLayer(id){return{geo:geoLayers,pmw:pmwLayers,sar:sarLayers}[id]}
+function applyImageLayerOrder(container=layerOrderControl?.getContainer()){
+  const rows=container?.querySelectorAll(".imagery-layer-row");
+  rows?.forEach((row,index)=>{map.getPane(IMAGE_LAYER_META.find(item=>item.id===row.dataset.layer).pane).style.zIndex=350-index*10;row.querySelector(".imagery-layer-rank").textContent=index===0?"TOP":String(index+1)});
 }
-function setupLayerOrderControl(control){
-  layerOrderControl=control;
-  const overlays=control.getContainer().querySelector(".leaflet-control-layers-overlays");
-  const labels=[...overlays.querySelectorAll("label")];
-  const labelsByLayer=new Map(["geo","sar","pmw"].map((id,index)=>[id,labels[index]]));
-  const instruction=document.createElement("div");instruction.className="imagery-layer-instruction";instruction.id="imageryLayerInstruction";instruction.setAttribute("aria-live","polite");instruction.innerHTML="<strong>Imagery stack</strong><span>Drag a grip · top draws above</span>";overlays.prepend(instruction);
-  const refreshOrder=()=>{
-    [...overlays.querySelectorAll(".imagery-layer-row")].forEach((row,index)=>{row.querySelector(".imagery-layer-rank").textContent=index===0?"TOP":String(index+1)});
-    applyImageLayerOrder();
+function createImageryLayerControl(){
+  const control=L.control({position:"topright"});
+  control.onAdd=()=>{
+    const container=L.DomUtil.create("section","imagery-stack-control");container.setAttribute("aria-label","Imagery layers and drawing order");
+    const heading=document.createElement("header");heading.innerHTML="<strong>Imagery stack</strong><span>Top draws above</span>";
+    const list=document.createElement("div");list.className="imagery-stack-list";container.append(heading,list);
+    const refreshOrder=()=>applyImageLayerOrder(container);
+    IMAGE_LAYER_META.forEach(meta=>{
+      const layer=imageryLayer(meta.id),row=document.createElement("div");row.className="imagery-layer-row";row.dataset.layer=meta.id;
+      const handle=document.createElement("button");handle.type="button";handle.className="imagery-layer-handle";handle.setAttribute("aria-label",`Reorder ${meta.label}. Drag, or use up and down arrow keys.`);handle.title="Drag layer up or down";
+      const toggle=document.createElement("label");toggle.className="imagery-layer-toggle";
+      const input=document.createElement("input");input.type="checkbox";input.checked=map.hasLayer(layer);input.setAttribute("aria-label",`Show ${meta.label}`);
+      const check=document.createElement("i");check.setAttribute("aria-hidden","true");
+      const copy=document.createElement("span");copy.className="imagery-layer-copy";copy.innerHTML=`<strong>${meta.label}</strong><small>${meta.detail}</small>`;toggle.append(input,check,copy);
+      const rank=document.createElement("span");rank.className="imagery-layer-rank";rank.setAttribute("aria-hidden","true");row.append(handle,toggle,rank);list.append(row);
+      input.addEventListener("change",()=>{if(input.checked)layer.addTo(map);else map.removeLayer(layer);if(meta.id==="geo")$("#geostatKey").hidden=!input.checked;if(meta.id==="pmw")$("#pmwKey").hidden=!input.checked});
+      let pointerId=null,startY=0,lastY=0;
+      const finishDrag=()=>{if(pointerId===null)return;const siblings=[...list.querySelectorAll(".imagery-layer-row")].filter(item=>item!==row),before=siblings.find(item=>lastY<item.getBoundingClientRect().top+item.offsetHeight/2);list.insertBefore(row,before||null);pointerId=null;row.style.removeProperty("--drag-offset");row.classList.remove("is-dragging");document.body.classList.remove("is-reordering-imagery");refreshOrder()};
+      handle.addEventListener("pointerdown",event=>{if(event.button!==0)return;event.preventDefault();pointerId=event.pointerId;startY=lastY=event.clientY;handle.setPointerCapture(pointerId);row.classList.add("is-dragging");document.body.classList.add("is-reordering-imagery")});
+      handle.addEventListener("pointermove",event=>{if(event.pointerId!==pointerId)return;event.preventDefault();lastY=event.clientY;row.style.setProperty("--drag-offset",`${lastY-startY}px`)});
+      handle.addEventListener("pointerup",finishDrag);handle.addEventListener("pointercancel",finishDrag);handle.addEventListener("lostpointercapture",finishDrag);
+      handle.addEventListener("keydown",event=>{if(!["ArrowUp","ArrowDown"].includes(event.key))return;event.preventDefault();const sibling=event.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;if(!sibling?.classList.contains("imagery-layer-row"))return;if(event.key==="ArrowUp")list.insertBefore(row,sibling);else list.insertBefore(sibling,row);refreshOrder();handle.focus()});
+    });
+    L.DomEvent.disableClickPropagation(container);L.DomEvent.disableScrollPropagation(container);refreshOrder();return container;
   };
-  IMAGE_LAYER_META.forEach(meta=>{
-    const label=labelsByLayer.get(meta.id);if(!label)return;
-    const row=document.createElement("div");row.className="imagery-layer-row";row.dataset.layer=meta.id;
-    const handle=document.createElement("button");handle.type="button";handle.className="imagery-layer-handle";handle.setAttribute("aria-label",`Reorder ${meta.label}. Drag, or use up and down arrow keys.`);handle.setAttribute("aria-describedby",instruction.id);handle.title="Drag to reorder";
-    const rank=document.createElement("span");rank.className="imagery-layer-rank";rank.setAttribute("aria-hidden","true");
-    row.append(handle,label,rank);overlays.append(row);
-    let pointerId=null,startY=0,lastY=0;
-    const finishDrag=()=>{
-      if(pointerId===null)return;
-      const siblings=[...overlays.querySelectorAll(".imagery-layer-row")].filter(item=>item!==row),before=siblings.find(item=>lastY<item.getBoundingClientRect().top+item.offsetHeight/2);
-      overlays.insertBefore(row,before||null);pointerId=null;row.style.removeProperty("--drag-offset");row.classList.remove("is-dragging");document.body.classList.remove("is-reordering-imagery");refreshOrder();
-    };
-    handle.addEventListener("pointerdown",event=>{if(event.button!==0)return;event.preventDefault();pointerId=event.pointerId;startY=lastY=event.clientY;handle.setPointerCapture(pointerId);row.classList.add("is-dragging");document.body.classList.add("is-reordering-imagery")});
-    handle.addEventListener("pointermove",event=>{if(event.pointerId!==pointerId)return;event.preventDefault();lastY=event.clientY;row.style.setProperty("--drag-offset",`${lastY-startY}px`)});
-    handle.addEventListener("pointerup",finishDrag);handle.addEventListener("pointercancel",finishDrag);handle.addEventListener("lostpointercapture",finishDrag);
-    handle.addEventListener("keydown",event=>{if(!["ArrowUp","ArrowDown"].includes(event.key))return;event.preventDefault();const sibling=event.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;if(!sibling?.classList.contains("imagery-layer-row"))return;if(event.key==="ArrowUp")overlays.insertBefore(row,sibling);else overlays.insertBefore(sibling,row);refreshOrder();handle.focus()});
-  });
-  refreshOrder();
+  return control;
 }
 
 function initMap(){
@@ -79,9 +82,7 @@ function initMap(){
   geoLayers=L.layerGroup().addTo(map);
   sarLayers=L.layerGroup().addTo(map);
   pmwLayers=L.layerGroup();
-  const layerControl=L.control.layers(null,{"Geostationary imagery":geoLayers,"SAR wind fields":sarLayers,"PMW 89–92 GHz":pmwLayers},{collapsed:false,position:"topright"}).addTo(map);setupLayerOrderControl(layerControl);
-  map.on("overlayadd",event=>{if(event.layer===geoLayers)$("#geostatKey").hidden=false;if(event.layer===pmwLayers)$("#pmwKey").hidden=false});
-  map.on("overlayremove",event=>{if(event.layer===geoLayers)$("#geostatKey").hidden=true;if(event.layer===pmwLayers)$("#pmwKey").hidden=true});
+  layerOrderControl=createImageryLayerControl();layerOrderControl.addTo(map);applyImageLayerOrder();
 }
 function switcher(){
   $("#stormSwitcher").innerHTML=`<label><span>Storm</span><select id="stormSelect">${data.storms.map(s=>`<option value="${s.id}" ${s.id===storm.id?"selected":""}>${s.id}${s.name?` · ${displayStormName(s.name)}`:""} · ${s.basin}</option>`).join("")}</select></label>`;
