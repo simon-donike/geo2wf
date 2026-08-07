@@ -304,8 +304,8 @@ def export_forecasts(storm_id):
     if not models:
         return None
     default_model = (
-        "convlstm"
-        if any(model["id"] == "convlstm" for model in models)
+        "mlp"
+        if any(model["id"] == "mlp" for model in models)
         else models[0]["id"]
     )
     default_metadata = next(model for model in models if model["id"] == default_model)
