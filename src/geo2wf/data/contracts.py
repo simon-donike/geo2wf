@@ -51,6 +51,8 @@ class WindFieldBatch(TypedDict):
     pmw_mask: NotRequired[torch.Tensor]
     pmw_bounds: NotRequired[torch.Tensor]
     ibtracs: NotRequired[list[Mapping[str, Any]]]
+    intensity_target_ms: NotRequired[torch.Tensor]
+    intensity_observation_timestamp: NotRequired[list[str]]
 
 
 @dataclass(frozen=True)

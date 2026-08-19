@@ -465,9 +465,6 @@ def soft_exceedance_area_loss(
 class ERA5ResidualRegressor(WindFieldLightningModule):
     """Predict a deterministic physical-wind correction to the ERA5 field.
 
-    When ``use_era5`` is false, the same U-Net predicts the absolute physical
-    wind field directly and requires no ERA5 tensors in the batch.
-
     The data set supplies an ERA5 wind speed transformed like the SAR target for
     network input, plus its physical m/s value for the residual connection. Loss
     and validation metrics are calculated in m/s over the joint valid mask.

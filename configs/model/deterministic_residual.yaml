@@ -1,5 +1,6 @@
 _target_: geo2wf.models.deterministic_residual.ERA5ResidualRegressor
 condition_channels: 23
+use_era5: true
 base_channels: 32
 channel_mults: [1, 2, 4, 8]
 huber_delta_ms: 2.0

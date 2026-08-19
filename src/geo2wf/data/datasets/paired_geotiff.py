@@ -62,6 +62,7 @@ class PairedImageDataset(Dataset):
         center_crop_size: tuple[int, int] | None = None,
         augment: bool = False,
         require_era5: bool = False,
+        use_era5: bool = True,
         include_pmw: bool = False,
         pmw_as_condition: bool = False,
         max_pmw_time_gap_hours: float | None = None,
@@ -82,8 +83,9 @@ class PairedImageDataset(Dataset):
             )
         self.samples = pd.read_csv(self.manifest_file, keep_default_na=False)
         self.manifest_sample_count = len(self.samples)
-        self.require_era5 = require_era5
-        if self.require_era5:
+        self.require_era5 = bool(require_era5)
+        self.use_era5 = bool(use_era5)
+        if self.require_era5 and self.use_era5:
             self.samples = self.samples.loc[
                 _manifest_has_era5(self.samples)
             ].reset_index(drop=True)
@@ -121,7 +123,7 @@ class PairedImageDataset(Dataset):
         )
         self.max_era5_time_gap_hours = max_era5_time_gap_hours
         self.filtered_stale_era5_count = 0
-        if max_era5_time_gap_hours is not None:
+        if self.use_era5 and max_era5_time_gap_hours is not None:
             if max_era5_time_gap_hours <= 0:
                 raise ValueError("max_era5_time_gap_hours must be positive")
             gap_hours = _manifest_era5_time_gap_hours(self.samples)
@@ -207,6 +209,10 @@ class PairedImageDataset(Dataset):
         context_channels = _json_list(
             _row_value(row, "context_channels", row.get("era5_channels", "[]"))
         )
+        if not self.use_era5 and context_source_type == "era5":
+            context_path = ""
+            context_source_type = ""
+            context_channels = []
         pmw_path = _row_value(row, "pmw_path", "") if self.include_pmw else ""
         pmw_channels = (
             _json_list(_row_value(row, "pmw_channels", "[]"))

@@ -7,6 +7,10 @@ from .intensity_forecast import (
     IntensityForecastDataSpec,
     IntensityForecastDataset,
 )
+from .joint_intensity import (
+    JointPairedIntensityDataModule,
+    JointPairedIntensityDataset,
+)
 
 __all__ = [
     "DataSpec",
@@ -14,6 +18,8 @@ __all__ = [
     "IntensityForecastDataModule",
     "IntensityForecastDataSpec",
     "IntensityForecastDataset",
+    "JointPairedIntensityDataModule",
+    "JointPairedIntensityDataset",
     "SampleMetadata",
     "UNetIntensityDataModule",
     "UNetIntensityDataset",
