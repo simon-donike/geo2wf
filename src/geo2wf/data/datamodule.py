@@ -41,6 +41,7 @@ class PairedDataModule(pl.LightningDataModule):
         random_flips: bool = True,
         include_test_in_train: bool = False,
         require_era5: bool = False,
+        use_era5: bool = True,
         include_pmw: bool = False,
         pmw_as_condition: bool = False,
         max_pmw_time_gap_hours: float | None = None,
@@ -81,6 +82,7 @@ class PairedDataModule(pl.LightningDataModule):
         self.random_flips = random_flips
         self.include_test_in_train = include_test_in_train
         self.require_era5 = require_era5
+        self.use_era5 = bool(use_era5)
         self.include_pmw = bool(include_pmw)
         self.pmw_as_condition = bool(pmw_as_condition)
         self.max_pmw_time_gap_hours = max_pmw_time_gap_hours
@@ -162,6 +164,7 @@ class PairedDataModule(pl.LightningDataModule):
             random_flips=data_cfg.get("random_flips", True),
             include_test_in_train=data_cfg.get("include_test_in_train", False),
             require_era5=require_era5,
+            use_era5=data_cfg.get("use_era5", True),
             include_pmw=data_cfg.get("include_pmw", False),
             pmw_as_condition=data_cfg.get("pmw_as_condition", False),
             max_pmw_time_gap_hours=(
@@ -331,6 +334,7 @@ class PairedDataModule(pl.LightningDataModule):
             center_crop_size=self.center_crop_size,
             augment=augment,
             require_era5=self.require_era5,
+            use_era5=self.use_era5,
             include_pmw=self.include_pmw,
             include_ibtracs=self.include_ibtracs,
             pmw_as_condition=self.pmw_as_condition,

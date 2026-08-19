@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - override /data: joint_geo_sar_ibtracs
+  - override /model: bottleneck_unet_mlp
+
+# Ten GEO bands plus distance-to-center and three solar-time channels.
+data:
+  use_era5: false
+
+model:
+  condition_channels: 14
+
+trainer:
+  max_epochs: 1000
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    name: bottleneck-unet-mlp-joint-no-era5
+    project: geo2wf

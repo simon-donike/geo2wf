@@ -1,0 +1,19 @@
+# @package _global_
+defaults:
+  - override /data: geo_pmw_near89_common10_era5
+  - override /model: direct_unet
+
+# Ten GEO bands plus distance-to-center and three solar-time channels.
+data:
+  use_era5: false
+
+model:
+  condition_channels: 14
+
+trainer:
+  max_epochs: 10_000
+  checkpoint:
+    monitor: val/rmse_k
+    mode: min
+    save_top_k: 2
+    save_last: true

@@ -9,6 +9,7 @@ center_crop_size: null
 random_flips: true
 include_test_in_train: false
 require_era5: true
+use_era5: true
 include_pmw: false
 include_ibtracs: false
 normalization: robust-zscore

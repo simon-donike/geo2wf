@@ -74,4 +74,24 @@ uv run geo2wf-train \
   model=deterministic_residual
 ```
 
+## No-ERA5 ablation
+
+The same U-Net can be trained without ERA5:
+
+```bash
+uv run geo2wf-train experiment=deterministic_unet_no_era5
+```
+
+In this mode the 14-channel condition contains ten GEO bands, storm-center
+distance, and three solar-time channels. The U-Net predicts absolute physical
+wind speed rather than a correction to an unavailable baseline. ERA5 filtering,
+the ERA5 residual addition, off-swath anchoring, and ERA5 comparison metrics are
+disabled.
+
+The older direct near-89 GHz U-Net has an equivalent preset:
+
+```bash
+uv run geo2wf-train experiment=geo_pmw_near89_unet_no_era5
+```
+
 After selecting a checkpoint, pass it to Stage 2 through `GEO2WF_BASELINE_CKPT` or the modular `model.baseline_checkpoint_path` override. The historical full-YAML equivalent is `model.residual.baseline.checkpoint_path`. Continue to [Stage 2 residual diffusion](residual-diffusion.md) or [Evaluation](../experiments/evaluation.md).

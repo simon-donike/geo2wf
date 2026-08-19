@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - override /data: geo_sar_common10_era5
+  - override /model: deterministic_residual
+
+# Without ERA5 this model predicts absolute wind speed instead of a residual.
+data:
+  use_era5: false
+
+model:
+  use_era5: false
+  condition_channels: 14
+  off_swath_anchor_weight: 0.0
+
+trainer:
+  checkpoint:
+    monitor: val/eye_structure_score
+    mode: min
+    save_top_k: 2
+    save_last: true
+logging:
+  wandb:
+    name: deterministic-unet-no-era5
