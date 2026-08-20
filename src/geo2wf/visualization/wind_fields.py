@@ -282,8 +282,18 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
         for sample in samples
     )
     has_baseline = any(sample.get("baseline") is not None for sample in samples)
+    has_intensity = any(
+        sample.get("intensity_prediction_ms") is not None
+        and sample.get("intensity_target_ms") is not None
+        for sample in samples
+    )
     panel_count = (
-        3 + int(has_pmw) + int(has_baseline) + int(has_map) + int(has_era5_wind)
+        3
+        + int(has_pmw)
+        + int(has_baseline)
+        + int(has_map)
+        + int(has_era5_wind)
+        + int(has_intensity)
     )
     fig, axes = plt.subplots(
         len(samples),
@@ -300,12 +310,20 @@ def plot_validation_reconstruction_batch(samples: list[dict[str, Any]]) -> Figur
             has_baseline=has_baseline,
             has_map=has_map,
             has_era5_wind=has_era5_wind,
+            has_intensity=has_intensity,
         )
     return fig
 
 
 def _draw_validation_row(
-    axes, sample, *, has_pmw, has_baseline, has_map, has_era5_wind
+    axes,
+    sample,
+    *,
+    has_pmw,
+    has_baseline,
+    has_map,
+    has_era5_wind,
+    has_intensity,
 ):
     condition_array = _as_chw_numpy(sample["condition"])
     prediction_array = _as_chw_numpy(sample["prediction"])
@@ -492,6 +510,16 @@ def _draw_validation_row(
                 center,
                 value_range=output_ranges[0] if physical_wind_output else None,
             )
+    if has_intensity:
+        intensity_ax = axes[
+            3 + int(has_pmw) + int(has_baseline) + int(has_map) + int(has_era5_wind)
+        ]
+        predicted = sample.get("intensity_prediction_ms")
+        actual = sample.get("intensity_target_ms")
+        if predicted is None or actual is None:
+            intensity_ax.set_axis_off()
+        else:
+            _plot_intensity_comparison(intensity_ax, float(actual), float(predicted))
     if sample.get("sample_label"):
         axes[0].annotate(
             sample["sample_label"],
@@ -502,6 +530,29 @@ def _draw_validation_row(
             fontsize=11,
             annotation_clip=False,
         )
+
+
+def _plot_intensity_comparison(ax, actual: float, predicted: float) -> None:
+    """Draw the continuous IBTrACS target and bottleneck-MLP prediction."""
+    values = [actual, predicted]
+    bars = ax.bar(
+        ["Actual", "Predicted"], values, color=["#4c78a8", "#f58518"], width=0.62
+    )
+    upper = max(max(values), 1.0)
+    ax.set_ylim(0.0, upper * 1.25)
+    for bar, value in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + upper * 0.025,
+            f"{value:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
+    error = predicted - actual
+    ax.set_title(f"IBTrACS max wind\nerror {error:+.1f} m s$^{{-1}}$", fontsize=10)
+    ax.set_ylabel(r"Wind speed (m s$^{-1}$)")
+    ax.grid(axis="y", alpha=0.25)
 
 
 def _condition_plot_view(array, mask, channels):

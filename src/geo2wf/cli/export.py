@@ -19,6 +19,7 @@ def main() -> None:
             "geo-sar",
             "geo-pmw",
             "intensity-cache",
+            "joint-intensity-cache",
             "intensity-forecast-cache",
         ),
     )
@@ -30,6 +31,8 @@ def main() -> None:
         from scripts.export_geo_pmw_geotiffs import main as export_main
     elif args.dataset == "intensity-cache":
         from scripts.export_unet_intensity_cache import main as export_main
+    elif args.dataset == "joint-intensity-cache":
+        from scripts.export_joint_intensity_cache import main as export_main
     else:
         from scripts.export_intensity_forecast_cache import main as export_main
     export_main()

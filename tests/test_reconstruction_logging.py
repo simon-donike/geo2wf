@@ -43,6 +43,8 @@ def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:
             wandb_key="images/val_reconstruction",
             target_batch=batch["target_physical"],
             baseline_batch=baseline,
+            intensity_prediction_batch=torch.tensor([37.5]),
+            intensity_target_batch=torch.tensor([40.0]),
         )
 
     samples = plot_batch.call_args.args[0]
@@ -56,6 +58,9 @@ def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:
         step=12,
     )
     close_figure.assert_called_once_with(figure)
+
+    assert samples[0]["intensity_prediction_ms"] == 37.5
+    assert samples[0]["intensity_target_ms"] == 40.0
 
 
 def test_shared_logger_passes_physical_pmw_to_plotter() -> None:

@@ -1,6 +1,7 @@
 _target_: geo2wf.data.joint_intensity.JointPairedIntensityDataModule
 root: ${oc.env:GEO2WF_JOINT_PAIRED_ROOT,data/geotiff/geo_sar_10bands_era5_v2_pmw}
-intensity_root: ${oc.env:GEO2WF_JOINT_INTENSITY_ROOT,data/unet_intensity_geostat_nopmw_v2}
+ibtracs_file: ${oc.env:GEO2WF_IBTRACS_FILE,data/IBTrACs/ibtracs.ALL.list.v04r01.csv}
+max_ibtracs_bracket_hours: 3.0
 stats_file: ${.root}/stats.json
 train_split: train
 val_split: val
