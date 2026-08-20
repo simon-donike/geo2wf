@@ -69,6 +69,7 @@ nav:
       - Configuration guide: experiments/configuration.md
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
+      - Intensity model comparison: experiments/intensity-comparison.md
       - Diffusion refinement ablations: experiments/ablations.md
       - Completed ablation analysis: experiments/ablation-analysis.md
       - Post-processing ablation: experiments/postprocessing-ablation.md

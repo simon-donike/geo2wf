@@ -22,6 +22,12 @@ def main() -> None:
 
         intensity_main()
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "intensity-comparison":
+        sys.argv.pop(1)
+        from scripts.evaluate_intensity_models import main as comparison_main
+
+        comparison_main()
+        return
     from scripts.evaluate_checkpoint import main as evaluate_main
 
     evaluate_main()

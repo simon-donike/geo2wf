@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - override /data: joint_geo_sar_ibtracs
+  - override /model: deterministic_residual
+
+# Train the field-only U-Net on exactly the same interpolated-IBTrACS cohort
+# used by the joint U-Net + MLP. The deterministic model ignores the scalar
+# companion, but retaining the joint data module makes the sample IDs and
+# storm-disjoint train/validation/test partitions identical by construction.
+trainer:
+  max_epochs: 1000
+  checkpoint:
+    monitor: val/eye_structure_score
+    mode: min
+    save_top_k: 2
+    save_last: true
+
+logging:
+  wandb:
+    name: intensity-comparison-field-unet
+    project: geo2wf
+    enabled: true
+    log_model: true

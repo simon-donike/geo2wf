@@ -14,6 +14,8 @@ def log_wandb_reconstruction(
     condition_batch: torch.Tensor | None = None,
     target_batch: torch.Tensor | None = None,
     baseline_batch: torch.Tensor | None = None,
+    intensity_prediction_batch: torch.Tensor | None = None,
+    intensity_target_batch: torch.Tensor | None = None,
     physical_wind_output: bool = False,
     physical_output_units: str | None = None,
 ) -> None:
@@ -58,6 +60,12 @@ def log_wandb_reconstruction(
         }
         if baseline_batch is not None:
             sample["baseline"] = baseline_batch[index]
+        if intensity_prediction_batch is not None:
+            sample["intensity_prediction_ms"] = _batch_scalar(
+                intensity_prediction_batch, index
+            )
+        if intensity_target_batch is not None:
+            sample["intensity_target_ms"] = _batch_scalar(intensity_target_batch, index)
         if isinstance(batch, dict):
             meta = batch.get("meta", {})
             if isinstance(meta, list):
@@ -148,6 +156,16 @@ def _batch_value(value: Any, index: int) -> str:
     if isinstance(value, (list, tuple)):
         return str(value[index]) if index < len(value) else ""
     return str(value)
+
+
+def _batch_scalar(value: Any, index: int) -> float:
+    item = value[index]
+    if torch.is_tensor(item):
+        item = item.detach().cpu()
+        if item.numel() != 1:
+            raise ValueError("Expected one scalar intensity value per sample")
+        return float(item.item())
+    return float(item)
 
 
 def _channel_names(value: Any, index: int) -> list[str] | None:

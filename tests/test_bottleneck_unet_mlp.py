@@ -9,6 +9,7 @@ import pytest
 import pytorch_lightning as pl
 import rasterio
 from rasterio.transform import from_origin
+from matplotlib import pyplot as plt
 import torch
 
 from geo2wf.config import compose_config, instantiate_model
@@ -23,6 +24,8 @@ from geo2wf.models.bottleneck_unet_mlp import (
     BottleneckUNetMLP,
     BottleneckUNetMLPRegressor,
 )
+
+from geo2wf.visualization.wind_fields import plot_validation_reconstruction_batch
 
 
 def _batch(batch_size: int = 2, channels: int = 3, size: int = 16) -> dict:
@@ -62,6 +65,32 @@ def test_architecture_preserves_image_shape_and_exposes_bottleneck(shape) -> Non
     assert output.reconstruction_normalized.min() >= 0.0
     assert output.reconstruction_normalized.max() <= 1.0
     assert output.ibtracs_max_wind_ms.min() >= 0.0
+
+
+def test_reconstruction_plot_shows_ibtracs_actual_vs_mlp_prediction() -> None:
+    sample = {
+        "condition": torch.full((3, 4, 4), 0.5),
+        "prediction": torch.full((1, 4, 4), 20.0),
+        "target": torch.full((1, 4, 4), 22.0),
+        "condition_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
+        "intensity_target_ms": 40.0,
+        "intensity_prediction_ms": 37.5,
+        "physical_wind_output": True,
+    }
+
+    figure = plot_validation_reconstruction_batch([sample])
+    intensity_axis = next(
+        axis for axis in figure.axes if axis.get_title().startswith("IBTrACS max wind")
+    )
+
+    assert [tick.get_text() for tick in intensity_axis.get_xticklabels()] == [
+        "Actual",
+        "Predicted",
+    ]
+    assert [patch.get_height() for patch in intensity_axis.patches] == [40.0, 37.5]
+    assert "error -2.5" in intensity_axis.get_title()
+    plt.close(figure)
 
 
 def test_intensity_branch_reaches_encoder_but_not_decoder() -> None:
@@ -184,21 +213,7 @@ def _write_tiff(path: Path, values: np.ndarray) -> None:
         destination.write(values.astype(np.float32))
 
 
-def _write_joint_fixture(root: Path, labels_root: Path) -> None:
-    (labels_root / "cache-metadata.json").parent.mkdir(parents=True)
-    (labels_root / "cache-metadata.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "target": {
-                    "source": "IBTrACS USA_WIND",
-                    "units": "m s-1",
-                    "knot_to_ms": 0.514444,
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+def _write_joint_fixture(root: Path, ibtracs_file: Path) -> None:
     stats = {
         "channels": {
             "geo": {"CMI_C13": {"min": 200.0, "max": 300.0}},
@@ -217,13 +232,26 @@ def _write_joint_fixture(root: Path, labels_root: Path) -> None:
     root.mkdir(parents=True)
     (root / "stats.json").write_text(json.dumps(stats), encoding="utf-8")
 
+    ibtracs_rows = []
     for split_index, split in enumerate(("train", "val", "test")):
         paired_split = root / split
-        label_split = labels_root / split
         paired_split.mkdir()
-        label_split.mkdir()
         rows = []
         storm_id = f"AL0{split_index + 1}2024"
+        ibtracs_rows.extend(
+            [
+                {
+                    "USA_ATCF_ID": storm_id,
+                    "ISO_TIME": "2024-08-01T00:00:00Z",
+                    "USA_WIND": 40.0 + split_index,
+                },
+                {
+                    "USA_ATCF_ID": storm_id,
+                    "ISO_TIME": "2024-08-01T03:00:00Z",
+                    "USA_WIND": 50.0 + split_index,
+                },
+            ]
+        )
         for sample_index in range(2):
             sample_id = f"{split}-{sample_index}"
             condition_name = f"{sample_id}-geo.tif"
@@ -265,33 +293,23 @@ def _write_joint_fixture(root: Path, labels_root: Path) -> None:
                     "condition_channels": json.dumps(["CMI_C13"]),
                     "target_channels": json.dumps(["wind_speed"]),
                     "condition_timestamp": "2024-08-01T00:00:00Z",
-                    "target_timestamp": "2024-08-01T00:00:00Z",
+                    "target_timestamp": "2024-08-01T01:30:00Z",
                     "dt_minutes": 0.0,
                     "ibtracs_center_lat": 4.0,
                     "ibtracs_center_lon": 4.0,
                 }
             )
         pd.DataFrame(rows).to_csv(paired_split / "manifest.csv", index=False)
-        pd.DataFrame(
-            [
-                {
-                    "sample_id": f"intensity-{split}",
-                    "source_sample_id": f"{split}-0",
-                    "storm_id": storm_id,
-                    "split": split,
-                    "observation_timestamp": "2024-08-01T00:00:00Z",
-                    "target_wind_ms": 31.25 + split_index,
-                }
-            ]
-        ).to_csv(label_split / "manifest.csv", index=False)
+    pd.DataFrame(ibtracs_rows).to_csv(ibtracs_file, index=False)
 
 
 def _joint_datamodule(
-    root: Path, labels_root: Path, *, use_era5: bool = True
+    root: Path, ibtracs_file: Path, *, use_era5: bool = True
 ) -> JointPairedIntensityDataModule:
     return JointPairedIntensityDataModule(
         root=root,
-        intensity_root=labels_root,
+        ibtracs_file=ibtracs_file,
+        max_ibtracs_bracket_hours=3.0,
         stats_file=root / "stats.json",
         batch_size=1,
         num_workers=0,
@@ -304,20 +322,20 @@ def _joint_datamodule(
 
 
 def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) -> None:
-    root, labels_root = tmp_path / "paired", tmp_path / "labels"
-    _write_joint_fixture(root, labels_root)
-    datamodule = _joint_datamodule(root, labels_root)
+    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    datamodule = _joint_datamodule(root, ibtracs_file)
     datamodule.setup("fit")
 
-    assert len(datamodule.train_dataset) == 1
-    assert len(datamodule.val_dataset) == 1
+    assert len(datamodule.train_dataset) == 2
+    assert len(datamodule.val_dataset) == 2
     assert IBTRACS_MAX_WIND_COMPANION in datamodule.data_spec.companions
     batch = next(iter(datamodule.train_dataloader()))
-    assert batch["intensity_target_ms"].item() == pytest.approx(31.25)
+    assert batch["intensity_target_ms"].item() == pytest.approx(45.0 * 0.514444)
     assert batch["condition"].shape[1] == 14
     assert "era5_wind_speed" in batch
 
-    no_era5 = _joint_datamodule(root, labels_root, use_era5=False)
+    no_era5 = _joint_datamodule(root, ibtracs_file, use_era5=False)
     no_era5.setup("fit")
     no_era5_batch = next(iter(no_era5.train_dataloader()))
     assert no_era5_batch["condition"].shape[1] == 5
@@ -325,27 +343,32 @@ def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) 
     assert "target_category" not in batch
 
 
-def test_data_adapter_rejects_duplicate_and_unmapped_labels(tmp_path: Path) -> None:
-    root, labels_root = tmp_path / "paired", tmp_path / "labels"
-    _write_joint_fixture(root, labels_root)
-    manifest = labels_root / "train" / "manifest.csv"
-    labels = pd.read_csv(manifest)
-    pd.concat([labels, labels], ignore_index=True).to_csv(manifest, index=False)
-    with pytest.raises(ValueError, match="must be unique"):
-        _joint_datamodule(root, labels_root)
+def test_data_adapter_rejects_conflicts_and_filters_wide_brackets(
+    tmp_path: Path,
+) -> None:
+    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    fixes = pd.read_csv(ibtracs_file)
+    conflict = fixes.iloc[[0]].copy()
+    conflict["USA_WIND"] = 99.0
+    pd.concat([fixes, conflict], ignore_index=True).to_csv(ibtracs_file, index=False)
+    with pytest.raises(ValueError, match="conflicting USA_WIND"):
+        _joint_datamodule(root, ibtracs_file)
 
-    labels.iloc[:1].to_csv(manifest, index=False)
-    labels.loc[0, "source_sample_id"] = "missing-paired-sample"
-    labels.to_csv(manifest, index=False)
-    datamodule = _joint_datamodule(root, labels_root)
-    with pytest.raises(ValueError, match="do not map"):
-        datamodule.setup("fit")
+    fixes.loc[fixes["ISO_TIME"].str.contains("03:00:00"), "ISO_TIME"] = (
+        "2024-08-01T04:00:00Z"
+    )
+    fixes.to_csv(ibtracs_file, index=False)
+    datamodule = _joint_datamodule(root, ibtracs_file)
+    datamodule.setup("fit")
+    assert len(datamodule.train_dataset) == 0
+    assert datamodule.train_dataset.filtered_unbracketed_count == 2
 
 
 def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
-    root, labels_root = tmp_path / "paired", tmp_path / "labels"
-    _write_joint_fixture(root, labels_root)
-    datamodule = _joint_datamodule(root, labels_root)
+    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    datamodule = _joint_datamodule(root, ibtracs_file)
     model = BottleneckUNetMLPRegressor(
         condition_channels=14,
         base_channels=4,

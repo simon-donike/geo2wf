@@ -594,12 +594,15 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             )
 
     def _log_reconstruction(self, batch: Mapping[str, Any], wandb_key: str) -> None:
+        prediction = self.predict_joint(batch)
         log_wandb_reconstruction(
             self,
             batch,
-            self.predict_physical(batch),
+            prediction.central_physical,
             wandb_key=wandb_key,
             target_batch=batch["target_physical"],
+            intensity_prediction_batch=prediction.ibtracs_max_wind_ms,
+            intensity_target_batch=batch["intensity_target_ms"],
             physical_output_units="m s-1",
         )
 

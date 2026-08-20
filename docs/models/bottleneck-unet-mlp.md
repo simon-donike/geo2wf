@@ -19,10 +19,16 @@ knots to metres per second. Tropical-cyclone categories are not model targets
 and do not contribute to the loss.
 
 The data module reuses `PairedImageDataset` for all raster loading,
-normalization, masking, and augmentation. It reads only label rows from the
-existing intensity cache, joins them to paired samples with `source_sample_id`,
-and filters each split to samples having both a SAR image and an IBTrACS label.
-Cached frozen-U-Net fields and predictions are not used.
+normalization, masking, and augmentation. It reads `USA_WIND` directly from
+IBTrACS and linearly interpolates it at each SAR target timestamp between the
+immediately preceding and following valid fixes. The two fixes may be at most
+three hours apart. Exact fix timestamps use the recorded value directly.
+Category fields, frozen-U-Net caches, and ERA5 are not involved in constructing
+the scalar target. Samples outside a valid three-hour bracket are excluded.
+
+With the current local files this retains 842/232/212 train/validation/test
+samples when ERA5 is enabled, and 1,237/330/302 when it is disabled. The
+remaining records lie outside a valid three-hour `USA_WIND` bracket.
 
 Train with the default local data paths:
 
@@ -30,11 +36,11 @@ Train with the default local data paths:
 uv run geo2wf-train experiment=bottleneck_unet_mlp
 ```
 
-Override the two roots directly or through environment variables:
+Override the paired root and IBTrACS file through environment variables:
 
 ```bash
 GEO2WF_JOINT_PAIRED_ROOT=/path/to/paired \
-GEO2WF_JOINT_INTENSITY_ROOT=/path/to/intensity-cache \
+GEO2WF_IBTRACS_FILE=/path/to/ibtracs.ALL.list.v04r01.csv \
 uv run geo2wf-train experiment=bottleneck_unet_mlp
 ```
 
@@ -46,7 +52,7 @@ uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
 
 This sets `data.use_era5=false` and changes `model.condition_channels` from 23
 to 14: ten GEO bands, distance to the storm center, and three solar-time
-channels. The paired manifests and IBTrACS intensity join are unchanged. ERA5
+channels. The paired manifests and IBTrACS interpolation are unchanged. ERA5
 rasters, derived ERA5 wind speed/vorticity, and ERA5 companion tensors are not
 loaded or passed to either branch.
 
