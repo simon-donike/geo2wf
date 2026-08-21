@@ -190,7 +190,7 @@ for name, settings in loss_variants.items():
         if key in settings:
             loss[key] = settings[key]
     config.setdefault("data", {})["include_test_in_train"] = True
-    config.setdefault("validation", {})["log_reconstruction_images"] = False
+    config.setdefault("validation", {})["log_reconstruction_images"] = True
     config.setdefault("logging", {}).setdefault("wandb", {})["project"] = (
         "geo2wf-stage2-peak-tail-ablations"
     )

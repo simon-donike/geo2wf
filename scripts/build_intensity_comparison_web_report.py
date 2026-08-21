@@ -624,13 +624,27 @@ def _report_markdown(
         "| With ERA5 | epoch 61 · `4rqrc3oh` | epoch 27 · `ymivzoau` | epoch 139 · `rj7951rk` |",
         "| Without ERA5 | epoch 77 · `ldd7fp28` | epoch 50 · `frrrn6dl` | epoch 70 · `oyiqs6go` |",
         "",
-        "### W&B validation media at the selected checkpoints",
+        "### Validation reconstruction media at the selected checkpoints",
         "",
         "The correction images are the W&B three-storm diagnostic nearest each "
         "selected checkpoint. They show the automatically selected validation "
         "storms (not the dedicated three-storm dense analysis below). The joint "
         "images show validation GEO input, predicted and SAR target fields, valid "
         "footprints, ERA5 where applicable, and scalar-intensity error.",
+        "",
+        "The raw U-Net run had media logging disabled, so its panels below were "
+        "regenerated from the exact selected epoch-77 checkpoint (`ldd7fp28`) on "
+        "the same storm-stratified validation loader. Each row shows GEO input, "
+        "the reconstructed wind field, the SAR target, and both valid footprints. "
+        "No ERA5 field is supplied to this model.",
+        "",
+        '=== "Raw U-Net · without ERA5"',
+        "",
+        "    ![Raw U-Net reconstruction samples without ERA5, set 1](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-03.jpg)",
+        "",
+        "    ![Raw U-Net reconstruction samples without ERA5, set 2](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-23.jpg)",
+        "",
+        "    ![Raw U-Net reconstruction samples without ERA5, set 3](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-31.jpg)",
         "",
         '=== "Correction · with ERA5"',
         "",

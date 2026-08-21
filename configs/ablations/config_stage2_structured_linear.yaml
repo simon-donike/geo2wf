@@ -158,7 +158,7 @@ trainer:
     save_last: true
 validation:
   reconstruction_batches: 3
-  log_reconstruction_images: false
+  log_reconstruction_images: true
   ensemble_size: 4
   ensemble_batches: 3
   sampling_seed: 42

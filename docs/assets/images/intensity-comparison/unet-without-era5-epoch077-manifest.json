@@ -1,0 +1,17 @@
+{
+  "created_utc": "2026-08-21T16:01:50.706153+00:00",
+  "config": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/resolved-config.yaml",
+  "checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/checkpoints/epoch=077-step=16458.ckpt",
+  "device": "cpu",
+  "batch_indices": [
+    2,
+    22,
+    30
+  ],
+  "max_samples": 4,
+  "images": [
+    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-03.jpg",
+    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-23.jpg",
+    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-31.jpg"
+  ]
+}

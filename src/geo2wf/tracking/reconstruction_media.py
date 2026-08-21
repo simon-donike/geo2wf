@@ -30,11 +30,53 @@ def log_wandb_reconstruction(
     try:
         import matplotlib.pyplot as plt
         import wandb
-        from geo2wf.visualization.wind_fields import (
-            plot_validation_reconstruction_batch,
-        )
     except ImportError:
         return
+
+    fig = build_reconstruction_figure(
+        batch,
+        prediction_batch,
+        condition_batch=condition_batch,
+        target_batch=target_batch,
+        baseline_batch=baseline_batch,
+        intensity_prediction_batch=intensity_prediction_batch,
+        intensity_target_batch=intensity_target_batch,
+        physical_wind_output=physical_wind_output,
+        physical_output_units=physical_output_units,
+    )
+    # Keep validation media lightweight: cap the longest rendered edge and use
+    # JPEG instead of W&B's lossless PNG default.
+    max_edge_pixels = 1600
+    width_inches, height_inches = fig.get_size_inches()
+    max_dpi = max_edge_pixels / max(width_inches, height_inches)
+    fig.set_dpi(min(float(fig.dpi), max_dpi))
+    try:
+        experiment.log(
+            {wandb_key: wandb.Image(fig, file_type="jpg")},
+            step=module.global_step,
+        )
+    finally:
+        plt.close(fig)
+
+
+def build_reconstruction_figure(
+    batch: Any,
+    prediction_batch: torch.Tensor,
+    *,
+    condition_batch: torch.Tensor | None = None,
+    target_batch: torch.Tensor | None = None,
+    baseline_batch: torch.Tensor | None = None,
+    intensity_prediction_batch: torch.Tensor | None = None,
+    intensity_target_batch: torch.Tensor | None = None,
+    physical_wind_output: bool = False,
+    physical_output_units: str | None = None,
+    max_samples: int = 5,
+):
+    """Build the same reconstruction figure used by W&B for local artifacts."""
+    if max_samples < 1:
+        raise ValueError("max_samples must be positive")
+
+    from geo2wf.visualization.wind_fields import plot_validation_reconstruction_batch
 
     if isinstance(batch, dict):
         condition_batch = (
@@ -46,7 +88,7 @@ def log_wandb_reconstruction(
             "condition_batch and target_batch are required for non-dict batches"
         )
 
-    sample_count = min(int(prediction_batch.shape[0]), 5)
+    sample_count = min(int(prediction_batch.shape[0]), int(max_samples), 5)
     samples = []
     for index in range(sample_count):
         sample = {
@@ -109,20 +151,7 @@ def log_wandb_reconstruction(
             )
         samples.append(sample)
 
-    fig = plot_validation_reconstruction_batch(samples)
-    # Keep validation media lightweight: cap the longest rendered edge and use
-    # JPEG instead of W&B's lossless PNG default.
-    max_edge_pixels = 1600
-    width_inches, height_inches = fig.get_size_inches()
-    max_dpi = max_edge_pixels / max(width_inches, height_inches)
-    fig.set_dpi(min(float(fig.dpi), max_dpi))
-    try:
-        experiment.log(
-            {wandb_key: wandb.Image(fig, file_type="jpg")},
-            step=module.global_step,
-        )
-    finally:
-        plt.close(fig)
+    return plot_validation_reconstruction_batch(samples)
 
 
 def _wandb_experiment(module: Any, trainer: Any) -> Any | None:

@@ -106,7 +106,7 @@ optimization:
 
 validation:
   reconstruction_batches: 1
-  log_reconstruction_images: false
+  log_reconstruction_images: true
 
 trainer:
   max_epochs: 1000
