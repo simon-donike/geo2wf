@@ -85,7 +85,7 @@ class PairedImageDataset(Dataset):
         self.manifest_sample_count = len(self.samples)
         self.require_era5 = bool(require_era5)
         self.use_era5 = bool(use_era5)
-        if self.require_era5 and self.use_era5:
+        if self.require_era5:
             self.samples = self.samples.loc[
                 _manifest_has_era5(self.samples)
             ].reset_index(drop=True)
@@ -123,7 +123,7 @@ class PairedImageDataset(Dataset):
         )
         self.max_era5_time_gap_hours = max_era5_time_gap_hours
         self.filtered_stale_era5_count = 0
-        if self.use_era5 and max_era5_time_gap_hours is not None:
+        if (self.use_era5 or self.require_era5) and max_era5_time_gap_hours is not None:
             if max_era5_time_gap_hours <= 0:
                 raise ValueError("max_era5_time_gap_hours must be positive")
             gap_hours = _manifest_era5_time_gap_hours(self.samples)

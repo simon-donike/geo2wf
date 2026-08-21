@@ -1,5 +1,8 @@
 # Intensity model comparison
 
+The completed benchmark, plots, W&B media, and dense Humberto/Kiko/Otis
+analysis are available in the [published results report](intensity-comparison-results.md).
+
 This workflow compares three scalar intensity estimators on exactly the same
 storm-disjoint samples and continuous IBTrACS targets:
 
@@ -47,7 +50,7 @@ GPU 0 and GPU 1 train concurrently. Cache export and correction training depend
 on the field-only U-Net, so they run sequentially on GPU 1. Evaluation begins
 only after both branches finish.
 
-## Run the complete workflow
+## Run both ERA5 regimes
 
 From the repository root:
 
@@ -55,8 +58,23 @@ From the repository root:
 uv run python scripts/run_intensity_model_comparison.py \
   --joint-gpu 0 \
   --pipeline-gpu 1 \
+  --era5 with \
+  --split val
+
+uv run python scripts/run_intensity_model_comparison.py \
+  --joint-gpu 0 \
+  --pipeline-gpu 1 \
+  --era5 without \
   --split val
 ```
+
+Run these commands sequentially because each comparison occupies both GPUs.
+Both regimes require ERA5 availability when selecting samples, so they use
+identical sample IDs and storm splits; the no-ERA5 regime simply omits all ERA5
+channels and predicts the absolute wind field instead of an ERA5 residual.
+Training uses W&B metrics/config logging by default; model checkpoints stay
+local. All three stages stop early after 50 validation epochs without
+improvement on the same metric used to select their checkpoint.
 
 The checked-in defaults use
 `data/geotiff/geo_sar_10bands_era5_v2_pmw` and
@@ -69,8 +87,22 @@ uv run python scripts/run_intensity_model_comparison.py \
   --output-root logs/intensity-comparisons/my-run \
   --joint-gpu 0 \
   --pipeline-gpu 1 \
+  --era5 with \
   --split val
 ```
+
+Before starting either GPU, the runner protects the inference-folder case-study
+storms from training: Humberto 2025 (`AL082025`), Kiko 2025 (`EP112025`), and
+Otis 2023 (`EP182023`). It aborts if any appears in the source or effective
+training split and records source and post-filter coverage in `workflow.json`.
+Repeat `--protected-storm ATCF_ID` to replace this default list for another
+study.
+
+In the current paired dataset all three are validation storms, with 18, 23, and
+2 effective samples respectively; none occurs in training or test. The separate
+dense inference report evaluates every compatible GEO observation from those
+storms, while the matched benchmark table retains the common 232-sample paired
+validation cohort.
 
 Use `--disable-wandb` for a local-only run. Use `--smoke-test` to check the
 training paths with one epoch and one train/validation batch before committing
@@ -120,12 +152,25 @@ val-comparison.csv
 val-comparison.md
 ```
 
-The scalar table reports sample and storm counts, MAE, RMSE, bias,
-storm-macro MAE, category accuracy, category macro F1, and within-one-category
-accuracy. The MAE interval is a paired 95% cluster-bootstrap interval over
-storms, which avoids treating multiple observations from one storm as
-independent. The two field-producing models additionally report valid-pixel
-MAE, RMSE, and bias against SAR.
+After completing both ERA5 regimes, combine their saved JSON results into one
+self-contained report with both tables and a shared metric glossary:
+
+```bash
+uv run python scripts/combine_intensity_comparison_reports.py \
+  --with-era5 /path/to/with-era5/val-comparison.json \
+  --without-era5 /path/to/without-era5/val-comparison.json \
+  --output logs/intensity-comparisons/validation-with-and-without-era5.md
+```
+
+The combiner verifies that the split, exact cohort fingerprint, and bootstrap
+settings match before writing the report.
+
+The scalar table reports sample and storm counts, MAE, the paired MAE difference
+from the raw U-Net, RMSE, bias, storm-macro MAE, category accuracy, category
+macro F1, and within-one-category accuracy. MAE and its paired difference have
+95% cluster-bootstrap intervals over storms, which avoids treating multiple
+observations from one storm as independent. The two field-producing models
+additionally report valid-pixel MAE, RMSE, and bias against SAR.
 
 Validation results are model-selection diagnostics because validation controls
 checkpoint choice and learning-rate scheduling. Inspect `val` while developing,

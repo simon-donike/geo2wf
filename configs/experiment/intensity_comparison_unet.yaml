@@ -14,10 +14,15 @@ trainer:
     mode: min
     save_top_k: 2
     save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/eye_structure_score
+    mode: min
+    patience: 50
 
 logging:
   wandb:
     name: intensity-comparison-field-unet
     project: geo2wf
     enabled: true
-    log_model: true
+    log_model: false

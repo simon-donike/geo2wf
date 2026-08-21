@@ -403,6 +403,14 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     no_era5_config = compose_config(["experiment=bottleneck_unet_mlp_no_era5"])
     assert no_era5_config["data"]["use_era5"] is False
     assert no_era5_config["model"]["condition_channels"] == 14
+    assert no_era5_config["trainer"]["early_stopping"]["patience"] == 50
+    comparison_no_era5 = compose_config(
+        ["experiment=intensity_comparison_unet_no_era5"]
+    )
+    assert comparison_no_era5["data"]["require_era5"] is True
+    assert comparison_no_era5["data"]["use_era5"] is False
+    assert comparison_no_era5["model"]["condition_channels"] == 14
+    assert comparison_no_era5["model"]["use_era5"] is False
     direct_config = compose_config(["experiment=geo_pmw_near89_unet_no_era5"])
     assert direct_config["data"]["use_era5"] is False
     assert direct_config["model"]["condition_channels"] == 14
