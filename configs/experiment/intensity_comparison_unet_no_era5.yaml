@@ -1,30 +1,34 @@
 # @package _global_
 defaults:
   - override /data: joint_geo_sar_ibtracs
-  - override /model: bottleneck_unet_mlp
+  - override /model: deterministic_residual
 
-# Ten GEO bands plus distance-to-center and three solar-time channels.
+# Match the ERA5 comparison cohort exactly, but do not load ERA5 as a feature.
 data:
+  require_era5: true
   use_era5: false
 
 model:
   condition_channels: 14
+  use_era5: false
+  off_swath_anchor_weight: 0.0
 
 trainer:
   max_epochs: 1000
   checkpoint:
-    monitor: val/loss
+    monitor: val/eye_structure_score
     mode: min
     save_top_k: 2
     save_last: true
   early_stopping:
     enabled: true
-    monitor: val/loss
+    monitor: val/eye_structure_score
     mode: min
     patience: 50
+
 logging:
   wandb:
-    name: bottleneck-unet-mlp-joint-no-era5
+    name: intensity-comparison-field-unet-no-era5
     project: geo2wf
     enabled: true
     log_model: false

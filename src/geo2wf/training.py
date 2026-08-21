@@ -18,7 +18,11 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/dif_img_rec_matplotlib")
 import pytorch_lightning as pl
 import torch
 import yaml
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from pytorch_lightning.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
 from geo2wf.data.datamodule import PairedDataModule
@@ -515,6 +519,23 @@ def main() -> None:
     ]
     if checkpointing_enabled:
         callbacks.append(checkpoint_callback)
+    early_stopping_cfg = trainer_cfg.get("early_stopping", {})
+    if early_stopping_cfg.get("enabled", False):
+        callbacks.append(
+            EarlyStopping(
+                monitor=early_stopping_cfg.get("monitor", checkpoint_monitor),
+                mode=early_stopping_cfg.get(
+                    "mode",
+                    checkpoint_cfg.get(
+                        "mode", getattr(model, "checkpoint_mode", "min")
+                    ),
+                ),
+                patience=int(early_stopping_cfg.get("patience", 50)),
+                min_delta=float(early_stopping_cfg.get("min_delta", 0.0)),
+                strict=bool(early_stopping_cfg.get("strict", True)),
+                check_finite=bool(early_stopping_cfg.get("check_finite", True)),
+            )
+        )
     # Trainer controls loop behavior, device placement, precision, and logging cadence.
     trainer_kwargs = {
         "max_epochs": trainer_cfg.get("max_epochs", 1),
