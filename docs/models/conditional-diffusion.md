@@ -67,7 +67,7 @@ Validation first computes the same noise-prediction loss. For the configured num
 - calculates normalized PSNR, SSIM, and L1;
 - maps back to m/s for physical and storm metrics;
 - logs sample range and saturation diagnostics; and
-- creates W&B condition/prediction/target panels.
+- can create W&B condition/prediction/target panels when image logging is enabled.
 
 A checkpoint is rejected when its saved diffusion coefficients do not match the configured schedule or timestep count. This prevents silently resuming a linear-schedule model as cosine.
 

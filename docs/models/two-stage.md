@@ -1,4 +1,4 @@
-# Two-stage baseline + diffusion
+# Two-stage baseline and diffusion
 
 This is the main geo2wf workflow. Stage 1 produces one stable physical reconstruction. Stage 2 treats that reconstruction as fixed and models only the remaining signed difference to SAR.
 
@@ -16,7 +16,7 @@ flowchart LR
   A --> O[SAR-like wind sample]
 ```
 
-## Stage 1: commit to a baseline
+## Stage 1: deterministic baseline
 
 The deterministic `ERA5ResidualRegressor` predicts a physical correction around ERA5:
 
@@ -25,7 +25,7 @@ The deterministic `ERA5ResidualRegressor` predicts a physical correction around 
 v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, m)
 \]
 
-Its final head is initialized to zero. Before training, the model returns ERA5 exactly. Training then asks whether GEO and the wider context can improve that field on observed SAR pixels.
+Its final head is initialized to zero, so the initial physical prediction equals ERA5. Training estimates a correction on observed SAR pixels.
 
 The 26 U-Net inputs are:
 
@@ -71,14 +71,14 @@ At each diffusion timestep, the denoiser receives 27 channels:
 
 [Read the Stage 2 objective, guidance, and probabilistic metrics.](residual-diffusion.md)
 
-## Why split the work?
+## Stage separation
 
 | Stage | Job | Desired behavior |
 |---|---|---|
-| Deterministic baseline | broad wind magnitude and placement | stable, interpretable, directly comparable with ERA5 |
-| Residual diffusion | unresolved SAR-like correction | plausible structure and diversity without moving the large-scale field arbitrarily |
+| Deterministic baseline | broad wind magnitude and placement | stable field directly comparable with ERA5 |
+| Residual diffusion | unresolved SAR-like correction | structural variation around the fixed large-scale field |
 
-An absolute-field diffusion model must learn broad physics and fine detail inside one generative objective. The staged version gives diffusion a narrower question: *given this committed field and the observations, what plausible signed structure remains?*
+The staged formulation restricts diffusion to the residual distribution instead of the complete wind field.
 
 The baseline also makes evaluation clearer. Stage 2 reports `baseline_mae_ms` and `mae_skill_vs_baseline`, so refinement is measured against the exact frozen prediction it was asked to improve.
 
@@ -92,7 +92,7 @@ uv run geo2wf-train \
   model=deterministic_residual
 ```
 
-Choose a Stage 1 checkpoint using physical and storm-structure validation metrics, not training loss alone.
+Select the Stage 1 checkpoint using the configured physical and storm-structure validation metric.
 
 ### 2. Train Stage 2 on the frozen checkpoint
 
@@ -105,9 +105,10 @@ uv run geo2wf-train \
 
 The baseline module stays in evaluation mode, is excluded from the optimizer, and is saved inside the residual-diffusion checkpoint for reproducibility.
 
-### 3. Inspect samples, not only the ensemble mean
+### 3. Inspect ensemble members
 
-The deterministic Stage 1 output is a single field. Stage 2 produces multiple valid members from different initial latents. Judge the individual members for sharpness; an ensemble mean will blur alternatives even when each member is coherent.
+Stage 2 produces multiple members from different initial latents. Report
+member-level structure because the ensemble mean suppresses spatial variation.
 
 ## Next
 

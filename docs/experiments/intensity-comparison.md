@@ -8,7 +8,7 @@ storm-disjoint samples and continuous IBTrACS targets:
 
 1. the maximum valid pixel in a deterministic U-Net wind field;
 2. the learned single-field correction applied to that U-Net field; and
-3. the scalar MLP output of the jointly trained U-Net + MLP.
+3. the scalar MLP output of the jointly trained U-Net+MLP.
 
 It also reports SAR wind-field metrics for the deterministic and joint U-Nets.
 The correction model has no field metrics because it emits only a scalar.
@@ -21,15 +21,10 @@ interpolated inside the configured three-hour IBTrACS bracket. Consequently the
 field-only U-Net and joint model have identical train, validation, and test
 sample IDs.
 
-After field-only U-Net training, the workflow regenerates its correction cache
-by iterating those exact joint datasets. The exporter preserves each source
-`sample_id`, target, split, and storm. Evaluation refuses to run if the joint
-dataset and correction cache differ in sample IDs, storm IDs, or targets.
-
-This is deliberately different from the older observation-manifest intensity
-cache, whose closest-GEO/eligible-fix matching produces a different cohort.
-That cache is valid for its own correction experiment but not for this direct
-comparison.
+After field-only U-Net training, the workflow regenerates the correction cache
+from the same datasets. Evaluation rejects mismatched sample IDs, storm IDs, or
+targets. The older observation-manifest correction cache uses a different
+matching procedure and is not valid for this comparison.
 
 ## Two-GPU schedule
 
@@ -46,9 +41,8 @@ flowchart LR
   E --> T[JSON + CSV + Markdown table]
 ```
 
-GPU 0 and GPU 1 train concurrently. Cache export and correction training depend
-on the field-only U-Net, so they run sequentially on GPU 1. Evaluation begins
-only after both branches finish.
+GPU 0 trains the joint model. GPU 1 trains the field-only U-Net, exports its
+cache, and trains the correction model. Evaluation waits for both branches.
 
 ## Run both ERA5 regimes
 
@@ -70,7 +64,7 @@ uv run python scripts/run_intensity_model_comparison.py \
 
 Run these commands sequentially because each comparison occupies both GPUs.
 Both regimes require ERA5 availability when selecting samples, so they use
-identical sample IDs and storm splits; the no-ERA5 regime simply omits all ERA5
+identical sample IDs and storm splits; the no-ERA5 regime omits all ERA5
 channels and predicts the absolute wind field instead of an ERA5 residual.
 Training uses W&B metrics/config logging by default; model checkpoints stay
 local. All three stages stop early after 50 validation epochs without
@@ -104,10 +98,8 @@ dense inference report evaluates every compatible GEO observation from those
 storms, while the matched benchmark table retains the common 232-sample paired
 validation cohort.
 
-Use `--disable-wandb` for a local-only run. Use `--smoke-test` to check the
-training paths with one epoch and one train/validation batch before committing
-to the full jobs. The smoke run still exports and evaluates the full validation
-cohort so that the strict cohort audit remains meaningful.
+Use `--disable-wandb` for a local-only run. `--smoke-test` uses one epoch and
+one train/validation batch, while retaining full cache export and cohort audit.
 
 The epoch counts can be overridden independently with `--joint-epochs`,
 `--unet-epochs`, and `--correction-epochs`. Set `--seed` to repeat the full
@@ -130,9 +122,8 @@ uv run python scripts/run_intensity_model_comparison.py \
   --pipeline-gpu 1
 ```
 
-For the primary comparison, retrain all three stages. An old correction
-checkpoint may have learned from a different cache even when its tensor shape
-is compatible.
+Reused correction checkpoints must originate from the exact cache identified
+by the workflow; tensor compatibility alone is insufficient.
 
 ## Outputs and metrics
 
@@ -165,47 +156,16 @@ uv run python scripts/combine_intensity_comparison_reports.py \
 The combiner verifies that the split, exact cohort fingerprint, and bootstrap
 settings match before writing the report.
 
-The scalar table reports sample and storm counts, MAE, the paired MAE difference
-from the raw U-Net, RMSE, bias, storm-macro MAE, category accuracy, category
-macro F1, and within-one-category accuracy. MAE and its paired difference have
-95% cluster-bootstrap intervals over storms, which avoids treating multiple
-observations from one storm as independent. The two field-producing models
-additionally report valid-pixel MAE, RMSE, and bias against SAR.
+The scalar table reports error and category metrics, sample and storm counts,
+and the paired MAE difference from the raw U-Net. MAE intervals use a
+storm-cluster bootstrap. Field-producing models additionally report
+valid-pixel MAE, RMSE, and bias against SAR.
 
 Validation results are model-selection diagnostics because validation controls
 checkpoint choice and learning-rate scheduling. Inspect `val` while developing,
 freeze all model and hyperparameter decisions, and then run the workflow once
 with `--split test` for the final held-out generalization table.
 
-One training seed measures one trained instance. If conclusions are close,
-repeat the full workflow with several seeds and summarize variation across
-runs; the within-run storm bootstrap does not replace across-seed uncertainty.
-
-## Run stages manually
-
-The field-only comparator preset is:
-
-```bash
-uv run geo2wf-train experiment=intensity_comparison_unet
-```
-
-After selecting its best checkpoint:
-
-```bash
-uv run geo2wf-export joint-intensity-cache \
-  --config /path/to/unet-run/resolved-config.yaml \
-  --checkpoint /path/to/unet-run/checkpoints/best.ckpt \
-  --output-root data/intensity-comparison-cache
-
-uv run geo2wf-train \
-  experiment=unet_intensity_correction \
-  data.root=data/intensity-comparison-cache
-
-uv run geo2wf-evaluate intensity-comparison \
-  --data-config /path/to/unet-run/resolved-config.yaml \
-  --cache-root data/intensity-comparison-cache \
-  --joint-checkpoint /path/to/joint.ckpt \
-  --correction-checkpoint /path/to/correction.ckpt \
-  --split val \
-  --output logs/intensity-comparison.json
-```
+One seed measures one trained instance. Repeat complete workflows with several
+seeds when model differences are small; the storm bootstrap does not quantify
+training-seed variation.

@@ -18,7 +18,7 @@ The footprint panel exposes the central learning challenge. GEO may cover the cr
   <figcaption>Example condition / prediction / target panels logged from validation and a small training subset.</figcaption>
 </figure>
 
-Current validation logging is shared by both model paths. It renders up to five georeferenced samples, labels storm and sample IDs, shades target no-data, plots the IBTrACS center, adds valid-area and ERA5 wind panels when metadata is available, caps the longest edge at 1600 pixels, and sends a compact JPEG to W&B. Diffusion panels use normalized predictions/targets; residual panels use physical m/s values. Prediction and target share a display stretch derived only from valid ground-truth pixels.
+Validation logging renders up to five georeferenced samples, labels storm and sample IDs, shades target no-data, plots the IBTrACS center, and adds valid-area and ERA5 panels when available. Prediction and target use a common display range derived from valid target pixels.
 
 The qualitative comparison should be read alongside physical metrics. Look for:
 
@@ -31,10 +31,10 @@ The qualitative comparison should be read alongside physical metrics. Look for:
 
 ## Recreate the pair figure
 
-`src.utils.plotting.plot_random_geo_sar_pairs()` reads the split manifest and GeoTIFF metadata:
+`plot_random_geo_sar_pairs()` reads the split manifest and GeoTIFF metadata:
 
 ```python
-from src.utils.plotting import plot_random_geo_sar_pairs
+from geo2wf.visualization.wind_fields import plot_random_geo_sar_pairs
 
 plot_random_geo_sar_pairs(
     "data/geotiff/geo_sar",

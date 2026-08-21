@@ -45,16 +45,18 @@ Invalid values are replaced with neutral zeros **after normalization** and multi
 
 ## Sparse-target completion
 
-The ERA5 diffusion preset uses:
+The grouped residual-diffusion preset uses:
 
 ```yaml
 model:
-  sparse_target:
-    fill: era5
-    unobserved_loss_weight: 0.05
+  sparse_target_fill: era5
+  unobserved_loss_weight: 0.1
 ```
 
-Observed SAR pixels keep their target and weight 1. Unobserved pixels with valid ERA5 receive the target-normalized ERA5 speed and weight 0.05. Remaining pixels receive neutral 0.5 with weight 0. Metrics still use only observed SAR pixels.
+Observed SAR pixels keep their target and weight 1. Unobserved pixels with
+valid ERA5 receive the target-normalized ERA5 speed and weight 0.1. Remaining
+pixels receive neutral 0.5 with weight 0. Metrics still use only observed SAR
+pixels.
 
 ## Physics-aware flips
 

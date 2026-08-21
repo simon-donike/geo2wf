@@ -1,7 +1,7 @@
 # Dataset contract
 
 Datasets return tensor-oriented samples described by `WindFieldBatch`. The
-canonical collator stacks tensors and identifiers but deliberately keeps
+canonical collator stacks tensors and identifiers but keeps
 metadata as one mapping per sample.
 
 ## Required sample fields
@@ -66,7 +66,7 @@ DataSpec(
 ```
 
 Models validate this object before the first training or inference batch. The
-ordered names—not just the channel count—make resolved configs and mismatch
+ordered names, rather than only the channel count, make resolved configs and mismatch
 errors interpretable. Models with extra requirements should override
 `validate_data_spec()`.
 
