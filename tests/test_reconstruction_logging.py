@@ -1,9 +1,31 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from pathlib import Path
 
 import torch
+import yaml
 
 from src.reconstruction_logging import log_wandb_reconstruction
+
+
+def _find_logging_switches(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "log_reconstruction_images":
+                yield item
+            yield from _find_logging_switches(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _find_logging_switches(item)
+
+
+def test_all_checked_in_configs_enable_reconstruction_images() -> None:
+    disabled = []
+    for path in sorted(Path("configs").rglob("*.yaml")):
+        config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if any(value is not True for value in _find_logging_switches(config)):
+            disabled.append(str(path))
+    assert disabled == []
 
 
 def test_shared_logger_emits_physical_reconstruction_to_wandb() -> None:

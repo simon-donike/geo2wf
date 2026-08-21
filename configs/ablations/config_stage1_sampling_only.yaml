@@ -97,7 +97,7 @@ optimization:
     min_lr: 2.0e-05
 validation:
   reconstruction_batches: 1
-  log_reconstruction_images: false
+  log_reconstruction_images: true
 trainer:
   max_epochs: 60
   accelerator: auto

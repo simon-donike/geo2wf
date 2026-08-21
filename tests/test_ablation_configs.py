@@ -23,7 +23,7 @@ def test_ablation_config_has_reproducible_contract(path: Path) -> None:
     }
     assert ablation["changes"]
     assert config["data"]["include_test_in_train"] is True
-    assert config["validation"]["log_reconstruction_images"] is False
+    assert config["validation"]["log_reconstruction_images"] is True
     assert config["trainer"]["devices"] == 1
     assert config["trainer"]["strategy"] is None
 

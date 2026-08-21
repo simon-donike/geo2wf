@@ -25,4 +25,4 @@ condition_dropout_probability: 0.1
 guidance_scale: 1.0
 validation_ensemble_size: 1
 validation_ensemble_batches: 1
-log_reconstruction_images: false
+log_reconstruction_images: true

@@ -33,4 +33,4 @@ lr_scheduler_monitor: val/peak_structure_score
 lr_scheduler_cooldown: 5
 lr_scheduler_min_lr: 0.00002
 validation_reconstruction_batches: 1
-log_reconstruction_images: false
+log_reconstruction_images: true
