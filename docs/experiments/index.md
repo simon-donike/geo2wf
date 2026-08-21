@@ -16,7 +16,7 @@ uv run geo2wf-train \
   model=residual_diffusion_deterministic_baseline
 ```
 
-## Modular model choices
+## Principal model choices
 
 | Choice | Scientific role | Baseline |
 |---|---|---|
@@ -24,10 +24,15 @@ uv run geo2wf-train \
 | `residual_diffusion_deterministic_baseline` | Stage 2 probabilistic refinement | frozen Stage 1 checkpoint |
 | `residual_diffusion` | residual-diffusion ablation | ERA5 |
 | `conditional_diffusion` | standalone absolute-field diffusion control | none |
+| `direct_unet` | direct wind-field control | none |
+| `bottleneck_unet_mlp` | joint field and scalar-intensity estimation | none |
+| `intensity_correction` | scalar correction from a frozen U-Net field | frozen U-Net checkpoint |
+| `intensity_forecast` | six-hour scalar forecast | current intensity and recent history |
 
-The two checked-in data choices are `geo_sar_common10_era5` and
-`geo_sar_common4`. Model/data channel contracts must match; the common4 smoke
-example documents its necessary conditional-diffusion width overrides.
+Data choices cover GEO–SAR reconstruction, GEO–PMW proxy training, joint
+field–intensity training, single-field correction, and intensity forecasting.
+List `configs/data/*.yaml` for the current set. Model and data contracts must
+match; the common4 smoke example specifies its conditional-diffusion widths.
 
 ## Experiment overrides
 
@@ -54,11 +59,11 @@ Notable compatibility presets include:
 
 | Full YAML | Purpose |
 |---|---|
-| `config_geo_sar_10bands_era5_residual.yaml` | historical Stage 1 |
-| `config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` | historical Stage 2 |
-| `config_geo_sar_10bands_era5_pmw_residual.yaml` | PMW-conditioned Stage 1 candidate |
-| `config_geo_sar_10bands_era5_pmw_diffusion_residual_deterministic.yaml` | PMW-conditioned Stage 2 candidate |
-| `config_pretrain_geo_pmw*.yaml` | GEO→PMW proxy pretraining |
+| `configs/config_geo_sar_10bands_era5_residual.yaml` | historical Stage 1 |
+| `configs/config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml` | historical Stage 2 |
+| `configs/config_geo_sar_10bands_era5_pmw_residual.yaml` | PMW-conditioned Stage 1 candidate |
+| `configs/config_geo_sar_10bands_era5_pmw_diffusion_residual_deterministic.yaml` | PMW-conditioned Stage 2 candidate |
+| `configs/v1/config_pretrain_geo_pmw*.yaml` | GEO→PMW proxy pretraining |
 
 ## Comparability checks
 
@@ -67,7 +72,7 @@ Notable compatibility presets include:
 - Stage 2 must use the exact Stage 1 checkpoint recorded in its resolved config/run manifest.
 - Residual physical losses are not numerically comparable to normalized diffusion noise MSE.
 - Record sampler, reverse-step count, guidance, ensemble size, and validation coverage.
-- Compare Stage 2 against its exact frozen baseline and inspect individual members as well as ensemble summaries.
+- Compare Stage 2 against its exact frozen baseline and report individual-member and ensemble summaries.
 
 Continue to [configuration](configuration.md), [training](training.md), and
 [evaluation](evaluation.md).

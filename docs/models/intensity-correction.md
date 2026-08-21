@@ -116,5 +116,5 @@ uv run geo2wf-infer intensity-correction \
 ```
 
 Inference returns `raw_unet_max_wind_ms`, `correction_ms`, `output_msw_ms`, and
-`output_category` with observation identifiers and timestamps. The Explorer UI
-does not consume these fields yet.
+`output_category` with observation identifiers and timestamps. StormSense
+displays this output as its U-Net+MLP maximum-wind series.

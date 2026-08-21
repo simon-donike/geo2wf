@@ -1,4 +1,4 @@
-# Completed diffusion refinement ablation analysis
+# Diffusion refinement ablation results
 
 This report is generated from the final machine-readable artifacts in
 `logs/ablation-suites/refinement-rerun-20260731T130254Z/` and
@@ -9,28 +9,17 @@ sweep, and calibration diagnostics.
 `include_test_in_train: true` was retained as requested. These are controlled
 comparisons, not unbiased held-out generalization estimates.
 
-## Executive conclusions
+## Summary
 
-- **Model B:** `stage1_peak_only` has the lowest composite peak/structure score
-  (6.62) and robust-peak MAE
-  (5.75 m/s). `stage1_peak_aware` is the
-  better compromise for high-wind MAE and peak bias.
-- **Sampling trade-off:** `stage1_peak_structure_balanced` has the best RMW
-  error (22.35 km), but weaker peak score and
-  more negative peak bias than the peak-only variants.
-- **Model C training:** `stage2_structured_asinh` has the best probabilistic
-  score (4.52), but every
-  Stage 2 variant has negative skill versus the frozen baseline. The best is
-  -42.7%.
-- **Model C evaluation:** raw pixel-MSW MAE is best for
-  `radial_only` (10.08 m/s),
-  while robust-peak MAE is best for `peak_only`
-  (8.51 m/s). These are different optima.
-- **Core failure mode:** the literal maximum pixel is strongly high-biased,
-  while robust high-wind peaks are low-biased. For target winds above 60 m/s,
-  robust-peak bias is roughly -23 to -24 m/s.
-- **Calibration:** in-sample calibration is optimistic. Leave-one-storm-out
-  errors remain large and interval coverage is far below nominal.
+- Stage 1 `peak_only` has the lowest peak/structure score (6.62) and
+  robust-peak MAE (5.75 m/s); `peak_aware` has lower high-wind MAE and less
+  negative peak bias.
+- Stage 2 `structured_asinh` has the lowest probabilistic score (4.52), but all
+  Stage 2 variants have negative pixel-MAE skill against the frozen baseline.
+- Literal maximum and robust peak select different Stage 2 variants. The
+  literal maximum is high-biased, whereas robust peaks are low-biased.
+- Leave-one-storm-out calibration errors remain large and interval coverage is
+  substantially below nominal.
 
 ## Model B / Stage 1 results
 
@@ -49,12 +38,8 @@ better; negative values indicate underestimation.
 | control_finetune | 9.79 | -7.79 | 8.87 | 3.56 | 2.73 | 25.45 | 27.1% |
 
 
-Relative to control, `stage1_peak_only` reduces robust-peak MAE from
-8.87 to 5.75 m/s
-and improves peak bias from -7.79 to
--3.17 m/s. The peak term is the strongest
-single intervention; high-wind weighting helps, but less than the explicit peak
-loss.
+Relative to control, `stage1_peak_only` reduces robust-peak MAE from 8.87 to
+5.75 m/s and changes peak bias from −7.79 to −3.17 m/s.
 
 ## Model C / Stage 2 training results
 
@@ -74,12 +59,8 @@ residual output. The probabilistic score is minimized by checkpoint selection.
 | exceedance_only | 5.58 | 2.01 | 4.07 | -102.3% | 11.94 | 11.94 | 9.40 | 3.91 |
 
 
-The important negative result is that all refined MAEs exceed the frozen
-baseline (about 2.01 m/s). The current Stage 2
-objective produces useful stochastic structure but does not yet deliver net
-pixelwise skill under this validation protocol. Structured asinh is the strongest
-candidate because it has the best composite score and least-negative baseline
-skill.
+All refined MAEs exceed the frozen baseline value of approximately 2.01 m/s.
+`structured_asinh` has the lowest composite score and the least-negative skill.
 
 ## Stage 2 checkpoint evaluation
 
@@ -100,9 +81,9 @@ pixels.
 | weighting_only | 24.41 | 25.38 | 0.24 | -4.38 | 8.94 | 0.88 |
 
 
-The raw MSW and robust peak disagree: optimizing one does not optimize the other.
-Use robust peak, radial profiles, threshold areas, and MSW together when choosing
-a checkpoint.
+Raw maximum and robust peak rank the variants differently. Checkpoint
+selection therefore requires both statistics plus radial and threshold-area
+errors.
 
 ## Model C guidance sweep
 
@@ -113,9 +94,8 @@ a checkpoint.
 | 1.5 | 17.52 | 21.01 | 0.20 | -10.23 | 13.37 | 0.72 | 24.4% | 17.82 |
 
 
-Guidance 1.5 gives the lowest raw MSW bias/MAE, but narrows intervals and does
-not improve correlation. Guidance changes are not a substitute for a high-wind
-objective.
+Guidance 1.5 lowers raw maximum bias and MAE, narrows intervals, and does not
+improve correlation.
 
 ### Target winds above 60 m/s
 
@@ -126,9 +106,9 @@ objective.
 | 1.5 | 90 | 0.41 | 10.18 | -23.43 | 23.43 |
 
 
-This bin is the clearest evidence of the failure mode: raw pixel maxima are near
-zero to slightly high-biased, while robust peaks are about 23--24 m/s too low.
-A global additive correction to the raw maximum would worsen the shape problem.
+Above 60 m/s, raw maxima are near zero bias while robust peaks are 23–24 m/s
+too low. A scalar offset to the raw maximum would not correct this structural
+difference.
 
 ## Leave-one-storm-out calibration
 
@@ -139,31 +119,26 @@ A global additive correction to the raw maximum would worsen the shape problem.
 | 1.5 | 15.76 | 15.66 | -2.55 | -2.71 | 12.45 | 13.81 | -1.46 | -5.12 |
 
 
-With only two storms in the LOSO folds, calibration is unstable. It can reduce
-raw bias, but coverage remains poor and correlations are weak. More independent
-storms are needed before using a calibration map operationally.
+The leave-one-storm-out folds contain only two storms. Calibration is therefore
+unstable, with poor coverage and weak correlations.
 
 ## Residual-transform diagnostic
 
-The initial residual q99.9 absolute tail was 18.48 m/s,
-with a recommended 20 m/s linear clip. After the peak/structure-aware Model B,
-q99.9 increased to 24.04 m/s and the data-driven
-clip became 25 m/s. The peak-aware baseline exposes more of the target tail; the
-linear transform is therefore a tail-capacity ablation, not a neutral replacement.
+The initial absolute residual q99.9 was 18.48 m/s and supported a 20 m/s linear
+clip. With the peak/structure-aware Stage 1 model it increased to 24.04 m/s,
+supporting a 25 m/s clip. Linear scaling therefore changes tail capacity.
 
-## Recommended next model iteration
+## Implications
 
-1. Use `stage1_peak_aware` or `stage1_peak_only` as the Model B baseline instead
-   of the current balanced-sampling baseline.
+1. Use `stage1_peak_aware` or `stage1_peak_only` as the Stage 1 baseline.
 2. Retrain `stage2_structured_asinh` on that selected baseline and require
    non-negative `mae_skill_vs_baseline` before promotion.
 3. Make checkpoint selection multi-objective: penalize positive literal-MSW bias
    and negative robust-peak bias simultaneously, while retaining radial/area
    constraints.
-4. Calibrate with more storms and storm-level folds; do not rank from the
-   current two-storm in-sample calibration.
-5. Keep the K=10 ensemble for uncertainty reporting, but rank it using robust
-   peak, high-wind-bin error, radial structure, and interval coverage together.
+4. Evaluate calibration with more storms and storm-level folds.
+5. Report the ten-member ensemble with robust peak, high-wind-bin error,
+   radial structure, and interval coverage.
 
 ## Post-processing follow-up
 

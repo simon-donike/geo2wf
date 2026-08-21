@@ -20,13 +20,18 @@ unet.channels      = prepared condition + noisy target
 The residual config is different: `condition_channels` includes distance-to-center but excludes the three internally appended mask/baseline features.
 
 Checkpoints trained before the distance channel was added have a narrower first
-convolution and are not shape-compatible with these configs. Start a new run;
-for deterministic-baseline residual diffusion, retrain and select a 20-channel
-deterministic baseline checkpoint first.
+convolution and are not shape-compatible with current configs. Retrain with the
+current data/model pair. For deterministic-baseline residual diffusion, its
+Stage 1 checkpoint must use the exact input assembly declared by the Stage 2
+configuration.
 
 ## No `val/eye_structure_score`
 
-The composite is logged only when eye MAE, inner-core MAE, radial-profile MAE, RMW error, and eye-to-eyewall contrast are all available. Sparse swaths or too few reconstruction batches may omit a component. Increase `validation.reconstruction_batches`/validation coverage or monitor a reliably present metric during debugging.
+The composite is logged only when eye MAE, inner-core MAE, radial-profile MAE,
+RMW error, and eye-to-eyewall contrast are available. Sparse swaths or limited
+reconstruction coverage may omit a component. Increase
+`model.validation_reconstruction_batches` or monitor a consistently available
+metric during debugging.
 
 ## Resume rejects diffusion coefficients
 
@@ -38,7 +43,9 @@ The checkpoint was trained with a different schedule or timestep count. Restore 
 
 ## Validation is unexpectedly slow
 
-A diffusion loss needs one U-Net pass; reconstruction needs 100–1000 sequential passes. Reduce `validation.reconstruction_batches`, use deterministic 100-step DDIM, or limit validation batches for smoke work.
+A diffusion loss needs one U-Net pass; reconstruction requires one pass per
+reverse step. Reduce `model.validation_reconstruction_batches`, use the
+100-step DDIM setting, or limit validation batches for smoke tests.
 
 ## W&B still starts
 
@@ -54,4 +61,6 @@ The loader rejects condition rasters that look like all-zero fill, applies inter
 
 ## Test results are not held out
 
-All checked-in training presets use `include_test_in_train: true`. Set it to `false` before training when final test generalization is required. Changing it after training cannot restore a held-out test.
+Modular data configs default to `include_test_in_train: false`; some historical
+full-YAML presets set it to `true`. Inspect `resolved-config.yaml`. Changing the
+flag after training cannot restore a held-out test.

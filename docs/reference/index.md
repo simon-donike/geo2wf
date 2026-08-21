@@ -24,7 +24,7 @@ geo2wf/
 │   │   ├── samplers/
 │   │   └── backbones/
 │   ├── objectives/ metrics/ visualization/ tracking/
-│   ├── evaluation/ inference/ preprocessing/
+│   ├── evaluation/ preprocessing/
 │   └── training.py
 ├── scripts/                            maintained workflow implementations
 ├── tests/
@@ -51,12 +51,12 @@ geo2wf/
 | physical/storm metrics | `src/geo2wf/metrics/`, framework adaptation in `evaluation/` |
 | plotting | `src/geo2wf/visualization/` |
 | W&B/CSV/media/run records | `src/geo2wf/tracking/` |
-| strict loading and unified prediction | `src/geo2wf/inference/` |
-| source pairing and export | reusable APIs under `preprocessing/`; thin maintained scripts under `scripts/` |
+| checkpoint evaluation and storm inference | installed CLI dispatch under `src/geo2wf/cli/`; maintained workflows under `scripts/` |
+| source pairing and export | reusable APIs under `preprocessing/`; maintained workflows under `scripts/` |
 
-Do not add new behavior to `data/`, CamelCase `src/*.py`, the root `train.py`,
-or the old `src/DenoisingDiffusionProcess/` paths. They exist so old imports and
-checkpoints remain usable.
+Do not add new behavior to CamelCase `src/*.py`, the root `train.py`, or the old
+`src/DenoisingDiffusionProcess/` paths. They exist for compatible imports and
+checkpoints.
 
 ## Test map
 

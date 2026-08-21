@@ -1,10 +1,11 @@
 # The reconstruction problem
 
-geo2wf asks whether colocated GEO imagery and environmental context can recover a plausible tropical-cyclone surface wind field where SAR provides sparse supervision.
+geo2wf estimates tropical-cyclone surface wind fields from colocated GEO imagery and environmental context, using sparse SAR observations as supervision.
 
 ## Observations, context, and target
 
-Each sample is aligned to one 256 × 256 EPSG:4326 grid:
+Each export is aligned to one 256 × 256 EPSG:4326 grid; the grouped training
+configs apply a 192 × 192 center crop:
 
 - **GEO observation:** ten GOES ABI or Himawari AHI infrared / water-vapor channels;
 - **ERA5 context:** seven exported atmospheric/surface fields plus derived wind speed and relative vorticity;
@@ -16,9 +17,9 @@ See [Model inputs and training targets](../data/index.md) for real examples and 
 
 GEO and SAR do not observe the same physical quantity, so this is not ordinary super-resolution. The model infers surface-wind structure compatible with cloud-top, water-vapor, environmental, and storm-relative context.
 
-## Main two-stage formulation
+## Two-stage formulation
 
-Stage 1 makes one deterministic commitment:
+Stage 1 estimates a deterministic baseline:
 
 \[
 \hat v_{\mathrm{base}} =
@@ -36,7 +37,7 @@ x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}},
 \right)
 \]
 
-This separates the broad, stable reconstruction from probabilistic fine-structure refinement. [Read the full two-stage workflow.](../models/two-stage.md)
+This separates broad-field estimation from probabilistic fine-structure refinement. [Read the full two-stage workflow.](../models/two-stage.md)
 
 ## Scientific constraints reflected in code
 

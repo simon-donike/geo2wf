@@ -1,8 +1,7 @@
 # First experiment
 
-This smoke path exercises the canonical exporter, composed configuration,
-`DataSpec` validation, Lightning lifecycle, CSV logging, and physical prediction
-contract with deliberately bounded work.
+This smoke test exercises export, configuration composition, `DataSpec`
+validation, one Lightning training step, CSV logging, and physical prediction.
 
 ## 1. Export two GEO–SAR pairs per split
 
@@ -52,7 +51,7 @@ The four-band export supplies eight data-condition channels: four GEO bands,
 distance to the IBTrACS center, local-solar-time sine/cosine, and solar zenith.
 The diffusion model appends the condition mask, so this smoke override uses
 `condition_channels=9`; noisy target concatenation makes `model_channels=10`.
-The production ERA5 config already contains its correct widths and needs no
+The default ERA5 config contains its required widths and needs no
 such override.
 
 ## 3. Run one training and validation batch
@@ -66,7 +65,7 @@ WANDB_DISABLED=true uv run geo2wf-train \
   model.num_timesteps=10 \
   model.sampling_method=ddim \
   model.sampling_timesteps=2 \
-  model.validation_reconstruction_batches=0 \
+  model.validation_reconstruction_batches=1 \
   trainer.max_epochs=1 \
   trainer.limit_train_batches=1 \
   trainer.limit_val_batches=1 \
@@ -74,9 +73,8 @@ WANDB_DISABLED=true uv run geo2wf-train \
   data.loader.num_workers=0
 ```
 
-Hydra overrides are temporary: no copied smoke YAML is required. Use
-`WANDB_DISABLED=true` to prove that CSV logging and the run manifest do not
-depend on W&B.
+Hydra overrides apply only to this invocation. `WANDB_DISABLED=true` disables
+W&B while retaining CSV logging and the run manifest.
 
 ## 4. Inspect the run directory
 
@@ -92,8 +90,8 @@ logs/<timestamp>_modular/
 ```
 
 A successful smoke run has finite `train/loss` and `val/loss`. Reverse sampling
-is reduced to one reconstruction batch and two DDIM steps; scientific runs
-should use the model config's validated sampling settings.
+uses one reconstruction batch and two DDIM steps. Full runs should use the
+model configuration's sampling settings.
 
 ## Next
 
