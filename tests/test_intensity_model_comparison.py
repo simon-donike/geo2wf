@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import pandas as pd
 import pytest
 
+from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
+from scripts.combine_intensity_comparison_reports import combined_markdown_report
 from scripts.evaluate_intensity_models import (
     _assert_common_cohort,
     _cluster_bootstrap,
@@ -16,6 +19,7 @@ from scripts.evaluate_intensity_models import (
 from scripts.export_joint_intensity_cache import (
     _cohort_fingerprint as export_fingerprint,
 )
+from scripts.run_intensity_model_comparison import _source_storm_counts
 from scripts.run_intensity_model_comparison import _training_result
 
 
@@ -120,6 +124,51 @@ def test_table_marks_scalar_only_correction_field_metrics_as_missing() -> None:
     assert correction["field_mae_ms"] is None
     assert "U-Net + correction" in markdown
     assert "—" in markdown
+    assert "## Metric definitions" in markdown
+    assert "Field bias" in markdown
+
+
+def test_combined_report_requires_and_documents_the_same_cohort() -> None:
+    rows = [
+        {
+            "model": "Example",
+            "model_key": "example",
+            "samples": 2,
+            "storms": 2,
+            "intensity_mae_ms": 1.0,
+            "intensity_mae_95ci_low_ms": 0.5,
+            "intensity_mae_95ci_high_ms": 1.5,
+            "intensity_mae_delta_vs_unet_raw_max_ms": -0.25,
+            "intensity_mae_delta_95ci_low_ms": -0.5,
+            "intensity_mae_delta_95ci_high_ms": -0.1,
+            "intensity_rmse_ms": 1.2,
+            "intensity_bias_ms": -0.2,
+            "storm_macro_mae_ms": 0.9,
+            "category_accuracy": 0.5,
+            "category_macro_f1": 0.4,
+            "within_one_category_accuracy": 1.0,
+            "field_mae_ms": 2.0,
+            "field_rmse_ms": 2.5,
+            "field_bias_ms": -0.1,
+        }
+    ]
+    payload = {
+        "split": "val",
+        "cohort": {"sha256": "same", "samples": 2, "storms": 2},
+        "paired_storm_bootstrap": {"repetitions": 2000, "seed": 42},
+        "table": rows,
+    }
+
+    report = combined_markdown_report(payload, payload)
+
+    assert "## With ERA5" in report
+    assert "## Without ERA5" in report
+    assert "2,000 paired cluster-bootstrap repetitions" in report
+    assert report.count("## Metric definitions") == 1
+
+    different = {**payload, "cohort": {**payload["cohort"], "sha256": "other"}}
+    with pytest.raises(ValueError, match="exact same cohort"):
+        combined_markdown_report(payload, different)
 
 
 def test_training_result_uses_recorded_best_checkpoint(tmp_path: Path) -> None:
@@ -142,3 +191,47 @@ def test_training_result_uses_recorded_best_checkpoint(tmp_path: Path) -> None:
 
     assert selected == checkpoint.resolve()
     assert config == (run / "resolved-config.yaml").resolve()
+
+
+def test_source_storm_counts_reports_absent_and_held_out_storms(
+    tmp_path: Path,
+) -> None:
+    for split, storms in {
+        "train": ["AL012020"],
+        "val": ["EP182023", "EP182023"],
+        "test": ["AL092019"],
+    }.items():
+        directory = tmp_path / split
+        directory.mkdir()
+        pd.DataFrame({"storm_id": storms}).to_csv(
+            directory / "manifest.csv", index=False
+        )
+
+    counts = _source_storm_counts(tmp_path, ["AL092019", "EP132019", "EP182023"])
+
+    assert counts["AL092019"] == {"train": 0, "val": 0, "test": 1}
+    assert counts["EP132019"] == {"train": 0, "val": 0, "test": 0}
+    assert counts["EP182023"] == {"train": 0, "val": 2, "test": 0}
+
+
+def test_no_era5_regime_filters_to_the_era5_available_cohort(tmp_path: Path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
+    pd.DataFrame(
+        {
+            "sample_id": ["with-era5", "without-era5"],
+            "context_path": ["train/context.tif", ""],
+            "context_source_type": ["era5", ""],
+        }
+    ).to_csv(split_dir / "manifest.csv", index=False)
+    (tmp_path / "stats.json").write_text("{}", encoding="utf-8")
+
+    dataset = PairedImageDataset(
+        tmp_path,
+        "train",
+        require_era5=True,
+        use_era5=False,
+    )
+
+    assert dataset.samples["sample_id"].tolist() == ["with-era5"]
+    assert dataset.filtered_missing_era5_count == 1

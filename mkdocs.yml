@@ -70,6 +70,7 @@ nav:
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
       - Intensity model comparison: experiments/intensity-comparison.md
+      - Completed intensity benchmark: experiments/intensity-comparison-results.md
       - Diffusion refinement ablations: experiments/ablations.md
       - Completed ablation analysis: experiments/ablation-analysis.md
       - Post-processing ablation: experiments/postprocessing-ablation.md
