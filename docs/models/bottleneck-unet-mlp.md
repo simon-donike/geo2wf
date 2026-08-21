@@ -26,10 +26,6 @@ three hours apart. Exact fix timestamps use the recorded value directly.
 Category fields, frozen-U-Net caches, and ERA5 are not involved in constructing
 the scalar target. Samples outside a valid three-hour bracket are excluded.
 
-With the current local files this retains 842/232/212 train/validation/test
-samples when ERA5 is enabled, and 1,237/330/302 when it is disabled. The
-remaining records lie outside a valid three-hour `USA_WIND` bracket.
-
 Train with the default local data paths:
 
 ```bash
@@ -52,9 +48,9 @@ uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
 
 This sets `data.use_era5=false` and changes `model.condition_channels` from 23
 to 14: ten GEO bands, distance to the storm center, and three solar-time
-channels. The paired manifests and IBTrACS interpolation are unchanged. ERA5
-rasters, derived ERA5 wind speed/vorticity, and ERA5 companion tensors are not
-loaded or passed to either branch.
+channels. The comparison preset still requires ERA5 availability to preserve
+the same cohort, but no ERA5 channel or companion tensor is passed to the
+model.
 
 The objective is
 

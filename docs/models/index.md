@@ -1,6 +1,6 @@
 # Model overview
 
-The recommended system is a stack, not a choice between unrelated models:
+The principal wind-field system is a two-stage stack:
 
 1. **Stage 1 — deterministic baseline:** learn a physical correction around ERA5.
 2. **Stage 2 — residual diffusion:** freeze Stage 1 and sample a signed correction around its output.
@@ -14,26 +14,28 @@ The recommended system is a stack, not a choice between unrelated models:
 | Residual diffusion on ERA5 | ERA5 + sampled residual | GEO, ERA5, derived context, masks | portable generative ablation without Stage 1 |
 | Absolute conditional diffusion | absolute wind sample | GEO, optional ERA5, derived context, masks | standalone research baseline |
 | Single-field intensity correction | corrected maximum wind + derived category | one frozen U-Net field, mask, center distance, current metadata | dashboard-scalar estimation |
-| Six-hour intensity forecast | maximum wind at +6 h | current UNet+MLP scalar, IBTrACS winds at −6 h and −12 h | short-range scalar forecast |
+| Joint U-Net + MLP | wind field and current maximum wind | GEO, optional ERA5, derived context, masks | joint field–intensity estimation |
+| Six-hour intensity forecast | maximum wind at +6 h | current correction estimate, IBTrACS winds at −6 h and −12 h | short-range scalar forecast |
 
 ```mermaid
 flowchart LR
   C[GEO + ERA5 + derived context] --> S1[Stage 1 deterministic baseline]
-  S1 --> B[Committed wind field]
+  S1 --> B[Baseline wind field]
   C --> S2[Stage 2 residual diffusion]
   B --> S2
   S2 --> O[Baseline + sampled correction]
 ```
 
-The wind-field reconstruction paths use the same `PairedDataModule`, physical target conversion, masks, and storm-centric metrics. The scalar intensity path uses its own cached single-field contract while preserving storm-disjoint evaluation.
+Wind-field reconstruction paths share the paired raster contract, physical target conversion, and masks. The intensity correction and forecast models use separate cached scalar contracts.
 
 ## Main articles
 
-- **[Two-stage baseline + diffusion](two-stage.md)** — the central workflow, exact handoff, channel counts, and training order.
+- **[Two-stage baseline + diffusion](two-stage.md)** — handoff, channel counts, and training order.
 - **[Stage 1 deterministic baseline](era5-residual.md)** — residual connection to ERA5, physical Huber loss, and zero-initialized head.
 - **[Stage 2 residual diffusion](residual-diffusion.md)** — signed residual transform, frozen baseline, guidance, and ensemble diagnostics.
 - **[Single-field intensity correction](intensity-correction.md)** — correct a frozen U-Net field into USA maximum wind and a wind-derived category.
-- **[Six-hour scalar intensity forecast](intensity-forecast.md)** — forecast maximum wind from the current UNet+MLP scalar and 12 hours of IBTrACS history.
+- **[Joint U-Net + MLP](bottleneck-unet-mlp.md)** — estimate the wind field and current IBTrACS intensity from a shared encoder.
+- **[Six-hour scalar intensity forecast](intensity-forecast.md)** — forecast maximum wind from the current correction estimate and 12 hours of IBTrACS history.
 
 ## Supporting and ablation articles
 

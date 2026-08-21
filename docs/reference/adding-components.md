@@ -1,8 +1,8 @@
 # Adding models, datasets, and metrics
 
-The extension rule is intentionally narrow: a new model adds its package,
-model config, and tests; a new dataset adds its implementation, data config,
-and tests. Existing runtime modules should not need edits.
+A new model adds its package, model config, and tests. A new dataset adds its
+implementation, data config, and tests. Existing runtime modules should not
+require edits.
 
 ## Add a model
 
@@ -59,8 +59,8 @@ class QuantileResidualModel(WindFieldLightningModule):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
 ```
 
-A production model must handle normalization shapes carefully and should use
-shared objective/metric primitives rather than duplicating them.
+Models must preserve normalization shapes and should use shared
+objective/metric primitives.
 
 ### 2. Add one model config
 
@@ -116,8 +116,8 @@ Put pure tensor logic in `geo2wf.metrics` and framework adaptation in
 - treat unavailable masked/storm values as unavailable, not zero; and
 - import neither Lightning, W&B, plotting, CLI, nor concrete datasets.
 
-Wire the metric into the shared evaluation collection or tracking callback—not
-into every model's prediction method. Preserve established scalar names when
+Integrate the metric at the model evaluation boundary or in a shared tracking
+callback, not in `predict_batch()`. Preserve established scalar names when
 migrating an existing calculation.
 
 ## Add a plot

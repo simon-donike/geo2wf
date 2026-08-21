@@ -26,7 +26,8 @@ The model appends:
 
 Its compact U-Net therefore receives 26 channels. It uses two GroupNorm/SiLU residual blocks per resolution, strided-convolution downsampling, bilinear upsampling, encoder skips, and a one-channel residual head.
 
-The final head starts with zero weights and bias. Before the first update, the predicted residual is zero and the physical prediction is exactly ERA5. Training can only improve or worsen that explicit starting point; the baseline is meaningful from step zero.
+The final head starts with zero weights and bias. Before the first update, the
+predicted residual is zero and the physical prediction equals ERA5.
 
 ## Physical-unit objective
 
@@ -84,9 +85,9 @@ uv run geo2wf-train experiment=deterministic_unet_no_era5
 
 In this mode the 14-channel condition contains ten GEO bands, storm-center
 distance, and three solar-time channels. The U-Net predicts absolute physical
-wind speed rather than a correction to an unavailable baseline. ERA5 filtering,
-the ERA5 residual addition, off-swath anchoring, and ERA5 comparison metrics are
-disabled.
+wind speed. The comparison preset retains ERA5 availability filtering to keep
+the same cohort, but disables ERA5 inputs, residual addition, off-swath
+anchoring, and ERA5 comparison metrics.
 
 The older direct near-89 GHz U-Net has an equivalent preset:
 

@@ -58,7 +58,8 @@ Ten percent condition dropout trains an unconditional branch without changing U-
 
 ## Validation ensemble
 
-Validation uses four stable latent members on its first reconstruction batch and reports:
+Validation uses four stable latent members on the first three configured
+ensemble batches and reports:
 
 - CRPS and ensemble spread;
 - pairwise diversity;
@@ -67,7 +68,8 @@ Validation uses four stable latent members on its first reconstruction batch and
 - log-spectrum error; and
 - `probabilistic_refinement_score`.
 
-Checkpoints use the composite score. Inspect individual members when judging sharpness because averaging plausible alternatives is expected to blur them.
+Checkpoints use the composite score. Member-level diagnostics are required
+because averaging alternatives suppresses sharp gradients.
 
 ## Train Stage 2
 

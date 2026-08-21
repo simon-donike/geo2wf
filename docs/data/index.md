@@ -1,6 +1,9 @@
 # Model inputs and training targets
 
-This page describes exactly what enters each model. The figures are not illustrations: they are Matplotlib renders of exported GeoTIFFs and derived tensors from sample `WP232024_sar_geo_20241030095303_bb2c52ca`.
+This page describes the default two-stage inputs. Figures are Matplotlib renders
+of exported GeoTIFFs and derived tensors for sample
+`WP232024_sar_geo_20241030095303_bb2c52ca`. They show the 256 × 256 export;
+training applies the configured 192 × 192 center crop.
 
 ## At a glance
 
@@ -15,7 +18,8 @@ This page describes exactly what enters each model. The figures are not illustra
 | Noisy residual | 1 | no | yes | variable denoised at the current timestep |
 | SAR wind + target mask | 1 + 1 | training only | training only | supervision and observed footprint |
 
-The distinction matters: **SAR is never an inference input.** At inference, Stage 1 receives observation/context tensors and produces a baseline. Stage 2 receives the same context plus that frozen baseline and a noise latent.
+SAR is not an inference input. Stage 1 receives observation and context tensors.
+Stage 2 additionally receives the frozen baseline and a noise latent.
 
 ## GEO imagery
 
@@ -37,12 +41,12 @@ The ten-channel set is `B07` through `B16` for AHI and `CMI_C07` through `CMI_C1
   <figcaption>Four of the nine real source and derived ERA5 fields on the same grid. ERA5 is smoother than GEO or SAR by construction; it supplies environmental context and the initial physical wind anchor.</figcaption>
 </figure>
 
-ERA5 wind speed is used twice on purpose:
+ERA5 wind speed has two paths:
 
 1. its normalized form is available as a context channel; and
 2. an explicit target-normalized wind field and validity mask are appended inside Stage 1.
 
-That explicit path makes the residual connection unambiguous: the deterministic prediction begins as ERA5 and learns a correction in m/s.
+The explicit path defines the deterministic prediction as ERA5 plus a learned correction in m/s.
 
 ## Storm geometry and solar context
 
@@ -53,7 +57,10 @@ That explicit path makes the residual connection unambiguous: the deterministic 
   <figcaption>The exact derived tensors for the selected sample: normalized great-circle distance, local-solar-time sine and cosine, and solar zenith divided by π. These are model inputs, not plotting overlays.</figcaption>
 </figure>
 
-The distance raster gives the network a storm-relative coordinate without passing scalar latitude/longitude into the model. Local solar time varies by pixel longitude and includes the equation-of-time correction. The sine/cosine pair avoids a discontinuity at midnight; solar zenith helps the model distinguish daylight-dependent imagery.
+The distance raster provides a storm-relative coordinate without passing scalar
+latitude or longitude. Local solar time varies by pixel longitude and includes
+the equation-of-time correction. Sine/cosine encoding removes the midnight
+discontinuity; solar zenith represents illumination.
 
 ## Physical anchor, SAR target, and masks
 
@@ -133,7 +140,9 @@ Run the checked-in renderer from the repository root:
 uv run python scripts/render_docs_data_examples.py
 ```
 
-The selected sample, timestamps, sensors, and grid settings are recorded in [`data-example-metadata.json`](../assets/images/data-example-metadata.json). Change `--sample-id` to render another row from the split manifest.
+The selected sample, timestamps, sensors, and grid settings are recorded in
+[`data-example-metadata.json`](../assets/images/data-example-metadata.json).
+Use `--sample-id` to render another manifest row.
 
 ## Related articles
 

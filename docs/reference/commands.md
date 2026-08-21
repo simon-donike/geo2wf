@@ -66,11 +66,11 @@ uv run geo2wf-export geo-sar \
 
 # ERA5-enriched GEO–SAR export
 uv run geo2wf-export geo-sar \
-  --config configs/config_geo_sar_10bands_era5.yaml
+  --config configs/v1/config_geo_sar_10bands_era5.yaml
 
 # GEO–PMW proxy export
 uv run geo2wf-export geo-pmw \
-  --config configs/config_pretrain_geo_pmw_10bands_era5.yaml \
+  --config configs/v1/config_pretrain_geo_pmw_10bands_era5.yaml \
   --limit 2
 ```
 
@@ -123,10 +123,9 @@ uv run geo2wf-infer residual-diffusion \
   --output-root inference/inf_simon_diffusion
 ```
 
-Both workflows also accept `--data-root`, `--manifest`, `--reference-root`,
-`--stats`, `--device`, `--storms`, and `--limit`. Diffusion additionally accepts
-batch, guidance, ensemble-summary, member-quantile, and member-field controls.
-PMW-aware runs write `pmw-inference-audit.csv` beside their summaries.
+Both workflows accept data, manifest, reference, statistics, device, storm,
+and limit options. Diffusion adds sampling and ensemble controls. PMW-aware
+runs write `pmw-inference-audit.csv` beside their summaries.
 
 ## Batch jobs
 

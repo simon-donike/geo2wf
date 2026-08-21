@@ -8,11 +8,11 @@ flowchart LR
   A[Source manifest] --> B[geo2wf-export]
   B --> C[WindFieldBatch + DataSpec]
   C --> D[geo2wf-train]
-  D --> E[CheckpointLoader]
+  D --> E[Checkpoint]
   E --> F[geo2wf-evaluate / geo2wf-infer]
 ```
 
-## Recommended reading order
+## Reading order
 
 1. [Install and verify the package](installation.md).
 2. Run the [first smoke experiment](first-experiment.md).
@@ -35,13 +35,14 @@ flowchart LR
 : Defines the common training-objective and physical-prediction extension
   points used by modular models.
 
-`CheckpointLoader` and `PredictionService`
-: Strict-load old or new checkpoints and expose deterministic and ensemble
-  predictions through one physical-unit `PredictionBatch`.
+`geo2wf-evaluate` and `geo2wf-infer`
+: Dispatch to the maintained checkpoint-evaluation and storm-inference
+  workflows in `scripts/`. Each subcommand retains its workflow-specific
+  arguments.
 
 ## Choose a route
 
-- To prove the installation and configuration, follow [First experiment](first-experiment.md).
+- To verify the installation and configuration, follow [First experiment](first-experiment.md).
 - To train the main stack, use the [Stage 1 → Stage 2 sequence](../models/two-stage.md#training-sequence).
 - To add a component, follow [Adding models, datasets, and metrics](../reference/adding-components.md).
 - To understand package ownership, read [Modular package architecture](../concepts/modular-architecture.md).
