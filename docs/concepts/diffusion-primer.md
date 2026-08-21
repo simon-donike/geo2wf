@@ -27,7 +27,9 @@ and a sinusoidal embedding of `t`. It predicts the noise \(\hat\epsilon_\theta\)
 \mathcal L = \frac{\sum m\,(\epsilon - \hat\epsilon_\theta)^2}{\sum m}
 \]
 
-For ERA5 sparse completion, observed SAR pixels have weight 1 and eligible off-swath ERA5 anchor pixels have the configured weak weight (0.05 in the checked-in experiment).
+For residual-diffusion sparse completion, observed SAR pixels have weight 1 and
+eligible off-swath ERA5 anchor pixels have the configured lower weight (0.1 in
+the grouped default).
 
 ## Reverse process
 
@@ -49,6 +51,7 @@ sequenceDiagram
 
 ## Why conditioning works
 
-The network is never asked to reconstruct GEO. GEO and optional ERA5 channels are stable context at every denoising step. The noisy target channel tells the model what partial sample it is refining; the condition tells it which storm structure is plausible.
+The network does not reconstruct GEO. GEO and optional ERA5 channels remain
+fixed at every denoising step; the noisy target is the variable being refined.
 
 Continue to [Conditional diffusion](../models/conditional-diffusion.md) for implementation details and [Sampling](../models/sampling.md) for DDPM/DDIM behavior.

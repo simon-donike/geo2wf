@@ -22,21 +22,21 @@ Statistics are pooled under `TB_near89V`, producing one sensor-independent Kelvi
 
     ```bash
     uv run geo2wf-export geo-pmw \
-      --config configs/config_pretrain_geo_pmw.yaml
+      --config configs/v1/config_pretrain_geo_pmw.yaml
     ```
 
 === "Ten GEO bands"
 
     ```bash
     uv run geo2wf-export geo-pmw \
-      --config configs/config_pretrain_geo_pmw_10bands.yaml
+      --config configs/v1/config_pretrain_geo_pmw_10bands.yaml
     ```
 
 === "Ten bands + ERA5"
 
     ```bash
     uv run geo2wf-export geo-pmw \
-      --config configs/config_pretrain_geo_pmw_10bands_era5.yaml
+      --config configs/v1/config_pretrain_geo_pmw_10bands_era5.yaml
     ```
 
 The exporter is PMW-anchored: it finds a closest GEO occurrence for each acceptable PMW observation, builds the same geographic crop contract as the SAR exporter, and writes generic `condition_path` and `target_path` columns. This is why `PairedImageDataset` can load either task without a separate class.
@@ -73,5 +73,5 @@ uv run geo2wf-train \
 
 The model architecture and condition/target widths must match exactly.
 
-!!! tip "Use proxy data to answer a specific question"
-    Compare training from scratch against a controlled initialization with identical SAR data, seed, normalization, and evaluation. More proxy samples alone do not prove better SAR reconstruction.
+Evaluate proxy pretraining against training from scratch with identical SAR
+data, seed, normalization, and evaluation.

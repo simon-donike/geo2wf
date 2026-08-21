@@ -3,7 +3,7 @@
 This report compares the raw U-Net field maximum, a separately trained U-Net plus correction network, and the jointly trained U-Net+MLP. Every model is evaluated once with ERA5 conditioning and once without it.
 
 !!! warning "Validation results, not a final test claim"
-    The matched benchmark and the Humberto, Kiko, and Otis trajectories are all from the `val` split. None of these storm IDs occurs in training, but validation metrics were used for early stopping and checkpoint selection. Treat these numbers as model-selection evidence, not an unbiased held-out test estimate.
+    The matched benchmark and the Humberto, Kiko, and Otis trajectories are all from the `val` split. None of these storm IDs occurs in training, but validation metrics were used for early stopping and checkpoint selection. These are model-selection diagnostics, not an unbiased held-out test estimate.
 
 ## Main result
 
@@ -90,9 +90,9 @@ The inference manifest contributes every listed 10-minute GEO image: **1,006 Hum
 
 Inference was attempted for all **3,268** scans. **3,266** have a non-empty valid footprint after the model's center crop and are scored; **2 scans** are retained in the download with `inference_valid = false` and excluded identically from both regimes and every model metric.
 
-Across the dense common cohort, **U-Net + correction** has the lowest aggregate MAE with ERA5 (**7.476 m/s**), while **Joint U-Net + MLP** is lowest without ERA5 (**7.243 m/s**). Per-storm behavior can differ, so the trajectory and storm-level table remain the more informative diagnostic.
+Across the dense common cohort, **U-Net + correction** has the lowest aggregate MAE with ERA5 (**7.476 m/s**), while **Joint U-Net + MLP** is lowest without ERA5 (**7.243 m/s**). Per-storm behavior differs; the trajectory and storm-level table report that variation.
 
-The plotted curves are hourly means solely to keep the dense 10-minute series readable. The table scores every valid individual observation, while the download also retains any explicitly flagged unusable scan.
+The plotted curves are hourly means to keep the dense 10-minute series readable. The table scores every valid individual observation, while the download also retains any explicitly flagged unusable scan.
 
 ![Predicted and ground-truth full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)
 
@@ -119,7 +119,7 @@ All values below are m/s except the sample count.
 | Kiko (`EP112025`) | `val` | 0 | 23 | 0 | 1,576 / 1,578 |
 | Otis (`EP182023`) | `val` | 0 | 2 | 0 | 684 / 684 |
 
-This answers the leakage question directly: **none of the three storms is in training**. They are validation storms, including Otis; none is in the test split. Because validation guided early stopping, the dense plots are diagnostic case studies rather than fresh generalization tests.
+The split audit confirms that **none of the three storms is in training**. They are validation storms, including Otis; none is in the test split. Because validation guided early stopping, the dense plots are diagnostic case studies rather than independent test cases.
 
 ## Reproduce the dense inference
 
@@ -137,4 +137,4 @@ Each inference JSON records SHA-256 hashes for the raw U-Net, correction, and jo
 - Dense 10-minute observations are strongly temporally correlated; 3,268 rows are not 3,268 independent storms or trials.
 - IBTrACS is a best-track estimate interpolated in time, not a direct measurement at each satellite scan.
 - The raw scalar is the largest valid pixel in a reconstructed field, while the learned heads estimate IBTrACS maximum wind directly; these are related but not identical physical quantities.
-- A final claim should be made once on a locked, storm-disjoint test set after all architecture and checkpoint choices are frozen.
+- Final performance estimation requires a locked, storm-disjoint test set after architecture and checkpoint selection.

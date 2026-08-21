@@ -1,11 +1,11 @@
 # Six-hour scalar intensity forecast
 
-This workflow forecasts one scalar: maximum sustained wind six hours after the
-current U-Net + MLP estimate. It uses the preceding 6-hour and 12-hour
-IBTrACS `USA_WIND` values and learns a signed change around the current scalar.
+This workflow forecasts maximum sustained wind six hours after the current
+single-field correction estimate. It also uses IBTrACS `USA_WIND` at −6 h and
+−12 h and learns a signed change around the current estimate.
 
 ```text
-forecast(t + 6 h) = max(0, UNet+MLP(t) + learned change)
+forecast(t + 6 h) = max(0, corrected U-Net intensity(t) + learned change)
 ```
 
 ## Export the forecast cache

@@ -9,12 +9,12 @@ Training always uses the full configured forward schedule. Sampling chooses how 
 ```yaml
 model:
   num_timesteps: 1000
-  sampling:
-    method: ddpm
-    # timesteps must equal num_timesteps
+  sampling_method: ddpm
+  sampling_timesteps: 1000
 ```
 
-DDPM is the implicit default when `model.sampling` is absent. It is faithful to the full chain but expensive during validation.
+`sampling_method` defaults to `ddpm` when omitted. The full chain is expensive
+during validation.
 
 ## DDIM
 
@@ -23,11 +23,10 @@ DDPM is the implicit default when `model.sampling` is absent. It is faithful to 
 ```yaml
 model:
   num_timesteps: 1000
-  sampling:
-    method: ddim
-    timesteps: 100
-    eta: 0.0
-    clip_sample: true
+  sampling_method: ddim
+  sampling_timesteps: 100
+  sampling_eta: 0.0
+  clip_sample: true
 ```
 
 With `eta: 0`, the chain is deterministic given initial noise. Positive eta adds controlled stochasticity. DDIM allows fewer steps, making reconstruction logging much cheaper.
@@ -35,12 +34,12 @@ With `eta: 0`, the chain is deterministic given initial noise. Positive eta adds
 ## Ensembles and classifier-free guidance
 
 Different initial Gaussian latents produce different conditional samples even
-when DDIM uses `eta: 0`. `validation.ensemble_size` assigns each sample a stable
+when DDIM uses `eta: 0`. `validation_ensemble_size` assigns each sample a stable
 latent namespace, making diversity and calibration comparable across epochs.
 The model exposes `sample_ensemble(...)`, which returns tensors shaped
 `[member, batch, channel, height, width]`.
 
-When condition dropout was enabled during training, `sampling.guidance_scale`
+When condition dropout was enabled during training, `guidance_scale`
 combines conditional and zero-condition noise predictions. A value of `1`
 performs the original single conditional evaluation. Values above `1` usually
 increase fidelity to the baseline and GEO/ERA context at some cost to ensemble

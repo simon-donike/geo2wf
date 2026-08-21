@@ -27,7 +27,7 @@ instantiation mechanism.
 | `target_size`, `center_crop_size` | output and optional final crop shape |
 | `random_flips` | paired physics-aware train augmentation |
 | `include_test_in_train` | explicitly merge test into train; modular default is false |
-| `require_era5` | reject rows without context |
+| `require_era5`, `use_era5` | filter for ERA5 availability and include ERA5 as model input, respectively |
 | `include_pmw`, `include_ibtracs` | request optional companions/metadata |
 | `normalization`, `target_normalization` | condition and target transforms |
 | `robust_clip`, `max_era5_time_gap_hours` | robust range and context freshness |

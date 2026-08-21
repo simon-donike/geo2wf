@@ -60,9 +60,9 @@ their forwarding environment module.
 
 ## GPU notes
 
-The refactor intentionally retains Lightning `1.9.3` and the existing PyTorch
-range. A generic sync may select a CPU/platform build; managed GPU systems may
-need the site's supported CUDA wheel or module strategy.
+The lock file pins Lightning `1.9.3` and the compatible PyTorch range. A
+generic sync may select a CPU build; managed GPU systems may require the
+site-specific CUDA wheel or module.
 
 Use trainer overrides instead of copying a config:
 

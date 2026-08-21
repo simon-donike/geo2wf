@@ -43,7 +43,7 @@ Diffusion additionally checks saved schedule coefficients and timestep count.
 
 ## Initialize weights only
 
-Use `--weights-only-path` for deliberate transfer learning. It strict-loads the
+Use `--weights-only-path` for transfer learning. It strict-loads the
 state dictionary but starts optimizer, scheduler, epoch, and step state fresh.
 It is mutually exclusive with `--ckpt-path`.
 
@@ -116,7 +116,7 @@ the tracking layer, whose callback can also drain standardized events.
 
 ## Resume safety
 
-- Same architecture, channel order, schedule, and target definition: resume is plausible.
+- Resume only with the same architecture, channel order, schedule, and target definition.
 - Changed optimizer only: use weights-only initialization if intentional.
 - Changed diffusion schedule or target normalization: start a fresh run.
 - Changed bands, companions, or spatial contract: select compatible config and checkpoint.

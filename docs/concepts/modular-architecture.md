@@ -1,8 +1,8 @@
 # Modular package architecture
 
 The installable `geo2wf` package under `src/geo2wf/` is the source of truth.
-Root scripts, the old `data` package, CamelCase model modules, and the original
-diffusion paths are compatibility adapters only.
+Root scripts, CamelCase model modules, and the original diffusion paths are
+compatibility adapters.
 
 ## Package ownership
 
@@ -18,7 +18,6 @@ diffusion paths are compatibility adapters only.
 | `geo2wf.visualization` | plotting functions returning Matplotlib figures |
 | `geo2wf.tracking` | callbacks, reconstruction media adaptation, CSV/W&B run records |
 | `geo2wf.evaluation` | shared prediction evaluation |
-| `geo2wf.inference` | strict checkpoint loading and unified physical prediction service |
 | `geo2wf.preprocessing` | source/feature logic reusable by export and raw inference |
 
 A model package may import shared contracts, objectives, metrics, and diffusion
@@ -74,9 +73,9 @@ request, and writes versioned metadata into new checkpoints.
 Deterministic models use `E=1`. This removes deterministic/diffusion branches
 from downstream metrics and serialization.
 
-`CheckpointLoader` uses the config's `_target_`, strict-loads the state dict,
-and supports a legacy factory for old full YAML. `PredictionService` adapts
-both new `predict_batch()` models and compatible older prediction methods.
+Installed inference subcommands call the maintained workflow scripts. Modular
+models expose `predict_batch()` for physical predictions; older full-YAML
+checkpoints continue through their workflow-specific compatibility paths.
 
 ## Tracking and visualization boundary
 
@@ -90,9 +89,9 @@ machine-readable manifests remain independent.
 ## Command migration status
 
 - `geo2wf-train` natively composes Hydra groups.
-- `geo2wf-evaluate`, `geo2wf-infer`, and `geo2wf-export` are canonical installed
-  entry points over maintained workflows, retaining their existing argparse and
-  full-YAML options during staged migration.
+- `geo2wf-evaluate`, `geo2wf-infer`, and `geo2wf-export` are installed entry
+  points over maintained workflows and retain their argparse and full-YAML
+  options.
 - Root scripts and legacy imports forward to the same source implementation and
   remain supported with deprecation warnings.
 

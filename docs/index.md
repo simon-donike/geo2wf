@@ -8,7 +8,7 @@ hide:
 
 # Two-stage wind-field reconstruction
 
-geo2wf reconstructs SAR-like surface wind fields from geostationary satellite imagery and ERA5 context. The main system is deliberately two-stage: a deterministic model commits to a broad physical field, then diffusion models the signed correction that remains.
+geo2wf reconstructs surface wind fields from geostationary satellite imagery and optional ERA5 context. The principal reconstruction system uses a deterministic baseline followed by diffusion of the remaining signed error.
 
 <div class="geo-actions" markdown>
 [Read the two-stage workflow](models/two-stage.md){ .md-button .md-button--primary }
@@ -17,13 +17,13 @@ geo2wf reconstructs SAR-like surface wind fields from geostationary satellite im
 </div>
 </div>
 
-## The central workflow
+## Reconstruction workflow
 
 <div class="stage-flow">
   <div class="stage-card">
     <span class="geo-kicker">Stage 1</span>
     <strong>Deterministic baseline</strong>
-    <p>GEO, ERA5, geometry, solar context, and validity masks produce one dense wind field anchored to ERA5.</p>
+    <p>GEO, ERA5, storm-relative geometry, solar context, and validity masks produce one dense wind field.</p>
     <code>baseline = ERA5 + learned correction</code>
   </div>
   <div class="stage-arrow">→</div>
@@ -35,11 +35,11 @@ geo2wf reconstructs SAR-like surface wind fields from geostationary satellite im
   </div>
 </div>
 
-The split is useful because the two models have different jobs. Stage 1 learns the stable, broad reconstruction. Stage 2 spends its capacity on plausible eye, eyewall, gradient, and asymmetric structure without having to regenerate the whole field from noise. [See the equations, channel counts, and training sequence.](models/two-stage.md)
+Stage 1 estimates the broad field. Stage 2 models unresolved eye, eyewall, gradient, and asymmetric structure without regenerating the complete field from noise. [See the equations, channel counts, and training sequence.](models/two-stage.md)
 
 ## What the models receive
 
-The checked-in two-stage setup uses a 23-channel data condition:
+The default two-stage configuration uses a 23-channel data condition:
 
 - 10 GEO infrared and water-vapor bands;
 - 9 ERA5 fields: seven exported variables plus derived 10 m wind speed and relative vorticity;
@@ -65,6 +65,6 @@ Validity masks and an explicit ERA5 wind anchor are appended by the model. Stage
 
 ## Scope
 
-geo2wf is paired image-to-image reconstruction on a shared 256 × 256 geospatial grid. It does not currently model arbitrary observation sets, full storm tracks, or multi-temporal windows. Those boundaries keep the data contract, physical units, masks, and model comparisons inspectable.
+The wind-field models operate on paired rasters on a common grid and use a 192 × 192 center crop by default. Separate scalar models estimate current intensity and six-hour intensity change. The repository does not implement joint track and wind-field forecasting or arbitrary observation-set models.
 
 Start with [the two-stage workflow](models/two-stage.md), then follow the [data inputs](data/index.md) into [training](experiments/training.md) and [evaluation](experiments/evaluation.md).
