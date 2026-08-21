@@ -55,8 +55,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--splits", nargs="+", default=["train", "val", "test"])
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
-    parser.add_argument("--minimum-valid-fraction", type=float, default=0.05)
-    parser.add_argument("--limit-per-split", type=int, default=None)
+    parser.add_argument(
+        "--minimum-valid-fraction",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional stricter valid-pixel threshold. The comparison default "
+            "retains every sample having at least one valid pixel."
+        ),
+    )
     parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -65,10 +72,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--batch-size must be positive")
     if args.num_workers is not None and args.num_workers < 0:
         parser.error("--num-workers must be non-negative")
-    if not 0.0 < args.minimum_valid_fraction <= 1.0:
-        parser.error("--minimum-valid-fraction must be in (0, 1]")
-    if args.limit_per_split is not None and args.limit_per_split <= 0:
-        parser.error("--limit-per-split must be positive")
+    if not 0.0 <= args.minimum_valid_fraction <= 1.0:
+        parser.error("--minimum-valid-fraction must be in [0, 1]")
     if len(set(args.splits)) != len(args.splits):
         parser.error("--splits must not contain duplicates")
     return args
@@ -275,21 +280,17 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                 prediction = model.predict_physical(device_batch).detach().cpu()
                 condition_mask = batch["condition_mask"].bool()
                 for index, sample_id in enumerate(batch["sample_id"]):
+                    sample_id = str(sample_id)
                     if (
-                        args.limit_per_split is not None
-                        and len(split_rows) >= args.limit_per_split
+                        not sample_id
+                        or sample_id in {".", ".."}
+                        or Path(sample_id).name != sample_id
                     ):
-                        break
+                        raise ValueError(
+                            f"sample ID is not safe for a cache filename: {sample_id!r}"
+                        )
                     field = prediction[index, 0]
                     valid = condition_mask[index, 0] & torch.isfinite(field)
-                    valid_fraction = float(valid.float().mean())
-                    if valid_fraction < args.minimum_valid_fraction:
-                        raise ValueError(
-                            f"sample {sample_id} in {split} has valid fraction "
-                            f"{valid_fraction:.6f}, below the comparison minimum "
-                            f"{args.minimum_valid_fraction:.6f}; refusing to change "
-                            "the common cohort"
-                        )
                     center = batch["center"][index]
                     distance = _normalized_distance_to_center(
                         batch["condition_bounds"][index], field.shape, center
@@ -298,6 +299,14 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                     if not valid.any():
                         raise ValueError(
                             f"sample {sample_id} has no finite valid pixels"
+                        )
+                    valid_fraction = float(valid.float().mean())
+                    if valid_fraction < args.minimum_valid_fraction:
+                        raise ValueError(
+                            f"sample {sample_id} in {split} has valid fraction "
+                            f"{valid_fraction:.6f}, below the comparison minimum "
+                            f"{args.minimum_valid_fraction:.6f}; refusing to change "
+                            "the common cohort"
                         )
                     field = torch.where(valid, field, torch.zeros_like(field))
                     distance = torch.nan_to_num(
@@ -326,8 +335,8 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                     start = storm_metadata[storm_id]["start"]
                     split_rows.append(
                         {
-                            "sample_id": str(sample_id),
-                            "source_sample_id": str(sample_id),
+                            "sample_id": sample_id,
+                            "source_sample_id": sample_id,
                             "storm_id": storm_id,
                             "split": split,
                             "field_path": relative.as_posix(),
@@ -345,11 +354,6 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                             "valid_fraction": float(valid.float().mean()),
                         }
                     )
-                if (
-                    args.limit_per_split is not None
-                    and len(split_rows) >= args.limit_per_split
-                ):
-                    break
             if not split_rows:
                 raise RuntimeError(f"cache export produced no usable {split!r} samples")
             split_rows.sort(key=lambda row: str(row["sample_id"]))

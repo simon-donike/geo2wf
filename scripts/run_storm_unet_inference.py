@@ -333,7 +333,11 @@ def _era5_fields(
 
 
 def _prepare_sample(
-    geo, era5_dataset: xr.Dataset, stats: dict
+    geo,
+    era5_dataset: xr.Dataset | None,
+    stats: dict,
+    *,
+    use_era5: bool = True,
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
     if geo.center is None or geo.ibtracs_center is None:
         raise ValueError(f"{geo.observation_id} has no finite center")
@@ -353,23 +357,7 @@ def _prepare_sample(
         [item[1] & np.isfinite(item[0]) for item in geo_regridded]
     )
 
-    era5_fields = _era5_fields(era5_dataset, geo.timestamp)
-    era5_fields = _append_native_era5_derived_fields(era5_fields)
-    era5_channels = list(era5_fields)
-    era5_regridded = [
-        _regrid_continuous(*era5_fields[channel], grid_lat, grid_lon)
-        for channel in era5_channels
-    ]
-    era5_array = np.stack([item[0] for item in era5_regridded]).astype(np.float32)
-    era5_mask = np.logical_and.reduce(
-        [item[1] & np.isfinite(item[0]) for item in era5_regridded]
-    )
-    valid = torch.from_numpy(geo_mask & era5_mask).unsqueeze(0)
     geo_tensor = torch.from_numpy(geo_array)
-    era5_tensor = torch.from_numpy(era5_array)
-    wind_index = era5_channels.index("wind_speed_10m")
-    era5_wind_physical = era5_tensor[wind_index : wind_index + 1].clone()
-
     geo_tensor = _normalize(
         geo_tensor,
         "geo",
@@ -378,26 +366,46 @@ def _prepare_sample(
         normalization="robust-zscore",
         robust_clip=ROBUST_CLIP,
     )
-    era5_tensor = _normalize(
-        era5_tensor,
-        "era5",
-        [f"era5_{channel}" for channel in era5_channels],
-        stats,
-        normalization="robust-zscore",
-        robust_clip=ROBUST_CLIP,
-    )
-    era5_wind = _normalize(
-        era5_wind_physical,
-        "sar",
-        ["wind_speed"],
-        stats,
-        normalization="min-max",
-    )
-    condition = torch.cat([geo_tensor, era5_tensor], dim=0)
+    valid = torch.from_numpy(geo_mask).unsqueeze(0)
+    condition = geo_tensor
+    era5_wind = None
+    era5_wind_physical = None
+    if use_era5:
+        if era5_dataset is None:
+            raise ValueError("ERA5 data are required when use_era5=True")
+        era5_fields = _era5_fields(era5_dataset, geo.timestamp)
+        era5_fields = _append_native_era5_derived_fields(era5_fields)
+        era5_channels = list(era5_fields)
+        era5_regridded = [
+            _regrid_continuous(*era5_fields[channel], grid_lat, grid_lon)
+            for channel in era5_channels
+        ]
+        era5_array = np.stack([item[0] for item in era5_regridded]).astype(np.float32)
+        era5_mask = np.logical_and.reduce(
+            [item[1] & np.isfinite(item[0]) for item in era5_regridded]
+        )
+        valid = torch.from_numpy(geo_mask & era5_mask).unsqueeze(0)
+        era5_tensor = torch.from_numpy(era5_array)
+        wind_index = era5_channels.index("wind_speed_10m")
+        era5_wind_physical = era5_tensor[wind_index : wind_index + 1].clone()
+        era5_tensor = _normalize(
+            era5_tensor,
+            "era5",
+            [f"era5_{channel}" for channel in era5_channels],
+            stats,
+            normalization="robust-zscore",
+            robust_clip=ROBUST_CLIP,
+        )
+        era5_wind = _normalize(
+            era5_wind_physical,
+            "sar",
+            ["wind_speed"],
+            stats,
+            normalization="min-max",
+        )
+        condition = torch.cat([geo_tensor, era5_tensor], dim=0)
     condition = _center_crop(torch.nan_to_num(condition) * valid)
 
-    era5_wind = _center_crop(torch.nan_to_num(era5_wind) * valid)
-    era5_wind_physical = _center_crop(torch.nan_to_num(era5_wind_physical) * valid)
     valid = _center_crop(valid)
     bounds = _bounds(*geo.center)
     distance = _normalized_distance_to_center(
@@ -408,10 +416,18 @@ def _prepare_sample(
     batch = {
         "condition": condition.unsqueeze(0),
         "condition_mask": valid.unsqueeze(0),
-        "era5_wind_speed": era5_wind.unsqueeze(0),
-        "era5_wind_speed_physical": era5_wind_physical.unsqueeze(0),
-        "era5_wind_speed_mask": valid.unsqueeze(0),
     }
+    if use_era5:
+        assert era5_wind is not None and era5_wind_physical is not None
+        era5_wind = _center_crop(torch.nan_to_num(era5_wind)) * valid
+        era5_wind_physical = _center_crop(torch.nan_to_num(era5_wind_physical)) * valid
+        batch.update(
+            {
+                "era5_wind_speed": era5_wind.unsqueeze(0),
+                "era5_wind_speed_physical": era5_wind_physical.unsqueeze(0),
+                "era5_wind_speed_mask": valid.unsqueeze(0),
+            }
+        )
     return batch, _physical_distance_km(bounds, geo.ibtracs_center)
 
 

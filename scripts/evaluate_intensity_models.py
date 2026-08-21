@@ -411,10 +411,14 @@ def _table_rows(
 ) -> list[dict[str, Any]]:
     rows = []
     bootstrap_models = bootstrap.get("models", {})
+    baseline_mae = summaries["unet_raw_max"]["regression"]["mae_ms"]
     for model_name in ("unet_raw_max", "unet_correction", "joint_unet_mlp"):
         summary = summaries[model_name]
         field = field_metrics.get(model_name, {})
         interval = bootstrap_models.get(model_name, {}).get("mae_ms_95ci", [None, None])
+        delta_interval = bootstrap_models.get(model_name, {}).get(
+            "mae_delta_vs_unet_raw_max_ms_95ci", [None, None]
+        )
         rows.append(
             {
                 "model": MODEL_LABELS[model_name],
@@ -424,6 +428,12 @@ def _table_rows(
                 "intensity_mae_ms": summary["regression"]["mae_ms"],
                 "intensity_mae_95ci_low_ms": interval[0],
                 "intensity_mae_95ci_high_ms": interval[1],
+                "intensity_mae_delta_vs_unet_raw_max_ms": summary["regression"][
+                    "mae_ms"
+                ]
+                - baseline_mae,
+                "intensity_mae_delta_95ci_low_ms": delta_interval[0],
+                "intensity_mae_delta_95ci_high_ms": delta_interval[1],
                 "intensity_rmse_ms": summary["regression"]["rmse_ms"],
                 "intensity_bias_ms": summary["regression"]["bias_ms"],
                 "storm_macro_mae_ms": summary["storm_macro_mae_ms"],
@@ -446,16 +456,10 @@ def _format_number(value: Any, digits: int = 3) -> str:
     return f"{float(value):.{digits}f}"
 
 
-def _markdown_table(rows: Sequence[Mapping[str, Any]], *, split: str) -> str:
+def _markdown_result_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     lines = [
-        f"# Intensity model comparison ({split})",
-        "",
-        "All rows use the exact same sample IDs, storm-disjoint split, and "
-        "interpolated IBTrACS USA_WIND targets. MAE confidence intervals use a "
-        "paired cluster bootstrap over storms.",
-        "",
-        "| Model | N | Intensity MAE m/s (95% CI) | RMSE | Bias | Storm-macro MAE | Category acc. | Macro F1 | Within one | Field MAE | Field RMSE |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Model | Samples | Storms | Intensity MAE (m/s; 95% CI) | Δ MAE vs raw U-Net (m/s; 95% CI) | Intensity RMSE (m/s) | Intensity bias (m/s) | Storm-macro MAE (m/s) | Category accuracy | Category macro F1 | Within one category | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         low = row["intensity_mae_95ci_low_ms"]
@@ -466,12 +470,23 @@ def _markdown_table(rows: Sequence[Mapping[str, Any]], *, split: str) -> str:
             if low is not None and high is not None
             else mae
         )
+        delta_low = row["intensity_mae_delta_95ci_low_ms"]
+        delta_high = row["intensity_mae_delta_95ci_high_ms"]
+        delta = _format_number(row["intensity_mae_delta_vs_unet_raw_max_ms"])
+        delta_ci = (
+            f"{delta} ({_format_number(delta_low)}–{_format_number(delta_high)})"
+            if delta_low is not None and delta_high is not None
+            else delta
+        )
         lines.append(
-            "| {model} | {samples} | {mae_ci} | {rmse} | {bias} | {macro} | "
-            "{accuracy} | {f1} | {within} | {field_mae} | {field_rmse} |".format(
+            "| {model} | {samples} | {storms} | {mae_ci} | {delta_ci} | {rmse} | "
+            "{bias} | {macro} | {accuracy} | {f1} | {within} | {field_mae} | "
+            "{field_rmse} | {field_bias} |".format(
                 model=row["model"],
                 samples=row["samples"],
+                storms=row["storms"],
                 mae_ci=mae_ci,
+                delta_ci=delta_ci,
                 rmse=_format_number(row["intensity_rmse_ms"]),
                 bias=_format_number(row["intensity_bias_ms"]),
                 macro=_format_number(row["storm_macro_mae_ms"]),
@@ -480,17 +495,119 @@ def _markdown_table(rows: Sequence[Mapping[str, Any]], *, split: str) -> str:
                 within=_format_number(row["within_one_category_accuracy"]),
                 field_mae=_format_number(row["field_mae_ms"]),
                 field_rmse=_format_number(row["field_rmse_ms"]),
+                field_bias=_format_number(row["field_bias_ms"]),
             )
         )
-    lines.extend(
-        [
-            "",
-            "The correction model has no field metrics because it emits only a scalar. "
-            "Validation results are model-selection diagnostics; use the untouched test "
-            "split once after choices are frozen for the final generalization claim.",
-            "",
-        ]
+    return lines
+
+
+def _methodology_markdown(
+    *,
+    split: str,
+    samples: int,
+    storms: int,
+    bootstrap_repetitions: int,
+    bootstrap_seed: int,
+) -> list[str]:
+    interpretation = (
+        "These are validation/model-selection results, not a final held-out "
+        "generalization estimate. Hyperparameters and model choices should be frozen "
+        "before evaluating the test split."
+        if split == "val"
+        else "These are held-out test results and should not be used for further model selection."
     )
+    return [
+        "## What the models predict",
+        "",
+        "- **U-Net raw field maximum** is the largest predicted wind speed over all "
+        "finite, valid pixels in the separately trained U-Net field.",
+        "- **U-Net + correction** starts from that same raw maximum and adds the "
+        "output of a separately trained correction network. The correction network "
+        "sees the frozen U-Net field, its validity mask, distance to the storm center, "
+        "and contemporaneously available metadata. Its final intensity is clamped to "
+        "be non-negative.",
+        "- **Joint U-Net + MLP** directly predicts scalar maximum wind from an MLP "
+        "attached to the U-Net bottleneck. Its field reconstruction and scalar head "
+        "are optimized jointly and share the encoder.",
+        "",
+        "The correction model emits only a scalar, so field MAE, RMSE, and bias are "
+        "not applicable and are shown as —.",
+        "",
+        "## Evaluation cohort and target",
+        "",
+        f"The `{split}` cohort contains **{samples} samples from {storms} storms**. "
+        "Every row in every table uses the exact same sample IDs and storm-disjoint "
+        "split. The scalar target is IBTrACS `USA_WIND`, expressed in m/s and "
+        "linearly interpolated to the image timestamp only when the surrounding "
+        "IBTrACS fixes are no more than three hours apart.",
+        "",
+        "## Metric definitions",
+        "",
+        "Let `prediction - target` be the signed scalar intensity error for one sample.",
+        "",
+        "| Metric | How it is calculated | How to read it |",
+        "|---|---|---|",
+        "| **Samples / Storms** | Counts of image observations and unique storm IDs in the evaluation cohort. | These counts must match across model rows for a paired comparison. |",
+        "| **Intensity MAE** | Mean of `abs(prediction - target)` over samples. | Typical absolute scalar-intensity miss; lower is better. The parenthesized range is the 95% storm-bootstrap interval. |",
+        "| **Δ MAE vs raw U-Net** | A model's MAE minus the raw U-Net MAE, computed on the same bootstrap resample. | Negative values favor the model; a 95% interval excluding zero indicates a consistent paired improvement at the sampled-storm level. |",
+        "| **Intensity RMSE** | Square root of the mean squared scalar error over samples. | Penalizes large intensity misses more heavily than MAE; lower is better. |",
+        "| **Intensity bias** | Mean of `prediction - target` over samples. | Zero is ideal; negative means systematic underprediction and positive means overprediction. Opposite errors can cancel. |",
+        "| **Storm-macro MAE** | Compute MAE separately for every storm, then take the unweighted mean over storms. | Gives each storm equal weight regardless of how many images it contributes; lower is better. |",
+        "| **Category accuracy** | Fraction whose predicted and target intensity categories match exactly. | Higher is better; range 0–1. |",
+        "| **Category macro F1** | For each target category present, calculate the harmonic mean of precision and recall, then average categories equally. | Rewards balanced category performance rather than dominance by frequent categories; higher is better. |",
+        "| **Within one category** | Fraction for which the numeric predicted category differs from the target category by at most one. | Measures tolerance to a one-bin miss; higher is better. |",
+        "| **Field MAE** | Mean absolute U-Net-versus-SAR wind error over all valid pixels. | Typical pixel-level wind-field miss; lower is better. |",
+        "| **Field RMSE** | Square root of mean squared U-Net-versus-SAR error over all valid pixels. | More sensitive than field MAE to large pixel errors; lower is better. |",
+        "| **Field bias** | Mean signed U-Net-minus-SAR error over all valid pixels. | Zero is ideal; negative means field underprediction and positive means overprediction. |",
+        "",
+        "### Intensity categories",
+        "",
+        "Continuous one-minute wind is converted without rounding using these "
+        "thresholds: tropical depression `<34 kt`; tropical storm `34–<64 kt`; "
+        "Category 1 `64–<83 kt`; Category 2 `83–<96 kt`; Category 3 `96–<113 kt`; "
+        "Category 4 `113–<137 kt`; and Category 5 `≥137 kt` "
+        "(`1 kt = 0.514444 m/s`).",
+        "",
+        "### Valid pixels and uncertainty",
+        "",
+        "Field metrics pool pixels over the intersection of the SAR target mask, "
+        "condition mask, and finite predictions/targets; the cached raw U-Net also "
+        "uses its exported validity mask. They are therefore pixel-weighted, not "
+        "sample- or storm-macro metrics.",
+        "",
+        f"The reported 95% intervals use **{bootstrap_repetitions:,} paired "
+        f"cluster-bootstrap repetitions over storms** with seed `{bootstrap_seed}`. "
+        "Each repetition samples storm IDs with replacement and evaluates all models "
+        "on that identical resample, preserving within-storm dependence and the "
+        "pairing between models. Bounds are the 2.5th and 97.5th percentiles.",
+        "",
+        interpretation,
+        "",
+    ]
+
+
+def _markdown_table(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    split: str,
+    bootstrap_repetitions: int = 2000,
+    bootstrap_seed: int = 42,
+) -> str:
+    if not rows:
+        raise ValueError("cannot render an empty comparison table")
+    lines = [
+        f"# Intensity model comparison ({split})",
+        "",
+        *_markdown_result_table(rows),
+        "",
+        *_methodology_markdown(
+            split=split,
+            samples=int(rows[0]["samples"]),
+            storms=int(rows[0]["storms"]),
+            bootstrap_repetitions=bootstrap_repetitions,
+            bootstrap_seed=bootstrap_seed,
+        ),
+    ]
     return "\n".join(lines)
 
 
@@ -609,9 +726,22 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
     os.replace(temporary, output)
     pd.DataFrame(table_rows).to_csv(output.with_suffix(".csv"), index=False)
     output.with_suffix(".md").write_text(
-        _markdown_table(table_rows, split=args.split), encoding="utf-8"
+        _markdown_table(
+            table_rows,
+            split=args.split,
+            bootstrap_repetitions=args.bootstrap_repetitions,
+            bootstrap_seed=args.bootstrap_seed,
+        ),
+        encoding="utf-8",
     )
-    print(_markdown_table(table_rows, split=args.split))
+    print(
+        _markdown_table(
+            table_rows,
+            split=args.split,
+            bootstrap_repetitions=args.bootstrap_repetitions,
+            bootstrap_seed=args.bootstrap_seed,
+        )
+    )
     print(
         f"Wrote {output}, {output.with_suffix('.csv')}, and {output.with_suffix('.md')}"
     )

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from datetime import datetime, timezone
 import json
 import os
@@ -15,6 +16,7 @@ from typing import Any, Sequence, TextIO
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PROTECTED_STORMS = ("AL082025", "EP112025", "EP182023")
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,6 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--joint-gpu", default="0")
     parser.add_argument("--pipeline-gpu", default="1")
+    parser.add_argument(
+        "--era5",
+        choices=("with", "without"),
+        default="with",
+        help="Run the matched-cohort comparison with or without ERA5 features.",
+    )
     parser.add_argument("--split", choices=("val", "test"), default="val")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--image-batch-size", type=int, default=4)
@@ -41,6 +49,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--unet-epochs", type=int, default=None)
     parser.add_argument("--correction-epochs", type=int, default=None)
     parser.add_argument("--bootstrap-repetitions", type=int, default=2000)
+    parser.add_argument(
+        "--protected-storm",
+        action="append",
+        dest="protected_storms",
+        default=None,
+        metavar="ATCF_ID",
+        help=(
+            "Storm that must not occur in the training split. Repeat as needed; "
+            "defaults to the inference-folder Humberto 2025, Kiko 2025, and "
+            "Otis 2023 storms."
+        ),
+    )
     parser.add_argument("--disable-wandb", action="store_true")
     parser.add_argument(
         "--smoke-test",
@@ -83,6 +103,17 @@ def parse_args() -> argparse.Namespace:
             parser.error(f"--{name.replace('_', '-')} must be positive")
     if args.bootstrap_repetitions < 0:
         parser.error("--bootstrap-repetitions must be non-negative")
+    for name in ("joint_gpu", "pipeline_gpu"):
+        if not str(getattr(args, name)).isdigit():
+            parser.error(f"--{name.replace('_', '-')} must be a numeric GPU index")
+    args.protected_storms = tuple(
+        dict.fromkeys(
+            str(storm).strip().upper()
+            for storm in (args.protected_storms or DEFAULT_PROTECTED_STORMS)
+        )
+    )
+    if not all(args.protected_storms):
+        parser.error("--protected-storm must be a non-empty ATCF ID")
     if args.unet_checkpoint is not None and args.unet_config is None:
         parser.error("--unet-config is required with --unet-checkpoint")
     if args.unet_config is not None and args.unet_checkpoint is None:
@@ -116,6 +147,7 @@ def _command_text(command: Sequence[str]) -> str:
 def _training_command(
     experiment: str,
     stage_root: Path,
+    gpu: str,
     overrides: Sequence[str],
 ) -> list[str]:
     return [
@@ -124,7 +156,7 @@ def _training_command(
         "geo2wf.training",
         f"experiment={experiment}",
         "trainer.accelerator=gpu",
-        "trainer.devices=1",
+        f"trainer.devices=[{gpu}]",
         f"trainer.default_root_dir={stage_root}",
         *overrides,
     ]
@@ -190,7 +222,12 @@ def _run_stage(
     environment: MappingLike,
     log_path: Path,
 ) -> None:
-    RunningStage(name, command, environment=environment, log_path=log_path).wait()
+    stage = RunningStage(name, command, environment=environment, log_path=log_path)
+    try:
+        stage.wait()
+    except BaseException:
+        stage.terminate()
+        raise
 
 
 def _training_result(stage_root: Path) -> tuple[Path, Path]:
@@ -220,6 +257,115 @@ def _checked_path(path: Path | None, name: str) -> Path | None:
     return resolved
 
 
+def _source_storm_counts(
+    paired_root: Path, storm_ids: Sequence[str]
+) -> dict[str, dict[str, int]]:
+    requested = set(storm_ids)
+    counts = {
+        storm_id: {split: 0 for split in ("train", "val", "test")}
+        for storm_id in storm_ids
+    }
+    for split in ("train", "val", "test"):
+        manifest = paired_root / split / "manifest.csv"
+        with manifest.open(newline="", encoding="utf-8") as stream:
+            for row in csv.DictReader(stream):
+                storm_id = str(row.get("storm_id", "")).strip().upper()
+                if storm_id in requested:
+                    counts[storm_id][split] += 1
+    return counts
+
+
+def _protected_storm_audit(
+    paired_root: Path,
+    ibtracs_file: Path,
+    storm_ids: Sequence[str],
+    *,
+    era5: str,
+) -> dict[str, Any]:
+    """Reject protected training storms and report their effective coverage."""
+    from geo2wf.config import compose_config, instantiate_datamodule
+
+    source_counts = _source_storm_counts(paired_root, storm_ids)
+    source_training = [
+        storm_id for storm_id in storm_ids if source_counts[storm_id]["train"]
+    ]
+    if source_training:
+        raise ValueError(
+            "protected storms occur in the source training split: " f"{source_training}"
+        )
+
+    experiment = (
+        "intensity_comparison_unet"
+        if era5 == "with"
+        else "intensity_comparison_unet_no_era5"
+    )
+    config = compose_config(
+        [
+            f"experiment={experiment}",
+            f"data.root={paired_root}",
+            f"data.stats_file={paired_root / 'stats.json'}",
+            f"data.ibtracs_file={ibtracs_file}",
+            "data.num_workers=0",
+        ]
+    )
+    datamodule = instantiate_datamodule(config)
+    effective_counts = {
+        storm_id: {split: 0 for split in ("train", "val", "test")}
+        for storm_id in storm_ids
+    }
+    for split in ("train", "val", "test"):
+        dataset = datamodule._make_dataset(split, augment=False)
+        values = dataset.samples["storm_id"].astype(str).str.upper().value_counts()
+        for storm_id in storm_ids:
+            effective_counts[storm_id][split] = int(values.get(storm_id, 0))
+
+    effective_training = [
+        storm_id for storm_id in storm_ids if effective_counts[storm_id]["train"]
+    ]
+    if effective_training:
+        raise ValueError(
+            "protected storms occur in the effective training cohort: "
+            f"{effective_training}"
+        )
+
+    storms = {}
+    for storm_id in storm_ids:
+        held_out_splits = [
+            split for split in ("val", "test") if effective_counts[storm_id][split]
+        ]
+        storms[storm_id] = {
+            "source_counts": source_counts[storm_id],
+            "effective_counts": effective_counts[storm_id],
+            "effective_held_out_splits": held_out_splits,
+            "included_in_evaluation": bool(held_out_splits),
+        }
+        source_text = (
+            ", ".join(
+                f"{split}={count}"
+                for split, count in source_counts[storm_id].items()
+                if count
+            )
+            or "absent"
+        )
+        effective_text = (
+            ", ".join(
+                f"{split}={count}"
+                for split, count in effective_counts[storm_id].items()
+                if count
+            )
+            or "absent"
+        )
+        print(
+            f"[protected storm] {storm_id}: source {source_text}; "
+            f"effective {effective_text}"
+        )
+    return {
+        "era5": era5,
+        "protected_storms": list(storm_ids),
+        "storms": storms,
+    }
+
+
 def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
     paired_root = args.paired_root.expanduser().resolve()
     ibtracs_file = args.ibtracs_file.expanduser().resolve()
@@ -227,11 +373,22 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
     for path in (paired_root, ibtracs_file, stats_file):
         if not path.exists():
             raise FileNotFoundError(path)
+    storm_audit = _protected_storm_audit(
+        paired_root,
+        ibtracs_file,
+        args.protected_storms,
+        era5=args.era5,
+    )
 
     output_root = (
         args.output_root.expanduser().resolve()
         if args.output_root is not None
-        else (ROOT / "logs" / "intensity-comparisons" / _utc_timestamp()).resolve()
+        else (
+            ROOT
+            / "logs"
+            / "intensity-comparisons"
+            / f"{_utc_timestamp()}-{args.era5}-era5"
+        ).resolve()
     )
     if output_root.exists() and any(output_root.iterdir()):
         raise FileExistsError(f"workflow output root is not empty: {output_root}")
@@ -248,6 +405,8 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
     environment.pop("GEO2WF_RUN_DIR", None)
     if args.disable_wandb:
         environment["WANDB_DISABLED"] = "true"
+    else:
+        environment.pop("WANDB_DISABLED", None)
     common = [
         f"seed={args.seed}",
         f"data.root={paired_root}",
@@ -272,10 +431,12 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
         "started_utc": datetime.now(timezone.utc).isoformat(),
         "output_root": str(output_root),
         "split": args.split,
+        "era5": args.era5,
         "seed": args.seed,
         "gpus": {"joint": args.joint_gpu, "pipeline": args.pipeline_gpu},
         "paired_root": str(paired_root),
         "ibtracs_file": str(ibtracs_file),
+        "storm_holdout_audit": storm_audit,
         "stages": {},
     }
     manifest_path = output_root / "workflow.json"
@@ -283,19 +444,31 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
 
     joint_stage: RunningStage | None = None
     try:
+        joint_experiment = (
+            "bottleneck_unet_mlp"
+            if args.era5 == "with"
+            else "bottleneck_unet_mlp_no_era5"
+        )
+        unet_experiment = (
+            "intensity_comparison_unet"
+            if args.era5 == "with"
+            else "intensity_comparison_unet_no_era5"
+        )
         if joint_checkpoint is None:
             overrides = [
                 *common,
-                f"logging.wandb.name=intensity-comparison-joint-{timestamp}",
+                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-joint-{timestamp}",
                 *smoke,
             ]
             if args.joint_epochs is not None and not args.smoke_test:
                 overrides.append(f"trainer.max_epochs={args.joint_epochs}")
             command = _training_command(
-                "bottleneck_unet_mlp", output_root / "joint-runs", overrides
+                joint_experiment,
+                output_root / "joint-runs",
+                args.joint_gpu,
+                overrides,
             )
             joint_environment = environment.copy()
-            joint_environment["CUDA_VISIBLE_DEVICES"] = args.joint_gpu
             joint_stage = RunningStage(
                 "joint training",
                 command,
@@ -309,17 +482,19 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             }
 
         pipeline_environment = environment.copy()
-        pipeline_environment["CUDA_VISIBLE_DEVICES"] = args.pipeline_gpu
         if unet_checkpoint is None:
             overrides = [
                 *common,
-                f"logging.wandb.name=intensity-comparison-unet-{timestamp}",
+                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-unet-{timestamp}",
                 *smoke,
             ]
             if args.unet_epochs is not None and not args.smoke_test:
                 overrides.append(f"trainer.max_epochs={args.unet_epochs}")
             command = _training_command(
-                "intensity_comparison_unet", output_root / "unet-runs", overrides
+                unet_experiment,
+                output_root / "unet-runs",
+                args.pipeline_gpu,
+                overrides,
             )
             manifest["stages"]["unet_training"] = {"command": command}
             _run_stage(
@@ -352,7 +527,7 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             "--num-workers",
             str(args.num_workers),
             "--device",
-            "cuda",
+            f"cuda:{args.pipeline_gpu}",
         ]
         manifest["stages"]["cache_export"] = {"command": export_command}
         _run_stage(
@@ -364,10 +539,11 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
 
         if correction_checkpoint is None:
             overrides = [
+                f"seed={args.seed}",
                 f"data.root={cache_root}",
                 f"data.batch_size={args.correction_batch_size}",
                 f"data.num_workers={args.num_workers}",
-                f"logging.wandb.name=intensity-comparison-correction-{timestamp}",
+                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-correction-{timestamp}",
                 *smoke,
             ]
             if args.correction_epochs is not None and not args.smoke_test:
@@ -375,6 +551,7 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             command = _training_command(
                 "unet_intensity_correction",
                 output_root / "correction-runs",
+                args.pipeline_gpu,
                 overrides,
             )
             manifest["stages"]["correction_training"] = {"command": command}
@@ -417,8 +594,10 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             str(args.num_workers),
             "--bootstrap-repetitions",
             str(args.bootstrap_repetitions),
+            "--bootstrap-seed",
+            str(args.seed),
             "--device",
-            "cuda",
+            f"cuda:{args.pipeline_gpu}",
         ]
         manifest["stages"]["evaluation"] = {"command": evaluate_command}
         _run_stage(
