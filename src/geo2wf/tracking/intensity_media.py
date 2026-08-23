@@ -86,6 +86,19 @@ def log_wandb_intensity_evaluation(
         sharex=False,
     )
     prediction_table_rows: list[list[Any]] = []
+    target_sources = {
+        str(row.get("intensity_target_source", "ibtracs")) for row in rows
+    }
+    target_source = next(iter(target_sources)) if len(target_sources) == 1 else "scalar"
+    target_label = {
+        "ibtracs": "IBTrACS USA_WIND",
+        "sar_robust_peak": "SAR robust peak",
+    }.get(target_source, "Scalar reference")
+    raw_label = (
+        "Raw U-Net robust peak"
+        if target_source == "sar_robust_peak"
+        else "Raw U-Net maximum"
+    )
     for axis, storm_id in zip(axes[:, 0], selected_storms):
         storm_rows = sorted(
             (row for row in rows if str(row["storm_id"]) == storm_id),
@@ -105,7 +118,7 @@ def log_wandb_intensity_evaluation(
             color="black",
             marker="o",
             linewidth=2.0,
-            label="IBTrACS USA_WIND",
+            label=target_label,
         )
         axis.plot(
             timestamps,
@@ -122,7 +135,7 @@ def log_wandb_intensity_evaluation(
             linestyle="--",
             linewidth=1.3,
             alpha=0.8,
-            label="Raw U-Net maximum",
+            label=raw_label,
         )
         mae = float(np.mean(np.abs(prediction - target)))
         axis.set_title(f"{storm_id} · {len(storm_rows)} fixes · MAE {mae:.2f} m/s")
@@ -184,12 +197,12 @@ def log_wandb_intensity_evaluation(
                 "sample_id",
                 "storm_id",
                 "timestamp_utc",
-                "ibtracs_wind_ms",
+                "target_wind_ms",
                 "predicted_wind_ms",
                 "raw_unet_wind_ms",
                 "correction_ms",
                 "prediction_error_ms",
-                "ibtracs_category",
+                "target_category",
                 "predicted_category",
             ],
             data=prediction_table_rows,

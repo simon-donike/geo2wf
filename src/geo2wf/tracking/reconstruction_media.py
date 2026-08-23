@@ -147,6 +147,13 @@ def build_reconstruction_figure(
                     "target_bounds": _batch_item(batch.get("target_bounds"), index),
                     "center": _finite_pair(batch.get("center"), index),
                     "sample_label": label,
+                    "intensity_target_label": {
+                        "ibtracs": "IBTrACS max wind",
+                        "sar_robust_peak": "SAR robust peak",
+                    }.get(
+                        _batch_value(batch.get("intensity_target_source"), index),
+                        "Scalar intensity",
+                    ),
                 }
             )
         samples.append(sample)

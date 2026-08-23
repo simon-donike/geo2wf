@@ -17,3 +17,4 @@ lr_scheduler_cooldown: 0
 lr_scheduler_min_lr: 0.0
 validation_reconstruction_batches: 1
 log_reconstruction_images: true
+sar_robust_peak_fraction: ${data.sar_robust_peak_fraction}

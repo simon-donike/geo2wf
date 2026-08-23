@@ -190,24 +190,29 @@ def _radius_grid(
         * (bounds.top - bounds.bottom)
         / height
     )[:, None]
-    lon = bounds.left + (
-        np.arange(width, dtype=np.float64) + 0.5
-    ) * (bounds.right - bounds.left) / width
+    lon = (
+        bounds.left
+        + (np.arange(width, dtype=np.float64) + 0.5)
+        * (bounds.right - bounds.left)
+        / width
+    )
     lat_radians = np.deg2rad(lat)
     center_lat_radians = math.radians(center_lat)
     delta_latitude = lat_radians - center_lat_radians
-    delta_longitude = np.deg2rad(
-        (lon - center_lon + 180.0) % 360.0 - 180.0
-    )
+    delta_longitude = np.deg2rad((lon - center_lon + 180.0) % 360.0 - 180.0)
     haversine = (
         np.sin(delta_latitude / 2.0) ** 2
         + np.cos(lat_radians)
         * math.cos(center_lat_radians)
         * np.sin(delta_longitude / 2.0) ** 2
     )
-    return 2.0 * EARTH_RADIUS_KM * np.arctan2(
-        np.sqrt(np.clip(haversine, 0.0, 1.0)),
-        np.sqrt(np.clip(1.0 - haversine, 0.0, 1.0)),
+    return (
+        2.0
+        * EARTH_RADIUS_KM
+        * np.arctan2(
+            np.sqrt(np.clip(haversine, 0.0, 1.0)),
+            np.sqrt(np.clip(1.0 - haversine, 0.0, 1.0)),
+        )
     )
 
 
@@ -283,9 +288,11 @@ def _radial_summary(
         "valid_bins": int(len(means)),
         "peak_mean": float(np.max(values)),
         "rmw": float(radii[int(np.argmax(values))]),
-        "r64": float(np.max(radii[values >= R64_THRESHOLD_MS]))
-        if np.any(values >= R64_THRESHOLD_MS)
-        else math.nan,
+        "r64": (
+            float(np.max(radii[values >= R64_THRESHOLD_MS]))
+            if np.any(values >= R64_THRESHOLD_MS)
+            else math.nan
+        ),
     }
 
 
@@ -357,19 +364,34 @@ def _center_offset_km(row: pd.Series) -> float:
     center_lon = _finite_float(row.get("ibtracs_center_lon"))
     image_lat = _finite_float(row.get("center_lat"))
     image_lon = _finite_float(row.get("center_lon"))
-    if not all(math.isfinite(value) for value in (center_lat, center_lon, image_lat, image_lon)):
+    if not all(
+        math.isfinite(value) for value in (center_lat, center_lon, image_lat, image_lon)
+    ):
         return math.nan
     lat1, lat2 = math.radians(center_lat), math.radians(image_lat)
     dlat = lat2 - lat1
     dlon = math.radians((image_lon - center_lon + 180.0) % 360.0 - 180.0)
-    haversine = math.sin(dlat / 2.0) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2.0) ** 2
-    return float(2.0 * EARTH_RADIUS_KM * math.atan2(math.sqrt(haversine), math.sqrt(max(0.0, 1.0 - haversine))))
+    haversine = (
+        math.sin(dlat / 2.0) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2.0) ** 2
+    )
+    return float(
+        2.0
+        * EARTH_RADIUS_KM
+        * math.atan2(math.sqrt(haversine), math.sqrt(max(0.0, 1.0 - haversine)))
+    )
 
 
-def _era5_wind(path: Path, channels: Iterable[str]) -> tuple[np.ndarray | None, rasterio.coords.BoundingBox | None]:
+def _era5_wind(
+    path: Path, channels: Iterable[str]
+) -> tuple[np.ndarray | None, rasterio.coords.BoundingBox | None]:
     channel_names = list(channels)
-    u_index = next((index for index, name in enumerate(channel_names) if name in U_CHANNELS), None)
-    v_index = next((index for index, name in enumerate(channel_names) if name in V_CHANNELS), None)
+    u_index = next(
+        (index for index, name in enumerate(channel_names) if name in U_CHANNELS), None
+    )
+    v_index = next(
+        (index for index, name in enumerate(channel_names) if name in V_CHANNELS), None
+    )
     if u_index is None or v_index is None:
         return None, None
     with rasterio.open(path) as source:
@@ -395,9 +417,25 @@ def _row_metrics(root: Path, row: pd.Series) -> dict[str, Any]:
         else None
     )
     result = _field_metrics(target_field, target_radius, prefix="sar")
+    center_valid = False
+    if target_radius is not None:
+        height, width = target_field.shape
+        left, bottom, right, top = (
+            target_bounds.left,
+            target_bounds.bottom,
+            target_bounds.right,
+            target_bounds.top,
+        )
+        target_row = math.floor((top - center_lat) * height / (top - bottom))
+        target_column = math.floor((center_lon - left) * width / (right - left))
+        center_valid = bool(
+            0 <= target_row < height
+            and 0 <= target_column < width
+            and math.isfinite(float(target_field[target_row, target_column]))
+        )
     result.update(
         {
-            "sar_has_valid_center": bool(target_radius is not None),
+            "sar_has_valid_center": center_valid,
             "ibtracs_center_offset_km": _center_offset_km(row),
             "era5_time_gap_hours": _time_gap_hours(row),
         }
@@ -496,13 +534,22 @@ def _empty_difference_metrics() -> dict[str, Any]:
 
 def _difference(left: Any, right: Any) -> float:
     left_float, right_float = _finite_float(left), _finite_float(right)
-    return left_float - right_float if math.isfinite(left_float) and math.isfinite(right_float) else math.nan
+    return (
+        left_float - right_float
+        if math.isfinite(left_float) and math.isfinite(right_float)
+        else math.nan
+    )
 
 
 def _time_gap_hours(row: pd.Series) -> float:
     era5 = pd.to_datetime(row.get("era5_timestamp", ""), errors="coerce", utc=True)
     reference = pd.NaT
-    for column in ("target_timestamp", "sar_timestamp", "condition_timestamp", "geo_timestamp"):
+    for column in (
+        "target_timestamp",
+        "sar_timestamp",
+        "condition_timestamp",
+        "geo_timestamp",
+    ):
         value = pd.to_datetime(row.get(column, ""), errors="coerce", utc=True)
         if not pd.isna(value):
             reference = value
@@ -537,7 +584,9 @@ def _finish_flags(result: dict[str, Any]) -> dict[str, Any]:
                 and eye_coverage >= MATURE_MIN_REGIONAL_COVERAGE
                 and eye_contrast >= MATURE_MIN_EYE_CONTRAST_MS
             ),
-            "sar_high_intensity_v1": bool(robust_peak >= HIGH_INTENSITY_PEAK_THRESHOLD_MS),
+            "sar_high_intensity_v1": bool(
+                robust_peak >= HIGH_INTENSITY_PEAK_THRESHOLD_MS
+            ),
             "sar_weak_v1": bool(robust_peak < WEAK_PEAK_THRESHOLD_MS),
         }
     )
@@ -546,7 +595,9 @@ def _finish_flags(result: dict[str, Any]) -> dict[str, Any]:
 
 def _storm_metadata(all_rows: pd.DataFrame) -> pd.DataFrame:
     frame = all_rows[["sample_id", "storm_id", "target_timestamp"]].copy()
-    frame["_time"] = pd.to_datetime(frame["target_timestamp"], errors="coerce", utc=True)
+    frame["_time"] = pd.to_datetime(
+        frame["target_timestamp"], errors="coerce", utc=True
+    )
     frame = frame.sort_values(["storm_id", "_time", "sample_id"], kind="stable")
     grouped = frame.groupby("storm_id", sort=False)
     frame["storm_sample_index_all"] = grouped.cumcount()
@@ -569,7 +620,9 @@ def _write_atomic(frame: pd.DataFrame, path: Path) -> None:
     os.replace(temporary, path)
 
 
-def _discover_and_load(root: Path, requested: list[str] | None) -> dict[Path, pd.DataFrame]:
+def _discover_and_load(
+    root: Path, requested: list[str] | None
+) -> dict[Path, pd.DataFrame]:
     frames: dict[Path, pd.DataFrame] = {}
     for path in _manifest_paths(root, requested):
         frames[path] = pd.read_csv(path, keep_default_na=False, low_memory=False)
@@ -587,7 +640,9 @@ def enrich_manifests(
 ) -> dict[str, Any]:
     root = root.expanduser().resolve()
     frames = _discover_and_load(root, requested)
-    all_rows = pd.concat(frames.values(), ignore_index=True).drop_duplicates("sample_id")
+    all_rows = pd.concat(frames.values(), ignore_index=True).drop_duplicates(
+        "sample_id"
+    )
     storm_info = _storm_metadata(all_rows)
     summaries: dict[str, Any] = {}
     for path, frame in frames.items():

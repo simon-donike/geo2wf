@@ -52,6 +52,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--intensity-target-source",
+        choices=("ibtracs", "sar_robust_peak"),
+        default=None,
+        help="Override the scalar label source while reusing a field-only U-Net config.",
+    )
     parser.add_argument("--splits", nargs="+", default=["train", "val", "test"])
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
@@ -128,13 +134,12 @@ def _atomic_json(payload: dict[str, Any], path: Path) -> None:
 
 
 def _cohort_fingerprint(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Fingerprint the scalar target contract independently of row order."""
+    """Fingerprint sample identity independently of label source and row order."""
     columns = [
         "sample_id",
         "storm_id",
         "split",
         "target_timestamp",
-        "target_wind_ms",
     ]
     frame = pd.DataFrame(rows, columns=columns).sort_values("sample_id")
     serialized = frame.to_csv(
@@ -143,6 +148,26 @@ def _cohort_fingerprint(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {
         "samples": len(frame),
         "storms": int(frame["storm_id"].nunique()),
+        "sha256": hashlib.sha256(serialized).hexdigest(),
+        "columns": columns,
+    }
+
+
+def _target_fingerprint(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    columns = [
+        "sample_id",
+        "intensity_target_source",
+        "target_wind_ms",
+        "ibtracs_target_ms",
+        "sar_robust_peak_target_ms",
+    ]
+    frame = pd.DataFrame(rows, columns=columns).sort_values("sample_id")
+    serialized = frame.to_csv(
+        index=False, lineterminator="\n", float_format="%.9g"
+    ).encode("utf-8")
+    return {
+        "samples": len(frame),
+        "source": str(frame["intensity_target_source"].iloc[0]),
         "sha256": hashlib.sha256(serialized).hexdigest(),
         "columns": columns,
     }
@@ -220,6 +245,9 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
             raise FileNotFoundError(path)
 
     config = load_config_file(args.config)
+    if args.intensity_target_source is not None:
+        config["data"]["intensity_target_source"] = args.intensity_target_source
+        config["data"]["require_sar_valid_center"] = True
     datamodule = instantiate_datamodule(config)
     if not isinstance(datamodule, JointPairedIntensityDataModule):
         raise TypeError(
@@ -325,6 +353,26 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     target_wind_ms = float(batch["intensity_target_ms"][index])
                     target_category = tropical_category_from_wind_ms(target_wind_ms)
+                    ibtracs_target_ms = float(batch["ibtracs_target_ms"][index])
+                    sar_robust_peak_target_ms = float(
+                        batch["sar_robust_peak_target_ms"][index]
+                    )
+                    sar_max_wind_ms = float(batch["sar_max_wind_ms"][index])
+                    source = str(batch["intensity_target_source"][index])
+                    robust_count = max(
+                        1,
+                        int(
+                            math.ceil(
+                                valid.sum().item() * datamodule.sar_robust_peak_fraction
+                            )
+                        ),
+                    )
+                    raw_robust_peak_ms = float(
+                        torch.topk(
+                            field[valid], robust_count, sorted=False
+                        ).values.mean()
+                    )
+                    anchor_statistic = "max" if source == "ibtracs" else "robust_peak"
                     relative = Path(split) / "fields" / f"{sample_id}.npz"
                     _atomic_npz(
                         output_root / relative,
@@ -350,8 +398,34 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                             ),
                             "target_wind_ms": target_wind_ms,
                             "target_category": target_category,
+                            "intensity_target_source": source,
+                            "anchor_statistic": anchor_statistic,
+                            "ibtracs_target_ms": ibtracs_target_ms,
+                            "sar_robust_peak_target_ms": sar_robust_peak_target_ms,
+                            "sar_max_wind_ms": sar_max_wind_ms,
+                            "ibtracs_category": tropical_category_from_wind_ms(
+                                ibtracs_target_ms
+                            ),
+                            "sar_robust_peak_category": tropical_category_from_wind_ms(
+                                sar_robust_peak_target_ms
+                            ),
+                            "is_rapid_intensification": bool(
+                                batch["is_rapid_intensification"][index]
+                            ),
+                            "ri_24h_change_ms": float(batch["ri_24h_change_ms"][index]),
                             "raw_unet_max_wind_ms": float(field[valid].max()),
+                            "raw_unet_robust_peak_ms": raw_robust_peak_ms,
                             "valid_fraction": float(valid.float().mean()),
+                            "cohort_retained_count": len(dataset),
+                            "filtered_unbracketed_count": (
+                                dataset.filtered_unbracketed_count
+                            ),
+                            "filtered_invalid_sar_center_count": (
+                                dataset.filtered_invalid_sar_center_count
+                            ),
+                            "filtered_unusable_sar_count": (
+                                dataset.filtered_unusable_sar_count
+                            ),
                         }
                     )
             if not split_rows:
@@ -380,10 +454,27 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
         "single_timestep": True,
         "source_kind": "joint_paired_intensity_cohort",
         "target": {
-            "source": "IBTrACS USA_WIND interpolated at paired SAR target time",
+            "source": datamodule.intensity_target_source,
+            "description": (
+                "IBTrACS USA_WIND interpolated at paired SAR target time"
+                if datamodule.intensity_target_source == "ibtracs"
+                else "mean of highest 0.5% of valid cropped SAR wind pixels"
+            ),
             "units": "m s-1",
             "knot_to_ms": KNOT_TO_MS,
             "max_bracket_hours": datamodule.max_ibtracs_bracket_hours,
+            "sar_robust_peak_fraction": datamodule.sar_robust_peak_fraction,
+            "require_sar_valid_center": datamodule.require_sar_valid_center,
+            "anchor_statistic": (
+                "max"
+                if datamodule.intensity_target_source == "ibtracs"
+                else "robust_peak"
+            ),
+        },
+        "rapid_intensification": {
+            "reference": "IBTrACS USA_WIND",
+            "threshold_kt": datamodule.ri_threshold_kt,
+            "window_hours": datamodule.ri_window_hours,
         },
         "unet_checkpoint": {
             "path": str(args.checkpoint.expanduser().resolve()),
@@ -407,7 +498,19 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
         "samples": len(all_rows),
         "storms": len({str(row["storm_id"]) for row in all_rows}),
         "splits": {split: len(rows) for split, rows in rows_by_split.items()},
+        "filtering_counts": {
+            split: {
+                "retained": len(dataset),
+                "filtered_unbracketed": dataset.filtered_unbracketed_count,
+                "filtered_invalid_sar_center": (
+                    dataset.filtered_invalid_sar_center_count
+                ),
+                "filtered_unusable_sar": dataset.filtered_unusable_sar_count,
+            }
+            for split, dataset in split_datasets.items()
+        },
         "cohort": _cohort_fingerprint(all_rows),
+        "target_fingerprint": _target_fingerprint(all_rows),
         "skipped_samples": 0,
     }
     _atomic_json(metadata, output_root / "cache-metadata.json")

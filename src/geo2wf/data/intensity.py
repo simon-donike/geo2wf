@@ -15,7 +15,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 
-INTENSITY_CACHE_SCHEMA_VERSION = 1
+INTENSITY_CACHE_SCHEMA_VERSION = 2
+SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS = frozenset({1, 2})
 KNOT_TO_MS = 0.514444
 TROPICAL_CATEGORY_MIN = -1
 TROPICAL_CATEGORY_MAX = 5
@@ -51,6 +52,22 @@ REQUIRED_MANIFEST_COLUMNS = frozenset(
         "target_category",
         "raw_unet_max_wind_ms",
         "valid_fraction",
+    }
+)
+V2_MANIFEST_COLUMNS = frozenset(
+    {
+        "intensity_target_source",
+        "anchor_statistic",
+        "ibtracs_target_ms",
+        "sar_robust_peak_target_ms",
+        "sar_max_wind_ms",
+        "raw_unet_robust_peak_ms",
+        "is_rapid_intensification",
+        "ri_24h_change_ms",
+        "cohort_retained_count",
+        "filtered_unbracketed_count",
+        "filtered_invalid_sar_center_count",
+        "filtered_unusable_sar_count",
     }
 )
 
@@ -92,6 +109,35 @@ def tropical_category_from_wind_ms_tensor(wind_ms: torch.Tensor) -> torch.Tensor
 def tropical_category_from_wind_ms(wind_ms: float) -> int:
     value = torch.tensor(float(wind_ms), dtype=torch.float64)
     return int(tropical_category_from_wind_ms_tensor(value).item())
+
+
+def category_macro_f1_tensor(
+    prediction_category: torch.Tensor, target_category: torch.Tensor
+) -> torch.Tensor:
+    """Macro F1 over categories represented in the reference cohort."""
+
+    prediction_category = prediction_category.reshape(-1)
+    target_category = target_category.reshape(-1)
+    if (
+        prediction_category.shape != target_category.shape
+        or not target_category.numel()
+    ):
+        raise ValueError("category tensors must have one matching non-empty dimension")
+    values = []
+    for category in range(TROPICAL_CATEGORY_MIN, TROPICAL_CATEGORY_MAX + 1):
+        observed = target_category == category
+        if not bool(observed.any()):
+            continue
+        predicted = prediction_category == category
+        true_positive = (observed & predicted).sum().to(torch.float64)
+        false_positive = ((~observed) & predicted).sum().to(torch.float64)
+        false_negative = (observed & (~predicted)).sum().to(torch.float64)
+        values.append(
+            2.0
+            * true_positive
+            / (2.0 * true_positive + false_positive + false_negative)
+        )
+    return torch.stack(values).mean()
 
 
 def _finite_float(value: Any, name: str) -> float:
@@ -162,16 +208,17 @@ def _read_cache_metadata(root: Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Intensity cache metadata does not exist: {path}")
     metadata = json.loads(path.read_text(encoding="utf-8"))
     version = metadata.get("schema_version")
-    if version != INTENSITY_CACHE_SCHEMA_VERSION:
+    if version not in SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS:
         raise ValueError(
             "unsupported intensity cache schema: "
-            f"expected {INTENSITY_CACHE_SCHEMA_VERSION}, got {version!r}"
+            f"expected one of {sorted(SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS)}, "
+            f"got {version!r}"
         )
     return metadata
 
 
 class UNetIntensityDataset(Dataset):
-    """Load one frozen U-Net prediction and one scalar IBTrACS target."""
+    """Load one frozen U-Net prediction and matched scalar wind references."""
 
     def __init__(
         self,
@@ -202,6 +249,8 @@ class UNetIntensityDataset(Dataset):
             )
         self.samples = pd.read_csv(self.manifest_path, keep_default_na=False)
         missing = REQUIRED_MANIFEST_COLUMNS.difference(self.samples.columns)
+        if self.cache_metadata.get("schema_version") == 2:
+            missing |= V2_MANIFEST_COLUMNS.difference(self.samples.columns)
         if missing:
             raise ValueError(
                 f"{self.manifest_path} is missing columns: {sorted(missing)}"
@@ -233,7 +282,8 @@ class UNetIntensityDataset(Dataset):
         if self._data_spec is None:
             sample = self[0]
             self._data_spec = IntensityDataSpec(
-                spatial_shape=tuple(int(value) for value in sample["wind_field"].shape)
+                spatial_shape=tuple(int(value) for value in sample["wind_field"].shape),
+                cache_schema_version=int(self.cache_metadata["schema_version"]),
             )
         return self._data_spec
 
@@ -261,6 +311,16 @@ class UNetIntensityDataset(Dataset):
         if not finite_valid.any():
             raise ValueError(f"{path} has no finite valid pixels")
         raw_max = float(np.max(wind[finite_valid]))
+        valid_values = wind[finite_valid]
+        robust_fraction = float(
+            self.cache_metadata.get("target", {}).get("sar_robust_peak_fraction", 0.005)
+        )
+        if not 0.0 < robust_fraction <= 1.0:
+            raise ValueError("cached SAR robust-peak fraction must be in (0, 1]")
+        robust_count = max(1, int(math.ceil(len(valid_values) * robust_fraction)))
+        raw_robust_peak = float(
+            np.mean(np.partition(valid_values, -robust_count)[-robust_count:])
+        )
         if self.verify_cache and not math.isclose(
             raw_max,
             _finite_float(row["raw_unet_max_wind_ms"], "raw_unet_max_wind_ms"),
@@ -268,22 +328,127 @@ class UNetIntensityDataset(Dataset):
             abs_tol=1e-4,
         ):
             raise ValueError(f"{path} raw maximum disagrees with its manifest row")
+        if (
+            self.cache_metadata.get("schema_version") == 2
+            and self.verify_cache
+            and not math.isclose(
+                raw_robust_peak,
+                _finite_float(
+                    row["raw_unet_robust_peak_ms"], "raw_unet_robust_peak_ms"
+                ),
+                rel_tol=1e-5,
+                abs_tol=1e-4,
+            )
+        ):
+            raise ValueError(f"{path} robust peak disagrees with its manifest row")
         wind = np.where(finite_valid, wind, 0.0).astype(np.float32, copy=False)
         distance = np.nan_to_num(distance, nan=0.0, posinf=1.0, neginf=0.0)
         distance = np.clip(distance, 0.0, 1.0).astype(np.float32, copy=False)
+        version = int(self.cache_metadata.get("schema_version", 1))
+        target_wind_ms = _finite_float(row["target_wind_ms"], "target_wind_ms")
+        target_source = (
+            str(row["intensity_target_source"]).strip().lower()
+            if version == 2
+            else "ibtracs"
+        )
+        if target_source not in {"ibtracs", "sar_robust_peak"}:
+            raise ValueError(
+                f"unknown cached intensity target source {target_source!r}"
+            )
+        ibtracs_target_ms = (
+            _finite_float(row["ibtracs_target_ms"], "ibtracs_target_ms")
+            if version == 2
+            else target_wind_ms
+        )
+        sar_target_ms = (
+            _finite_float(row["sar_robust_peak_target_ms"], "sar_robust_peak_target_ms")
+            if version == 2
+            else math.nan
+        )
+        anchor_statistic = (
+            str(row["anchor_statistic"]).strip().lower() if version == 2 else "max"
+        )
+        expected_anchor = "max" if target_source == "ibtracs" else "robust_peak"
+        if anchor_statistic != expected_anchor:
+            raise ValueError(
+                f"cached target {target_source!r} requires {expected_anchor!r} "
+                f"anchor, got {anchor_statistic!r}"
+            )
+        expected_target = (
+            ibtracs_target_ms if target_source == "ibtracs" else sar_target_ms
+        )
+        if not math.isclose(
+            target_wind_ms, expected_target, rel_tol=1.0e-6, abs_tol=1.0e-4
+        ):
+            raise ValueError(
+                "cached primary intensity target disagrees with its selected reference"
+            )
+        filtering_counts = self.cache_metadata.get("filtering_counts", {}).get(
+            self.split, {}
+        )
         return {
             "wind_field": torch.from_numpy(wind),
             "valid_mask": torch.from_numpy(finite_valid),
             "distance_to_center": torch.from_numpy(distance),
             "metadata": encode_intensity_metadata(row),
             "target_wind_ms": torch.tensor(
-                _finite_float(row["target_wind_ms"], "target_wind_ms"),
+                target_wind_ms,
                 dtype=torch.float32,
             ),
             "target_category": torch.tensor(
                 int(row["target_category"]), dtype=torch.long
             ),
             "raw_unet_max_wind_ms": torch.tensor(raw_max, dtype=torch.float32),
+            "raw_unet_robust_peak_ms": torch.tensor(
+                raw_robust_peak, dtype=torch.float32
+            ),
+            "ibtracs_target_ms": torch.tensor(ibtracs_target_ms, dtype=torch.float32),
+            "sar_robust_peak_target_ms": torch.tensor(
+                sar_target_ms, dtype=torch.float32
+            ),
+            "sar_max_wind_ms": torch.tensor(
+                (
+                    _finite_float(row["sar_max_wind_ms"], "sar_max_wind_ms")
+                    if version == 2
+                    else math.nan
+                ),
+                dtype=torch.float32,
+            ),
+            "is_rapid_intensification": torch.tensor(
+                (
+                    bool(row["is_rapid_intensification"])
+                    if version == 2
+                    and isinstance(row["is_rapid_intensification"], (bool, np.bool_))
+                    else (
+                        str(row["is_rapid_intensification"]).strip().lower()
+                        in {"1", "true", "yes"}
+                        if version == 2
+                        else False
+                    )
+                ),
+                dtype=torch.bool,
+            ),
+            "ri_24h_change_ms": torch.tensor(
+                (
+                    pd.to_numeric(row["ri_24h_change_ms"], errors="coerce")
+                    if version == 2
+                    else math.nan
+                ),
+                dtype=torch.float32,
+            ),
+            "intensity_target_source": target_source,
+            "anchor_statistic": anchor_statistic,
+            "intensity_filtering_counts": {
+                name: torch.tensor(
+                    int(filtering_counts.get(name, default)), dtype=torch.long
+                )
+                for name, default in (
+                    ("retained", len(self)),
+                    ("filtered_unbracketed", 0),
+                    ("filtered_invalid_sar_center", 0),
+                    ("filtered_unusable_sar", 0),
+                )
+            },
             "sample_weight": torch.tensor(
                 _finite_float(row["_sample_weight"], "_sample_weight"),
                 dtype=torch.float32,
@@ -430,11 +595,13 @@ class UNetIntensityDataModule(pl.LightningDataModule):
 __all__ = [
     "BASINS",
     "INTENSITY_CACHE_SCHEMA_VERSION",
+    "SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS",
     "INTENSITY_METADATA_NAMES",
     "IntensityDataSpec",
     "KNOT_TO_MS",
     "UNetIntensityDataModule",
     "UNetIntensityDataset",
+    "category_macro_f1_tensor",
     "encode_intensity_metadata",
     "tropical_category_from_wind_ms",
     "tropical_category_from_wind_ms_tensor",

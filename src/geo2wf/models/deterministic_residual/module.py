@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from typing import Any
 
 import pytorch_lightning as pl
 import torch
@@ -20,6 +21,10 @@ from geo2wf.metrics.wind import (
     EARTH_RADIUS_KM,
     RADIAL_METRIC_NAMES,
     radial_wind_metric_statistics,
+)
+from geo2wf.data.intensity import (
+    category_macro_f1_tensor,
+    tropical_category_from_wind_ms_tensor,
 )
 
 
@@ -627,6 +632,7 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             torch.zeros(self._STAT_COUNT, dtype=torch.float64),
             persistent=False,
         )
+        self._validation_intensity_rows: list[dict[str, Any]] = []
         self.register_buffer(
             "_validation_radial_statistics",
             torch.zeros((len(RADIAL_METRIC_NAMES), 2), dtype=torch.float64),
@@ -942,6 +948,58 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             valid_mask,
             batch,
         )
+        intensity_target = batch.get("intensity_target_ms")
+        if intensity_target is not None:
+            is_ri = batch.get(
+                "is_rapid_intensification",
+                torch.zeros_like(intensity_target, dtype=torch.bool),
+            ).bool()
+            condition_valid = self._single_channel(
+                batch["condition_mask"], "condition_mask", collapse_mask=True
+            ).bool() & torch.isfinite(bounded_prediction)
+            storm_ids = [str(item.get("storm_id", "")) for item in batch["meta"]]
+            ibtracs = batch.get("ibtracs_target_ms", intensity_target).to(
+                bounded_prediction
+            )
+            sar = batch.get("sar_robust_peak_target_ms", intensity_target).to(
+                bounded_prediction
+            )
+            for index, sample_id in enumerate(batch["sample_id"]):
+                values = bounded_prediction[index][condition_valid[index]]
+                if not values.numel():
+                    continue
+                field_error = (bounded_prediction[index] - target[index])[
+                    valid_mask[index].bool()
+                ]
+                robust_count = max(
+                    1, int(math.ceil(values.numel() * self.peak_top_fraction))
+                )
+                self._validation_intensity_rows.append(
+                    {
+                        "sample_id": str(sample_id),
+                        "storm_id": storm_ids[index],
+                        "raw_unet_max_ms": float(values.max().detach().cpu()),
+                        "raw_unet_robust_peak_ms": float(
+                            torch.topk(values, robust_count, sorted=False)
+                            .values.mean()
+                            .detach()
+                            .cpu()
+                        ),
+                        "ibtracs_target_ms": float(ibtracs[index].detach().cpu()),
+                        "sar_robust_peak_target_ms": float(sar[index].detach().cpu()),
+                        "field_valid_pixels": int(field_error.numel()),
+                        "field_absolute_error_sum": float(
+                            field_error.abs().sum().detach().cpu()
+                        ),
+                        "field_squared_error_sum": float(
+                            field_error.square().sum().detach().cpu()
+                        ),
+                        "field_signed_error_sum": float(
+                            field_error.sum().detach().cpu()
+                        ),
+                        "is_rapid_intensification": bool(is_ri[index].detach().cpu()),
+                    }
+                )
         if (
             self.log_reconstruction_images
             and batch_idx < self.validation_reconstruction_batches
@@ -953,6 +1011,7 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
         self._validation_statistics.zero_()
         self._validation_radial_statistics.zero_()
         self._validation_exceedance_statistics.zero_()
+        self._validation_intensity_rows = []
 
     def on_validation_epoch_end(self) -> None:
         self._log_statistics("val", self._validation_statistics)
@@ -964,6 +1023,7 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             self._validation_radial_statistics,
             self._validation_exceedance_statistics,
         )
+        self._log_ri_intensity_metrics()
 
     @torch.no_grad()
     def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
@@ -1306,6 +1366,109 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
                 logger=True,
                 sync_dist=False,
             )
+
+    @staticmethod
+    def _distributed_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if (
+            not torch.distributed.is_available()
+            or not torch.distributed.is_initialized()
+        ):
+            return rows
+        gathered: list[list[dict[str, Any]] | None] = [
+            None for _ in range(torch.distributed.get_world_size())
+        ]
+        torch.distributed.all_gather_object(gathered, rows)
+        combined = [row for part in gathered if part is not None for row in part]
+        # DistributedSampler may pad validation with repeated samples.
+        return list({str(row["sample_id"]): row for row in combined}.values())
+
+    def _log_ri_intensity_metrics(self) -> None:
+        rows = self._distributed_rows(self._validation_intensity_rows)
+        rows = [row for row in rows if bool(row.get("is_rapid_intensification", False))]
+        self.log("val_ri/samples", float(len(rows)), on_epoch=True, sync_dist=False)
+        self.log(
+            "val_ri/storms",
+            float(len({str(row["storm_id"]) for row in rows})),
+            on_epoch=True,
+            sync_dist=False,
+        )
+        for reference, prediction_key, target_key in (
+            ("ibtracs", "raw_unet_max_ms", "ibtracs_target_ms"),
+            (
+                "sar_robust_peak",
+                "raw_unet_robust_peak_ms",
+                "sar_robust_peak_target_ms",
+            ),
+        ):
+            selected = [
+                row
+                for row in rows
+                if math.isfinite(float(row.get(target_key, math.nan)))
+            ]
+            if not selected:
+                continue
+            prediction = torch.tensor(
+                [float(row[prediction_key]) for row in selected], dtype=torch.float64
+            )
+            target = torch.tensor(
+                [float(row[target_key]) for row in selected], dtype=torch.float64
+            )
+            error = prediction - target
+            storm_mae = []
+            for storm_id in sorted({str(row["storm_id"]) for row in selected}):
+                indices = [
+                    index
+                    for index, row in enumerate(selected)
+                    if str(row["storm_id"]) == storm_id
+                ]
+                storm_mae.append(error[indices].abs().mean())
+            prediction_category = tropical_category_from_wind_ms_tensor(prediction)
+            target_category = tropical_category_from_wind_ms_tensor(target)
+            for name, value in {
+                "mae_ms": error.abs().mean(),
+                "rmse_ms": error.square().mean().sqrt(),
+                "bias_ms": error.mean(),
+                "storm_macro_mae_ms": torch.stack(storm_mae).mean(),
+                "category_accuracy": (prediction_category == target_category)
+                .double()
+                .mean(),
+                "category_macro_f1": category_macro_f1_tensor(
+                    prediction_category, target_category
+                ),
+                "category_within_one_accuracy": (
+                    (prediction_category - target_category).abs() <= 1
+                )
+                .double()
+                .mean(),
+            }.items():
+                self.log(
+                    f"val_ri/{reference}_{name}",
+                    value.to(self.device),
+                    on_epoch=True,
+                    sync_dist=False,
+                )
+        field_count = sum(int(row.get("field_valid_pixels", 0)) for row in rows)
+        if field_count:
+            for name, value in {
+                "field_mae_ms": sum(
+                    float(row["field_absolute_error_sum"]) for row in rows
+                )
+                / field_count,
+                "field_rmse_ms": math.sqrt(
+                    sum(float(row["field_squared_error_sum"]) for row in rows)
+                    / field_count
+                ),
+                "field_bias_ms": sum(
+                    float(row["field_signed_error_sum"]) for row in rows
+                )
+                / field_count,
+            }.items():
+                self.log(
+                    f"val_ri/{name}",
+                    torch.tensor(value, device=self.device),
+                    on_epoch=True,
+                    sync_dist=False,
+                )
 
     def _accumulate_exceedance_statistics(
         self,

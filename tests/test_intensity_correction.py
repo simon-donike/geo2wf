@@ -84,6 +84,48 @@ def _cache(root: Path) -> Path:
     return root
 
 
+def _v2_cache(root: Path) -> Path:
+    root = _cache(root)
+    metadata_path = root / "cache-metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.update(
+        {
+            "schema_version": 2,
+            "target": {"sar_robust_peak_fraction": 0.005},
+        }
+    )
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    for split in ("train", "val", "test"):
+        path = root / split / "manifest.csv"
+        frame = pd.read_csv(path)
+        robust_values = []
+        for relative in frame["field_path"]:
+            with np.load(root / relative) as payload:
+                wind = payload["wind_speed_ms"]
+                valid = payload["valid_mask"].astype(bool) & np.isfinite(wind)
+            values = wind[valid]
+            count = max(1, math.ceil(values.size * 0.005))
+            robust_values.append(float(np.sort(values)[-count:].mean()))
+        frame["intensity_target_source"] = "sar_robust_peak"
+        frame["anchor_statistic"] = "robust_peak"
+        frame["ibtracs_target_ms"] = frame["target_wind_ms"]
+        frame["sar_robust_peak_target_ms"] = np.asarray(robust_values) + 2.0
+        frame["sar_max_wind_ms"] = frame["raw_unet_max_wind_ms"] + 1.0
+        frame["raw_unet_robust_peak_ms"] = robust_values
+        frame["target_wind_ms"] = frame["sar_robust_peak_target_ms"]
+        frame["target_category"] = frame["target_wind_ms"].map(
+            tropical_category_from_wind_ms
+        )
+        frame["is_rapid_intensification"] = split == "val"
+        frame["ri_24h_change_ms"] = 30.0 * KNOT_TO_MS if split == "val" else np.nan
+        frame["cohort_retained_count"] = len(frame)
+        frame["filtered_unbracketed_count"] = 0
+        frame["filtered_invalid_sar_center_count"] = 0
+        frame["filtered_unusable_sar_count"] = 0
+        frame.to_csv(path, index=False)
+    return root
+
+
 @pytest.mark.parametrize(
     ("wind_kt", "expected"),
     [
@@ -135,8 +177,32 @@ def test_dataset_returns_one_field_and_checks_provenance(tmp_path: Path) -> None
     assert sample["metadata"].shape == (len(INTENSITY_METADATA_NAMES),)
     assert not any(key in sample for key in ("history", "sequence", "previous_field"))
     assert sample["raw_unet_max_wind_ms"] == 20.0
+    assert sample["intensity_target_source"] == "ibtracs"
+    assert sample["anchor_statistic"] == "max"
+    assert sample["ibtracs_target_ms"] == sample["target_wind_ms"]
+    assert torch.isnan(sample["sar_robust_peak_target_ms"])
+    assert dataset.data_spec.cache_schema_version == 1
     with pytest.raises(ValueError, match="checkpoint mismatch"):
         UNetIntensityDataset(root, "train", expected_unet_checkpoint_sha256="different")
+
+
+def test_v2_cache_round_trip_exposes_both_targets_ri_and_robust_anchor(
+    tmp_path: Path,
+) -> None:
+    root = _v2_cache(tmp_path / "cache")
+    train = UNetIntensityDataset(root, "train")
+    validation = UNetIntensityDataset(root, "val")
+    sample = train[0]
+    ri_sample = validation[0]
+
+    assert train.data_spec.cache_schema_version == 2
+    assert sample["intensity_target_source"] == "sar_robust_peak"
+    assert sample["anchor_statistic"] == "robust_peak"
+    assert sample["target_wind_ms"] == sample["sar_robust_peak_target_ms"]
+    assert sample["raw_unet_robust_peak_ms"] == pytest.approx(12.0)
+    assert sample["raw_unet_max_wind_ms"] == 20.0
+    assert ri_sample["is_rapid_intensification"]
+    assert ri_sample["ri_24h_change_ms"] == pytest.approx(30.0 * KNOT_TO_MS)
 
 
 def test_storm_and_category_weights_equalize_storm_totals() -> None:
@@ -192,6 +258,21 @@ def test_zero_initialized_model_reproduces_masked_unet_maximum() -> None:
     assert torch.allclose(prediction.output_msw_ms, torch.tensor([20.0, 21.0]))
 
 
+def test_robust_peak_anchor_uses_top_half_percent_mean() -> None:
+    model = UNetIntensityCorrection(
+        field_base_channels=4,
+        field_channel_mults=(1, 2),
+        anchor_statistic="robust_peak",
+        robust_peak_fraction=0.005,
+    )
+    prediction = model.predict_intensity(_batch(1))
+
+    assert prediction.raw_unet_max_wind_ms.item() == 20.0
+    assert prediction.raw_unet_robust_peak_ms.item() == pytest.approx(12.0)
+    assert prediction.raw_unet_anchor_ms.item() == pytest.approx(12.0)
+    assert prediction.output_msw_ms.item() == pytest.approx(12.0)
+
+
 def test_invalid_wind_values_cannot_affect_model_or_raw_maximum() -> None:
     torch.manual_seed(2)
     model = UNetIntensityCorrection(
@@ -236,6 +317,57 @@ def test_training_and_inference_smoke_from_single_field_cache(tmp_path: Path) ->
         "output_msw_ms",
         "output_category",
     }
+
+
+def test_validation_logs_dual_reference_ri_namespace(monkeypatch) -> None:
+    model = UNetIntensityCorrection(
+        field_base_channels=4,
+        field_channel_mults=(1, 2),
+        log_wandb_validation_media=False,
+    )
+    batch = _batch()
+    batch.update(
+        {
+            "ibtracs_target_ms": torch.tensor([25.0, 26.0]),
+            "sar_robust_peak_target_ms": torch.tensor([24.0, 27.0]),
+            "is_rapid_intensification": torch.tensor([True, False]),
+            "intensity_target_source": ["ibtracs", "ibtracs"],
+        }
+    )
+    logged = {}
+    monkeypatch.setattr(
+        model,
+        "log",
+        lambda name, value, **kwargs: logged.__setitem__(name, value),
+    )
+
+    model.on_validation_epoch_start()
+    model.validation_step(batch, 0)
+    model.on_validation_epoch_end()
+
+    assert logged["val_ri/samples"] == 1.0
+    assert logged["val_ri/storms"] == 1.0
+    assert "val_ri/ibtracs_mae_ms" in logged
+    assert "val_ri/ibtracs_category_macro_f1" in logged
+    assert "val_ri/ibtracs_raw_unet_rmse_ms" in logged
+    assert "val_ri/sar_robust_peak_mae_ms" in logged
+    assert "val_ri/sar_robust_peak_raw_unet_category_macro_f1" in logged
+
+
+def test_distributed_validation_rows_are_gathered(monkeypatch) -> None:
+    local = [{"sample_id": "local"}]
+    monkeypatch.setattr(torch.distributed, "is_available", lambda: True)
+    monkeypatch.setattr(torch.distributed, "is_initialized", lambda: True)
+    monkeypatch.setattr(torch.distributed, "get_world_size", lambda: 2)
+
+    def gather(output, rows) -> None:
+        output[0] = rows
+        output[1] = [{"sample_id": "remote"}]
+
+    monkeypatch.setattr(torch.distributed, "all_gather_object", gather)
+    gathered = UNetIntensityCorrection._distributed_rows(local)
+
+    assert [row["sample_id"] for row in gathered] == ["local", "remote"]
 
 
 def test_metric_summary_reports_baseline_storm_macro_and_confusion() -> None:

@@ -8,17 +8,23 @@ import math
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
+import rasterio
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 from geo2wf.data.datamodule import PairedDataModule
 from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
 
 
+INTENSITY_TARGET_COMPANION = "intensity_target"
+# Legacy companion retained so older data specs/checkpoint wrappers still pass.
 IBTRACS_MAX_WIND_COMPANION = "ibtracs_max_wind"
 KNOT_TO_MS = 0.514444
 REQUIRED_IBTRACS_COLUMNS = frozenset({"USA_ATCF_ID", "ISO_TIME", "USA_WIND"})
+INTENSITY_TARGET_SOURCES = frozenset({"ibtracs", "sar_robust_peak"})
 
 
 def _validate_storm_disjoint(labels_by_split: dict[str, pd.DataFrame]) -> None:
@@ -127,8 +133,157 @@ def _interpolate_ibtracs_wind(
     }
 
 
+def _target_tensor_and_mask(
+    path: Path,
+    *,
+    target_size: tuple[int, int],
+    center_crop_size: tuple[int, int] | None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Read the physical target using the paired dataset's resize/crop contract."""
+
+    with rasterio.open(path) as source:
+        masked = source.read(1, masked=True).astype("float32")
+        bounds = source.bounds
+    values = np.asarray(masked.filled(np.nan), dtype=np.float32)
+    valid = np.isfinite(values) & ~np.ma.getmaskarray(masked)
+    target = torch.from_numpy(np.where(valid, values, 0.0)).unsqueeze(0)
+    mask = torch.from_numpy(valid).unsqueeze(0)
+    if target.shape[-2:] != target_size:
+        target = F.interpolate(
+            target.unsqueeze(0), size=target_size, mode="bilinear", align_corners=False
+        ).squeeze(0)
+        mask = (
+            F.interpolate(mask.unsqueeze(0).float(), size=target_size, mode="nearest")
+            .squeeze(0)
+            .bool()
+        )
+        target = target * mask.to(target)
+    tensor_bounds = torch.tensor(
+        [bounds.left, bounds.right, bounds.bottom, bounds.top], dtype=torch.float64
+    )
+    if center_crop_size is not None:
+        crop_height, crop_width = center_crop_size
+        height, width = target.shape[-2:]
+        if crop_height > height or crop_width > width:
+            raise ValueError(
+                f"center crop {center_crop_size} exceeds target shape {(height, width)}"
+            )
+        top = (height - crop_height) // 2
+        left = (width - crop_width) // 2
+        target = target[:, top : top + crop_height, left : left + crop_width]
+        mask = mask[:, top : top + crop_height, left : left + crop_width]
+        bounds_left, bounds_right, bounds_bottom, bounds_top = tensor_bounds
+        x_resolution = (bounds_right - bounds_left) / width
+        y_resolution = (bounds_top - bounds_bottom) / height
+        tensor_bounds = torch.stack(
+            [
+                bounds_left + left * x_resolution,
+                bounds_left + (left + crop_width) * x_resolution,
+                bounds_top - (top + crop_height) * y_resolution,
+                bounds_top - top * y_resolution,
+            ]
+        )
+    return target, mask, tensor_bounds
+
+
+def _center_mask_value(
+    mask: torch.Tensor,
+    bounds: torch.Tensor,
+    center_lat: float,
+    center_lon: float,
+) -> bool:
+    """Return validity of the nearest raster cell containing the storm center."""
+
+    if not math.isfinite(center_lat) or not math.isfinite(center_lon):
+        return False
+    height, width = mask.shape[-2:]
+    left, right, bottom, top = (float(value) for value in bounds)
+    if not (bottom < top and left < right):
+        return False
+    row = math.floor((top - center_lat) * height / (top - bottom))
+    column = math.floor((center_lon - left) * width / (right - left))
+    if not (0 <= row < height and 0 <= column < width):
+        return False
+    return bool(mask[..., row, column].all())
+
+
+def _sar_intensity_diagnostics(
+    paired_dataset: PairedImageDataset,
+    row: pd.Series,
+    *,
+    robust_peak_fraction: float,
+) -> dict[str, Any]:
+    """Calculate center validity and scalar winds from the effective SAR crop."""
+
+    relative_path = str(row.get("target_path") or row.get("sar_path") or "")
+    if not relative_path:
+        return {
+            "has_valid_center": False,
+            "max_wind_ms": math.nan,
+            "robust_peak_ms": math.nan,
+            "valid_pixels": 0,
+        }
+    target, mask, bounds = _target_tensor_and_mask(
+        paired_dataset.root / relative_path,
+        target_size=tuple(paired_dataset.target_size),
+        center_crop_size=(
+            tuple(paired_dataset.center_crop_size)
+            if paired_dataset.center_crop_size is not None
+            else None
+        ),
+    )
+    center_lat = pd.to_numeric(row.get("ibtracs_center_lat"), errors="coerce")
+    center_lon = pd.to_numeric(row.get("ibtracs_center_lon"), errors="coerce")
+    center_valid = _center_mask_value(
+        mask,
+        bounds,
+        float(center_lat),
+        float(center_lon),
+    )
+    values = target[mask & torch.isfinite(target)]
+    if not values.numel():
+        return {
+            "has_valid_center": center_valid,
+            "max_wind_ms": math.nan,
+            "robust_peak_ms": math.nan,
+            "valid_pixels": 0,
+        }
+    count = max(1, int(math.ceil(values.numel() * robust_peak_fraction)))
+    return {
+        "has_valid_center": center_valid,
+        "max_wind_ms": float(values.max()),
+        "robust_peak_ms": float(torch.topk(values, count, sorted=False).values.mean()),
+        "valid_pixels": int(values.numel()),
+    }
+
+
+def _ri_diagnostics(
+    fixes: pd.DataFrame,
+    timestamp: Any,
+    *,
+    current_wind_ms: float,
+    max_bracket_hours: float,
+    threshold_kt: float,
+    window_hours: float,
+) -> tuple[float, bool]:
+    target_time = pd.Timestamp(timestamp)
+    prior = _interpolate_ibtracs_wind(
+        fixes,
+        target_time - pd.Timedelta(hours=window_hours),
+        max_bracket_hours=max_bracket_hours,
+    )
+    if prior is None:
+        return math.nan, False
+    change_ms = current_wind_ms - float(prior["target_wind_ms"])
+    threshold_ms = threshold_kt * KNOT_TO_MS
+    is_ri = change_ms > threshold_ms or math.isclose(
+        change_ms, threshold_ms, rel_tol=1.0e-12, abs_tol=1.0e-9
+    )
+    return change_ms, is_ri
+
+
 class JointPairedIntensityDataset(Dataset):
-    """Attach time-interpolated IBTrACS USA_WIND to paired SAR samples."""
+    """Attach matched IBTrACS and SAR scalar intensity references."""
 
     def __init__(
         self,
@@ -137,12 +292,31 @@ class JointPairedIntensityDataset(Dataset):
         split: str,
         *,
         max_bracket_hours: float = 3.0,
+        intensity_target_source: str = "ibtracs",
+        require_sar_valid_center: bool = False,
+        sar_robust_peak_fraction: float = 0.005,
+        ri_threshold_kt: float = 30.0,
+        ri_window_hours: float = 24.0,
     ) -> None:
         self.paired_dataset = paired_dataset
         self.split = str(split)
         self.max_bracket_hours = float(max_bracket_hours)
         if self.max_bracket_hours <= 0:
             raise ValueError("max_bracket_hours must be positive")
+        self.intensity_target_source = str(intensity_target_source).strip().lower()
+        if self.intensity_target_source not in INTENSITY_TARGET_SOURCES:
+            raise ValueError(
+                "intensity_target_source must be one of "
+                f"{sorted(INTENSITY_TARGET_SOURCES)}, got {intensity_target_source!r}"
+            )
+        self.require_sar_valid_center = bool(require_sar_valid_center)
+        self.sar_robust_peak_fraction = float(sar_robust_peak_fraction)
+        self.ri_threshold_kt = float(ri_threshold_kt)
+        self.ri_window_hours = float(ri_window_hours)
+        if not 0.0 < self.sar_robust_peak_fraction <= 1.0:
+            raise ValueError("sar_robust_peak_fraction must be in (0, 1]")
+        if self.ri_threshold_kt <= 0.0 or self.ri_window_hours <= 0.0:
+            raise ValueError("RI threshold and window must be positive")
 
         paired_samples = paired_dataset.samples
         paired_ids = paired_samples["sample_id"].astype(str)
@@ -155,10 +329,14 @@ class JointPairedIntensityDataset(Dataset):
 
         self._paired_indices: list[int] = []
         self._labels: list[dict[str, Any]] = []
+        self.filtered_unbracketed_count = 0
+        self.filtered_invalid_sar_center_count = 0
+        self.filtered_unusable_sar_count = 0
         for index, row in paired_samples.iterrows():
             storm_id = str(row["storm_id"]).strip().upper()
             fixes = ibtracs_tracks.get(storm_id)
             if fixes is None:
+                self.filtered_unbracketed_count += 1
                 continue
             label = _interpolate_ibtracs_wind(
                 fixes,
@@ -166,19 +344,51 @@ class JointPairedIntensityDataset(Dataset):
                 max_bracket_hours=self.max_bracket_hours,
             )
             if label is None:
+                self.filtered_unbracketed_count += 1
                 continue
+            sar = _sar_intensity_diagnostics(
+                paired_dataset,
+                row,
+                robust_peak_fraction=self.sar_robust_peak_fraction,
+            )
+            if not math.isfinite(float(sar["robust_peak_ms"])):
+                self.filtered_unusable_sar_count += 1
+                continue
+            if self.require_sar_valid_center and not sar["has_valid_center"]:
+                self.filtered_invalid_sar_center_count += 1
+                continue
+            ibtracs_wind_ms = float(label["target_wind_ms"])
+            ri_change_ms, is_ri = _ri_diagnostics(
+                fixes,
+                label["observation_timestamp"],
+                current_wind_ms=ibtracs_wind_ms,
+                max_bracket_hours=self.max_bracket_hours,
+                threshold_kt=self.ri_threshold_kt,
+                window_hours=self.ri_window_hours,
+            )
+            target_wind_ms = (
+                ibtracs_wind_ms
+                if self.intensity_target_source == "ibtracs"
+                else float(sar["robust_peak_ms"])
+            )
             label.update(
                 {
                     "source_sample_id": str(row["sample_id"]),
                     "storm_id": storm_id,
+                    "target_wind_ms": target_wind_ms,
+                    "ibtracs_wind_ms": ibtracs_wind_ms,
+                    "sar_max_wind_ms": float(sar["max_wind_ms"]),
+                    "sar_robust_peak_ms": float(sar["robust_peak_ms"]),
+                    "sar_valid_pixels": int(sar["valid_pixels"]),
+                    "sar_has_valid_center": bool(sar["has_valid_center"]),
+                    "intensity_target_source": self.intensity_target_source,
+                    "ri_24h_change_ms": ri_change_ms,
+                    "is_rapid_intensification": is_ri,
                 }
             )
             self._paired_indices.append(int(index))
             self._labels.append(label)
 
-        self.filtered_unbracketed_count = len(paired_samples) - len(
-            self._paired_indices
-        )
         self.samples = paired_samples.iloc[self._paired_indices].reset_index(drop=True)
 
     @property
@@ -190,7 +400,8 @@ class JointPairedIntensityDataset(Dataset):
         spec = self.paired_dataset.data_spec
         return replace(
             spec,
-            companions=spec.companions | {IBTRACS_MAX_WIND_COMPANION},
+            companions=spec.companions
+            | {INTENSITY_TARGET_COMPANION, IBTRACS_MAX_WIND_COMPANION},
         )
 
     def __len__(self) -> int:
@@ -204,18 +415,57 @@ class JointPairedIntensityDataset(Dataset):
         sample["intensity_target_ms"] = torch.tensor(
             float(label["target_wind_ms"]), dtype=torch.float32
         )
+        sample["ibtracs_target_ms"] = torch.tensor(
+            float(label["ibtracs_wind_ms"]), dtype=torch.float32
+        )
+        sample["sar_robust_peak_target_ms"] = torch.tensor(
+            float(label["sar_robust_peak_ms"]), dtype=torch.float32
+        )
+        sample["sar_max_wind_ms"] = torch.tensor(
+            float(label["sar_max_wind_ms"]), dtype=torch.float32
+        )
+        sample["sar_valid_pixels"] = torch.tensor(
+            int(label["sar_valid_pixels"]), dtype=torch.long
+        )
+        sample["sar_has_valid_center"] = torch.tensor(
+            bool(label["sar_has_valid_center"]), dtype=torch.bool
+        )
+        sample["is_rapid_intensification"] = torch.tensor(
+            bool(label["is_rapid_intensification"]), dtype=torch.bool
+        )
+        sample["ri_24h_change_ms"] = torch.tensor(
+            float(label["ri_24h_change_ms"]), dtype=torch.float32
+        )
+        sample["intensity_target_source"] = str(label["intensity_target_source"])
+        sample["intensity_filtering_counts"] = {
+            "retained": torch.tensor(len(self), dtype=torch.long),
+            "filtered_unbracketed": torch.tensor(
+                self.filtered_unbracketed_count, dtype=torch.long
+            ),
+            "filtered_invalid_sar_center": torch.tensor(
+                self.filtered_invalid_sar_center_count, dtype=torch.long
+            ),
+            "filtered_unusable_sar": torch.tensor(
+                self.filtered_unusable_sar_count, dtype=torch.long
+            ),
+        }
         sample["intensity_observation_timestamp"] = str(label["observation_timestamp"])
         return sample
 
 
 class JointPairedIntensityDataModule(PairedDataModule):
-    """Pair SAR fields with directly interpolated continuous IBTrACS labels."""
+    """Pair SAR fields with matched scalar intensity references."""
 
     def __init__(
         self,
         *args: Any,
         ibtracs_file: str | Path,
         max_ibtracs_bracket_hours: float = 3.0,
+        intensity_target_source: str = "ibtracs",
+        require_sar_valid_center: bool = False,
+        sar_robust_peak_fraction: float = 0.005,
+        ri_threshold_kt: float = 30.0,
+        ri_window_hours: float = 24.0,
         **kwargs: Any,
     ) -> None:
         if kwargs.get("include_test_in_train", False):
@@ -226,6 +476,11 @@ class JointPairedIntensityDataModule(PairedDataModule):
         self.max_ibtracs_bracket_hours = float(max_ibtracs_bracket_hours)
         if self.max_ibtracs_bracket_hours <= 0:
             raise ValueError("max_ibtracs_bracket_hours must be positive")
+        self.intensity_target_source = str(intensity_target_source).strip().lower()
+        self.require_sar_valid_center = bool(require_sar_valid_center)
+        self.sar_robust_peak_fraction = float(sar_robust_peak_fraction)
+        self.ri_threshold_kt = float(ri_threshold_kt)
+        self.ri_window_hours = float(ri_window_hours)
         super().__init__(*args, **kwargs)
 
         split_frames = {
@@ -254,11 +509,21 @@ class JointPairedIntensityDataModule(PairedDataModule):
             self.ibtracs_tracks,
             split,
             max_bracket_hours=self.max_ibtracs_bracket_hours,
+            intensity_target_source=self.intensity_target_source,
+            require_sar_valid_center=self.require_sar_valid_center,
+            sar_robust_peak_fraction=self.sar_robust_peak_fraction,
+            ri_threshold_kt=self.ri_threshold_kt,
+            ri_window_hours=self.ri_window_hours,
         )
 
 
 __all__ = [
     "IBTRACS_MAX_WIND_COMPANION",
+    "INTENSITY_TARGET_COMPANION",
+    "INTENSITY_TARGET_SOURCES",
     "JointPairedIntensityDataModule",
     "JointPairedIntensityDataset",
+    "_center_mask_value",
+    "_ri_diagnostics",
+    "_sar_intensity_diagnostics",
 ]
