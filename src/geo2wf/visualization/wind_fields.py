@@ -519,7 +519,12 @@ def _draw_validation_row(
         if predicted is None or actual is None:
             intensity_ax.set_axis_off()
         else:
-            _plot_intensity_comparison(intensity_ax, float(actual), float(predicted))
+            _plot_intensity_comparison(
+                intensity_ax,
+                float(actual),
+                float(predicted),
+                label=str(sample.get("intensity_target_label", "Scalar intensity")),
+            )
     if sample.get("sample_label"):
         axes[0].annotate(
             sample["sample_label"],
@@ -532,8 +537,10 @@ def _draw_validation_row(
         )
 
 
-def _plot_intensity_comparison(ax, actual: float, predicted: float) -> None:
-    """Draw the continuous IBTrACS target and bottleneck-MLP prediction."""
+def _plot_intensity_comparison(
+    ax, actual: float, predicted: float, *, label: str
+) -> None:
+    """Draw a continuous scalar target and bottleneck-MLP prediction."""
     values = [actual, predicted]
     bars = ax.bar(
         ["Actual", "Predicted"], values, color=["#4c78a8", "#f58518"], width=0.62
@@ -550,7 +557,7 @@ def _plot_intensity_comparison(ax, actual: float, predicted: float) -> None:
             fontsize=10,
         )
     error = predicted - actual
-    ax.set_title(f"IBTrACS max wind\nerror {error:+.1f} m s$^{{-1}}$", fontsize=10)
+    ax.set_title(f"{label}\nerror {error:+.1f} m s$^{{-1}}$", fontsize=10)
     ax.set_ylabel(r"Wind speed (m s$^{-1}$)")
     ax.grid(axis="y", alpha=0.25)
 

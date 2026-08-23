@@ -76,6 +76,7 @@ def test_reconstruction_plot_shows_ibtracs_actual_vs_mlp_prediction() -> None:
         "target_mask": torch.ones((1, 4, 4), dtype=torch.bool),
         "intensity_target_ms": 40.0,
         "intensity_prediction_ms": 37.5,
+        "intensity_target_label": "IBTrACS max wind",
         "physical_wind_output": True,
     }
 
@@ -170,10 +171,52 @@ def test_model_rejects_data_without_continuous_ibtracs_companion() -> None:
         frozenset({IBTRACS_MAX_WIND_COMPANION}),
     )
     model.validate_data_spec(valid)
-    with pytest.raises(ValueError, match="continuous IBTrACS"):
+    with pytest.raises(ValueError, match="continuous scalar intensity"):
         model.validate_data_spec(
             DataSpec(("a", "b", "c"), ("wind_speed",), (16, 16), "m s-1")
         )
+
+
+def test_joint_validation_logs_dual_reference_ri_and_field_metrics(
+    monkeypatch,
+) -> None:
+    model = BottleneckUNetMLPRegressor(
+        condition_channels=3,
+        base_channels=4,
+        channel_mults=(1, 2),
+        log_reconstruction_images=False,
+    )
+    model._evaluation_rows["val"] = [
+        {
+            "sample_id": "sample",
+            "storm_id": "storm",
+            "prediction_ms": 32.0,
+            "ibtracs_target_ms": 30.0,
+            "sar_robust_peak_target_ms": 31.0,
+            "raw_unet_max_ms": 29.0,
+            "raw_unet_robust_peak_ms": 28.0,
+            "field_valid_pixels": 2,
+            "field_absolute_error_sum": 4.0,
+            "field_squared_error_sum": 10.0,
+            "field_signed_error_sum": -2.0,
+            "is_rapid_intensification": True,
+        }
+    ]
+    logged = {}
+    monkeypatch.setattr(
+        model,
+        "log",
+        lambda name, value, **kwargs: logged.__setitem__(name, value),
+    )
+
+    model._log_ri_statistics()
+
+    assert logged["val_ri/samples"] == 1.0
+    assert "val_ri/ibtracs_category_macro_f1" in logged
+    assert "val_ri/ibtracs_raw_unet_bias_ms" in logged
+    assert "val_ri/sar_robust_peak_raw_unet_mae_ms" in logged
+    assert logged["val_ri/field_mae_ms"] == pytest.approx(2.0)
+    assert logged["val_ri/field_bias_ms"] == pytest.approx(-1.0)
 
 
 def test_deterministic_unet_can_train_and_predict_without_era5() -> None:
@@ -304,7 +347,12 @@ def _write_joint_fixture(root: Path, ibtracs_file: Path) -> None:
 
 
 def _joint_datamodule(
-    root: Path, ibtracs_file: Path, *, use_era5: bool = True
+    root: Path,
+    ibtracs_file: Path,
+    *,
+    use_era5: bool = True,
+    intensity_target_source: str = "ibtracs",
+    require_sar_valid_center: bool = False,
 ) -> JointPairedIntensityDataModule:
     return JointPairedIntensityDataModule(
         root=root,
@@ -316,6 +364,8 @@ def _joint_datamodule(
         target_size=(8, 8),
         random_flips=False,
         use_era5=use_era5,
+        intensity_target_source=intensity_target_source,
+        require_sar_valid_center=require_sar_valid_center,
         normalization="min-max",
         target_normalization="min-max",
     )
@@ -341,6 +391,59 @@ def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) 
     assert no_era5_batch["condition"].shape[1] == 5
     assert "era5_wind_speed" not in no_era5_batch
     assert "target_category" not in batch
+
+
+def test_target_variants_share_exact_center_valid_cohort(tmp_path: Path) -> None:
+    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    modules = {
+        source: _joint_datamodule(
+            root,
+            ibtracs_file,
+            intensity_target_source=source,
+            require_sar_valid_center=True,
+        )
+        for source in ("ibtracs", "sar_robust_peak")
+    }
+    for datamodule in modules.values():
+        datamodule.setup(None)
+
+    for split in ("train_dataset", "val_dataset", "test_dataset"):
+        ibtracs = getattr(modules["ibtracs"], split)
+        sar = getattr(modules["sar_robust_peak"], split)
+        assert (
+            ibtracs.samples["sample_id"].tolist() == sar.samples["sample_id"].tolist()
+        )
+    ibtracs_sample = modules["ibtracs"].train_dataset[0]
+    sar_sample = modules["sar_robust_peak"].train_dataset[0]
+    assert ibtracs_sample["intensity_target_ms"] == pytest.approx(45.0 * 0.514444)
+    assert sar_sample["intensity_target_ms"] == pytest.approx(20.0)
+    assert sar_sample["ibtracs_target_ms"] == ibtracs_sample["intensity_target_ms"]
+    assert sar_sample["sar_has_valid_center"]
+    assert sar_sample["intensity_filtering_counts"]["retained"] == 2
+
+
+def test_center_filter_inspects_effective_sar_mask(tmp_path: Path) -> None:
+    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    path = root / "train" / "train-0-sar.tif"
+    with rasterio.open(path, "r+") as raster:
+        values = raster.read(1)
+        values[4, 4] = np.nan
+        raster.write(values, 1)
+
+    filtered = _joint_datamodule(
+        root, ibtracs_file, require_sar_valid_center=True
+    )._make_dataset("train", augment=False)
+    unfiltered = _joint_datamodule(
+        root, ibtracs_file, require_sar_valid_center=False
+    )._make_dataset("train", augment=False)
+
+    assert filtered.samples["sample_id"].tolist() == ["train-1"]
+    assert filtered.filtered_invalid_sar_center_count == 1
+    assert len(unfiltered) == 2
+    assert unfiltered[0]["sar_has_valid_center"] is not None
+    assert not bool(unfiltered[0]["sar_has_valid_center"])
 
 
 def test_data_adapter_rejects_conflicts_and_filters_wide_brackets(
@@ -414,3 +517,46 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     direct_config = compose_config(["experiment=geo_pmw_near89_unet_no_era5"])
     assert direct_config["data"]["use_era5"] is False
     assert direct_config["model"]["condition_channels"] == 14
+
+
+@pytest.mark.parametrize("target_source", ["ibtracs", "sar_robust_peak"])
+@pytest.mark.parametrize("use_era5", [True, False])
+def test_one_epoch_joint_smoke_for_target_era5_matrix(
+    tmp_path: Path,
+    target_source: str,
+    use_era5: bool,
+) -> None:
+    root = tmp_path / f"paired-{target_source}-{use_era5}"
+    ibtracs_file = tmp_path / f"ibtracs-{target_source}-{use_era5}.csv"
+    _write_joint_fixture(root, ibtracs_file)
+    datamodule = _joint_datamodule(
+        root,
+        ibtracs_file,
+        use_era5=use_era5,
+        intensity_target_source=target_source,
+        require_sar_valid_center=True,
+    )
+    datamodule.setup("fit")
+    model = BottleneckUNetMLPRegressor(
+        condition_channels=datamodule.data_spec.condition_channel_count,
+        base_channels=4,
+        channel_mults=(1, 2),
+        intensity_hidden_features=8,
+        intensity_dropout=0.0,
+        log_reconstruction_images=False,
+    )
+    trainer = pl.Trainer(
+        max_epochs=1,
+        accelerator="cpu",
+        devices=1,
+        logger=False,
+        enable_checkpointing=False,
+        limit_train_batches=1,
+        limit_val_batches=1,
+        num_sanity_val_steps=0,
+    )
+
+    trainer.fit(model, datamodule=datamodule)
+
+    assert trainer.current_epoch == 1
+    assert trainer.callback_metrics["val_ri/samples"] == 0.0

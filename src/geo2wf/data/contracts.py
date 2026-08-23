@@ -52,6 +52,15 @@ class WindFieldBatch(TypedDict):
     pmw_bounds: NotRequired[torch.Tensor]
     ibtracs: NotRequired[list[Mapping[str, Any]]]
     intensity_target_ms: NotRequired[torch.Tensor]
+    ibtracs_target_ms: NotRequired[torch.Tensor]
+    sar_robust_peak_target_ms: NotRequired[torch.Tensor]
+    sar_max_wind_ms: NotRequired[torch.Tensor]
+    sar_valid_pixels: NotRequired[torch.Tensor]
+    sar_has_valid_center: NotRequired[torch.Tensor]
+    is_rapid_intensification: NotRequired[torch.Tensor]
+    ri_24h_change_ms: NotRequired[torch.Tensor]
+    intensity_target_source: NotRequired[list[str]]
+    intensity_filtering_counts: NotRequired[dict[str, torch.Tensor]]
     intensity_observation_timestamp: NotRequired[list[str]]
 
 

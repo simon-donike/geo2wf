@@ -1,4 +1,4 @@
-"""Learned single-field correction from U-Net wind maps to IBTrACS intensity."""
+"""Learned single-field correction from U-Net wind maps to scalar intensity."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from geo2wf.data.intensity import (
     INTENSITY_METADATA_NAMES,
     IntensityDataSpec,
+    category_macro_f1_tensor,
     tropical_category_from_wind_ms_tensor,
 )
 from geo2wf.tracking.intensity_media import log_wandb_intensity_evaluation
@@ -35,7 +36,9 @@ CATEGORY_NAMES = {
 
 @dataclass(frozen=True)
 class IntensityPredictionBatch:
+    raw_unet_anchor_ms: torch.Tensor
     raw_unet_max_wind_ms: torch.Tensor
+    raw_unet_robust_peak_ms: torch.Tensor
     correction_ms: torch.Tensor
     output_msw_ms: torch.Tensor
     output_category: torch.Tensor
@@ -116,9 +119,15 @@ def _as_rows(
     sample_ids: Sequence[str],
     storm_ids: Sequence[str],
     observation_timestamps: Sequence[str],
+    target_sources: Sequence[str],
     prediction: torch.Tensor,
     target: torch.Tensor,
-    raw: torch.Tensor,
+    raw_anchor: torch.Tensor,
+    raw_max: torch.Tensor,
+    raw_robust_peak: torch.Tensor,
+    ibtracs_target: torch.Tensor,
+    sar_robust_peak_target: torch.Tensor,
+    is_rapid_intensification: torch.Tensor,
     correction: torch.Tensor,
     prediction_category: torch.Tensor,
     target_category: torch.Tensor,
@@ -128,7 +137,12 @@ def _as_rows(
         for value in (
             prediction,
             target,
-            raw,
+            raw_anchor,
+            raw_max,
+            raw_robust_peak,
+            ibtracs_target,
+            sar_robust_peak_target,
+            is_rapid_intensification,
             correction,
             prediction_category,
             target_category,
@@ -139,9 +153,16 @@ def _as_rows(
             "sample_id": str(sample_id),
             "storm_id": str(storm_id),
             "observation_timestamp": str(observation_timestamp),
+            "intensity_target_source": str(target_source),
             "prediction_ms": float(predicted),
             "target_ms": float(observed),
-            "raw_unet_ms": float(baseline),
+            "raw_unet_ms": float(baseline_anchor),
+            "raw_unet_anchor_ms": float(baseline_anchor),
+            "raw_unet_max_ms": float(baseline_max),
+            "raw_unet_robust_peak_ms": float(baseline_robust_peak),
+            "ibtracs_target_ms": float(ibtracs_observed),
+            "sar_robust_peak_target_ms": float(sar_observed),
+            "is_rapid_intensification": bool(is_ri),
             "correction_ms": float(correction_ms),
             "prediction_category": int(category),
             "target_category": int(observed_category),
@@ -150,14 +171,61 @@ def _as_rows(
             sample_id,
             storm_id,
             observation_timestamp,
+            target_source,
             predicted,
             observed,
-            baseline,
+            baseline_anchor,
+            baseline_max,
+            baseline_robust_peak,
+            ibtracs_observed,
+            sar_observed,
+            is_ri,
             correction_ms,
             category,
             observed_category,
-        ) in zip(sample_ids, storm_ids, observation_timestamps, *arrays)
+        ) in zip(
+            sample_ids,
+            storm_ids,
+            observation_timestamps,
+            target_sources,
+            *arrays,
+        )
     ]
+
+
+def rows_for_intensity_reference(
+    rows: Sequence[Mapping[str, Any]], reference: str
+) -> list[dict[str, Any]]:
+    """Project dual-reference rows onto one scalar evaluation target."""
+
+    reference = str(reference).strip().lower()
+    if reference == "ibtracs":
+        target_key = "ibtracs_target_ms"
+        baseline_key = "raw_unet_max_ms"
+    elif reference == "sar_robust_peak":
+        target_key = "sar_robust_peak_target_ms"
+        baseline_key = "raw_unet_robust_peak_ms"
+    else:
+        raise ValueError(f"unknown intensity reference {reference!r}")
+    projected = []
+    for row in rows:
+        target = float(row.get(target_key, math.nan))
+        baseline = float(row.get(baseline_key, math.nan))
+        if not math.isfinite(target) or not math.isfinite(baseline):
+            continue
+        projected.append(
+            {
+                **dict(row),
+                "target_ms": target,
+                "target_category": int(
+                    tropical_category_from_wind_ms_tensor(
+                        torch.tensor(target, dtype=torch.float64)
+                    ).item()
+                ),
+                "raw_unet_ms": baseline,
+            }
+        )
+    return projected
 
 
 def _regression_metrics(prediction: np.ndarray, target: np.ndarray) -> dict[str, float]:
@@ -265,7 +333,7 @@ def summarize_intensity_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any
 
 
 class UNetIntensityCorrection(pl.LightningModule):
-    """Correct one frozen U-Net wind field to an IBTrACS maximum-wind scalar."""
+    """Correct one frozen U-Net wind field to a supervised intensity scalar."""
 
     checkpoint_monitor = "val/storm_macro_mae_ms"
     checkpoint_mode = "min"
@@ -279,6 +347,8 @@ class UNetIntensityCorrection(pl.LightningModule):
         fusion_hidden_features: int = 128,
         dropout: float = 0.1,
         wind_soft_scale_ms: float = 20.0,
+        anchor_statistic: str = "max",
+        robust_peak_fraction: float = 0.005,
         huber_delta_ms: float = 5.0,
         use_field: bool = True,
         use_metadata: bool = True,
@@ -304,9 +374,16 @@ class UNetIntensityCorrection(pl.LightningModule):
             raise ValueError("at least one of use_field or use_metadata must be true")
         if validation_plot_storm_count < 1:
             raise ValueError("validation_plot_storm_count must be at least one")
+        anchor_statistic = str(anchor_statistic).strip().lower()
+        if anchor_statistic not in {"max", "robust_peak"}:
+            raise ValueError("anchor_statistic must be 'max' or 'robust_peak'")
+        if not 0.0 < robust_peak_fraction <= 1.0:
+            raise ValueError("robust_peak_fraction must be in (0, 1]")
         self.save_hyperparameters()
         self.metadata_features = int(metadata_features)
         self.wind_soft_scale_ms = float(wind_soft_scale_ms)
+        self.anchor_statistic = anchor_statistic
+        self.robust_peak_fraction = float(robust_peak_fraction)
         self.huber_delta_ms = float(huber_delta_ms)
         self.use_field = bool(use_field)
         self.use_metadata = bool(use_metadata)
@@ -397,6 +474,13 @@ class UNetIntensityCorrection(pl.LightningModule):
             )
         clean_wind = torch.where(finite_mask, wind, torch.zeros_like(wind))
         raw_max = torch.where(finite_mask, wind, -torch.inf).flatten(1).amax(dim=1)
+        robust_peaks = []
+        for sample_wind, sample_mask in zip(wind, finite_mask):
+            values = sample_wind[sample_mask]
+            count = max(1, int(math.ceil(values.numel() * self.robust_peak_fraction)))
+            robust_peaks.append(torch.topk(values, count, sorted=False).values.mean())
+        raw_robust_peak = torch.stack(robust_peaks)
+        raw_anchor = raw_max if self.anchor_statistic == "max" else raw_robust_peak
         features = []
         if self.field_encoder is not None:
             encoded_wind = torch.asinh(
@@ -416,9 +500,11 @@ class UNetIntensityCorrection(pl.LightningModule):
             features.append(self.metadata_encoder(metadata.to(wind)))
         fused = self.fusion(torch.cat(features, dim=1))
         correction = self.correction_head(fused).squeeze(1)
-        output = (raw_max + correction).clamp_min(0.0)
+        output = (raw_anchor + correction).clamp_min(0.0)
         return IntensityPredictionBatch(
+            raw_unet_anchor_ms=raw_anchor,
             raw_unet_max_wind_ms=raw_max,
+            raw_unet_robust_peak_ms=raw_robust_peak,
             correction_ms=correction,
             output_msw_ms=output,
             output_category=tropical_category_from_wind_ms_tensor(output),
@@ -460,7 +546,7 @@ class UNetIntensityCorrection(pl.LightningModule):
         loss, prediction = self._loss(batch)
         target = batch["target_wind_ms"].to(prediction.output_msw_ms)
         error = prediction.output_msw_ms - target
-        raw_error = prediction.raw_unet_max_wind_ms - target
+        raw_error = prediction.raw_unet_anchor_ms - target
         target_category = batch["target_category"].to(prediction.output_category)
         metrics = {
             "loss": loss,
@@ -506,9 +592,21 @@ class UNetIntensityCorrection(pl.LightningModule):
                 batch["sample_id"],
                 batch["storm_id"],
                 batch["observation_timestamp"],
+                batch.get(
+                    "intensity_target_source",
+                    ["ibtracs"] * len(batch["sample_id"]),
+                ),
                 prediction.output_msw_ms,
                 target,
+                prediction.raw_unet_anchor_ms,
                 prediction.raw_unet_max_wind_ms,
+                prediction.raw_unet_robust_peak_ms,
+                batch.get("ibtracs_target_ms", target).to(target),
+                batch.get("sar_robust_peak_target_ms", target).to(target),
+                batch.get(
+                    "is_rapid_intensification",
+                    torch.zeros_like(target, dtype=torch.bool),
+                ).to(target.device),
                 prediction.correction_ms,
                 prediction.output_category,
                 target_category,
@@ -540,7 +638,9 @@ class UNetIntensityCorrection(pl.LightningModule):
             None for _ in range(torch.distributed.get_world_size())
         ]
         torch.distributed.all_gather_object(gathered, rows)
-        return [row for part in gathered if part is not None for row in part]
+        combined = [row for part in gathered if part is not None for row in part]
+        # DistributedSampler may pad validation with repeated samples.
+        return list({str(row["sample_id"]): row for row in combined}.values())
 
     def _log_evaluation(self, prefix: str) -> None:
         rows = self._distributed_rows(self._evaluation_rows[prefix])
@@ -577,6 +677,82 @@ class UNetIntensityCorrection(pl.LightningModule):
                     on_epoch=True,
                     sync_dist=False,
                 )
+        if prefix == "val":
+            ri_rows = [
+                row for row in rows if bool(row.get("is_rapid_intensification", False))
+            ]
+            self.log(
+                "val_ri/samples",
+                float(len(ri_rows)),
+                on_step=False,
+                on_epoch=True,
+                sync_dist=False,
+            )
+            self.log(
+                "val_ri/storms",
+                float(len({str(row["storm_id"]) for row in ri_rows})),
+                on_step=False,
+                on_epoch=True,
+                sync_dist=False,
+            )
+            for reference in ("ibtracs", "sar_robust_peak"):
+                projected = rows_for_intensity_reference(ri_rows, reference)
+                if not projected:
+                    continue
+                reference_summary = summarize_intensity_rows(projected)
+                raw = torch.tensor(
+                    [float(row["raw_unet_ms"]) for row in projected],
+                    dtype=torch.float64,
+                )
+                target = torch.tensor(
+                    [float(row["target_ms"]) for row in projected],
+                    dtype=torch.float64,
+                )
+                raw_category = tropical_category_from_wind_ms_tensor(raw)
+                target_category = tropical_category_from_wind_ms_tensor(target)
+                reference_metrics = {
+                    "mae_ms": reference_summary["regression"]["mae_ms"],
+                    "rmse_ms": reference_summary["regression"]["rmse_ms"],
+                    "bias_ms": reference_summary["regression"]["bias_ms"],
+                    "storm_macro_mae_ms": reference_summary["storm_macro_mae_ms"],
+                    "raw_unet_mae_ms": reference_summary["raw_unet_baseline"]["mae_ms"],
+                    "raw_unet_rmse_ms": reference_summary["raw_unet_baseline"][
+                        "rmse_ms"
+                    ],
+                    "raw_unet_bias_ms": reference_summary["raw_unet_baseline"][
+                        "bias_ms"
+                    ],
+                    "raw_unet_storm_macro_mae_ms": float(
+                        np.mean(
+                            [
+                                metrics["raw_unet_mae_ms"]
+                                for metrics in reference_summary["per_storm"].values()
+                            ]
+                        )
+                    ),
+                    "category_accuracy": reference_summary["category"]["accuracy"],
+                    "category_macro_f1": reference_summary["category"]["macro_f1"],
+                    "category_within_one_accuracy": reference_summary["category"][
+                        "within_one_accuracy"
+                    ],
+                    "raw_unet_category_accuracy": float(
+                        (raw_category == target_category).double().mean()
+                    ),
+                    "raw_unet_category_macro_f1": float(
+                        category_macro_f1_tensor(raw_category, target_category)
+                    ),
+                    "raw_unet_category_within_one_accuracy": float(
+                        ((raw_category - target_category).abs() <= 1).double().mean()
+                    ),
+                }
+                for name, value in reference_metrics.items():
+                    self.log(
+                        f"val_ri/{reference}_{name}",
+                        value,
+                        on_step=False,
+                        on_epoch=True,
+                        sync_dist=False,
+                    )
         if prefix == "val" and self.log_wandb_validation_media:
             log_wandb_intensity_evaluation(
                 self,
@@ -604,6 +780,8 @@ class UNetIntensityCorrection(pl.LightningModule):
             "storm_id": list(batch["storm_id"]),
             "observation_timestamp": list(batch["observation_timestamp"]),
             "raw_unet_max_wind_ms": prediction.raw_unet_max_wind_ms,
+            "raw_unet_robust_peak_ms": prediction.raw_unet_robust_peak_ms,
+            "raw_unet_anchor_ms": prediction.raw_unet_anchor_ms,
             "correction_ms": prediction.correction_ms,
             "output_msw_ms": prediction.output_msw_ms,
             "output_category": prediction.output_category,
@@ -634,5 +812,6 @@ __all__ = [
     "IntensityPredictionBatch",
     "UNetIntensityCorrection",
     "WindFieldEncoder",
+    "rows_for_intensity_reference",
     "summarize_intensity_rows",
 ]

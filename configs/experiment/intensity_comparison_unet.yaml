@@ -3,10 +3,10 @@ defaults:
   - override /data: joint_geo_sar_ibtracs
   - override /model: deterministic_residual
 
-# Train the field-only U-Net on exactly the same interpolated-IBTrACS cohort
-# used by the joint U-Net + MLP. The deterministic model ignores the scalar
-# companion, but retaining the joint data module makes the sample IDs and
-# storm-disjoint train/validation/test partitions identical by construction.
+# Train the field-only U-Net on the matched IBTrACS/SAR-center-valid cohort used
+# by both scalar target variants. The deterministic model ignores the scalar
+# companion; the joint data module keeps sample IDs and storm-disjoint splits
+# identical by construction.
 trainer:
   max_epochs: 1000
   checkpoint:

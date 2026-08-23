@@ -2,6 +2,11 @@ _target_: geo2wf.data.joint_intensity.JointPairedIntensityDataModule
 root: ${oc.env:GEO2WF_JOINT_PAIRED_ROOT,data/geotiff/geo_sar_10bands_era5_v2_pmw}
 ibtracs_file: ${oc.env:GEO2WF_IBTRACS_FILE,data/IBTrACs/ibtracs.ALL.list.v04r01.csv}
 max_ibtracs_bracket_hours: 3.0
+intensity_target_source: ibtracs
+require_sar_valid_center: true
+sar_robust_peak_fraction: 0.005
+ri_threshold_kt: 30.0
+ri_window_hours: 24.0
 stats_file: ${.root}/stats.json
 train_split: train
 val_split: val

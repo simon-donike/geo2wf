@@ -30,10 +30,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from geo2wf.data.intensity import (  # noqa: E402
-    INTENSITY_CACHE_SCHEMA_VERSION,
-    KNOT_TO_MS,
-)
+from geo2wf.data.intensity import KNOT_TO_MS  # noqa: E402
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
@@ -380,7 +377,9 @@ def export_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
 
     include_test_in_train = bool(config.get("data", {}).get("include_test_in_train"))
     metadata = {
-        "schema_version": INTENSITY_CACHE_SCHEMA_VERSION,
+        # This exporter retains the legacy IBTrACS/max-anchor contract. Only
+        # export_joint_intensity_cache writes the matched dual-reference v2.
+        "schema_version": 1,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "single_timestep": True,
         "target": {

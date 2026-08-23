@@ -6,6 +6,8 @@ metadata_hidden_features: 32
 fusion_hidden_features: 128
 dropout: 0.1
 wind_soft_scale_ms: 20.0
+anchor_statistic: max
+robust_peak_fraction: 0.005
 huber_delta_ms: 5.0
 use_field: true
 use_metadata: true

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import math
@@ -13,6 +14,14 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from geo2wf.data.contracts import DataSpec
+from geo2wf.data.joint_intensity import (
+    IBTRACS_MAX_WIND_COMPANION,
+    INTENSITY_TARGET_COMPANION,
+)
+from geo2wf.data.intensity import (
+    category_macro_f1_tensor,
+    tropical_category_from_wind_ms_tensor,
+)
 from geo2wf.models.base import (
     LossOutput,
     PredictionBatch,
@@ -20,9 +29,6 @@ from geo2wf.models.base import (
     WindFieldLightningModule,
 )
 from geo2wf.tracking.reconstruction_media import log_wandb_reconstruction
-
-
-IBTRACS_MAX_WIND_COMPANION = "ibtracs_max_wind"
 
 
 def _group_count(channels: int, maximum: int = 8) -> int:
@@ -58,20 +64,34 @@ class ResidualBlock(nn.Module):
 @dataclass(frozen=True)
 class JointUNetOutput:
     reconstruction_normalized: torch.Tensor
-    ibtracs_max_wind_ms: torch.Tensor
+    intensity_prediction_ms: torch.Tensor
     bottleneck: torch.Tensor
+
+    @property
+    def ibtracs_max_wind_ms(self) -> torch.Tensor:
+        """Compatibility alias for checkpoints and downstream callers."""
+
+        return self.intensity_prediction_ms
 
 
 @dataclass(frozen=True, kw_only=True)
 class JointPredictionBatch(PredictionBatch):
-    """Standard physical field prediction plus continuous IBTrACS intensity."""
+    """Standard physical field prediction plus continuous scalar intensity."""
 
-    ibtracs_max_wind_ms: torch.Tensor
+    intensity_prediction_ms: torch.Tensor
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        if tuple(self.ibtracs_max_wind_ms.shape) != (self.central_physical.shape[0],):
-            raise ValueError("ibtracs_max_wind_ms must have shape [B]")
+        if tuple(self.intensity_prediction_ms.shape) != (
+            self.central_physical.shape[0],
+        ):
+            raise ValueError("intensity_prediction_ms must have shape [B]")
+
+    @property
+    def ibtracs_max_wind_ms(self) -> torch.Tensor:
+        """Compatibility alias for the former IBTrACS-specific output name."""
+
+        return self.intensity_prediction_ms
 
 
 class BottleneckUNetMLP(nn.Module):
@@ -216,7 +236,7 @@ def _masked_huber_loss(
 
 
 class BottleneckUNetMLPRegressor(WindFieldLightningModule):
-    """Jointly reconstruct a SAR field and regress continuous IBTrACS wind."""
+    """Jointly reconstruct a SAR field and regress one scalar wind reference."""
 
     checkpoint_monitor = "val/loss"
     checkpoint_mode = "min"
@@ -241,6 +261,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         lr_scheduler_min_lr: float = 0.0,
         validation_reconstruction_batches: int = 1,
         log_reconstruction_images: bool = True,
+        sar_robust_peak_fraction: float = 0.005,
     ) -> None:
         super().__init__()
         if condition_channels <= 0:
@@ -253,6 +274,8 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             raise ValueError("at least one loss weight must be positive")
         if validation_reconstruction_batches < 1:
             raise ValueError("validation_reconstruction_batches must be positive")
+        if not 0.0 < sar_robust_peak_fraction <= 1.0:
+            raise ValueError("sar_robust_peak_fraction must be in (0, 1]")
         self.save_hyperparameters()
         self.condition_channels = int(condition_channels)
         self.image_huber_delta_ms = float(image_huber_delta_ms)
@@ -267,6 +290,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self.lr_scheduler_min_lr = float(lr_scheduler_min_lr)
         self.validation_reconstruction_batches = int(validation_reconstruction_batches)
         self.log_reconstruction_images = bool(log_reconstruction_images)
+        self.sar_robust_peak_fraction = float(sar_robust_peak_fraction)
         self.model = BottleneckUNetMLP(
             self.condition_channels + 1,
             base_channels,
@@ -295,6 +319,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             torch.zeros(5, dtype=torch.float64),
             persistent=False,
         )
+        self._evaluation_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     def validate_data_spec(self, spec: DataSpec) -> None:
         super().validate_data_spec(spec)
@@ -308,8 +333,11 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 "BottleneckUNetMLPRegressor requires target units m s-1, got "
                 f"{spec.target_units!r}"
             )
-        if IBTRACS_MAX_WIND_COMPANION not in spec.companions:
-            raise ValueError("data must provide continuous IBTrACS maximum wind labels")
+        if not {
+            INTENSITY_TARGET_COMPANION,
+            IBTRACS_MAX_WIND_COMPANION,
+        }.intersection(spec.companions):
+            raise ValueError("data must provide continuous scalar intensity labels")
 
     def forward(
         self, condition: torch.Tensor, condition_mask: torch.Tensor
@@ -334,7 +362,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         return JointPredictionBatch(
             samples_physical=physical.unsqueeze(1),
             central_physical=physical,
-            ibtracs_max_wind_ms=output.ibtracs_max_wind_ms,
+            intensity_prediction_ms=output.intensity_prediction_ms,
         )
 
     def predict_physical(self, batch: Mapping[str, Any]) -> torch.Tensor:
@@ -355,7 +383,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             self.image_huber_delta_ms,
         )
         intensity_loss = _huber_values(
-            prediction.ibtracs_max_wind_ms - intensity_target,
+            prediction.intensity_prediction_ms - intensity_target,
             self.intensity_huber_delta_ms,
         ).mean()
         return image_loss, intensity_loss, prediction, target, mask
@@ -364,7 +392,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         image_loss, intensity_loss, prediction, target, mask = self._losses(batch)
         intensity_target = self._intensity_target(batch, prediction.central_physical)
         image_error = prediction.central_physical - target
-        intensity_error = prediction.ibtracs_max_wind_ms - intensity_target
+        intensity_error = prediction.intensity_prediction_ms - intensity_target
         valid_count = mask.sum().clamp_min(1.0)
         masked_squared_image_error = (image_error.square() * mask).sum() / valid_count
         total = (
@@ -396,7 +424,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         return JointPredictionBatch(
             samples_physical=members,
             central_physical=prediction.central_physical,
-            ibtracs_max_wind_ms=prediction.ibtracs_max_wind_ms,
+            intensity_prediction_ms=prediction.intensity_prediction_ms,
         )
 
     @torch.no_grad()
@@ -423,11 +451,65 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         )
         self._accumulate(
             self._validation_intensity_statistics,
-            prediction.ibtracs_max_wind_ms,
+            prediction.intensity_prediction_ms,
             intensity_target,
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
         )
+        ibtracs_target = batch.get("ibtracs_target_ms", intensity_target).to(
+            prediction.intensity_prediction_ms
+        )
+        sar_target = batch.get("sar_robust_peak_target_ms", intensity_target).to(
+            prediction.intensity_prediction_ms
+        )
+        is_ri = batch.get(
+            "is_rapid_intensification",
+            torch.zeros_like(intensity_target, dtype=torch.bool),
+        ).bool()
+        storm_ids = [str(item.get("storm_id", "")) for item in batch["meta"]]
+        condition_valid = self._single_channel(
+            batch["condition_mask"], "condition_mask"
+        ).bool() & torch.isfinite(prediction.central_physical)
+        for index, sample_id in enumerate(batch["sample_id"]):
+            field_values = prediction.central_physical[index][condition_valid[index]]
+            field_error = (prediction.central_physical[index] - target[index])[
+                mask[index].bool()
+            ]
+            raw_max = float(field_values.max().detach().cpu())
+            robust_count = max(
+                1,
+                int(math.ceil(field_values.numel() * self.sar_robust_peak_fraction)),
+            )
+            raw_robust_peak = float(
+                torch.topk(field_values, robust_count, sorted=False)
+                .values.mean()
+                .detach()
+                .cpu()
+            )
+            self._evaluation_rows["val"].append(
+                {
+                    "sample_id": str(sample_id),
+                    "storm_id": storm_ids[index],
+                    "prediction_ms": float(
+                        prediction.intensity_prediction_ms[index].detach().cpu()
+                    ),
+                    "ibtracs_target_ms": float(ibtracs_target[index].detach().cpu()),
+                    "sar_robust_peak_target_ms": float(
+                        sar_target[index].detach().cpu()
+                    ),
+                    "raw_unet_max_ms": raw_max,
+                    "raw_unet_robust_peak_ms": raw_robust_peak,
+                    "field_valid_pixels": int(field_error.numel()),
+                    "field_absolute_error_sum": float(
+                        field_error.abs().sum().detach().cpu()
+                    ),
+                    "field_squared_error_sum": float(
+                        field_error.square().sum().detach().cpu()
+                    ),
+                    "field_signed_error_sum": float(field_error.sum().detach().cpu()),
+                    "is_rapid_intensification": bool(is_ri[index].detach().cpu()),
+                }
+            )
         if (
             self.log_reconstruction_images
             and batch_idx < self.validation_reconstruction_batches
@@ -437,6 +519,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
     def on_validation_epoch_start(self) -> None:
         self._validation_field_statistics.zero_()
         self._validation_intensity_statistics.zero_()
+        self._evaluation_rows["val"] = []
 
     def on_validation_epoch_end(self) -> None:
         self._log_statistics(
@@ -444,6 +527,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             self._validation_field_statistics,
             self._validation_intensity_statistics,
         )
+        self._log_ri_statistics()
 
     @torch.no_grad()
     def test_step(self, batch: Mapping[str, Any], batch_idx: int) -> None:
@@ -459,7 +543,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         )
         self._accumulate(
             self._test_intensity_statistics,
-            prediction.ibtracs_max_wind_ms,
+            prediction.intensity_prediction_ms,
             intensity_target,
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
@@ -593,6 +677,132 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 sync_dist=False,
             )
 
+    @staticmethod
+    def _distributed_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if (
+            not torch.distributed.is_available()
+            or not torch.distributed.is_initialized()
+        ):
+            return rows
+        gathered: list[list[dict[str, Any]] | None] = [
+            None for _ in range(torch.distributed.get_world_size())
+        ]
+        torch.distributed.all_gather_object(gathered, rows)
+        combined = [row for part in gathered if part is not None for row in part]
+        # DistributedSampler may pad validation with repeated samples.
+        return list({str(row["sample_id"]): row for row in combined}.values())
+
+    def _log_ri_statistics(self) -> None:
+        rows = self._distributed_rows(self._evaluation_rows["val"])
+        rows = [row for row in rows if bool(row.get("is_rapid_intensification", False))]
+        self.log("val_ri/samples", float(len(rows)), on_epoch=True, sync_dist=False)
+        self.log(
+            "val_ri/storms",
+            float(len({str(row["storm_id"]) for row in rows})),
+            on_epoch=True,
+            sync_dist=False,
+        )
+        for reference, target_key, baseline_key in (
+            ("ibtracs", "ibtracs_target_ms", "raw_unet_max_ms"),
+            (
+                "sar_robust_peak",
+                "sar_robust_peak_target_ms",
+                "raw_unet_robust_peak_ms",
+            ),
+        ):
+            selected = [
+                row
+                for row in rows
+                if math.isfinite(float(row.get(target_key, math.nan)))
+            ]
+            if not selected:
+                continue
+            prediction = torch.tensor(
+                [float(row["prediction_ms"]) for row in selected], dtype=torch.float64
+            )
+            target = torch.tensor(
+                [float(row[target_key]) for row in selected], dtype=torch.float64
+            )
+            baseline = torch.tensor(
+                [float(row[baseline_key]) for row in selected], dtype=torch.float64
+            )
+            error = prediction - target
+            baseline_error = baseline - target
+            storm_mae = []
+            baseline_storm_mae = []
+            for storm_id in sorted({str(row["storm_id"]) for row in selected}):
+                indices = [
+                    index
+                    for index, row in enumerate(selected)
+                    if str(row["storm_id"]) == storm_id
+                ]
+                storm_mae.append(error[indices].abs().mean())
+                baseline_storm_mae.append(baseline_error[indices].abs().mean())
+            predicted_category = tropical_category_from_wind_ms_tensor(prediction)
+            baseline_category = tropical_category_from_wind_ms_tensor(baseline)
+            target_category = tropical_category_from_wind_ms_tensor(target)
+            metrics = {
+                "mae_ms": error.abs().mean(),
+                "rmse_ms": error.square().mean().sqrt(),
+                "bias_ms": error.mean(),
+                "storm_macro_mae_ms": torch.stack(storm_mae).mean(),
+                "category_accuracy": (predicted_category == target_category)
+                .double()
+                .mean(),
+                "category_macro_f1": category_macro_f1_tensor(
+                    predicted_category, target_category
+                ),
+                "category_within_one_accuracy": (
+                    (predicted_category - target_category).abs() <= 1
+                )
+                .double()
+                .mean(),
+                "raw_unet_mae_ms": baseline_error.abs().mean(),
+                "raw_unet_rmse_ms": baseline_error.square().mean().sqrt(),
+                "raw_unet_bias_ms": baseline_error.mean(),
+                "raw_unet_storm_macro_mae_ms": torch.stack(baseline_storm_mae).mean(),
+                "raw_unet_category_accuracy": (baseline_category == target_category)
+                .double()
+                .mean(),
+                "raw_unet_category_macro_f1": category_macro_f1_tensor(
+                    baseline_category, target_category
+                ),
+                "raw_unet_category_within_one_accuracy": (
+                    (baseline_category - target_category).abs() <= 1
+                )
+                .double()
+                .mean(),
+            }
+            for name, value in metrics.items():
+                self.log(
+                    f"val_ri/{reference}_{name}",
+                    value.to(self.device),
+                    on_epoch=True,
+                    sync_dist=False,
+                )
+        field_count = sum(int(row.get("field_valid_pixels", 0)) for row in rows)
+        if field_count:
+            for name, value in {
+                "field_mae_ms": sum(
+                    float(row["field_absolute_error_sum"]) for row in rows
+                )
+                / field_count,
+                "field_rmse_ms": math.sqrt(
+                    sum(float(row["field_squared_error_sum"]) for row in rows)
+                    / field_count
+                ),
+                "field_bias_ms": sum(
+                    float(row["field_signed_error_sum"]) for row in rows
+                )
+                / field_count,
+            }.items():
+                self.log(
+                    f"val_ri/{name}",
+                    torch.tensor(value, device=self.device),
+                    on_epoch=True,
+                    sync_dist=False,
+                )
+
     def _log_reconstruction(self, batch: Mapping[str, Any], wandb_key: str) -> None:
         prediction = self.predict_joint(batch)
         log_wandb_reconstruction(
@@ -601,7 +811,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             prediction.central_physical,
             wandb_key=wandb_key,
             target_batch=batch["target_physical"],
-            intensity_prediction_batch=prediction.ibtracs_max_wind_ms,
+            intensity_prediction_batch=prediction.intensity_prediction_ms,
             intensity_target_batch=batch["intensity_target_ms"],
             physical_output_units="m s-1",
         )

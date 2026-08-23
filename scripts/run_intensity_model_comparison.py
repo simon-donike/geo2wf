@@ -41,6 +41,11 @@ def parse_args() -> argparse.Namespace:
         help="Run the matched-cohort comparison with or without ERA5 features.",
     )
     parser.add_argument("--split", choices=("val", "test"), default="val")
+    parser.add_argument(
+        "--intensity-target-source",
+        choices=("ibtracs", "sar_robust_peak"),
+        default="ibtracs",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--image-batch-size", type=int, default=4)
     parser.add_argument("--correction-batch-size", type=int, default=16)
@@ -62,6 +67,7 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--disable-wandb", action="store_true")
+    parser.add_argument("--wandb-group", default=None)
     parser.add_argument(
         "--smoke-test",
         action="store_true",
@@ -387,7 +393,7 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             ROOT
             / "logs"
             / "intensity-comparisons"
-            / f"{_utc_timestamp()}-{args.era5}-era5"
+            / f"{_utc_timestamp()}-{args.era5}-era5-{args.intensity_target_source}"
         ).resolve()
     )
     if output_root.exists() and any(output_root.iterdir()):
@@ -412,9 +418,13 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
         f"data.root={paired_root}",
         f"data.stats_file={stats_file}",
         f"data.ibtracs_file={ibtracs_file}",
+        f"data.intensity_target_source={args.intensity_target_source}",
+        "data.require_sar_valid_center=true",
         f"data.batch_size={args.image_batch_size}",
         f"data.num_workers={args.num_workers}",
     ]
+    if args.wandb_group:
+        common.append(f"logging.wandb.group={args.wandb_group}")
     smoke = (
         [
             "trainer.max_epochs=1",
@@ -432,6 +442,7 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
         "output_root": str(output_root),
         "split": args.split,
         "era5": args.era5,
+        "intensity_target_source": args.intensity_target_source,
         "seed": args.seed,
         "gpus": {"joint": args.joint_gpu, "pipeline": args.pipeline_gpu},
         "paired_root": str(paired_root),
@@ -457,7 +468,8 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
         if joint_checkpoint is None:
             overrides = [
                 *common,
-                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-joint-{timestamp}",
+                "logging.wandb.name=intensity-comparison-"
+                f"{args.era5}-era5-{args.intensity_target_source}-joint-{timestamp}",
                 *smoke,
             ]
             if args.joint_epochs is not None and not args.smoke_test:
@@ -485,7 +497,8 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
         if unet_checkpoint is None:
             overrides = [
                 *common,
-                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-unet-{timestamp}",
+                "logging.wandb.name=intensity-comparison-"
+                f"{args.era5}-era5-matched-unet-{timestamp}",
                 *smoke,
             ]
             if args.unet_epochs is not None and not args.smoke_test:
@@ -512,6 +525,12 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             }
 
         assert unet_checkpoint is not None and unet_config is not None
+        from geo2wf.config import load_config_file
+
+        resolved_unet_config = load_config_file(unet_config)
+        robust_peak_fraction = float(
+            resolved_unet_config["data"]["sar_robust_peak_fraction"]
+        )
         cache_root = output_root / "unet-intensity-cache"
         export_command = [
             sys.executable,
@@ -522,6 +541,8 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             str(unet_checkpoint),
             "--output-root",
             str(cache_root),
+            "--intensity-target-source",
+            args.intensity_target_source,
             "--batch-size",
             str(args.image_batch_size),
             "--num-workers",
@@ -543,9 +564,19 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
                 f"data.root={cache_root}",
                 f"data.batch_size={args.correction_batch_size}",
                 f"data.num_workers={args.num_workers}",
-                f"logging.wandb.name=intensity-comparison-{args.era5}-era5-correction-{timestamp}",
+                "model.anchor_statistic="
+                + (
+                    "max"
+                    if args.intensity_target_source == "ibtracs"
+                    else "robust_peak"
+                ),
+                f"model.robust_peak_fraction={robust_peak_fraction}",
+                "logging.wandb.name=intensity-comparison-"
+                f"{args.era5}-era5-{args.intensity_target_source}-correction-{timestamp}",
                 *smoke,
             ]
+            if args.wandb_group:
+                overrides.append(f"logging.wandb.group={args.wandb_group}")
             if args.correction_epochs is not None and not args.smoke_test:
                 overrides.append(f"trainer.max_epochs={args.correction_epochs}")
             command = _training_command(
@@ -586,6 +617,8 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             str(correction_checkpoint),
             "--split",
             args.split,
+            "--intensity-target-source",
+            args.intensity_target_source,
             "--output",
             str(evaluation_output),
             "--batch-size",
@@ -612,6 +645,7 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
                 "finished_utc": datetime.now(timezone.utc).isoformat(),
                 "artifacts": {
                     "unet_checkpoint": str(unet_checkpoint),
+                    "unet_config": str(unet_config),
                     "joint_checkpoint": str(joint_checkpoint),
                     "correction_checkpoint": str(correction_checkpoint),
                     "cache_root": str(cache_root),

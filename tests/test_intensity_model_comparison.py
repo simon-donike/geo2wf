@@ -12,12 +12,15 @@ from scripts.evaluate_intensity_models import (
     _assert_common_cohort,
     _cluster_bootstrap,
     _cohort_fingerprint as evaluation_fingerprint,
+    _reference_evaluation,
+    _target_fingerprint as evaluation_target_fingerprint,
     _markdown_table,
     _raw_rows,
     _table_rows,
 )
 from scripts.export_joint_intensity_cache import (
     _cohort_fingerprint as export_fingerprint,
+    _target_fingerprint as export_target_fingerprint,
 )
 from scripts.run_intensity_model_comparison import _source_storm_counts
 from scripts.run_intensity_model_comparison import _training_result
@@ -64,6 +67,77 @@ def test_export_and_evaluation_use_the_same_order_independent_fingerprint() -> N
     assert exported == evaluated
     assert exported["samples"] == 2
     assert exported["storms"] == 2
+
+
+def test_cohort_fingerprint_is_label_independent_but_target_hash_is_not() -> None:
+    ibtracs = []
+    sar = []
+    for row in _rows():
+        shared = {
+            **row,
+            "ibtracs_target_ms": row["target_wind_ms"],
+            "sar_robust_peak_target_ms": float(row["target_wind_ms"]) + 2.0,
+        }
+        ibtracs.append(
+            {
+                **shared,
+                "intensity_target_source": "ibtracs",
+                "target_wind_ms": shared["ibtracs_target_ms"],
+            }
+        )
+        sar.append(
+            {
+                **shared,
+                "intensity_target_source": "sar_robust_peak",
+                "target_wind_ms": shared["sar_robust_peak_target_ms"],
+            }
+        )
+
+    assert export_fingerprint(ibtracs) == export_fingerprint(sar)
+    assert (
+        export_target_fingerprint(ibtracs)["sha256"]
+        != export_target_fingerprint(sar)["sha256"]
+    )
+    assert export_target_fingerprint(ibtracs) == evaluation_target_fingerprint(
+        pd.DataFrame(reversed(ibtracs))
+    )
+
+
+def test_dual_reference_evaluation_splits_ri_and_handles_empty_ri() -> None:
+    rows = []
+    for index, is_ri in enumerate((False, True)):
+        rows.append(
+            {
+                "sample_id": f"sample-{index}",
+                "storm_id": f"storm-{index}",
+                "prediction_ms": 22.0 + index,
+                "target_ms": 20.0 + index,
+                "target_category": 0,
+                "prediction_category": 0,
+                "raw_unet_ms": 19.0 + index,
+                "raw_unet_max_ms": 19.0 + index,
+                "raw_unet_robust_peak_ms": 18.0 + index,
+                "ibtracs_target_ms": 20.0 + index,
+                "sar_robust_peak_target_ms": 21.0 + index,
+                "correction_ms": 3.0,
+                "is_rapid_intensification": is_ri,
+            }
+        )
+    models = {
+        name: rows for name in ("unet_raw_max", "unet_correction", "joint_unet_mlp")
+    }
+    summary = _reference_evaluation(models, bootstrap_repetitions=0, bootstrap_seed=42)
+
+    assert summary["ibtracs"]["rapid_intensification"]["unet_raw_max"]["samples"] == 1
+    assert summary["sar_robust_peak"]["overall"]["joint_unet_mlp"]["samples"] == 2
+
+    no_ri = [{**row, "is_rapid_intensification": False} for row in rows]
+    empty_summary = _reference_evaluation(
+        {name: no_ri for name in models},
+        bootstrap_repetitions=0,
+        bootstrap_seed=42,
+    )
+    assert empty_summary["ibtracs"]["rapid_intensification"] is None
 
 
 def test_paired_storm_bootstrap_is_deterministic_and_raw_delta_is_zero() -> None:

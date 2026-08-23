@@ -26,10 +26,7 @@ from geo2wf.data.datasets.paired_geotiff import (  # noqa: E402
     DISTANCE_TO_IBTRACS_CENTER,
     PairedImageDataset,
 )
-from geo2wf.data.intensity import (  # noqa: E402
-    INTENSITY_CACHE_SCHEMA_VERSION,
-    KNOT_TO_MS,
-)
+from geo2wf.data.intensity import KNOT_TO_MS  # noqa: E402
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
 from scripts.export_unet_intensity_cache import (  # noqa: E402
     _safe_sample_id,
@@ -367,7 +364,9 @@ def export_geotiff_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
 
     include_test_in_train = bool(config.get("data", {}).get("include_test_in_train"))
     metadata = {
-        "schema_version": INTENSITY_CACHE_SCHEMA_VERSION,
+        # This exporter retains the legacy IBTrACS/max-anchor contract. Only
+        # export_joint_intensity_cache writes the matched dual-reference v2.
+        "schema_version": 1,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "single_timestep": True,
         "source_kind": "paired_geotiff_geo_era5_only",

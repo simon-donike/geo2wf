@@ -37,12 +37,13 @@ from geo2wf.models.bottleneck_unet_mlp import (  # noqa: E402
 )
 from geo2wf.models.intensity_correction import (  # noqa: E402
     UNetIntensityCorrection,
+    rows_for_intensity_reference,
     summarize_intensity_rows,
 )
 
 
 MODEL_LABELS = {
-    "unet_raw_max": "U-Net raw field maximum",
+    "unet_raw_max": "U-Net raw field diagnostic",
     "unet_correction": "U-Net + correction",
     "joint_unet_mlp": "Joint U-Net + MLP",
 }
@@ -59,6 +60,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument("--joint-checkpoint", type=Path, required=True)
     parser.add_argument("--correction-checkpoint", type=Path, required=True)
+    parser.add_argument(
+        "--intensity-target-source",
+        choices=("ibtracs", "sar_robust_peak"),
+        default=None,
+    )
     parser.add_argument("--split", choices=("val", "test"), default="val")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=16)
@@ -92,7 +98,6 @@ def _cohort_fingerprint(frame: pd.DataFrame) -> dict[str, Any]:
         "storm_id",
         "split",
         "target_timestamp",
-        "target_wind_ms",
     ]
     missing = set(columns).difference(frame.columns)
     if missing:
@@ -104,6 +109,45 @@ def _cohort_fingerprint(frame: pd.DataFrame) -> dict[str, Any]:
     return {
         "samples": len(selected),
         "storms": int(selected["storm_id"].nunique()),
+        "columns": columns,
+        "sha256": hashlib.sha256(serialized).hexdigest(),
+    }
+
+
+def _target_fingerprint(frame: pd.DataFrame) -> dict[str, Any]:
+    columns = [
+        "sample_id",
+        "intensity_target_source",
+        "target_wind_ms",
+        "ibtracs_target_ms",
+        "sar_robust_peak_target_ms",
+    ]
+    missing = set(columns).difference(frame.columns)
+    if missing:
+        legacy_columns = ["sample_id", "target_wind_ms"]
+        legacy_missing = set(legacy_columns).difference(frame.columns)
+        if legacy_missing:
+            raise ValueError(
+                f"comparison manifest is missing columns: {sorted(missing)}"
+            )
+        selected = frame.loc[:, legacy_columns].sort_values("sample_id")
+        serialized = selected.to_csv(
+            index=False, lineterminator="\n", float_format="%.9g"
+        ).encode("utf-8")
+        return {
+            "source": "ibtracs",
+            "samples": len(selected),
+            "columns": legacy_columns,
+            "sha256": hashlib.sha256(serialized).hexdigest(),
+            "legacy_schema": True,
+        }
+    selected = frame.loc[:, columns].sort_values("sample_id")
+    serialized = selected.to_csv(
+        index=False, lineterminator="\n", float_format="%.9g"
+    ).encode("utf-8")
+    return {
+        "source": str(selected["intensity_target_source"].iloc[0]),
+        "samples": len(selected),
         "columns": columns,
         "sha256": hashlib.sha256(serialized).hexdigest(),
     }
@@ -165,6 +209,25 @@ def _correction_rows(
         checkpoint, map_location="cpu"
     ).eval()
     model.validate_data_spec(dataset.data_spec)
+    expected_anchors = set(dataset.samples.get("anchor_statistic", ["max"]))
+    if expected_anchors != {model.anchor_statistic}:
+        raise ValueError(
+            "correction checkpoint anchor does not match the cache target: "
+            f"checkpoint={model.anchor_statistic!r}, cache={sorted(expected_anchors)}"
+        )
+    cache_fraction = float(
+        dataset.cache_metadata.get("target", {}).get("sar_robust_peak_fraction", 0.005)
+    )
+    if not math.isclose(
+        model.robust_peak_fraction,
+        cache_fraction,
+        rel_tol=0.0,
+        abs_tol=1.0e-12,
+    ):
+        raise ValueError(
+            "correction checkpoint robust-peak fraction does not match cache: "
+            f"checkpoint={model.robust_peak_fraction}, cache={cache_fraction}"
+        )
     model.to(device)
     rows: dict[str, dict[str, Any]] = {}
     with torch.inference_mode():
@@ -176,13 +239,29 @@ def _correction_rows(
             prediction = model.predict_intensity(device_batch)
             values = {
                 "prediction_ms": prediction.output_msw_ms.detach().cpu().tolist(),
+                "raw_unet_anchor_ms": prediction.raw_unet_anchor_ms.detach()
+                .cpu()
+                .tolist(),
                 "raw_unet_ms": prediction.raw_unet_max_wind_ms.detach().cpu().tolist(),
+                "raw_unet_max_ms": prediction.raw_unet_max_wind_ms.detach()
+                .cpu()
+                .tolist(),
+                "raw_unet_robust_peak_ms": prediction.raw_unet_robust_peak_ms.detach()
+                .cpu()
+                .tolist(),
                 "correction_ms": prediction.correction_ms.detach().cpu().tolist(),
                 "prediction_category": prediction.output_category.detach()
                 .cpu()
                 .tolist(),
                 "target_ms": batch["target_wind_ms"].tolist(),
                 "target_category": batch["target_category"].tolist(),
+                "ibtracs_target_ms": batch["ibtracs_target_ms"].tolist(),
+                "sar_robust_peak_target_ms": batch[
+                    "sar_robust_peak_target_ms"
+                ].tolist(),
+                "sar_max_wind_ms": batch["sar_max_wind_ms"].tolist(),
+                "is_rapid_intensification": batch["is_rapid_intensification"].tolist(),
+                "ri_24h_change_ms": batch["ri_24h_change_ms"].tolist(),
             }
             for index, sample_id in enumerate(batch["sample_id"]):
                 sample_id = str(sample_id)
@@ -192,8 +271,12 @@ def _correction_rows(
                     "sample_id": sample_id,
                     "storm_id": str(batch["storm_id"][index]),
                     "observation_timestamp": str(batch["observation_timestamp"][index]),
+                    "intensity_target_source": str(
+                        batch["intensity_target_source"][index]
+                    ),
                     **{name: value[index] for name, value in values.items()},
                 }
+                rows[sample_id]["raw_unet_ms"] = rows[sample_id]["raw_unet_anchor_ms"]
     return rows
 
 
@@ -253,7 +336,7 @@ def _joint_and_field_rows(
             }
             prediction = model.predict_joint(device_batch)
             joint_prediction = prediction.central_physical.detach().cpu()
-            intensity_prediction = prediction.ibtracs_max_wind_ms.detach().cpu()
+            intensity_prediction = prediction.intensity_prediction_ms.detach().cpu()
             target_field = batch["target_physical"]
             common_mask = batch["target_mask"].bool() & batch["condition_mask"].bool()
 
@@ -298,6 +381,23 @@ def _joint_and_field_rows(
                         "prediction_ms": predicted_ms,
                         "target_ms": target_ms,
                         "raw_unet_ms": float(reference["raw_unet_ms"]),
+                        "raw_unet_anchor_ms": float(reference["raw_unet_anchor_ms"]),
+                        "raw_unet_max_ms": float(reference["raw_unet_max_ms"]),
+                        "raw_unet_robust_peak_ms": float(
+                            reference["raw_unet_robust_peak_ms"]
+                        ),
+                        "ibtracs_target_ms": float(reference["ibtracs_target_ms"]),
+                        "sar_robust_peak_target_ms": float(
+                            reference["sar_robust_peak_target_ms"]
+                        ),
+                        "sar_max_wind_ms": float(reference["sar_max_wind_ms"]),
+                        "is_rapid_intensification": bool(
+                            reference["is_rapid_intensification"]
+                        ),
+                        "ri_24h_change_ms": float(reference["ri_24h_change_ms"]),
+                        "intensity_target_source": str(
+                            reference["intensity_target_source"]
+                        ),
                         "correction_ms": predicted_ms - float(reference["raw_unet_ms"]),
                         "prediction_category": tropical_category_from_wind_ms(
                             predicted_ms
@@ -326,6 +426,69 @@ def _raw_rows(
                 "prediction_category": category,
             }
         )
+    return result
+
+
+def _rows_by_reference(
+    rows_by_model: Mapping[str, Sequence[Mapping[str, Any]]], reference: str
+) -> dict[str, list[dict[str, Any]]]:
+    result = {}
+    for model_name, rows in rows_by_model.items():
+        projected = rows_for_intensity_reference(rows, reference)
+        if model_name == "unet_raw_max":
+            for row in projected:
+                row["prediction_ms"] = float(row["raw_unet_ms"])
+                row["correction_ms"] = 0.0
+                row["prediction_category"] = tropical_category_from_wind_ms(
+                    float(row["prediction_ms"])
+                )
+        result[model_name] = projected
+    return result
+
+
+def _reference_evaluation(
+    rows_by_model: Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    bootstrap_repetitions: int,
+    bootstrap_seed: int,
+) -> dict[str, Any]:
+    result = {}
+    for reference in ("ibtracs", "sar_robust_peak"):
+        reference_rows = _rows_by_reference(rows_by_model, reference)
+        if not all(reference_rows.values()):
+            continue
+        overall = {
+            name: summarize_intensity_rows(rows)
+            for name, rows in reference_rows.items()
+        }
+        overall_bootstrap = _cluster_bootstrap(
+            reference_rows,
+            repetitions=bootstrap_repetitions,
+            seed=bootstrap_seed,
+        )
+        ri_rows = {
+            name: [
+                row for row in rows if bool(row.get("is_rapid_intensification", False))
+            ]
+            for name, rows in reference_rows.items()
+        }
+        ri = None
+        ri_bootstrap = None
+        if all(ri_rows.values()):
+            ri = {
+                name: summarize_intensity_rows(rows) for name, rows in ri_rows.items()
+            }
+            ri_bootstrap = _cluster_bootstrap(
+                ri_rows,
+                repetitions=bootstrap_repetitions,
+                seed=bootstrap_seed,
+            )
+        result[reference] = {
+            "overall": overall,
+            "overall_storm_bootstrap": overall_bootstrap,
+            "rapid_intensification": ri,
+            "rapid_intensification_storm_bootstrap": ri_bootstrap,
+        }
     return result
 
 
@@ -621,13 +784,28 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         if not Path(path).expanduser().exists():
             raise FileNotFoundError(path)
 
+    cache_dataset = UNetIntensityDataset(args.cache_root, args.split)
+    cache_metadata = cache_dataset.cache_metadata
+    target_source = (
+        "ibtracs"
+        if int(cache_metadata.get("schema_version", 1)) == 1
+        else str(cache_metadata.get("target", {}).get("source", "ibtracs"))
+    )
+    if (
+        args.intensity_target_source is not None
+        and args.intensity_target_source != target_source
+    ):
+        raise ValueError(
+            "requested target source does not match cache: "
+            f"{args.intensity_target_source} != {target_source}"
+        )
     config = load_config_file(args.data_config)
+    config["data"]["intensity_target_source"] = target_source
+    config["data"]["require_sar_valid_center"] = True
     datamodule = instantiate_datamodule(config)
     if not isinstance(datamodule, JointPairedIntensityDataModule):
         raise TypeError("comparison requires JointPairedIntensityDataModule")
     joint_dataset = datamodule._make_dataset(args.split, augment=False)
-    cache_dataset = UNetIntensityDataset(args.cache_root, args.split)
-    cache_metadata = cache_dataset.cache_metadata
     if cache_metadata.get("source_kind") != "joint_paired_intensity_cohort":
         raise ValueError(
             "comparison requires a cache exported from the exact joint cohort"
@@ -666,6 +844,16 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
     summaries = {
         name: summarize_intensity_rows(rows) for name, rows in rows_by_model.items()
     }
+    reference_evaluation = _reference_evaluation(
+        rows_by_model,
+        bootstrap_repetitions=args.bootstrap_repetitions,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    if int(cache_metadata.get("schema_version", 1)) >= 2 and not any(
+        details.get("rapid_intensification")
+        for details in reference_evaluation.values()
+    ):
+        raise ValueError("final validation evaluation has no RI samples")
     bootstrap = _cluster_bootstrap(
         rows_by_model,
         repetitions=args.bootstrap_repetitions,
@@ -676,7 +864,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         args.cache_root / args.split / "manifest.csv", keep_default_na=False
     )
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "split": args.split,
         "interpretation": (
@@ -684,7 +872,14 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
             if args.split == "val"
             else "held_out_test_evaluation"
         ),
+        "conditioning": {
+            "use_era5": bool(config["data"].get("use_era5", True)),
+            "label": (
+                "with_era5" if config["data"].get("use_era5", True) else "without_era5"
+            ),
+        },
         "cohort": _cohort_fingerprint(cache_manifest),
+        "target_fingerprint": _target_fingerprint(cache_manifest),
         "data_config": {
             "path": str(args.data_config.resolve()),
             "sha256": _sha256(args.data_config),
@@ -712,6 +907,8 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
             }
             for name in MODEL_LABELS
         },
+        "reference_evaluation": reference_evaluation,
+        "prediction_rows": {name: rows for name, rows in rows_by_model.items()},
         "paired_storm_bootstrap": bootstrap,
         "table": table_rows,
     }

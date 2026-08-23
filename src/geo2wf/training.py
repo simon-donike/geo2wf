@@ -482,6 +482,9 @@ def main() -> None:
                 "WANDB_PROJECT", wandb_cfg.get("project", "dif_img_rec")
             ),
             name=os.environ.get("WANDB_NAME", wandb_cfg.get("name")),
+            group=os.environ.get("WANDB_GROUP", wandb_cfg.get("group")),
+            job_type=wandb_cfg.get("job_type", "training"),
+            tags=list(wandb_cfg.get("tags", [])),
             save_dir=str(run_dir),
             log_model=wandb_cfg.get("log_model", False),
         )

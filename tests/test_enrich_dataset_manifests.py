@@ -10,7 +10,9 @@ import rasterio
 from scripts.enrich_dataset_manifests import enrich_manifests
 
 
-def _write_raster(path: Path, values: np.ndarray, *, nodata: float | None = np.nan) -> None:
+def _write_raster(
+    path: Path, values: np.ndarray, *, nodata: float | None = np.nan
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(
         path,
@@ -58,10 +60,10 @@ def test_enrichment_preserves_rows_and_adds_physical_metrics(tmp_path: Path) -> 
                 ),
                 "target_timestamp": "2025-01-01T00:00:00Z",
                 "era5_timestamp": "2025-01-01T00:00:00Z",
-                "center_lat": 2.0,
-                "center_lon": 2.0,
-                "ibtracs_center_lat": 2.0,
-                "ibtracs_center_lon": 2.0,
+                "center_lat": 2.5,
+                "center_lon": 1.5,
+                "ibtracs_center_lat": 2.5,
+                "ibtracs_center_lon": 1.5,
             }
         ]
     )

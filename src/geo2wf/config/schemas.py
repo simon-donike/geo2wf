@@ -37,6 +37,9 @@ class WandbConfig:
     enabled: bool = True
     project: str = "geo2wf"
     name: str | None = None
+    group: str | None = None
+    job_type: str = "training"
+    tags: list[str] = field(default_factory=list)
     log_model: bool = False
 
 
