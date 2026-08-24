@@ -15,6 +15,7 @@ from scripts.evaluate_intensity_models import (
     _reference_evaluation,
     _target_fingerprint as evaluation_target_fingerprint,
     _markdown_table,
+    _json_compatible,
     _raw_rows,
     _table_rows,
 )
@@ -138,6 +139,27 @@ def test_dual_reference_evaluation_splits_ri_and_handles_empty_ri() -> None:
         bootstrap_seed=42,
     )
     assert empty_summary["ibtracs"]["rapid_intensification"] is None
+
+
+def test_json_report_serializes_missing_ri_history_as_null() -> None:
+    payload = _json_compatible(
+        {
+            "prediction_rows": {
+                "joint_unet_mlp": [
+                    {
+                        "sample_id": "missing-history",
+                        "ri_24h_change_ms": float("nan"),
+                        "prediction_ms": 20.0,
+                    }
+                ]
+            }
+        }
+    )
+
+    encoded = json.dumps(payload, allow_nan=False)
+
+    assert payload["prediction_rows"]["joint_unet_mlp"][0]["ri_24h_change_ms"] is None
+    assert '"ri_24h_change_ms": null' in encoded
 
 
 def test_paired_storm_bootstrap_is_deterministic_and_raw_delta_is_zero() -> None:

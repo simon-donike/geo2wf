@@ -43,11 +43,59 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-group", default=None)
     parser.add_argument("--disable-wandb", action="store_true")
     parser.add_argument("--smoke-test", action="store_true")
+    parser.add_argument(
+        "--completed-workflow",
+        action="append",
+        type=Path,
+        default=[],
+        help=(
+            "Reuse a successfully completed target/ERA5 workflow. Repeat for each "
+            "completed matrix cell."
+        ),
+    )
+    parser.add_argument(
+        "--initial-joint-checkpoint",
+        type=Path,
+        default=None,
+        help="Reuse the joint checkpoint for the first with-ERA5/IBTrACS cell.",
+    )
+    parser.add_argument(
+        "--initial-unet-checkpoint",
+        type=Path,
+        default=None,
+        help="Reuse the field U-Net checkpoint for the first matrix cell.",
+    )
+    parser.add_argument(
+        "--initial-unet-config",
+        type=Path,
+        default=None,
+        help="Resolved configuration for --initial-unet-checkpoint.",
+    )
+    parser.add_argument(
+        "--initial-correction-checkpoint",
+        type=Path,
+        default=None,
+        help="Reuse the correction checkpoint for the first matrix cell.",
+    )
+    parser.add_argument(
+        "--documentation",
+        type=Path,
+        default=ROOT / "docs" / "experiments" / "intensity-comparison.md",
+        help="Experiment page updated after successful consolidation.",
+    )
     args = parser.parse_args()
     if args.joint_gpu == args.pipeline_gpu:
         parser.error("--joint-gpu and --pipeline-gpu must identify different GPUs")
     if args.bootstrap_repetitions < 0:
         parser.error("--bootstrap-repetitions must be non-negative")
+    initial_artifacts = (
+        args.initial_joint_checkpoint,
+        args.initial_unet_checkpoint,
+        args.initial_unet_config,
+        args.initial_correction_checkpoint,
+    )
+    if any(initial_artifacts) and not all(initial_artifacts):
+        parser.error("all four --initial-*-checkpoint/config arguments are required")
     return args
 
 
@@ -96,6 +144,18 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
         raise FileExistsError(f"matrix output root is not empty: {output_root}")
     output_root.mkdir(parents=True, exist_ok=True)
     group = args.wandb_group or f"matched-intensity-validation-{_timestamp()}"
+    completed_workflows: dict[tuple[str, str], tuple[Path, dict[str, Any]]] = {}
+    for workflow_argument in args.completed_workflow:
+        workflow_path = workflow_argument.expanduser().resolve()
+        workflow = _workflow_payload(workflow_path)
+        key = (str(workflow["era5"]), str(workflow["intensity_target_source"]))
+        if key in completed_workflows:
+            raise ValueError(f"duplicate completed workflow for {key}")
+        if int(workflow["seed"]) != args.seed or workflow["split"] != "val":
+            raise ValueError(
+                f"completed workflow has incompatible seed/split: {workflow_path}"
+            )
+        completed_workflows[key] = (workflow_path, workflow)
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "status": "running",
@@ -104,6 +164,7 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
         "paired_root": str(paired_root),
         "ibtracs_file": str(ibtracs_file),
         "wandb_group": group,
+        "completed_workflows": [str(path) for path, _ in completed_workflows.values()],
         "runs": [],
     }
     manifest_path = output_root / "matrix-workflow.json"
@@ -149,6 +210,35 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
         for era5 in ("with", "without"):
             shared_unet: dict[str, str] | None = None
             for target in ("ibtracs", "sar_robust_peak"):
+                completed = completed_workflows.get((era5, target))
+                if completed is not None:
+                    workflow_path, workflow = completed
+                    completed_unet = {
+                        "checkpoint": workflow["artifacts"]["unet_checkpoint"],
+                        "config": workflow["artifacts"]["unet_config"],
+                    }
+                    if shared_unet is None:
+                        shared_unet = completed_unet
+                    elif completed_unet != shared_unet:
+                        raise RuntimeError(
+                            f"{era5} completed target runs did not share one U-Net"
+                        )
+                    result_path = Path(workflow["artifacts"]["comparison_json"])
+                    if not result_path.is_file():
+                        raise FileNotFoundError(result_path)
+                    result_paths.append(result_path)
+                    manifest["runs"].append(
+                        {
+                            "era5": era5,
+                            "target": target,
+                            "workflow": str(workflow_path),
+                            "result": str(result_path),
+                            "unet_checkpoint": shared_unet["checkpoint"],
+                            "reused_completed_workflow": True,
+                        }
+                    )
+                    _write_json(manifest, manifest_path)
+                    continue
                 run_root = output_root / f"{era5}-era5" / target
                 run_root.parent.mkdir(parents=True, exist_ok=True)
                 command = [
@@ -167,6 +257,25 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                             shared_unet["checkpoint"],
                             "--unet-config",
                             shared_unet["config"],
+                        ]
+                    )
+                elif (
+                    era5 == "with"
+                    and target == "ibtracs"
+                    and args.initial_joint_checkpoint is not None
+                ):
+                    command.extend(
+                        [
+                            "--joint-checkpoint",
+                            str(args.initial_joint_checkpoint.expanduser().resolve()),
+                            "--unet-checkpoint",
+                            str(args.initial_unet_checkpoint.expanduser().resolve()),
+                            "--unet-config",
+                            str(args.initial_unet_config.expanduser().resolve()),
+                            "--correction-checkpoint",
+                            str(
+                                args.initial_correction_checkpoint.expanduser().resolve()
+                            ),
                         ]
                     )
                 _run(command, log_path=output_root / f"{era5}-{target}.log")
@@ -225,6 +334,8 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
             args.wandb_project,
             "--wandb-group",
             group,
+            "--documentation",
+            str(args.documentation.expanduser().resolve()),
         ]
         if args.disable_wandb:
             combine_command.append("--disable-wandb")

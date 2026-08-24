@@ -65,6 +65,16 @@ Positive bias means the SAR diagnostic exceeds IBTrACS. The robust peak is more
 strongly correlated with IBTrACS and has lower overall MAE than the SAR maximum,
 but it is substantially lower than IBTrACS during RI.
 
+## Seed-42 matched validation results
+
+<!-- matched-validation-results:start -->
+
+The complete matched validation matrix is pending. This section is replaced
+automatically after the four target/ERA5 evaluations and consolidated W&B run
+complete successfully.
+
+<!-- matched-validation-results:end -->
+
 The divergence command writes JSON, CSV, and Markdown containing the full
 overall/split/RI tables, center-valid rates, signed and absolute-error
 quantiles, MAE and bias intervals, and per-sample rows:
@@ -110,11 +120,11 @@ uv run python scripts/run_matched_intensity_validation_matrix.py \
   --wandb-project geo2wf
 ```
 
-The current workspace cannot communicate with its NVIDIA driver. The full
-matrix and consolidated W&B run therefore need the project's execution host
-with two visible CUDA GPUs and valid W&B credentials. The divergence results
-above are CPU-generated; model-validation cells are intentionally not filled
-with partial smoke-test or fabricated values.
+The full matrix requires the project's execution host with two visible CUDA
+GPUs and valid W&B credentials. In restricted tool sessions, GPU commands and
+training processes may need to be launched outside the filesystem sandbox.
+The divergence results above are CPU-generated; the marked model-results
+section is updated only after all four matrix cells complete.
 
 Use `--smoke-test` for one epoch and one train/validation batch per stage.
 `--disable-wandb` runs locally. Epoch counts can be overridden with
