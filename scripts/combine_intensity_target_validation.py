@@ -12,6 +12,10 @@ from typing import Any
 import pandas as pd
 
 
+DOCUMENTATION_START = "<!-- matched-validation-results:start -->"
+DOCUMENTATION_END = "<!-- matched-validation-results:end -->"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--result", type=Path, action="append", required=True)
@@ -20,6 +24,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-project", default="geo2wf")
     parser.add_argument("--wandb-name", default=None)
     parser.add_argument("--wandb-group", default=None)
+    parser.add_argument(
+        "--documentation",
+        type=Path,
+        default=None,
+        help="Experiment page whose marked validation-results section is updated.",
+    )
     parser.add_argument("--disable-wandb", action="store_true")
     args = parser.parse_args()
     if len(args.result) != 4:
@@ -161,6 +171,40 @@ def _markdown(rows: list[dict[str, Any]]) -> str:
             f"{row['storm_macro_mae_ms']:.3f} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def _update_documentation(
+    path: Path,
+    *,
+    payload: dict[str, Any],
+    metric_rows: list[dict[str, Any]],
+) -> None:
+    path = path.expanduser().resolve()
+    text = path.read_text(encoding="utf-8")
+    if text.count(DOCUMENTATION_START) != 1 or text.count(DOCUMENTATION_END) != 1:
+        raise ValueError(
+            f"documentation must contain one validation marker pair: {path}"
+        )
+    before, marked = text.split(DOCUMENTATION_START, 1)
+    _, after = marked.split(DOCUMENTATION_END, 1)
+    report_lines = _markdown(metric_rows).splitlines()[2:]
+    generated = str(payload["created_utc"])
+    cohort = payload["cohort"]
+    section = "\n".join(
+        [
+            DOCUMENTATION_START,
+            "",
+            f"Generated on `{generated}` from the completed seed-42 validation matrix. "
+            f"All rows use the same cohort fingerprint `{cohort['sha256']}` "
+            f"({cohort['samples']} samples from {cohort['storms']} storms).",
+            "",
+            *report_lines,
+            DOCUMENTATION_END,
+        ]
+    )
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(before + section + after, encoding="utf-8")
+    temporary.replace(path)
 
 
 def _divergence_figure(divergence: dict[str, Any], output: Path) -> Path | None:
@@ -367,6 +411,14 @@ def combine(args: argparse.Namespace) -> dict[str, Any]:
             files.append(sibling)
     if figure is not None:
         files.append(figure)
+    documentation = getattr(args, "documentation", None)
+    if documentation is not None:
+        _update_documentation(
+            documentation,
+            payload=payload,
+            metric_rows=metric_rows,
+        )
+        files.append(Path(documentation).expanduser().resolve())
     wandb_id = _log_wandb(args, payload, metrics, predictions, files, figure)
     if wandb_id:
         payload["wandb_run_id"] = wandb_id

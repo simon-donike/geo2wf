@@ -127,6 +127,7 @@ def _args(tmp_path: Path) -> Namespace:
         wandb_project="geo2wf",
         wandb_name=None,
         wandb_group="test",
+        documentation=None,
         disable_wandb=True,
     )
 
@@ -161,3 +162,25 @@ def test_combiner_rejects_a_mismatched_target_cohort(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="cohort fingerprint"):
         combine(args)
+
+
+def test_combiner_updates_the_marked_experiment_results(tmp_path: Path) -> None:
+    args = _args(tmp_path)
+    args.documentation = tmp_path / "experiment.md"
+    args.documentation.write_text(
+        "# Experiment\n\n"
+        "## Results\n\n"
+        "<!-- matched-validation-results:start -->\n"
+        "Pending.\n"
+        "<!-- matched-validation-results:end -->\n\n"
+        "## Methods\n",
+        encoding="utf-8",
+    )
+
+    combine(args)
+
+    rendered = args.documentation.read_text(encoding="utf-8")
+    assert "Pending." not in rendered
+    assert "completed seed-42 validation matrix" in rendered
+    assert "| ERA5 | Trained target | Model |" in rendered
+    assert "## Methods" in rendered

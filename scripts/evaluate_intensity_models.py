@@ -49,6 +49,28 @@ MODEL_LABELS = {
 }
 
 
+def _json_compatible(value: Any) -> Any:
+    """Replace non-finite numeric values with JSON null recursively.
+
+    A missing 24-hour IBTrACS history is represented as NaN inside tensors and
+    data frames so metric code can distinguish it from a real zero change. JSON
+    has no portable NaN representation, so optional diagnostics are normalized
+    only at the report boundary.
+    """
+    if isinstance(value, Mapping):
+        return {str(key): _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_compatible(item) for item in value]
+    if isinstance(value, (float, np.floating)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    return value
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -863,55 +885,59 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
     cache_manifest = pd.read_csv(
         args.cache_root / args.split / "manifest.csv", keep_default_na=False
     )
-    payload = {
-        "schema_version": 2,
-        "created_utc": datetime.now(timezone.utc).isoformat(),
-        "split": args.split,
-        "interpretation": (
-            "validation_model_selection_diagnostic"
-            if args.split == "val"
-            else "held_out_test_evaluation"
-        ),
-        "conditioning": {
-            "use_era5": bool(config["data"].get("use_era5", True)),
-            "label": (
-                "with_era5" if config["data"].get("use_era5", True) else "without_era5"
+    payload = _json_compatible(
+        {
+            "schema_version": 2,
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "split": args.split,
+            "interpretation": (
+                "validation_model_selection_diagnostic"
+                if args.split == "val"
+                else "held_out_test_evaluation"
             ),
-        },
-        "cohort": _cohort_fingerprint(cache_manifest),
-        "target_fingerprint": _target_fingerprint(cache_manifest),
-        "data_config": {
-            "path": str(args.data_config.resolve()),
-            "sha256": _sha256(args.data_config),
-        },
-        "cache": {
-            "path": str(args.cache_root.resolve()),
-            "metadata": cache_metadata,
-        },
-        "checkpoints": {
-            "unet": cache_metadata["unet_checkpoint"],
-            "correction": {
-                "path": str(args.correction_checkpoint.resolve()),
-                "sha256": _sha256(args.correction_checkpoint),
+            "conditioning": {
+                "use_era5": bool(config["data"].get("use_era5", True)),
+                "label": (
+                    "with_era5"
+                    if config["data"].get("use_era5", True)
+                    else "without_era5"
+                ),
             },
-            "joint": {
-                "path": str(args.joint_checkpoint.resolve()),
-                "sha256": _sha256(args.joint_checkpoint),
+            "cohort": _cohort_fingerprint(cache_manifest),
+            "target_fingerprint": _target_fingerprint(cache_manifest),
+            "data_config": {
+                "path": str(args.data_config.resolve()),
+                "sha256": _sha256(args.data_config),
             },
-        },
-        "models": {
-            name: {
-                "label": MODEL_LABELS[name],
-                "intensity": summaries[name],
-                "field": field_metrics.get(name),
-            }
-            for name in MODEL_LABELS
-        },
-        "reference_evaluation": reference_evaluation,
-        "prediction_rows": {name: rows for name, rows in rows_by_model.items()},
-        "paired_storm_bootstrap": bootstrap,
-        "table": table_rows,
-    }
+            "cache": {
+                "path": str(args.cache_root.resolve()),
+                "metadata": cache_metadata,
+            },
+            "checkpoints": {
+                "unet": cache_metadata["unet_checkpoint"],
+                "correction": {
+                    "path": str(args.correction_checkpoint.resolve()),
+                    "sha256": _sha256(args.correction_checkpoint),
+                },
+                "joint": {
+                    "path": str(args.joint_checkpoint.resolve()),
+                    "sha256": _sha256(args.joint_checkpoint),
+                },
+            },
+            "models": {
+                name: {
+                    "label": MODEL_LABELS[name],
+                    "intensity": summaries[name],
+                    "field": field_metrics.get(name),
+                }
+                for name in MODEL_LABELS
+            },
+            "reference_evaluation": reference_evaluation,
+            "prediction_rows": {name: rows for name, rows in rows_by_model.items()},
+            "paired_storm_bootstrap": bootstrap,
+            "table": table_rows,
+        }
+    )
 
     output = args.output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
