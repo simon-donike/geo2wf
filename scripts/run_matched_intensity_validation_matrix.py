@@ -80,7 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--documentation",
         type=Path,
-        default=ROOT / "docs" / "experiments" / "intensity-comparison.md",
+        default=ROOT / "docs" / "experiments" / "intensity-comparison-results.md",
         help="Experiment page updated after successful consolidation.",
     )
     args = parser.parse_args()
