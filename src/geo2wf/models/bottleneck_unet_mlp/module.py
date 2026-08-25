@@ -28,6 +28,11 @@ from geo2wf.models.base import (
     PredictionRequest,
     WindFieldLightningModule,
 )
+from geo2wf.metrics.wind import (
+    IBTRACS_RADIUS_NAMES,
+    ibtracs_radius_metric_statistics,
+    ibtracs_radius_targets,
+)
 from geo2wf.tracking.reconstruction_media import log_wandb_reconstruction
 
 
@@ -319,6 +324,16 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             torch.zeros(5, dtype=torch.float64),
             persistent=False,
         )
+        self.register_buffer(
+            "_validation_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_test_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
         self._evaluation_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     def validate_data_spec(self, spec: DataSpec) -> None:
@@ -456,6 +471,11 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
         )
+        self._accumulate_ibtracs_radius_statistics(
+            self._validation_ibtracs_radius_statistics,
+            prediction.central_physical,
+            batch,
+        )
         ibtracs_target = batch.get("ibtracs_target_ms", intensity_target).to(
             prediction.intensity_prediction_ms
         )
@@ -519,6 +539,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
     def on_validation_epoch_start(self) -> None:
         self._validation_field_statistics.zero_()
         self._validation_intensity_statistics.zero_()
+        self._validation_ibtracs_radius_statistics.zero_()
         self._evaluation_rows["val"] = []
 
     def on_validation_epoch_end(self) -> None:
@@ -526,6 +547,9 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             "val",
             self._validation_field_statistics,
             self._validation_intensity_statistics,
+        )
+        self._log_ibtracs_radius_statistics(
+            "val", self._validation_ibtracs_radius_statistics
         )
         self._log_ri_statistics()
 
@@ -548,14 +572,23 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
         )
+        self._accumulate_ibtracs_radius_statistics(
+            self._test_ibtracs_radius_statistics,
+            prediction.central_physical,
+            batch,
+        )
 
     def on_test_epoch_start(self) -> None:
         self._test_field_statistics.zero_()
         self._test_intensity_statistics.zero_()
+        self._test_ibtracs_radius_statistics.zero_()
 
     def on_test_epoch_end(self) -> None:
         self._log_statistics(
             "test", self._test_field_statistics, self._test_intensity_statistics
+        )
+        self._log_ibtracs_radius_statistics(
+            "test", self._test_ibtracs_radius_statistics
         )
 
     def configure_optimizers(self) -> dict[str, Any]:
@@ -639,6 +672,56 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 ]
             ).to(statistics)
         )
+
+    def _accumulate_ibtracs_radius_statistics(
+        self,
+        statistics: torch.Tensor,
+        prediction: torch.Tensor,
+        batch: Mapping[str, Any],
+    ) -> None:
+        """Evaluate generated-field radii without adding them to either loss."""
+        targets = ibtracs_radius_targets(batch, prediction)
+        if targets is None or not {"center", "target_bounds"}.issubset(batch):
+            return
+        target_radii, target_valid = targets
+        prediction_mask = self._single_channel(
+            batch["condition_mask"], "condition_mask"
+        ).bool()
+        additions = ibtracs_radius_metric_statistics(
+            prediction,
+            prediction_mask,
+            batch["center"],
+            batch["target_bounds"],
+            target_radii,
+            target_valid,
+        )
+        statistics.add_(additions.to(statistics))
+
+    def _log_ibtracs_radius_statistics(
+        self, prefix: str, statistics: torch.Tensor
+    ) -> None:
+        values = statistics.clone()
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.all_reduce(values)
+        for index, name in enumerate(IBTRACS_RADIUS_NAMES):
+            count = values[index, 4]
+            if count <= 0:
+                continue
+            for metric_name, value in {
+                "predicted_mean_km": values[index, 0] / count,
+                "target_mean_km": values[index, 1] / count,
+                "mae_km": values[index, 2] / count,
+                "bias_km": values[index, 3] / count,
+                "samples": count,
+            }.items():
+                self.log(
+                    f"{prefix}/ibtracs_{name}_{metric_name}",
+                    value.to(dtype=torch.float32),
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    sync_dist=False,
+                )
 
     def _log_statistics(
         self,

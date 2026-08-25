@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import torch
 import torch.nn.functional as F
 
@@ -16,6 +19,36 @@ RADIAL_METRIC_NAMES = (
     "eye_to_eyewall_contrast_error_ms",
     "eye_center_displacement_km",
 )
+IBTRACS_RADIUS_NAMES = ("rmw", "r34", "r50", "r64")
+IBTRACS_WIND_RADIUS_THRESHOLDS_MS = {
+    "r34": 34.0 * 0.514444,
+    "r50": 50.0 * 0.514444,
+    "r64": 64.0 * 0.514444,
+}
+
+
+def ibtracs_radius_targets(
+    batch: Mapping[str, Any], reference: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Stack optional scalar IBTrACS radius companions in metric order."""
+    values = []
+    validity = []
+    for name in IBTRACS_RADIUS_NAMES:
+        source_name = name if name == "rmw" else f"{name}_mean"
+        value_key = f"ibtracs_{source_name}_km"
+        valid_key = f"{value_key}_valid"
+        if value_key not in batch or valid_key not in batch:
+            return None
+        value = torch.as_tensor(batch[value_key], device=reference.device).reshape(-1)
+        valid = torch.as_tensor(
+            batch[valid_key], device=reference.device, dtype=torch.bool
+        ).reshape(-1)
+        if value.shape != (reference.shape[0],) or valid.shape != value.shape:
+            raise ValueError(f"{value_key} must have one value per generated image")
+        values.append(value.to(dtype=reference.dtype))
+        validity.append(valid)
+    return torch.stack(values, dim=1), torch.stack(validity, dim=1)
+
 
 EYE_CENTER_SEARCH_RADIUS_KM = 100.0
 EYE_CENTER_TARGET_RADIUS_KM = 50.0
@@ -25,6 +58,162 @@ EYE_CENTER_MIN_COVERAGE = 0.8
 EYE_CENTER_MIN_RING_WIND_MS = 17.0
 EYE_CENTER_MIN_CONTRAST_MS = 5.0
 EYE_CENTER_MIN_SMOOTHING_PIXELS = 8
+
+
+def ibtracs_radius_metric_statistics(
+    prediction_ms: torch.Tensor,
+    prediction_mask: torch.Tensor,
+    center: torch.Tensor,
+    bounds: torch.Tensor,
+    target_radii_km: torch.Tensor,
+    target_valid: torch.Tensor,
+    *,
+    radial_bin_km: float = 10.0,
+    min_bin_pixels: int = 4,
+) -> torch.Tensor:
+    """Compare radii derived from generated fields with scalar IBTrACS radii.
+
+    The returned rows follow :data:`IBTRACS_RADIUS_NAMES`; columns contain
+    predicted sum, target sum, absolute-error sum, signed-error sum, and count.
+    Wind radii use the outermost annular-mean bin meeting 34, 50, or 64 knots.
+    RMW is the peak annular-mean bin. Only complete annuli supported by the
+    generated image are scored, which avoids treating a crop edge as a radius.
+    """
+    if prediction_ms.ndim != 4 or prediction_ms.shape[1] != 1:
+        raise ValueError("prediction_ms must have shape [batch, 1, height, width]")
+    if prediction_mask.ndim == 3:
+        prediction_mask = prediction_mask.unsqueeze(1)
+    if prediction_mask.shape != prediction_ms.shape:
+        raise ValueError("prediction_mask must match prediction_ms")
+    if radial_bin_km <= 0.0 or min_bin_pixels < 1:
+        raise ValueError("radial_bin_km and min_bin_pixels must be positive")
+
+    batch_size = prediction_ms.shape[0]
+    device = prediction_ms.device
+    geometry_dtype = (
+        prediction_ms.dtype if prediction_ms.dtype == torch.float64 else torch.float32
+    )
+    center = torch.as_tensor(center, device=device, dtype=geometry_dtype)
+    bounds = torch.as_tensor(bounds, device=device, dtype=geometry_dtype)
+    target_radii_km = torch.as_tensor(
+        target_radii_km, device=device, dtype=geometry_dtype
+    )
+    target_valid = torch.as_tensor(target_valid, device=device, dtype=torch.bool)
+    if center.ndim == 1:
+        center = center.unsqueeze(0)
+    if bounds.ndim == 1:
+        bounds = bounds.unsqueeze(0)
+    expected_radii_shape = (batch_size, len(IBTRACS_RADIUS_NAMES))
+    if center.shape != (batch_size, 2) or bounds.shape != (batch_size, 4):
+        raise ValueError("center and bounds have incompatible batch shapes")
+    if target_radii_km.shape != expected_radii_shape:
+        raise ValueError(f"target_radii_km must have shape {expected_radii_shape}")
+    if target_valid.shape != expected_radii_shape:
+        raise ValueError(f"target_valid must have shape {expected_radii_shape}")
+
+    statistics = prediction_ms.new_zeros((len(IBTRACS_RADIUS_NAMES), 5))
+    _, _, height, width = prediction_ms.shape
+    row_fraction = (
+        torch.arange(height, device=device, dtype=geometry_dtype) + 0.5
+    ) / height
+    column_fraction = (
+        torch.arange(width, device=device, dtype=geometry_dtype) + 0.5
+    ) / width
+
+    for sample_index in range(batch_size):
+        sample_center = center[sample_index]
+        sample_bounds = bounds[sample_index]
+        if (
+            not torch.isfinite(sample_center).all()
+            or not torch.isfinite(sample_bounds).all()
+        ):
+            continue
+        center_lat, center_lon = sample_center
+        left, right, bottom, top = sample_bounds
+        if right <= left or top <= bottom:
+            continue
+
+        latitudes = top - row_fraction * (top - bottom)
+        longitudes = left + column_fraction * (right - left)
+        latitude_grid, longitude_grid = torch.meshgrid(
+            latitudes, longitudes, indexing="ij"
+        )
+        delta_lon = torch.remainder(longitude_grid - center_lon + 180.0, 360.0) - 180.0
+        north_km = torch.deg2rad(latitude_grid - center_lat) * EARTH_RADIUS_KM
+        east_km = (
+            torch.deg2rad(delta_lon)
+            * EARTH_RADIUS_KM
+            * torch.cos(torch.deg2rad(center_lat)).clamp_min(1e-6)
+        )
+        radius_km = torch.sqrt(north_km.square() + east_km.square())
+        field = prediction_ms[sample_index, 0]
+        valid = (
+            prediction_mask[sample_index, 0].bool()
+            & torch.isfinite(field)
+            & torch.isfinite(radius_km)
+        )
+        if not valid.any():
+            continue
+
+        directional_extents = torch.stack(
+            [
+                north_km[valid].max(),
+                -north_km[valid].min(),
+                east_km[valid].max(),
+                -east_km[valid].min(),
+            ]
+        )
+        if bool((directional_extents <= 0.0).any()):
+            continue
+        complete_radius = directional_extents.min()
+        lower_edges = torch.arange(
+            0.0,
+            float(complete_radius.detach()),
+            radial_bin_km,
+            device=device,
+            dtype=geometry_dtype,
+        )
+        profile_radii = []
+        profile_winds = []
+        for lower in lower_edges:
+            upper = lower + radial_bin_km
+            if upper > complete_radius:
+                continue
+            annulus = valid & (radius_km >= lower) & (radius_km < upper)
+            if int(annulus.sum().detach()) < min_bin_pixels:
+                continue
+            profile_radii.append(lower + radial_bin_km / 2.0)
+            profile_winds.append(field[annulus].to(geometry_dtype).mean())
+        if not profile_winds:
+            continue
+        profile_radii_tensor = torch.stack(profile_radii)
+        profile_winds_tensor = torch.stack(profile_winds)
+        predicted = {
+            "rmw": profile_radii_tensor[profile_winds_tensor.argmax()],
+        }
+        for name, threshold_ms in IBTRACS_WIND_RADIUS_THRESHOLDS_MS.items():
+            exceeds = profile_winds_tensor >= threshold_ms
+            predicted[name] = (
+                profile_radii_tensor[exceeds].max()
+                if exceeds.any()
+                else profile_radii_tensor.new_zeros(())
+            )
+
+        for radius_index, name in enumerate(IBTRACS_RADIUS_NAMES):
+            target = target_radii_km[sample_index, radius_index]
+            if (
+                not target_valid[sample_index, radius_index]
+                or not torch.isfinite(target)
+                or target < 0.0
+                or target > complete_radius
+            ):
+                continue
+            estimate = predicted[name]
+            error = estimate - target
+            statistics[radius_index] += torch.stack(
+                [estimate, target, error.abs(), error, error.new_ones(())]
+            ).to(statistics)
+    return statistics
 
 
 def _masked_smooth_3x3(

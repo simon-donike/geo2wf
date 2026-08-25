@@ -22,8 +22,22 @@ from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
 INTENSITY_TARGET_COMPANION = "intensity_target"
 # Legacy companion retained so older data specs/checkpoint wrappers still pass.
 IBTRACS_MAX_WIND_COMPANION = "ibtracs_max_wind"
+IBTRACS_STRUCTURE_COMPANION = "ibtracs_structure"
 KNOT_TO_MS = 0.514444
+NAUTICAL_MILE_TO_KM = 1.852
 REQUIRED_IBTRACS_COLUMNS = frozenset({"USA_ATCF_ID", "ISO_TIME", "USA_WIND"})
+IBTRACS_STRUCTURE_COLUMNS = frozenset(
+    {
+        "USA_EYE",
+        "USA_RMW",
+        *(
+            f"USA_R{threshold}_{quadrant}"
+            for threshold in (34, 50, 64)
+            for quadrant in ("NE", "SE", "SW", "NW")
+        ),
+    }
+)
+IBTRACS_COMBINED_RADIUS_NAMES = ("r34", "r50", "r64")
 INTENSITY_TARGET_SOURCES = frozenset({"ibtracs", "sar_robust_peak"})
 
 
@@ -54,17 +68,24 @@ def _load_ibtracs_tracks(
     missing = REQUIRED_IBTRACS_COLUMNS.difference(available_columns)
     if missing:
         raise ValueError(f"{path} is missing IBTrACS columns: {sorted(missing)}")
+    selected_columns = REQUIRED_IBTRACS_COLUMNS | (
+        IBTRACS_STRUCTURE_COLUMNS & available_columns
+    )
     frame = pd.read_csv(
         path,
-        usecols=sorted(REQUIRED_IBTRACS_COLUMNS),
+        usecols=sorted(selected_columns),
         keep_default_na=False,
         low_memory=False,
     )
+    for column in IBTRACS_STRUCTURE_COLUMNS.difference(frame.columns):
+        frame[column] = np.nan
     frame["storm_id"] = frame["USA_ATCF_ID"].astype(str).str.strip().str.upper()
     frame["timestamp"] = pd.to_datetime(
         frame["ISO_TIME"], errors="coerce", utc=True, format="mixed"
     )
     frame["wind_kt"] = pd.to_numeric(frame["USA_WIND"], errors="coerce")
+    for column in IBTRACS_STRUCTURE_COLUMNS:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = frame.loc[
         frame["storm_id"].ne("")
         & frame["timestamp"].notna()
@@ -111,7 +132,7 @@ def _interpolate_ibtracs_wind(
     times = fixes["timestamp"].tolist()
     upper = bisect_left(times, target_time)
     if upper < len(times) and times[upper] == target_time:
-        wind_kt = float(fixes.iloc[upper]["wind_kt"])
+        lower = upper
         lower_time = upper_time = target_time
     else:
         if upper == 0 or upper == len(times):
@@ -121,15 +142,51 @@ def _interpolate_ibtracs_wind(
         bracket = upper_time - lower_time
         if bracket > pd.Timedelta(hours=max_bracket_hours):
             return None
-        fraction = (target_time - lower_time) / bracket
-        lower_wind = float(fixes.iloc[lower]["wind_kt"])
-        upper_wind = float(fixes.iloc[upper]["wind_kt"])
-        wind_kt = lower_wind + float(fraction) * (upper_wind - lower_wind)
+    fraction = (
+        0.0
+        if lower == upper
+        else float((target_time - lower_time) / (upper_time - lower_time))
+    )
+
+    def interpolated(column: str) -> float:
+        lower_value = float(fixes.iloc[lower][column])
+        upper_value = float(fixes.iloc[upper][column])
+        if not math.isfinite(lower_value) or not math.isfinite(upper_value):
+            return math.nan
+        value = lower_value + fraction * (upper_value - lower_value)
+        return value if value >= 0.0 else math.nan
+
+    wind_kt = interpolated("wind_kt")
+    if not math.isfinite(wind_kt):
+        return None
+    structure_nm = {
+        "eye_size": interpolated("USA_EYE"),
+        "rmw": interpolated("USA_RMW"),
+    }
+    for radius in IBTRACS_COMBINED_RADIUS_NAMES:
+        quadrant_values = [
+            interpolated(f"USA_{radius.upper()}_{quadrant}")
+            for quadrant in ("NE", "SE", "SW", "NW")
+        ]
+        # A combined wind radius represents a complete four-quadrant report.
+        # Partial reports are kept invalid rather than biasing the mean toward
+        # whichever quadrants happened to be present.
+        structure_nm[f"{radius}_mean"] = (
+            float(np.mean(quadrant_values))
+            if all(math.isfinite(value) for value in quadrant_values)
+            else math.nan
+        )
     return {
         "target_wind_ms": wind_kt * KNOT_TO_MS,
         "observation_timestamp": target_time.isoformat(),
         "lower_fix_timestamp": lower_time.isoformat(),
         "upper_fix_timestamp": upper_time.isoformat(),
+        **{
+            f"ibtracs_{name}_km": (
+                value * NAUTICAL_MILE_TO_KM if math.isfinite(value) else math.nan
+            )
+            for name, value in structure_nm.items()
+        },
     }
 
 
@@ -401,7 +458,11 @@ class JointPairedIntensityDataset(Dataset):
         return replace(
             spec,
             companions=spec.companions
-            | {INTENSITY_TARGET_COMPANION, IBTRACS_MAX_WIND_COMPANION},
+            | {
+                INTENSITY_TARGET_COMPANION,
+                IBTRACS_MAX_WIND_COMPANION,
+                IBTRACS_STRUCTURE_COMPANION,
+            },
         )
 
     def __len__(self) -> int:
@@ -418,6 +479,13 @@ class JointPairedIntensityDataset(Dataset):
         sample["ibtracs_target_ms"] = torch.tensor(
             float(label["ibtracs_wind_ms"]), dtype=torch.float32
         )
+        for name in ("eye_size", "rmw", "r34_mean", "r50_mean", "r64_mean"):
+            key = f"ibtracs_{name}_km"
+            value = float(label.get(key, math.nan))
+            sample[key] = torch.tensor(value, dtype=torch.float32)
+            sample[f"{key}_valid"] = torch.tensor(
+                math.isfinite(value), dtype=torch.bool
+            )
         sample["sar_robust_peak_target_ms"] = torch.tensor(
             float(label["sar_robust_peak_ms"]), dtype=torch.float32
         )

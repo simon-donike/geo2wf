@@ -19,7 +19,10 @@ from geo2wf.models.base import (
 )
 from geo2wf.metrics.wind import (
     EARTH_RADIUS_KM,
+    IBTRACS_RADIUS_NAMES,
     RADIAL_METRIC_NAMES,
+    ibtracs_radius_metric_statistics,
+    ibtracs_radius_targets,
     radial_wind_metric_statistics,
 )
 from geo2wf.data.intensity import (
@@ -643,6 +646,16 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             torch.zeros((len(RADIAL_METRIC_NAMES), 2), dtype=torch.float64),
             persistent=False,
         )
+        self.register_buffer(
+            "_validation_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_test_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
         exceedance_statistic_shape = (
             len(self.exceedance_area_thresholds_ms),
             4,
@@ -948,6 +961,11 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             valid_mask,
             batch,
         )
+        self._accumulate_ibtracs_radius_statistics(
+            self._validation_ibtracs_radius_statistics,
+            bounded_prediction,
+            batch,
+        )
         intensity_target = batch.get("intensity_target_ms")
         if intensity_target is not None:
             is_ri = batch.get(
@@ -1010,12 +1028,16 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
     def on_validation_epoch_start(self) -> None:
         self._validation_statistics.zero_()
         self._validation_radial_statistics.zero_()
+        self._validation_ibtracs_radius_statistics.zero_()
         self._validation_exceedance_statistics.zero_()
         self._validation_intensity_rows = []
 
     def on_validation_epoch_end(self) -> None:
         self._log_statistics("val", self._validation_statistics)
         self._log_radial_statistics("val", self._validation_radial_statistics)
+        self._log_ibtracs_radius_statistics(
+            "val", self._validation_ibtracs_radius_statistics
+        )
         self._log_exceedance_statistics("val", self._validation_exceedance_statistics)
         self._log_peak_structure_score(
             "val",
@@ -1054,16 +1076,25 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             valid_mask,
             batch,
         )
+        self._accumulate_ibtracs_radius_statistics(
+            self._test_ibtracs_radius_statistics,
+            bounded_prediction,
+            batch,
+        )
         return None
 
     def on_test_epoch_start(self) -> None:
         self._test_statistics.zero_()
         self._test_radial_statistics.zero_()
+        self._test_ibtracs_radius_statistics.zero_()
         self._test_exceedance_statistics.zero_()
 
     def on_test_epoch_end(self) -> None:
         self._log_statistics("test", self._test_statistics)
         self._log_radial_statistics("test", self._test_radial_statistics)
+        self._log_ibtracs_radius_statistics(
+            "test", self._test_ibtracs_radius_statistics
+        )
         self._log_exceedance_statistics("test", self._test_exceedance_statistics)
         self._log_peak_structure_score(
             "test",
@@ -1593,6 +1624,55 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
             batch["target_bounds"],
         )
         statistics.add_(additions.to(statistics))
+
+    def _accumulate_ibtracs_radius_statistics(
+        self,
+        statistics: torch.Tensor,
+        prediction: torch.Tensor,
+        batch: dict[str, torch.Tensor],
+    ) -> None:
+        """Evaluate generated-field radii without adding them to any loss."""
+        targets = ibtracs_radius_targets(batch, prediction)
+        if targets is None or not {"center", "target_bounds"}.issubset(batch):
+            return
+        target_radii, target_valid = targets
+        prediction_mask = self._single_channel(
+            batch["condition_mask"], "condition_mask", collapse_mask=True
+        ).bool()
+        additions = ibtracs_radius_metric_statistics(
+            prediction,
+            prediction_mask,
+            batch["center"],
+            batch["target_bounds"],
+            target_radii,
+            target_valid,
+        )
+        statistics.add_(additions.to(statistics))
+
+    def _log_ibtracs_radius_statistics(
+        self, prefix: str, statistics: torch.Tensor
+    ) -> None:
+        statistics = self._distributed_sum(statistics)
+        for index, name in enumerate(IBTRACS_RADIUS_NAMES):
+            count = statistics[index, 4]
+            if count <= 0:
+                continue
+            for metric_name, value in {
+                "predicted_mean_km": statistics[index, 0] / count,
+                "target_mean_km": statistics[index, 1] / count,
+                "mae_km": statistics[index, 2] / count,
+                "bias_km": statistics[index, 3] / count,
+                "samples": count,
+            }.items():
+                self.log(
+                    f"{prefix}/ibtracs_{name}_{metric_name}",
+                    value.to(dtype=torch.float32),
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                    sync_dist=False,
+                )
 
     def _log_radial_statistics(self, prefix: str, statistics: torch.Tensor) -> None:
         """All-reduce once, then log the globally available radial means."""
