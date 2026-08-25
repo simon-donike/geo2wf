@@ -6,9 +6,49 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+import torch
 
 from geo2wf.data.intensity import UNetIntensityDataModule
 from geo2wf.models.intensity_correction import UNetIntensityCorrection
+
+
+def test_mlp_only_optional_structure_head_outputs_and_trains() -> None:
+    model = UNetIntensityCorrection(
+        field_base_channels=4,
+        field_channel_mults=(1, 2),
+        fusion_hidden_features=16,
+        metadata_hidden_features=8,
+        use_field=False,
+        use_metadata=True,
+        structure_head_enabled=True,
+        structure_loss_weight=0.25,
+    )
+    batch = {
+        "wind_field": torch.full((2, 16, 16), 20.0),
+        "valid_mask": torch.ones((2, 16, 16), dtype=torch.bool),
+        "distance_to_center": torch.zeros((2, 16, 16)),
+        "metadata": torch.zeros((2, 19)),
+        "target_wind_ms": torch.tensor([25.0, 30.0]),
+        "sample_weight": torch.ones(2),
+    }
+    for index, key in enumerate(
+        (
+            "ibtracs_eye_size_km",
+            "ibtracs_rmw_km",
+            "ibtracs_r34_equivalent_km",
+            "ibtracs_r50_equivalent_km",
+            "ibtracs_r64_equivalent_km",
+        )
+    ):
+        batch[key] = torch.full((2,), 15.0 + index * 10.0)
+        batch[f"{key}_valid"] = torch.ones(2, dtype=torch.bool)
+
+    loss, prediction = model._loss(batch)
+    structure_loss, _ = model._structure_loss_and_metrics(prediction, batch)
+
+    assert prediction.structure_prediction_km.shape == (2, 5)
+    assert structure_loss > 0.0
+    assert loss > structure_loss * model.structure_loss_weight
 
 
 def _write_split(root: Path, split: str, storm_id: str) -> None:

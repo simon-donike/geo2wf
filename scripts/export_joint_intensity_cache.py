@@ -30,6 +30,7 @@ from geo2wf.data.datasets.paired_geotiff import (  # noqa: E402
     _normalized_distance_to_center,
 )
 from geo2wf.data.intensity import (  # noqa: E402
+    IBTRACS_STRUCTURE_MANIFEST_COLUMNS,
     INTENSITY_CACHE_SCHEMA_VERSION,
     KNOT_TO_MS,
     tropical_category_from_wind_ms,
@@ -381,6 +382,16 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                         distance_to_center=distance.numpy().astype(np.float32),
                     )
                     start = storm_metadata[storm_id]["start"]
+                    structure_fields = {
+                        key: float(batch[key][index])
+                        for key in IBTRACS_STRUCTURE_MANIFEST_COLUMNS
+                    }
+                    structure_fields.update(
+                        {
+                            f"{key}_valid": bool(batch[f"{key}_valid"][index])
+                            for key in IBTRACS_STRUCTURE_MANIFEST_COLUMNS
+                        }
+                    )
                     split_rows.append(
                         {
                             "sample_id": sample_id,
@@ -426,6 +437,7 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                             "filtered_unusable_sar_count": (
                                 dataset.filtered_unusable_sar_count
                             ),
+                            **structure_fields,
                         }
                     )
             if not split_rows:
@@ -475,6 +487,18 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
             "reference": "IBTrACS USA_WIND",
             "threshold_kt": datamodule.ri_threshold_kt,
             "window_hours": datamodule.ri_window_hours,
+        },
+        "ibtracs_structure": {
+            "targets": [
+                "eye_size",
+                "rmw",
+                "r34_equivalent",
+                "r50_equivalent",
+                "r64_equivalent",
+            ],
+            "wind_radius_reduction": "equivalent_area_from_four_quadrants",
+            "units": "km",
+            "training_optional": True,
         },
         "unet_checkpoint": {
             "path": str(args.checkpoint.expanduser().resolve()),

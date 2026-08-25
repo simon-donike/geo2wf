@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_left
+from collections.abc import Mapping
 from dataclasses import replace
 import math
 from pathlib import Path
@@ -38,7 +39,42 @@ IBTRACS_STRUCTURE_COLUMNS = frozenset(
     }
 )
 IBTRACS_COMBINED_RADIUS_NAMES = ("r34", "r50", "r64")
+IBTRACS_STRUCTURE_TARGET_NAMES = (
+    "eye_size",
+    "rmw",
+    "r34_equivalent",
+    "r50_equivalent",
+    "r64_equivalent",
+)
+IBTRACS_STRUCTURE_BATCH_KEYS = (
+    "ibtracs_eye_size_km",
+    "ibtracs_rmw_km",
+    "ibtracs_r34_equivalent_km",
+    "ibtracs_r50_equivalent_km",
+    "ibtracs_r64_equivalent_km",
+)
 INTENSITY_TARGET_SOURCES = frozenset({"ibtracs", "sar_robust_peak"})
+
+
+def ibtracs_structure_targets(
+    batch: Mapping[str, Any], reference: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Return ``[B,5]`` structure targets and validity masks when available."""
+    values = []
+    masks = []
+    for key in IBTRACS_STRUCTURE_BATCH_KEYS:
+        valid_key = f"{key}_valid"
+        if key not in batch or valid_key not in batch:
+            return None
+        value = torch.as_tensor(batch[key], device=reference.device).reshape(-1)
+        valid = torch.as_tensor(
+            batch[valid_key], device=reference.device, dtype=torch.bool
+        ).reshape(-1)
+        if value.shape != (reference.shape[0],) or valid.shape != value.shape:
+            raise ValueError(f"{key} must have one value per sample")
+        values.append(value.to(reference))
+        masks.append(valid & torch.isfinite(value) & (value >= 0.0))
+    return torch.stack(values, dim=1), torch.stack(masks, dim=1)
 
 
 def _validate_storm_disjoint(labels_by_split: dict[str, pd.DataFrame]) -> None:
@@ -168,11 +204,10 @@ def _interpolate_ibtracs_wind(
             interpolated(f"USA_{radius.upper()}_{quadrant}")
             for quadrant in ("NE", "SE", "SW", "NW")
         ]
-        # A combined wind radius represents a complete four-quadrant report.
-        # Partial reports are kept invalid rather than biasing the mean toward
-        # whichever quadrants happened to be present.
-        structure_nm[f"{radius}_mean"] = (
-            float(np.mean(quadrant_values))
+        # The equivalent-circle radius preserves the area of a complete
+        # four-quadrant wind envelope. Partial reports remain invalid.
+        structure_nm[f"{radius}_equivalent"] = (
+            float(np.sqrt(np.mean(np.square(quadrant_values))))
             if all(math.isfinite(value) for value in quadrant_values)
             else math.nan
         )
@@ -479,7 +514,13 @@ class JointPairedIntensityDataset(Dataset):
         sample["ibtracs_target_ms"] = torch.tensor(
             float(label["ibtracs_wind_ms"]), dtype=torch.float32
         )
-        for name in ("eye_size", "rmw", "r34_mean", "r50_mean", "r64_mean"):
+        for name in (
+            "eye_size",
+            "rmw",
+            "r34_equivalent",
+            "r50_equivalent",
+            "r64_equivalent",
+        ):
             key = f"ibtracs_{name}_km"
             value = float(label.get(key, math.nan))
             sample[key] = torch.tensor(value, dtype=torch.float32)

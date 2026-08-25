@@ -34,7 +34,7 @@ def ibtracs_radius_targets(
     values = []
     validity = []
     for name in IBTRACS_RADIUS_NAMES:
-        source_name = name if name == "rmw" else f"{name}_mean"
+        source_name = name if name == "rmw" else f"{name}_equivalent"
         value_key = f"ibtracs_{source_name}_km"
         valid_key = f"{value_key}_valid"
         if value_key not in batch or valid_key not in batch:
@@ -75,9 +75,9 @@ def ibtracs_radius_metric_statistics(
 
     The returned rows follow :data:`IBTRACS_RADIUS_NAMES`; columns contain
     predicted sum, target sum, absolute-error sum, signed-error sum, and count.
-    Wind radii use the outermost annular-mean bin meeting 34, 50, or 64 knots.
-    RMW is the peak annular-mean bin. Only complete annuli supported by the
-    generated image are scored, which avoids treating a crop edge as a radius.
+    Wind radii are equivalent-circle radii calculated from the 34-, 50-, or
+    64-knot exceedance area. RMW is the peak annular-mean bin. Only the complete
+    circular domain supported by the generated image is used.
     """
     if prediction_ms.ndim != 4 or prediction_ms.shape[1] != 1:
         raise ValueError("prediction_ms must have shape [batch, 1, height, width]")
@@ -191,13 +191,29 @@ def ibtracs_radius_metric_statistics(
         predicted = {
             "rmw": profile_radii_tensor[profile_winds_tensor.argmax()],
         }
+        latitude_edges = torch.linspace(
+            top,
+            bottom,
+            height + 1,
+            device=device,
+            dtype=geometry_dtype,
+        )
+        longitude_width_rad = torch.deg2rad((right - left).abs() / width)
+        row_area_km2 = (
+            EARTH_RADIUS_KM**2
+            * longitude_width_rad
+            * (
+                torch.sin(torch.deg2rad(latitude_edges[:-1]))
+                - torch.sin(torch.deg2rad(latitude_edges[1:]))
+            ).abs()
+        )
+        pixel_area_km2 = row_area_km2[:, None].expand(height, width)
+        complete_domain = valid & (radius_km <= complete_radius)
         for name, threshold_ms in IBTRACS_WIND_RADIUS_THRESHOLDS_MS.items():
-            exceeds = profile_winds_tensor >= threshold_ms
-            predicted[name] = (
-                profile_radii_tensor[exceeds].max()
-                if exceeds.any()
-                else profile_radii_tensor.new_zeros(())
-            )
+            exceedance_area_km2 = pixel_area_km2[
+                complete_domain & (field >= threshold_ms)
+            ].sum()
+            predicted[name] = torch.sqrt(exceedance_area_km2.clamp_min(0.0) / torch.pi)
 
         for radius_index, name in enumerate(IBTRACS_RADIUS_NAMES):
             target = target_radii_km[sample_index, radius_index]

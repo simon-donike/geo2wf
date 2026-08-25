@@ -15,6 +15,8 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from geo2wf.data.intensity import (
+    IBTRACS_STRUCTURE_MANIFEST_COLUMNS,
+    IBTRACS_STRUCTURE_TARGET_NAMES,
     INTENSITY_METADATA_NAMES,
     IntensityDataSpec,
     category_macro_f1_tensor,
@@ -42,6 +44,16 @@ class IntensityPredictionBatch:
     correction_ms: torch.Tensor
     output_msw_ms: torch.Tensor
     output_category: torch.Tensor
+    structure_prediction_km: torch.Tensor | None = None
+
+    @property
+    def structure_outputs_km(self) -> dict[str, torch.Tensor]:
+        if self.structure_prediction_km is None:
+            return {}
+        return {
+            name: self.structure_prediction_km[:, index]
+            for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES)
+        }
 
 
 def _group_count(channels: int, maximum: int = 8) -> int:
@@ -350,6 +362,9 @@ class UNetIntensityCorrection(pl.LightningModule):
         anchor_statistic: str = "max",
         robust_peak_fraction: float = 0.005,
         huber_delta_ms: float = 5.0,
+        structure_head_enabled: bool = False,
+        structure_loss_weight: float = 0.0,
+        structure_huber_delta_km: float = 20.0,
         use_field: bool = True,
         use_metadata: bool = True,
         lr: float = 3.0e-4,
@@ -379,12 +394,21 @@ class UNetIntensityCorrection(pl.LightningModule):
             raise ValueError("anchor_statistic must be 'max' or 'robust_peak'")
         if not 0.0 < robust_peak_fraction <= 1.0:
             raise ValueError("robust_peak_fraction must be in (0, 1]")
+        if structure_loss_weight < 0.0 or structure_huber_delta_km <= 0.0:
+            raise ValueError(
+                "structure loss weight/delta must be non-negative/positive"
+            )
+        if structure_loss_weight > 0.0 and not structure_head_enabled:
+            raise ValueError("positive structure loss requires structure_head_enabled")
         self.save_hyperparameters()
         self.metadata_features = int(metadata_features)
         self.wind_soft_scale_ms = float(wind_soft_scale_ms)
         self.anchor_statistic = anchor_statistic
         self.robust_peak_fraction = float(robust_peak_fraction)
         self.huber_delta_ms = float(huber_delta_ms)
+        self.structure_head_enabled = bool(structure_head_enabled)
+        self.structure_loss_weight = float(structure_loss_weight)
+        self.structure_huber_delta_km = float(structure_huber_delta_km)
         self.use_field = bool(use_field)
         self.use_metadata = bool(use_metadata)
         self.lr = float(lr)
@@ -426,6 +450,14 @@ class UNetIntensityCorrection(pl.LightningModule):
         self.correction_head = nn.Linear(fusion_hidden_features // 2, 1)
         nn.init.zeros_(self.correction_head.weight)
         nn.init.zeros_(self.correction_head.bias)
+        self.structure_head = (
+            nn.Linear(fusion_hidden_features // 2, len(IBTRACS_STRUCTURE_TARGET_NAMES))
+            if self.structure_head_enabled
+            else None
+        )
+        if self.structure_head is not None:
+            nn.init.normal_(self.structure_head.weight, std=1.0e-3)
+            nn.init.constant_(self.structure_head.bias, 4.0)
         self._evaluation_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     def validate_data_spec(self, spec: IntensityDataSpec) -> None:
@@ -438,6 +470,10 @@ class UNetIntensityCorrection(pl.LightningModule):
             raise ValueError(
                 f"model expects {self.metadata_features} metadata features, "
                 f"data provides {spec.metadata_feature_count}: {spec.metadata_names}"
+            )
+        if self.structure_loss_weight > 0.0 and spec.cache_schema_version < 3:
+            raise ValueError(
+                "structure loss requires an intensity cache with schema version 3"
             )
 
     @staticmethod
@@ -501,6 +537,11 @@ class UNetIntensityCorrection(pl.LightningModule):
         fused = self.fusion(torch.cat(features, dim=1))
         correction = self.correction_head(fused).squeeze(1)
         output = (raw_anchor + correction).clamp_min(0.0)
+        structure = (
+            F.softplus(self.structure_head(fused))
+            if self.structure_head is not None
+            else None
+        )
         return IntensityPredictionBatch(
             raw_unet_anchor_ms=raw_anchor,
             raw_unet_max_wind_ms=raw_max,
@@ -508,6 +549,7 @@ class UNetIntensityCorrection(pl.LightningModule):
             correction_ms=correction,
             output_msw_ms=output,
             output_category=tropical_category_from_wind_ms_tensor(output),
+            structure_prediction_km=structure,
         )
 
     def forward(
@@ -538,8 +580,59 @@ class UNetIntensityCorrection(pl.LightningModule):
             reduction="none",
             beta=self.huber_delta_ms,
         )
-        loss = (element_loss * weights).sum() / weights.sum().clamp_min(1e-12)
+        intensity_loss = (element_loss * weights).sum() / weights.sum().clamp_min(1e-12)
+        structure_loss, _ = self._structure_loss_and_metrics(prediction, batch)
+        loss = intensity_loss + self.structure_loss_weight * structure_loss
         return loss, prediction
+
+    @staticmethod
+    def _structure_targets(
+        batch: Mapping[str, Any], reference: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor] | None:
+        values = []
+        masks = []
+        for key in IBTRACS_STRUCTURE_MANIFEST_COLUMNS:
+            valid_key = f"{key}_valid"
+            if key not in batch or valid_key not in batch:
+                return None
+            value = torch.as_tensor(batch[key], device=reference.device).reshape(-1)
+            valid = torch.as_tensor(
+                batch[valid_key], device=reference.device, dtype=torch.bool
+            ).reshape(-1)
+            values.append(value.to(reference))
+            masks.append(valid & torch.isfinite(value) & (value >= 0.0))
+        return torch.stack(values, dim=1), torch.stack(masks, dim=1)
+
+    def _structure_loss_and_metrics(
+        self, prediction: IntensityPredictionBatch, batch: Mapping[str, Any]
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+        output = prediction.structure_prediction_km
+        if output is None:
+            return prediction.output_msw_ms.sum() * 0.0, {}
+        targets = self._structure_targets(batch, output)
+        if targets is None:
+            if self.structure_loss_weight > 0.0:
+                raise KeyError("structure-supervised MLP requires IBTrACS targets")
+            return output.sum() * 0.0, {}
+        target, valid = targets
+        element_loss = F.smooth_l1_loss(
+            output,
+            target,
+            reduction="none",
+            beta=self.structure_huber_delta_km,
+        )
+        weight = valid.to(output)
+        loss = (element_loss * weight).sum() / weight.sum().clamp_min(1.0)
+        metrics: dict[str, torch.Tensor] = {"structure_loss": loss}
+        error = output - target
+        for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
+            selected = valid[:, index]
+            if not selected.any():
+                continue
+            selected_error = error[selected, index]
+            metrics[f"structure_{name}_mae_km"] = selected_error.abs().mean()
+            metrics[f"structure_{name}_bias_km"] = selected_error.mean()
+        return loss, metrics
 
     def training_step(self, batch: Mapping[str, Any], batch_idx: int) -> torch.Tensor:
         del batch_idx
@@ -565,6 +658,8 @@ class UNetIntensityCorrection(pl.LightningModule):
             .float()
             .mean(),
         }
+        _, structure_metrics = self._structure_loss_and_metrics(prediction, batch)
+        metrics.update(structure_metrics)
         for name, value in metrics.items():
             self.log(
                 f"train/{name}",
@@ -586,6 +681,15 @@ class UNetIntensityCorrection(pl.LightningModule):
             batch_size=int(prediction.output_msw_ms.numel()),
         )
         target = batch["target_wind_ms"].to(prediction.output_msw_ms)
+        _, structure_metrics = self._structure_loss_and_metrics(prediction, batch)
+        for name, value in structure_metrics.items():
+            self.log(
+                f"{prefix}/{name}",
+                value,
+                on_step=False,
+                on_epoch=True,
+                batch_size=int(prediction.output_msw_ms.numel()),
+            )
         target_category = batch["target_category"].to(prediction.output_category)
         self._evaluation_rows[prefix].extend(
             _as_rows(
@@ -775,7 +879,7 @@ class UNetIntensityCorrection(pl.LightningModule):
     ) -> dict[str, Any]:
         del batch_idx, dataloader_idx
         prediction = self.predict_intensity(batch)
-        return {
+        result = {
             "sample_id": list(batch["sample_id"]),
             "storm_id": list(batch["storm_id"]),
             "observation_timestamp": list(batch["observation_timestamp"]),
@@ -786,6 +890,13 @@ class UNetIntensityCorrection(pl.LightningModule):
             "output_msw_ms": prediction.output_msw_ms,
             "output_category": prediction.output_category,
         }
+        if prediction.structure_prediction_km is not None:
+            result["structure_prediction_km"] = prediction.structure_prediction_km
+            for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
+                result[f"output_{name}_km"] = prediction.structure_prediction_km[
+                    :, index
+                ]
+        return result
 
     def configure_optimizers(self) -> dict[str, Any]:
         optimizer = torch.optim.AdamW(
