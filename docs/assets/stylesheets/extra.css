@@ -398,14 +398,14 @@ input {
 
 .md-typeset .datatable-container {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: visible;
   border: 1px solid var(--divider);
 }
 
 .md-typeset table.datatable-table {
   display: table;
   width: 100%;
-  min-width: max-content;
+  min-width: 0;
   margin: 0;
   color: var(--tint-10);
   background: var(--tint-90);
@@ -426,15 +426,42 @@ input {
   border-color: var(--divider);
 }
 
+.md-typeset .datatable-table > thead > tr > th,
+.md-typeset .datatable-table > tbody > tr > td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.md-typeset .datatable-table--wide,
+.md-typeset .datatable-table--very-wide {
+  table-layout: fixed;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.md-typeset .datatable-table--wide > thead > tr > th,
+.md-typeset .datatable-table--wide > tbody > tr > td,
+.md-typeset .datatable-table--very-wide > thead > tr > th,
+.md-typeset .datatable-table--very-wide > tbody > tr > td {
+  padding: 0.42rem 0.48rem;
+}
+
+.md-typeset .datatable-table--very-wide {
+  font-size: 0.66rem;
+}
+
 .md-typeset .datatable-table > tbody > tr:hover > td {
   background: color-mix(in srgb, var(--highlight) 7%, var(--tint-90));
 }
 
 .md-typeset .datatable-sorter {
-  min-width: max-content;
+  min-width: 0;
   padding-right: 1.2rem;
   color: var(--secondary);
   font: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .md-typeset .datatable-sorter::before {
@@ -512,6 +539,31 @@ input {
 .datatable-wrapper[data-wind-unit="m/s"] .wind-unit-value--kt,
 .datatable-wrapper[data-wind-unit="kt"] .wind-unit-value--ms {
   display: none;
+}
+
+.md-typeset .datatable-table .table-best-value {
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--highlight) 22%, var(--tint-90));
+  box-shadow: inset 3px 0 0 var(--highlight);
+  font-weight: 700;
+}
+
+.md-typeset .datatable-table > tbody > tr:hover > .table-best-value {
+  background: color-mix(in srgb, var(--highlight) 30%, var(--tint-90));
+}
+
+@media screen and (max-width: 760px) {
+  .md-typeset .datatable-container:has(.datatable-table--wide),
+  .md-typeset .datatable-container:has(.datatable-table--very-wide) {
+    overflow-x: auto;
+  }
+
+  .md-typeset .datatable-table--wide,
+  .md-typeset .datatable-table--very-wide {
+    width: max-content;
+    min-width: 44rem;
+    table-layout: auto;
+  }
 }
 
 .md-typeset figure img,
