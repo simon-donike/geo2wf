@@ -336,6 +336,184 @@ input {
   border-color: var(--divider);
 }
 
+/* Progressive table controls, backed by the locally vendored simple-datatables. */
+.md-typeset .datatable-wrapper {
+  width: 100%;
+  margin: 1em 0;
+  color: var(--tint-10);
+}
+
+.md-typeset .datatable-top,
+.md-typeset .datatable-bottom,
+.md-typeset .table-unit-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  float: none;
+}
+
+.md-typeset .datatable-top {
+  justify-content: flex-end;
+}
+
+.md-typeset .datatable-bottom {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.md-typeset .datatable-top::after,
+.md-typeset .datatable-bottom::after {
+  display: none;
+}
+
+.md-typeset .datatable-search,
+.md-typeset .datatable-dropdown,
+.md-typeset .datatable-info,
+.md-typeset .datatable-pagination {
+  float: none;
+}
+
+.md-typeset .datatable-input,
+.md-typeset .datatable-selector {
+  min-height: 2.1rem;
+  color: var(--secondary);
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
+  border-radius: 0.3rem;
+  font: inherit;
+}
+
+.md-typeset .datatable-input {
+  width: min(18rem, 70vw);
+}
+
+.md-typeset .datatable-input:focus,
+.md-typeset .datatable-selector:focus,
+.md-typeset .table-unit-control button:focus-visible,
+.md-typeset .datatable-sorter:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.md-typeset .datatable-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--divider);
+}
+
+.md-typeset table.datatable-table {
+  display: table;
+  width: 100%;
+  min-width: max-content;
+  margin: 0;
+  color: var(--tint-10);
+  background: var(--tint-90);
+  border: 0;
+}
+
+.md-typeset .datatable-table > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--secondary);
+  background: var(--tint-80);
+  border-color: var(--divider);
+  vertical-align: bottom;
+}
+
+.md-typeset .datatable-table > tbody > tr > td {
+  border-color: var(--divider);
+}
+
+.md-typeset .datatable-table > tbody > tr:hover > td {
+  background: color-mix(in srgb, var(--highlight) 7%, var(--tint-90));
+}
+
+.md-typeset .datatable-sorter {
+  min-width: max-content;
+  padding-right: 1.2rem;
+  color: var(--secondary);
+  font: inherit;
+}
+
+.md-typeset .datatable-sorter::before {
+  border-top-color: var(--tint-20);
+}
+
+.md-typeset .datatable-sorter::after {
+  border-bottom-color: var(--tint-20);
+}
+
+.md-typeset .datatable-pagination-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.md-typeset .datatable-pagination-list button {
+  min-width: 2rem;
+  padding: 0.35rem 0.55rem;
+  color: var(--tint-20);
+  background: transparent;
+  border: 1px solid var(--divider);
+  border-radius: 0.25rem;
+}
+
+.md-typeset .datatable-pagination-list button:hover,
+.md-typeset .datatable-pagination .datatable-active button {
+  color: var(--main);
+  background: var(--highlight);
+  border-color: var(--highlight);
+}
+
+.md-typeset .table-unit-control {
+  justify-content: flex-end;
+}
+
+.md-typeset .table-unit-control__label {
+  color: var(--tint-30);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.md-typeset .table-unit-control__buttons {
+  display: inline-flex;
+}
+
+.md-typeset .table-unit-control button {
+  min-width: 3rem;
+  padding: 0.35rem 0.6rem;
+  color: var(--tint-20);
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.md-typeset .table-unit-control button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+
+.md-typeset .table-unit-control button:last-child {
+  margin-left: -1px;
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+
+.md-typeset .table-unit-control button[aria-pressed="true"] {
+  color: var(--main);
+  background: var(--highlight);
+  border-color: var(--highlight);
+}
+
+.datatable-wrapper[data-wind-unit="m/s"] .wind-unit-value--kt,
+.datatable-wrapper[data-wind-unit="kt"] .wind-unit-value--ms {
+  display: none;
+}
+
 .md-typeset figure img,
 .md-typeset > p > img {
   background: var(--tint-90);
