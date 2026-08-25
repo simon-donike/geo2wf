@@ -9,6 +9,11 @@ image_huber_delta_ms: 2.0
 intensity_huber_delta_ms: 5.0
 image_loss_weight: 1.0
 intensity_loss_weight: 1.0
+# Optional multi-task IBTrACS structure head: eye size, RMW, and equivalent-area
+# R34/R50/R64 radii. Set enabled=true and weight>0 to train it.
+structure_head_enabled: false
+structure_loss_weight: 0.0
+structure_huber_delta_km: 20.0
 lr: 0.0002
 weight_decay: 0.0001
 lr_scheduler_factor: 0.5

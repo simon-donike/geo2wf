@@ -160,6 +160,43 @@ def test_joint_objective_uses_continuous_ibtracs_target_and_masks_image() -> Non
     assert torch.isfinite(objective.loss)
 
 
+def test_joint_optional_structure_head_outputs_and_contributes_to_loss() -> None:
+    model = BottleneckUNetMLPRegressor(
+        condition_channels=3,
+        base_channels=4,
+        channel_mults=(1, 2),
+        intensity_hidden_features=8,
+        intensity_dropout=0.0,
+        structure_head_enabled=True,
+        structure_loss_weight=0.5,
+        log_reconstruction_images=False,
+    )
+    batch = _batch()
+    structure_keys = (
+        "ibtracs_eye_size_km",
+        "ibtracs_rmw_km",
+        "ibtracs_r34_equivalent_km",
+        "ibtracs_r50_equivalent_km",
+        "ibtracs_r64_equivalent_km",
+    )
+    for index, key in enumerate(structure_keys):
+        batch[key] = torch.full((2,), 20.0 + 10.0 * index)
+        batch[f"{key}_valid"] = torch.ones(2, dtype=torch.bool)
+
+    prediction = model.predict_joint(batch)
+    objective = model.compute_training_objective(batch)
+
+    assert prediction.structure_prediction_km.shape == (2, 5)
+    assert torch.all(prediction.structure_prediction_km >= 0.0)
+    assert objective.components["structure_loss"] > 0.0
+    expected = (
+        model.image_loss_weight * objective.components["image_loss"]
+        + model.intensity_loss_weight * objective.components["intensity_loss"]
+        + model.structure_loss_weight * objective.components["structure_loss"]
+    )
+    assert torch.allclose(objective.loss, expected)
+
+
 def test_model_rejects_data_without_continuous_ibtracs_companion() -> None:
     model = BottleneckUNetMLPRegressor(
         condition_channels=3, base_channels=4, channel_mults=(1, 2)
@@ -400,11 +437,11 @@ def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) 
     assert batch["intensity_target_ms"].item() == pytest.approx(45.0 * 0.514444)
     assert batch["ibtracs_eye_size_km"].item() == pytest.approx(12.0 * 1.852)
     assert batch["ibtracs_rmw_km"].item() == pytest.approx(22.0 * 1.852)
-    assert batch["ibtracs_r34_mean_km"].item() == pytest.approx(42.0 * 1.852)
-    assert batch["ibtracs_r50_mean_km"].item() == pytest.approx(32.0 * 1.852)
-    assert batch["ibtracs_r64_mean_km"].item() == pytest.approx(22.0 * 1.852)
+    assert batch["ibtracs_r34_equivalent_km"].item() == pytest.approx(42.0 * 1.852)
+    assert batch["ibtracs_r50_equivalent_km"].item() == pytest.approx(32.0 * 1.852)
+    assert batch["ibtracs_r64_equivalent_km"].item() == pytest.approx(22.0 * 1.852)
     assert batch["ibtracs_eye_size_km_valid"].item()
-    assert batch["ibtracs_r64_mean_km_valid"].item()
+    assert batch["ibtracs_r64_equivalent_km_valid"].item()
     assert batch["condition"].shape[1] == 14
     assert "era5_wind_speed" in batch
 

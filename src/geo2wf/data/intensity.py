@@ -15,8 +15,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 
-INTENSITY_CACHE_SCHEMA_VERSION = 2
-SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS = frozenset({1, 2})
+INTENSITY_CACHE_SCHEMA_VERSION = 3
+SUPPORTED_INTENSITY_CACHE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 KNOT_TO_MS = 0.514444
 TROPICAL_CATEGORY_MIN = -1
 TROPICAL_CATEGORY_MAX = 5
@@ -69,6 +69,25 @@ V2_MANIFEST_COLUMNS = frozenset(
         "filtered_invalid_sar_center_count",
         "filtered_unusable_sar_count",
     }
+)
+IBTRACS_STRUCTURE_TARGET_NAMES = (
+    "eye_size",
+    "rmw",
+    "r34_equivalent",
+    "r50_equivalent",
+    "r64_equivalent",
+)
+IBTRACS_STRUCTURE_MANIFEST_COLUMNS = (
+    "ibtracs_eye_size_km",
+    "ibtracs_rmw_km",
+    "ibtracs_r34_equivalent_km",
+    "ibtracs_r50_equivalent_km",
+    "ibtracs_r64_equivalent_km",
+)
+V3_MANIFEST_COLUMNS = frozenset(
+    column
+    for value_column in IBTRACS_STRUCTURE_MANIFEST_COLUMNS
+    for column in (value_column, f"{value_column}_valid")
 )
 
 
@@ -249,8 +268,10 @@ class UNetIntensityDataset(Dataset):
             )
         self.samples = pd.read_csv(self.manifest_path, keep_default_na=False)
         missing = REQUIRED_MANIFEST_COLUMNS.difference(self.samples.columns)
-        if self.cache_metadata.get("schema_version") == 2:
+        if self.cache_metadata.get("schema_version") in {2, 3}:
             missing |= V2_MANIFEST_COLUMNS.difference(self.samples.columns)
+        if self.cache_metadata.get("schema_version") == 3:
+            missing |= V3_MANIFEST_COLUMNS.difference(self.samples.columns)
         if missing:
             raise ValueError(
                 f"{self.manifest_path} is missing columns: {sorted(missing)}"
@@ -329,7 +350,7 @@ class UNetIntensityDataset(Dataset):
         ):
             raise ValueError(f"{path} raw maximum disagrees with its manifest row")
         if (
-            self.cache_metadata.get("schema_version") == 2
+            self.cache_metadata.get("schema_version") in {2, 3}
             and self.verify_cache
             and not math.isclose(
                 raw_robust_peak,
@@ -348,7 +369,7 @@ class UNetIntensityDataset(Dataset):
         target_wind_ms = _finite_float(row["target_wind_ms"], "target_wind_ms")
         target_source = (
             str(row["intensity_target_source"]).strip().lower()
-            if version == 2
+            if version in {2, 3}
             else "ibtracs"
         )
         if target_source not in {"ibtracs", "sar_robust_peak"}:
@@ -357,16 +378,16 @@ class UNetIntensityDataset(Dataset):
             )
         ibtracs_target_ms = (
             _finite_float(row["ibtracs_target_ms"], "ibtracs_target_ms")
-            if version == 2
+            if version in {2, 3}
             else target_wind_ms
         )
         sar_target_ms = (
             _finite_float(row["sar_robust_peak_target_ms"], "sar_robust_peak_target_ms")
-            if version == 2
+            if version in {2, 3}
             else math.nan
         )
         anchor_statistic = (
-            str(row["anchor_statistic"]).strip().lower() if version == 2 else "max"
+            str(row["anchor_statistic"]).strip().lower() if version in {2, 3} else "max"
         )
         expected_anchor = "max" if target_source == "ibtracs" else "robust_peak"
         if anchor_statistic != expected_anchor:
@@ -386,7 +407,7 @@ class UNetIntensityDataset(Dataset):
         filtering_counts = self.cache_metadata.get("filtering_counts", {}).get(
             self.split, {}
         )
-        return {
+        sample = {
             "wind_field": torch.from_numpy(wind),
             "valid_mask": torch.from_numpy(finite_valid),
             "distance_to_center": torch.from_numpy(distance),
@@ -409,7 +430,7 @@ class UNetIntensityDataset(Dataset):
             "sar_max_wind_ms": torch.tensor(
                 (
                     _finite_float(row["sar_max_wind_ms"], "sar_max_wind_ms")
-                    if version == 2
+                    if version in {2, 3}
                     else math.nan
                 ),
                 dtype=torch.float32,
@@ -417,12 +438,12 @@ class UNetIntensityDataset(Dataset):
             "is_rapid_intensification": torch.tensor(
                 (
                     bool(row["is_rapid_intensification"])
-                    if version == 2
+                    if version in {2, 3}
                     and isinstance(row["is_rapid_intensification"], (bool, np.bool_))
                     else (
                         str(row["is_rapid_intensification"]).strip().lower()
                         in {"1", "true", "yes"}
-                        if version == 2
+                        if version in {2, 3}
                         else False
                     )
                 ),
@@ -431,7 +452,7 @@ class UNetIntensityDataset(Dataset):
             "ri_24h_change_ms": torch.tensor(
                 (
                     pd.to_numeric(row["ri_24h_change_ms"], errors="coerce")
-                    if version == 2
+                    if version in {2, 3}
                     else math.nan
                 ),
                 dtype=torch.float32,
@@ -457,6 +478,19 @@ class UNetIntensityDataset(Dataset):
             "storm_id": str(row["storm_id"]),
             "observation_timestamp": str(row["observation_timestamp"]),
         }
+        for column in IBTRACS_STRUCTURE_MANIFEST_COLUMNS:
+            value = pd.to_numeric(row.get(column), errors="coerce")
+            valid_value = row.get(f"{column}_valid", False)
+            valid = (
+                bool(valid_value)
+                if isinstance(valid_value, (bool, np.bool_))
+                else str(valid_value).strip().lower() in {"1", "true", "yes"}
+            )
+            sample[column] = torch.tensor(float(value), dtype=torch.float32)
+            sample[f"{column}_valid"] = torch.tensor(
+                valid and math.isfinite(float(value)), dtype=torch.bool
+            )
+        return sample
 
 
 def _assert_storm_disjoint(manifests: dict[str, pd.DataFrame]) -> None:

@@ -16,7 +16,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from geo2wf.data.contracts import DataSpec
 from geo2wf.data.joint_intensity import (
     IBTRACS_MAX_WIND_COMPANION,
+    IBTRACS_STRUCTURE_COMPANION,
+    IBTRACS_STRUCTURE_TARGET_NAMES,
     INTENSITY_TARGET_COMPANION,
+    ibtracs_structure_targets,
 )
 from geo2wf.data.intensity import (
     category_macro_f1_tensor,
@@ -71,6 +74,7 @@ class JointUNetOutput:
     reconstruction_normalized: torch.Tensor
     intensity_prediction_ms: torch.Tensor
     bottleneck: torch.Tensor
+    structure_prediction_km: torch.Tensor | None = None
 
     @property
     def ibtracs_max_wind_ms(self) -> torch.Tensor:
@@ -84,6 +88,7 @@ class JointPredictionBatch(PredictionBatch):
     """Standard physical field prediction plus continuous scalar intensity."""
 
     intensity_prediction_ms: torch.Tensor
+    structure_prediction_km: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -91,12 +96,26 @@ class JointPredictionBatch(PredictionBatch):
             self.central_physical.shape[0],
         ):
             raise ValueError("intensity_prediction_ms must have shape [B]")
+        if self.structure_prediction_km is not None and tuple(
+            self.structure_prediction_km.shape
+        ) != (self.central_physical.shape[0], len(IBTRACS_STRUCTURE_TARGET_NAMES)):
+            raise ValueError("structure_prediction_km must have shape [B,5]")
 
     @property
     def ibtracs_max_wind_ms(self) -> torch.Tensor:
         """Compatibility alias for the former IBTrACS-specific output name."""
 
         return self.intensity_prediction_ms
+
+    @property
+    def structure_outputs_km(self) -> dict[str, torch.Tensor]:
+        """Return named optional structure outputs."""
+        if self.structure_prediction_km is None:
+            return {}
+        return {
+            name: self.structure_prediction_km[:, index]
+            for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES)
+        }
 
 
 class BottleneckUNetMLP(nn.Module):
@@ -110,6 +129,7 @@ class BottleneckUNetMLP(nn.Module):
         intensity_hidden_features: int = 128,
         intensity_dropout: float = 0.1,
         initial_intensity_ms: float = 25.0,
+        structure_outputs: int = 0,
     ) -> None:
         super().__init__()
         if in_channels <= 0 or base_channels <= 0:
@@ -122,6 +142,8 @@ class BottleneckUNetMLP(nn.Module):
             raise ValueError("intensity_dropout must be in [0, 1)")
         if initial_intensity_ms <= 0.0:
             raise ValueError("initial_intensity_ms must be positive")
+        if structure_outputs < 0:
+            raise ValueError("structure_outputs must be non-negative")
 
         dimensions = [base_channels * int(value) for value in channel_mults]
         self.stem = nn.Conv2d(in_channels, dimensions[0], 3, padding=1)
@@ -165,6 +187,14 @@ class BottleneckUNetMLP(nn.Module):
             self.intensity_head.bias,
             math.log(math.expm1(float(initial_intensity_ms))),
         )
+        self.structure_head = (
+            nn.Linear(second_hidden, int(structure_outputs))
+            if structure_outputs > 0
+            else None
+        )
+        if self.structure_head is not None:
+            nn.init.normal_(self.structure_head.weight, std=1.0e-3)
+            nn.init.constant_(self.structure_head.bias, 4.0)
 
         self.decoder_projections = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -198,8 +228,12 @@ class BottleneckUNetMLP(nn.Module):
         bottleneck = self.bottleneck(hidden)
         flattened = bottleneck.flatten(2)
         pooled = torch.cat([flattened.mean(dim=2), flattened.amax(dim=2)], dim=1)
-        intensity = F.softplus(self.intensity_head(self.intensity_mlp(pooled))).squeeze(
-            1
+        intensity_features = self.intensity_mlp(pooled)
+        intensity = F.softplus(self.intensity_head(intensity_features)).squeeze(1)
+        structure = (
+            F.softplus(self.structure_head(intensity_features))
+            if self.structure_head is not None
+            else None
         )
 
         hidden = bottleneck
@@ -217,7 +251,7 @@ class BottleneckUNetMLP(nn.Module):
             hidden = projection(hidden)
             hidden = block(torch.cat([hidden, skip], dim=1))
         reconstruction = torch.sigmoid(self.reconstruction_head(hidden))
-        return JointUNetOutput(reconstruction, intensity, bottleneck)
+        return JointUNetOutput(reconstruction, intensity, bottleneck, structure)
 
 
 def _huber_values(error: torch.Tensor, delta: float) -> torch.Tensor:
@@ -258,6 +292,9 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         intensity_huber_delta_ms: float = 5.0,
         image_loss_weight: float = 1.0,
         intensity_loss_weight: float = 1.0,
+        structure_head_enabled: bool = False,
+        structure_loss_weight: float = 0.0,
+        structure_huber_delta_km: float = 20.0,
         lr: float = 2.0e-4,
         weight_decay: float = 1.0e-4,
         lr_scheduler_factor: float = 0.5,
@@ -273,10 +310,18 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             raise ValueError("condition_channels must be positive")
         if image_huber_delta_ms <= 0.0 or intensity_huber_delta_ms <= 0.0:
             raise ValueError("Huber deltas must be positive")
-        if image_loss_weight < 0.0 or intensity_loss_weight < 0.0:
+        if (
+            image_loss_weight < 0.0
+            or intensity_loss_weight < 0.0
+            or structure_loss_weight < 0.0
+        ):
             raise ValueError("loss weights must be non-negative")
-        if image_loss_weight + intensity_loss_weight <= 0.0:
+        if image_loss_weight + intensity_loss_weight + structure_loss_weight <= 0.0:
             raise ValueError("at least one loss weight must be positive")
+        if structure_huber_delta_km <= 0.0:
+            raise ValueError("structure_huber_delta_km must be positive")
+        if structure_loss_weight > 0.0 and not structure_head_enabled:
+            raise ValueError("positive structure loss requires structure_head_enabled")
         if validation_reconstruction_batches < 1:
             raise ValueError("validation_reconstruction_batches must be positive")
         if not 0.0 < sar_robust_peak_fraction <= 1.0:
@@ -287,6 +332,9 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self.intensity_huber_delta_ms = float(intensity_huber_delta_ms)
         self.image_loss_weight = float(image_loss_weight)
         self.intensity_loss_weight = float(intensity_loss_weight)
+        self.structure_head_enabled = bool(structure_head_enabled)
+        self.structure_loss_weight = float(structure_loss_weight)
+        self.structure_huber_delta_km = float(structure_huber_delta_km)
         self.lr = float(lr)
         self.weight_decay = float(weight_decay)
         self.lr_scheduler_factor = float(lr_scheduler_factor)
@@ -303,6 +351,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             intensity_hidden_features,
             intensity_dropout,
             initial_intensity_ms,
+            len(IBTRACS_STRUCTURE_TARGET_NAMES) if self.structure_head_enabled else 0,
         )
         self.register_buffer(
             "_validation_field_statistics",
@@ -322,6 +371,16 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self.register_buffer(
             "_test_intensity_statistics",
             torch.zeros(5, dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_validation_structure_statistics",
+            torch.zeros((len(IBTRACS_STRUCTURE_TARGET_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_test_structure_statistics",
+            torch.zeros((len(IBTRACS_STRUCTURE_TARGET_NAMES), 5), dtype=torch.float64),
             persistent=False,
         )
         self.register_buffer(
@@ -353,6 +412,11 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             IBTRACS_MAX_WIND_COMPANION,
         }.intersection(spec.companions):
             raise ValueError("data must provide continuous scalar intensity labels")
+        if (
+            self.structure_loss_weight > 0.0
+            and IBTRACS_STRUCTURE_COMPANION not in spec.companions
+        ):
+            raise ValueError("structure loss requires IBTRACS structure companions")
 
     def forward(
         self, condition: torch.Tensor, condition_mask: torch.Tensor
@@ -378,6 +442,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             samples_physical=physical.unsqueeze(1),
             central_physical=physical,
             intensity_prediction_ms=output.intensity_prediction_ms,
+            structure_prediction_km=output.structure_prediction_km,
         )
 
     def predict_physical(self, batch: Mapping[str, Any]) -> torch.Tensor:
@@ -405,6 +470,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
 
     def compute_training_objective(self, batch: Mapping[str, Any]) -> LossOutput:
         image_loss, intensity_loss, prediction, target, mask = self._losses(batch)
+        structure_loss = self._structure_loss(prediction, batch)
         intensity_target = self._intensity_target(batch, prediction.central_physical)
         image_error = prediction.central_physical - target
         intensity_error = prediction.intensity_prediction_ms - intensity_target
@@ -413,6 +479,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         total = (
             self.image_loss_weight * image_loss
             + self.intensity_loss_weight * intensity_loss
+            + self.structure_loss_weight * structure_loss
         )
         return LossOutput(
             total,
@@ -425,8 +492,32 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 "intensity_mae_ms": intensity_error.abs().mean(),
                 "intensity_rmse_ms": intensity_error.square().mean().sqrt(),
                 "intensity_bias_ms": intensity_error.mean(),
+                "structure_loss": structure_loss,
             },
         )
+
+    def _structure_loss(
+        self, prediction: JointPredictionBatch, batch: Mapping[str, Any]
+    ) -> torch.Tensor:
+        output = prediction.structure_prediction_km
+        if output is None:
+            return prediction.intensity_prediction_ms.sum() * 0.0
+        targets = ibtracs_structure_targets(batch, output)
+        if targets is None:
+            if self.structure_loss_weight > 0.0:
+                raise KeyError(
+                    "structure-supervised joint model requires IBTrACS targets"
+                )
+            return output.sum() * 0.0
+        target, valid = targets
+        element_loss = F.smooth_l1_loss(
+            output,
+            target,
+            reduction="none",
+            beta=self.structure_huber_delta_km,
+        )
+        weight = valid.to(element_loss)
+        return (element_loss * weight).sum() / weight.sum().clamp_min(1.0)
 
     @torch.no_grad()
     def predict_batch(
@@ -440,6 +531,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             samples_physical=members,
             central_physical=prediction.central_physical,
             intensity_prediction_ms=prediction.intensity_prediction_ms,
+            structure_prediction_km=prediction.structure_prediction_km,
         )
 
     @torch.no_grad()
@@ -470,6 +562,9 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             intensity_target,
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
+        )
+        self._accumulate_structure_statistics(
+            self._validation_structure_statistics, prediction, batch
         )
         self._accumulate_ibtracs_radius_statistics(
             self._validation_ibtracs_radius_statistics,
@@ -539,6 +634,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
     def on_validation_epoch_start(self) -> None:
         self._validation_field_statistics.zero_()
         self._validation_intensity_statistics.zero_()
+        self._validation_structure_statistics.zero_()
         self._validation_ibtracs_radius_statistics.zero_()
         self._evaluation_rows["val"] = []
 
@@ -547,6 +643,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             "val",
             self._validation_field_statistics,
             self._validation_intensity_statistics,
+            self._validation_structure_statistics,
         )
         self._log_ibtracs_radius_statistics(
             "val", self._validation_ibtracs_radius_statistics
@@ -572,6 +669,9 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             torch.ones_like(intensity_target),
             self.intensity_huber_delta_ms,
         )
+        self._accumulate_structure_statistics(
+            self._test_structure_statistics, prediction, batch
+        )
         self._accumulate_ibtracs_radius_statistics(
             self._test_ibtracs_radius_statistics,
             prediction.central_physical,
@@ -581,11 +681,15 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
     def on_test_epoch_start(self) -> None:
         self._test_field_statistics.zero_()
         self._test_intensity_statistics.zero_()
+        self._test_structure_statistics.zero_()
         self._test_ibtracs_radius_statistics.zero_()
 
     def on_test_epoch_end(self) -> None:
         self._log_statistics(
-            "test", self._test_field_statistics, self._test_intensity_statistics
+            "test",
+            self._test_field_statistics,
+            self._test_intensity_statistics,
+            self._test_structure_statistics,
         )
         self._log_ibtracs_radius_statistics(
             "test", self._test_ibtracs_radius_statistics
@@ -697,6 +801,39 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         )
         statistics.add_(additions.to(statistics))
 
+    def _accumulate_structure_statistics(
+        self,
+        statistics: torch.Tensor,
+        prediction: JointPredictionBatch,
+        batch: Mapping[str, Any],
+    ) -> None:
+        output = prediction.structure_prediction_km
+        if output is None:
+            return
+        targets = ibtracs_structure_targets(batch, output)
+        if targets is None:
+            return
+        target, valid = targets
+        error = output - target
+        huber = F.smooth_l1_loss(
+            output,
+            target,
+            reduction="none",
+            beta=self.structure_huber_delta_km,
+        )
+        weight = valid.to(error)
+        additions = torch.stack(
+            [
+                weight.sum(dim=0),
+                (error.abs() * weight).sum(dim=0),
+                (error.square() * weight).sum(dim=0),
+                (error * weight).sum(dim=0),
+                (huber * weight).sum(dim=0),
+            ],
+            dim=1,
+        )
+        statistics.add_(additions.to(statistics))
+
     def _log_ibtracs_radius_statistics(
         self, prefix: str, statistics: torch.Tensor
     ) -> None:
@@ -728,19 +865,25 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         prefix: str,
         field_statistics: torch.Tensor,
         intensity_statistics: torch.Tensor,
+        structure_statistics: torch.Tensor,
     ) -> None:
         field = field_statistics.clone()
         intensity = intensity_statistics.clone()
+        structure = structure_statistics.clone()
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             torch.distributed.all_reduce(field)
             torch.distributed.all_reduce(intensity)
+            torch.distributed.all_reduce(structure)
         field_count = field[0].clamp_min(1.0)
         intensity_count = intensity[0].clamp_min(1.0)
         image_loss = field[4] / field_count
         intensity_loss = intensity[4] / intensity_count
+        structure_count = structure[:, 0].sum()
+        structure_loss = structure[:, 4].sum() / structure_count.clamp_min(1.0)
         metrics = {
             "loss": self.image_loss_weight * image_loss
-            + self.intensity_loss_weight * intensity_loss,
+            + self.intensity_loss_weight * intensity_loss
+            + self.structure_loss_weight * structure_loss,
             "image_loss": image_loss,
             "intensity_loss": intensity_loss,
             "image_mae_ms": field[1] / field_count,
@@ -750,6 +893,17 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             "intensity_rmse_ms": torch.sqrt(intensity[2] / intensity_count),
             "intensity_bias_ms": intensity[3] / intensity_count,
         }
+        if structure_count > 0:
+            metrics["structure_loss"] = structure_loss
+            for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
+                count = structure[index, 0]
+                if count <= 0:
+                    continue
+                metrics[f"structure_{name}_mae_km"] = structure[index, 1] / count
+                metrics[f"structure_{name}_rmse_km"] = torch.sqrt(
+                    structure[index, 2] / count
+                )
+                metrics[f"structure_{name}_bias_km"] = structure[index, 3] / count
         for name, value in metrics.items():
             self.log(
                 f"{prefix}/{name}",

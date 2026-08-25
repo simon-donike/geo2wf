@@ -9,6 +9,11 @@ wind_soft_scale_ms: 20.0
 anchor_statistic: max
 robust_peak_fraction: 0.005
 huber_delta_ms: 5.0
+# Optional multi-task IBTrACS structure outputs. This works with either the
+# field+metadata model or an MLP-only run configured with use_field=false.
+structure_head_enabled: false
+structure_loss_weight: 0.0
+structure_huber_delta_km: 20.0
 use_field: true
 use_metadata: true
 lr: 0.0003
