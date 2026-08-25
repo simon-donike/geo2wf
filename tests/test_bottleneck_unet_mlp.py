@@ -16,6 +16,7 @@ from geo2wf.config import compose_config, instantiate_model
 from geo2wf.data.contracts import DataSpec
 from geo2wf.data.joint_intensity import (
     IBTRACS_MAX_WIND_COMPANION,
+    IBTRACS_STRUCTURE_COMPANION,
     JointPairedIntensityDataModule,
 )
 from geo2wf.models.base import PredictionRequest
@@ -287,11 +288,25 @@ def _write_joint_fixture(root: Path, ibtracs_file: Path) -> None:
                     "USA_ATCF_ID": storm_id,
                     "ISO_TIME": "2024-08-01T00:00:00Z",
                     "USA_WIND": 40.0 + split_index,
+                    "USA_EYE": 10.0,
+                    "USA_RMW": 20.0,
+                    **{
+                        f"USA_R{threshold}_{quadrant}": value
+                        for threshold, value in ((34, 40.0), (50, 30.0), (64, 20.0))
+                        for quadrant in ("NE", "SE", "SW", "NW")
+                    },
                 },
                 {
                     "USA_ATCF_ID": storm_id,
                     "ISO_TIME": "2024-08-01T03:00:00Z",
                     "USA_WIND": 50.0 + split_index,
+                    "USA_EYE": 14.0,
+                    "USA_RMW": 24.0,
+                    **{
+                        f"USA_R{threshold}_{quadrant}": value
+                        for threshold, value in ((34, 44.0), (50, 34.0), (64, 24.0))
+                        for quadrant in ("NE", "SE", "SW", "NW")
+                    },
                 },
             ]
         )
@@ -380,8 +395,16 @@ def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) 
     assert len(datamodule.train_dataset) == 2
     assert len(datamodule.val_dataset) == 2
     assert IBTRACS_MAX_WIND_COMPANION in datamodule.data_spec.companions
+    assert IBTRACS_STRUCTURE_COMPANION in datamodule.data_spec.companions
     batch = next(iter(datamodule.train_dataloader()))
     assert batch["intensity_target_ms"].item() == pytest.approx(45.0 * 0.514444)
+    assert batch["ibtracs_eye_size_km"].item() == pytest.approx(12.0 * 1.852)
+    assert batch["ibtracs_rmw_km"].item() == pytest.approx(22.0 * 1.852)
+    assert batch["ibtracs_r34_mean_km"].item() == pytest.approx(42.0 * 1.852)
+    assert batch["ibtracs_r50_mean_km"].item() == pytest.approx(32.0 * 1.852)
+    assert batch["ibtracs_r64_mean_km"].item() == pytest.approx(22.0 * 1.852)
+    assert batch["ibtracs_eye_size_km_valid"].item()
+    assert batch["ibtracs_r64_mean_km_valid"].item()
     assert batch["condition"].shape[1] == 14
     assert "era5_wind_speed" in batch
 
