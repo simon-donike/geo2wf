@@ -62,6 +62,14 @@ function unitValue(value, unit, includeUnit = true) {
   return span
 }
 
+function prepareSortValues(table) {
+  table.querySelectorAll("tbody tr").forEach((row) => {
+    Array.from(row.cells).forEach((cell) => {
+      if (!cell.hasAttribute("data-order")) cell.dataset.order = cell.textContent.trim()
+    })
+  })
+}
+
 function prepareWindValues(table) {
   const headings = [...table.querySelectorAll("thead th")]
   const windColumns = new Set()
@@ -93,6 +101,9 @@ function prepareWindValues(table) {
   headings.forEach((heading) => {
     replaceTextMatches(heading, WIND_HEADER_PATTERN, () => {
       const fragment = document.createDocumentFragment()
+      const lineBreak = document.createElement("br")
+      lineBreak.className = "table-heading-break"
+      fragment.append(lineBreak)
       fragment.append(unitValue("m/s", "m/s", false))
       fragment.append(unitValue("kt", "kt", false))
       return fragment
@@ -100,6 +111,41 @@ function prepareWindValues(table) {
   })
 
   return pairs > 0
+}
+
+function markBestValues(table) {
+  const headings = [...table.querySelectorAll("thead th")]
+
+  headings.forEach((heading, index) => {
+    const headingText = heading.textContent
+    const direction = headingText.includes("↓") ? "min" : headingText.includes("↑") ? "max" : null
+    if (!direction) return
+
+    const candidates = [...table.querySelectorAll("tbody tr")]
+      .map((row) => row.cells[index])
+      .filter(Boolean)
+      .map((cell) => {
+        const match = cell.dataset.order?.match(/^[+\-\u2212]?\d+(?:\.\d+)?/u)
+        return match ? { cell, value: Number(match[0].replace("\u2212", "-")) } : null
+      })
+      .filter((candidate) => candidate && Number.isFinite(candidate.value))
+
+    if (!candidates.length) return
+    const best = Math[direction](...candidates.map((candidate) => candidate.value))
+    candidates
+      .filter((candidate) => candidate.value === best)
+      .forEach(({ cell }) => {
+        cell.classList.add("table-best-value")
+        cell.dataset.best = direction === "min" ? "lowest" : "highest"
+        cell.title = `Best ${cell.dataset.best} value in this table`
+      })
+  })
+}
+
+function classifyTableWidth(table) {
+  const columnCount = table.tHead?.rows[0]?.cells.length ?? 0
+  if (columnCount >= 10) table.classList.add("datatable-table--very-wide")
+  else if (columnCount >= 7) table.classList.add("datatable-table--wide")
 }
 
 function preferredWindUnit() {
@@ -140,7 +186,8 @@ function addWindUnitControl(wrapper) {
   buttons.setAttribute("role", "group")
   buttons.setAttribute("aria-label", "Wind speed units")
 
-  ;["m/s", "kt"].forEach((unit) => {
+  const units = ["m/s", "kt"]
+  units.forEach((unit) => {
     const button = document.createElement("button")
     button.type = "button"
     button.dataset.setWindUnit = unit
@@ -165,7 +212,10 @@ function enhanceTables() {
     if (rowCount < TABLE_MIN_ROWS || !table.tHead) return
 
     table.dataset.enhanced = "true"
+    prepareSortValues(table)
     const hasWindValues = prepareWindValues(table)
+    markBestValues(table)
+    classifyTableWidth(table)
     const searchable = rowCount >= TABLE_SEARCH_MIN_ROWS
     const paging = rowCount >= TABLE_PAGE_MIN_ROWS
 
