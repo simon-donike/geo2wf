@@ -98,6 +98,11 @@ COLORS = {
     "Joint U-Net + MLP": "#009E73",
     "IBTrACS": "#111111",
 }
+KNOTS_PER_MPS = 1.0 / 0.514444
+
+
+def _dual_speed_tick(value: float, _position: int) -> str:
+    return f"{value:g}\n({value * KNOTS_PER_MPS:.1f} kt)"
 
 
 def parse_args() -> argparse.Namespace:
@@ -173,16 +178,24 @@ def _plot_validation_mae(frames: Mapping[str, pd.DataFrame], path: Path) -> None
             capsize=4,
             error_kw={"linewidth": 1.2},
         )
-        axis.bar_label(bars, fmt="%.2f", padding=5, fontsize=9)
+        axis.bar_label(
+            bars,
+            labels=[
+                f"{value:.2f}\n({value * KNOTS_PER_MPS:.2f} kt)" for value in center
+            ],
+            padding=5,
+            fontsize=8,
+        )
     axis.set_xticks(
         x, ["Raw field\nmaximum", "Separate\ncorrection", "Joint\nU-Net + MLP"]
     )
-    axis.set_ylabel("Validation intensity MAE (m/s)")
+    axis.set_ylabel("Validation intensity MAE: m/s (kt)")
+    axis.yaxis.set_major_formatter(_dual_speed_tick)
     axis.set_title("Matched 232-sample validation cohort")
     axis.grid(axis="y", alpha=0.25)
     axis.set_axisbelow(True)
     axis.legend(frameon=False)
-    axis.set_ylim(0, 11.5)
+    axis.set_ylim(0, 12.5)
     figure.tight_layout()
     _save_figure(figure, path)
 
@@ -218,6 +231,12 @@ def _plot_training_curves(path: Path) -> None:
             axis.set_title(f"{regime}: {stage}", fontsize=10)
             axis.set_xlabel("Epoch")
             axis.set_ylabel(metric.removeprefix("val/").replace("_", " "))
+            if metric.endswith("_ms"):
+                axis.set_ylabel(
+                    metric.removeprefix("val/").removesuffix("_ms").replace("_", " ")
+                    + ": m/s (kt)"
+                )
+                axis.yaxis.set_major_formatter(_dual_speed_tick)
             axis.grid(alpha=0.22)
             axis.legend(frameon=False, fontsize=8)
     figure.suptitle(
@@ -288,7 +307,8 @@ def _plot_storm_trajectories(frames: Mapping[str, pd.DataFrame], path: Path) -> 
                     alpha=0.92,
                 )
             axis.set_title(f"{STORM_NAMES[storm_id]} — {regime}")
-            axis.set_ylabel("Maximum wind (m/s)")
+            axis.set_ylabel("Maximum wind: m/s (kt)")
+            axis.yaxis.set_major_formatter(_dual_speed_tick)
             axis.grid(alpha=0.22)
             locator = mdates.AutoDateLocator(minticks=4, maxticks=7)
             axis.xaxis.set_major_locator(locator)
@@ -351,12 +371,20 @@ def _plot_storm_mae(metrics: pd.DataFrame, path: Path) -> None:
                 color=COLORS[model],
                 label=model,
             )
-            axis.bar_label(bars, fmt="%.1f", padding=3, fontsize=8)
+            axis.bar_label(
+                bars,
+                labels=[
+                    f"{value:.1f}\n({value * KNOTS_PER_MPS:.1f} kt)" for value in values
+                ],
+                padding=3,
+                fontsize=7,
+            )
         axis.set_xticks(x, ["Humberto", "Kiko", "Otis"])
         axis.set_title(regime)
         axis.grid(axis="y", alpha=0.22)
         axis.set_axisbelow(True)
-    axes[0].set_ylabel("Dense case-study MAE (m/s)")
+    axes[0].set_ylabel("Dense case-study MAE: m/s (kt)")
+    axes[0].yaxis.set_major_formatter(_dual_speed_tick)
     handles, labels = axes[0].get_legend_handles_labels()
     figure.legend(handles, labels, loc="lower center", ncol=3, frameon=False)
     figure.suptitle("Error by validation storm (all 10-minute GEO observations)")
@@ -370,11 +398,30 @@ def _format_number(value: Any, digits: int = 3) -> str:
     return f"{float(value):.{digits}f}"
 
 
+def _format_speed(value: Any, digits: int = 3) -> str:
+    """Format an m/s result with its knots equivalent in parentheses."""
+    if pd.isna(value):
+        return "—"
+    numeric = float(value)
+    return f"{numeric:.{digits}f} ({numeric * KNOTS_PER_MPS:.{digits}f} kt)"
+
+
+def _format_speed_interval(low: Any, high: Any, digits: int = 3) -> str:
+    if pd.isna(low) or pd.isna(high):
+        return "—"
+    low_numeric, high_numeric = float(low), float(high)
+    return (
+        f"{low_numeric:.{digits}f}–{high_numeric:.{digits}f} m/s "
+        f"({low_numeric * KNOTS_PER_MPS:.{digits}f}–"
+        f"{high_numeric * KNOTS_PER_MPS:.{digits}f} kt)"
+    )
+
+
 def _validation_table(frame: pd.DataFrame) -> list[str]:
     header = (
-        "| Model | n | MAE (95% CI), m/s | Δ MAE vs raw, m/s | RMSE, m/s | "
-        "Bias, m/s | Storm-macro MAE, m/s | Exact category | Macro F1 | "
-        "Within one | Field MAE / RMSE / bias, m/s |"
+        "| Model | n | MAE, m/s (kt); 95% CI | Δ MAE vs raw, m/s (kt); 95% CI | RMSE, m/s (kt) | "
+        "Bias, m/s (kt) | Storm-macro MAE, m/s (kt) | Exact category | Macro F1 | "
+        "Within one | Field MAE / RMSE / bias, m/s (kt) |"
     )
     lines = [
         header,
@@ -383,18 +430,14 @@ def _validation_table(frame: pd.DataFrame) -> list[str]:
     for model in MODEL_ORDER:
         row = frame.loc[frame["model"] == model].iloc[0]
         ci = (
-            f"{_format_number(row['intensity_mae_ms'])} "
-            f"({_format_number(row['intensity_mae_95ci_low_ms'])}–"
-            f"{_format_number(row['intensity_mae_95ci_high_ms'])})"
+            f"{_format_speed(row['intensity_mae_ms'])}; 95% CI "
+            f"{_format_speed_interval(row['intensity_mae_95ci_low_ms'], row['intensity_mae_95ci_high_ms'])}"
         )
-        delta = _format_number(row["intensity_mae_delta_vs_unet_raw_max_ms"])
+        delta = _format_speed(row["intensity_mae_delta_vs_unet_raw_max_ms"])
         if model != MODEL_ORDER[0]:
-            delta += (
-                f" ({_format_number(row['intensity_mae_delta_95ci_low_ms'])}–"
-                f"{_format_number(row['intensity_mae_delta_95ci_high_ms'])})"
-            )
+            delta += f"; 95% CI {_format_speed_interval(row['intensity_mae_delta_95ci_low_ms'], row['intensity_mae_delta_95ci_high_ms'])}"
         field = " / ".join(
-            _format_number(row[column])
+            _format_speed(row[column])
             for column in ("field_mae_ms", "field_rmse_ms", "field_bias_ms")
         )
         lines.append(
@@ -405,9 +448,9 @@ def _validation_table(frame: pd.DataFrame) -> list[str]:
                     str(int(row["samples"])),
                     ci,
                     delta,
-                    _format_number(row["intensity_rmse_ms"]),
-                    _format_number(row["intensity_bias_ms"]),
-                    _format_number(row["storm_macro_mae_ms"]),
+                    _format_speed(row["intensity_rmse_ms"]),
+                    _format_speed(row["intensity_bias_ms"]),
+                    _format_speed(row["storm_macro_mae_ms"]),
                     _format_number(row["category_accuracy"]),
                     _format_number(row["category_macro_f1"]),
                     _format_number(row["within_one_category_accuracy"]),
@@ -421,7 +464,7 @@ def _validation_table(frame: pd.DataFrame) -> list[str]:
 
 def _dense_table(metrics: pd.DataFrame) -> list[str]:
     lines = [
-        "| Conditioning | Model | valid n / attempted | MAE | RMSE | Bias | Humberto MAE | Kiko MAE | Otis MAE |",
+        "| Conditioning | Model | valid n / attempted | MAE, m/s (kt) | RMSE, m/s (kt) | Bias, m/s (kt) | Humberto MAE, m/s (kt) | Kiko MAE, m/s (kt) | Otis MAE, m/s (kt) |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, row in metrics.iterrows():
@@ -432,12 +475,12 @@ def _dense_table(metrics: pd.DataFrame) -> list[str]:
                     str(row["Conditioning"]),
                     str(row["Model"]),
                     f"{int(row['Samples'])} / {int(row['Attempted'])}",
-                    _format_number(row["MAE (m/s)"]),
-                    _format_number(row["RMSE (m/s)"]),
-                    _format_number(row["Bias (m/s)"]),
-                    _format_number(row["Humberto (AL082025) MAE (m/s)"]),
-                    _format_number(row["Kiko (EP112025) MAE (m/s)"]),
-                    _format_number(row["Otis (EP182023) MAE (m/s)"]),
+                    _format_speed(row["MAE (m/s)"]),
+                    _format_speed(row["RMSE (m/s)"]),
+                    _format_speed(row["Bias (m/s)"]),
+                    _format_speed(row["Humberto (AL082025) MAE (m/s)"]),
+                    _format_speed(row["Kiko (EP112025) MAE (m/s)"]),
+                    _format_speed(row["Otis (EP182023) MAE (m/s)"]),
                 ]
             )
             + " |"
@@ -561,9 +604,9 @@ def _report_markdown(
         "## Main result",
         "",
         f"On the matched **232-observation, 34-storm** validation cohort, the joint "
-        f"model has the lowest intensity MAE: **{joint_era:.3f} m/s with ERA5** and "
-        f"**{joint_no:.3f} m/s without ERA5**. With ERA5, the separate correction "
-        f"reaches **{correction_era:.3f} m/s**, versus **{raw_era:.3f} m/s** for the "
+        f"model has the lowest intensity MAE: **{_format_speed(joint_era)} with ERA5** and "
+        f"**{_format_speed(joint_no)} without ERA5**. With ERA5, the separate correction "
+        f"reaches **{_format_speed(correction_era)}**, versus **{_format_speed(raw_era)}** for the "
         "raw field maximum. The storm-bootstrap intervals for both learned scalar "
         "heads' improvement over the raw maximum exclude zero in both regimes.",
         "",
@@ -679,9 +722,9 @@ def _report_markdown(
         "",
         f"Across the dense common cohort, **{dense_best['With ERA5']['Model']}** "
         f"has the lowest aggregate MAE with ERA5 "
-        f"(**{dense_best['With ERA5']['MAE (m/s)']:.3f} m/s**), while "
+        f"(**{_format_speed(dense_best['With ERA5']['MAE (m/s)'])}**), while "
         f"**{dense_best['Without ERA5']['Model']}** is lowest without ERA5 "
-        f"(**{dense_best['Without ERA5']['MAE (m/s)']:.3f} m/s**). Per-storm "
+        f"(**{_format_speed(dense_best['Without ERA5']['MAE (m/s)'])}**). Per-storm "
         "behavior differs; the trajectory and storm-level table report that "
         "variation.",
         "",
@@ -693,7 +736,7 @@ def _report_markdown(
         "",
         "![Per-storm dense inference MAE](../assets/images/intensity-comparison/three-storm-mae.png)",
         "",
-        "All values below are m/s except the sample count.",
+        "Every wind-speed value below is shown in m/s with knots in parentheses; the sample count is unitless.",
         "",
         *_dense_table(dense),
         "",

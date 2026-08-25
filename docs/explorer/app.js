@@ -7,12 +7,15 @@ const MIN_VALID_RMW_KM=10;
 const FORECAST_MATCH_MS=11*60*1000;
 const forecastCache=new Map();
 const RI_WINDOW_MS=24*3600000,RI_THRESHOLD_MS=30*.514444;
+const KNOTS_PER_MPS=1/.514444;
 const CATEGORIES=[{label:"C1",value:32.9,color:"#4ca66b"},{label:"C2",value:42.7,color:"#d2b83f"},{label:"C3",value:49.4,color:"#e6943e"},{label:"C4",value:58.1,color:"#db604e"},{label:"C5",value:70.5,color:"#9e4267"}];
 const svg=(tag,a={})=>{const n=document.createElementNS(NS,tag);Object.entries(a).forEach(([k,v])=>n.setAttribute(k,v));return n};
 const setSvgHidden=(node,hidden)=>node.toggleAttribute("hidden",hidden);
 const dt=v=>new Date(v),short=v=>dt(v).toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"}),full=v=>dt(v).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"UTC",hour12:false})+" UTC";
 const cat=v=>v>=1?`C${v}`:({0:"TS","-1":"TD","-2":"SS","-3":"DB","-4":"EX"}[v]||"—");
 const categoryFromWind=v=>v>=137*.514444?5:v>=113*.514444?4:v>=96*.514444?3:v>=83*.514444?2:v>=64*.514444?1:v>=34*.514444?0:-1;
+const measurement=(value,unit,digits=1)=>unit==="m/s"?`${value.toFixed(digits)} m/s (${(value*KNOTS_PER_MPS).toFixed(digits)} kt)`:`${value.toFixed(digits)} ${unit}`;
+const signedMeasurement=(value,unit,digits=1)=>`${value>=0?"+":""}${measurement(value,unit,digits)}`;
 const assetUrl=path=>new URL(path,assetBaseUrl||document.baseURI).href;
 const displayStormName=name=>name?name.charAt(0).toUpperCase()+name.slice(1).toLowerCase():"";
 const themeColor=token=>getComputedStyle(document.body).getPropertyValue(token).trim();
@@ -70,7 +73,7 @@ function initMap(){
   }).addTo(map);
   map.getContainer().insertAdjacentHTML("beforeend",`<span class="map-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener">© CARTO</a></span>`);
   const intensityKey=L.control({position:"bottomright"});
-  intensityKey.onAdd=()=>{const el=L.DomUtil.create("div","intensity-key");el.innerHTML=`<strong>SAR wind intensity · ${data.sar_color_scale.unit}</strong><i></i><span><b>${data.sar_color_scale.min}</b><b>${data.sar_color_scale.mid}</b><b>${data.sar_color_scale.max}+</b></span>`;return el};
+  intensityKey.onAdd=()=>{const el=L.DomUtil.create("div","intensity-key"),scale=data.sar_color_scale;el.innerHTML=`<strong>SAR wind intensity · m/s (kt)</strong><i></i><span><b>${scale.min} (${Math.round(scale.min*KNOTS_PER_MPS)} kt)</b><b>${scale.mid} (${Math.round(scale.mid*KNOTS_PER_MPS)} kt)</b><b>${scale.max}+ (${Math.round(scale.max*KNOTS_PER_MPS)}+ kt)</b></span>`;return el};
   intensityKey.addTo(map);
   const geostatKey=L.control({position:"bottomright"});
   geostatKey.onAdd=()=>{const el=L.DomUtil.create("div","geostat-key");el.id="geostatKey";el.innerHTML=`<strong>Geostationary · ${data.geostat_color_scale.channel}</strong><i></i><span><b>${data.geostat_color_scale.min} K</b><b>${data.geostat_color_scale.mid} K</b><b>${data.geostat_color_scale.max} K</b></span>`;return el};
@@ -112,7 +115,7 @@ function renderMap(){
   storm.records.filter(r=>r.sar_overlay).forEach(r=>{
     const o=r.sar_overlay;
     const image=L.imageOverlay(assetUrl(o.image),o.bounds,{opacity:.95,interactive:true,className:"sar-overlay",pane:"sarPane"})
-      .bindTooltip(`<strong>SAR-derived WF</strong><br>${full(r.time)}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} m/s<br>Shared color scale: 0–60+ m/s`,{className:"sar-tooltip"});
+      .bindTooltip(`<strong>SAR-derived WF</strong><br>${full(r.time)}<br>Observed range: ${o.min.toFixed(1)}–${o.max.toFixed(1)} m/s (${(o.min*KNOTS_PER_MPS).toFixed(1)}–${(o.max*KNOTS_PER_MPS).toFixed(1)} kt)<br>Shared color scale: 0–60+ m/s (0–116.6+ kt)`,{className:"sar-tooltip"});
     const dot=L.circleMarker([r.lat,r.lon],{radius:5,color:colors.main,weight:2,fillColor:colors.secondary,fillOpacity:1})
       .bindTooltip(`SAR match · ${full(r.time)}`);
     const show=()=>{image.addTo(sarLayers);dot.addTo(sarLayers)};
@@ -235,7 +238,7 @@ function chart(metric,def){
   sar.forEach(r=>s.append(svg("circle",{class:"sar-dot",cx:x(r.time),cy:y(r.sar[metric]),r:3.5})));
   if(ibtracs.length)s.append(svg("path",{class:"ibtracs-path",d:path(ibtracs,r=>r.ibtracs_msw)}));
   s.append(svg("line",{class:"cursor-line","data-start":start,"data-end":end,x1:C.l,x2:C.l,y1:C.t,y2:C.h-C.b}));
-  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=inPredictionWindow(r)?predictionValue(metric,r):null,raw=graphPrediction(r,metric)?.[metric],tip=$("#tooltip"),predictionLabel=Number.isFinite(pv)?pv.toFixed(1)+" "+def.unit+(postProcessing?" (smoothed"+(Number.isFinite(raw)?"; raw "+raw.toFixed(1):"")+")":""):"Unavailable",modelCategory=graphModel==="unet_mlp"&&metric==="max"&&Number.isFinite(pv)?categoryFromWind(pv):null,modelCategoryLabel=metric==="max"&&Number.isFinite(modelCategory)?` · ${cat(modelCategory)}`:"",riActive=riIntervals.some(([begin,finish])=>dt(r.time).getTime()>=begin&&dt(r.time).getTime()<=finish),ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${r.ibtracs_msw.toFixed(1)} m/s · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${predictionSourceLabel(metric)} ${predictionLabel}${modelCategoryLabel}<br>SAR-derived WF ${Number.isFinite(sv)?sv.toFixed(1)+" "+def.unit:"No observation"}${ibtracsLabel}${riActive?`<br>IBTrACS rapid intensification · ≥30 kt in 24 h`:""}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
+  card.querySelector(".chart").onpointermove=e=>{const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*C.w-C.l)/(C.w-C.l-C.r))),target=start+fraction*(end-start),i=storm.records.reduce((best,r,index)=>Math.abs(dt(r.time).getTime()-target)<Math.abs(dt(storm.records[best].time).getTime()-target)?index:best,0);$("#timeSlider").value=i;current();const r=storm.records[i],sv=r.sar?.[metric],pv=inPredictionWindow(r)?predictionValue(metric,r):null,raw=graphPrediction(r,metric)?.[metric],tip=$("#tooltip"),predictionLabel=Number.isFinite(pv)?measurement(pv,def.unit)+(postProcessing?" (smoothed"+(Number.isFinite(raw)?"; raw "+measurement(raw,def.unit):"")+")":""):"Unavailable",modelCategory=graphModel==="unet_mlp"&&metric==="max"&&Number.isFinite(pv)?categoryFromWind(pv):null,modelCategoryLabel=metric==="max"&&Number.isFinite(modelCategory)?` · ${cat(modelCategory)}`:"",riActive=riIntervals.some(([begin,finish])=>dt(r.time).getTime()>=begin&&dt(r.time).getTime()<=finish),ibtracsLabel=metric==="max"&&Number.isFinite(r.ibtracs_msw)?`<br>IBTrACS ${measurement(r.ibtracs_msw,"m/s")} · ${cat(r.category)}`:"";tip.innerHTML=`<strong>${full(r.time)}</strong><br>${predictionSourceLabel(metric)} ${predictionLabel}${modelCategoryLabel}<br>SAR-derived WF ${Number.isFinite(sv)?measurement(sv,def.unit):"No observation"}${ibtracsLabel}${riActive?`<br>IBTrACS rapid intensification · ≥30 kt in 24 h`:""}`;tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-150)+"px";tip.style.top=e.clientY-45+"px"};
   card.querySelector(".chart").onpointerleave=()=>$("#tooltip").style.display="none";return card
 }
 function forecastValue(point,source,metric){
@@ -276,10 +279,10 @@ function segmentedForecastPath(rows,get,x,y,getTime=row=>row.valid_time){
   if(segment.length)segments.push(segment);
   return segments.map(points=>points.map(([xp,yp],index)=>`${index?"L":"M"}${xp.toFixed(1)},${yp.toFixed(1)}`).join(" ")).join(" ")
 }
-function forecastNumber(value,unit){return Number.isFinite(value)?`${value.toFixed(1)} ${unit}`:"Unavailable"}
+function forecastNumber(value,unit){return Number.isFinite(value)?measurement(value,unit):"Unavailable"}
 function signedForecastError(predicted,observed,unit){
   if(!Number.isFinite(predicted)||!Number.isFinite(observed))return"Unavailable";
-  const error=predicted-observed;return`${error>=0?"+":""}${error.toFixed(1)} ${unit}`
+  const error=predicted-observed;return signedMeasurement(error,unit)
 }
 function forecastTooltip(point,metric,def){
   const predicted=forecastValue(point,"predicted",metric),observed=forecastValue(point,"ibtracs",metric),predictedCategory=metric==="max"&&Number.isFinite(predicted)?` · ${cat(categoryFromWind(predicted))}`:"",observedCategory=metric==="max"&&Number.isFinite(observed)?` · ${cat(categoryFromWind(observed))}`:"";

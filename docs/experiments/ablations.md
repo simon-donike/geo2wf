@@ -28,7 +28,7 @@ Files are under `configs/ablations/`.
 | `config_stage1_highwind_only` | continuous high-wind pixel weighting |
 | `config_stage1_peak_only` | robust inner-core top-fraction peak loss |
 | `config_stage1_radial_only` | flip-aware radial-profile Huber loss |
-| `config_stage1_exceedance_only` | soft area losses at 17, 33, and 43 m/s |
+| `config_stage1_exceedance_only` | soft area losses at 17 m/s (33.0 kt), 33 m/s (64.1 kt), and 43 m/s (83.6 kt) |
 | `config_stage1_sampling_only` | intensity-balanced training sampler |
 | `config_stage1_peak_aware` | high-wind weighting plus peak loss |
 | `config_stage1_peak_structure_balanced` | peak-aware objective plus balanced sampling |
@@ -62,7 +62,7 @@ and threshold areas. Summary fields retain the median, mean, p10, p90, and
 medoid.
 
 Affine and isotonic calibration maps are fitted separately to the member-median
-maximum and robust peak. Outputs are bounded to 0–80 m/s. Storm-level
+maximum and robust peak. Outputs are bounded to 0–80 m/s (0–155.5 kt). Storm-level
 leave-one-out results are the relevant diagnostic; in-sample results are
 optimistic.
 
