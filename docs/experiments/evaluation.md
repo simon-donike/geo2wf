@@ -13,7 +13,7 @@ comparison must use the same sample IDs, masks, split policy, and aggregation.
 | Bias | Mean signed error, prediction minus target. Positive values indicate overestimation. |
 | PSNR | Reconstruction fidelity at the configured physical or normalized data range; higher is better. |
 | SSIM | Local luminance, contrast, and structural similarity; higher is better. |
-| High-wind MAE | MAE where target wind meets the configured threshold. The deterministic default is 17 m/s. |
+| High-wind MAE | MAE where target wind meets the configured threshold. The deterministic default is 17 m/s (33.0 kt). |
 
 When ERA5 is available, the deterministic model also evaluates ERA5 on the
 same common-valid pixels:
@@ -70,9 +70,9 @@ minima, not between either minimum and IBTrACS.
 The metric is available only if the target provides adequate evidence:
 
 - at least 80% valid coverage inside 100 km and in the 20–60 km reference ring;
-- target ring-mean wind of at least 17 m/s;
+- target ring-mean wind of at least 17 m/s (33.0 kt);
 - target minimum within 50 km of the IBTrACS center;
-- target ring-to-eye contrast of at least 5 m/s; and
+- target ring-to-eye contrast of at least 5 m/s (9.7 kt); and
 - valid geometric and smoothing support.
 
 Failed gates produce an unavailable value, not zero. Comparisons must therefore

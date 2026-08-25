@@ -13,6 +13,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+KNOTS_PER_MPS = 1.0 / 0.514444
+
+
+def _dual_speed_tick(value: float, _position: int) -> str:
+    return f"{value:g}\n({value * KNOTS_PER_MPS:.1f} kt)"
+
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RESULT = (
     ROOT
@@ -173,7 +180,8 @@ def build(args: argparse.Namespace) -> pd.DataFrame:
             loc="left",
             fontweight="bold",
         )
-        axis.set_ylabel("Wind speed (m/s)")
+        axis.set_ylabel("Wind speed: m/s (kt)")
+        axis.yaxis.set_major_formatter(_dual_speed_tick)
         axis.grid(True, axis="both", alpha=0.22)
         axis.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=9))
         axis.xaxis.set_major_formatter(

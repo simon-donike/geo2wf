@@ -58,7 +58,7 @@ The odd asinh transform preserves zero, gives small corrections more resolution,
 z = \frac{\operatorname{asinh}(r/s)}{\operatorname{asinh}(c/s)}
 \]
 
-The checked-in preset uses \(s=5\) m/s and \(c=80\) m/s.
+The checked-in preset uses \(s=5\) m/s (9.7 kt) and \(c=80\) m/s (155.5 kt).
 
 At each diffusion timestep, the denoiser receives 27 channels:
 

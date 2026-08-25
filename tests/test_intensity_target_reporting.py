@@ -183,4 +183,6 @@ def test_combiner_updates_the_marked_experiment_results(tmp_path: Path) -> None:
     assert "Pending." not in rendered
     assert "completed seed-42 validation matrix" in rendered
     assert "| ERA5 | Trained target | Model |" in rendered
+    assert "MAE, m/s (kt); 95% CI" in rendered
+    assert "kt); 95% CI" in rendered
     assert "## Methods" in rendered

@@ -21,7 +21,7 @@ z = \frac{\operatorname{asinh}(r/s)}{\operatorname{asinh}(c/s)},
 \quad r \in [-c,c]
 \]
 
-The checked-in preset uses `s = 5 m/s` and `c = 80 m/s`. Zero remains exactly zero, small corrections receive useful resolution, and the full tail maps into diffusion space `[-1,1]`.
+The checked-in preset uses `s = 5 m/s (9.7 kt)` and `c = 80 m/s (155.5 kt)`. Zero remains exactly zero, small corrections receive useful resolution, and the full tail maps into diffusion space `[-1,1]`.
 
 ## Inputs, masks, and output
 

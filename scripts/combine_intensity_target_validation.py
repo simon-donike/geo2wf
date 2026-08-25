@@ -14,6 +14,19 @@ import pandas as pd
 
 DOCUMENTATION_START = "<!-- matched-validation-results:start -->"
 DOCUMENTATION_END = "<!-- matched-validation-results:end -->"
+KNOTS_PER_MPS = 1.0 / 0.514444
+
+
+def _speed(value: float) -> str:
+    """Format an m/s result with its knots equivalent in parentheses."""
+    return f"{value:.3f} ({value * KNOTS_PER_MPS:.3f} kt)"
+
+
+def _speed_interval(low: float, high: float) -> str:
+    return (
+        f"{low:.3f}–{high:.3f} m/s "
+        f"({low * KNOTS_PER_MPS:.3f}–{high * KNOTS_PER_MPS:.3f} kt)"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -154,21 +167,21 @@ def _markdown(rows: list[dict[str, Any]]) -> str:
         "",
         "All models use the identical SAR-center-valid cohort. RI denotes an IBTrACS gain of at least 30 kt in the preceding 24 hours.",
         "",
-        "| ERA5 | Trained target | Model | Evaluated against | Subset | Samples | Storms | MAE (m/s; 95% CI) | RMSE | Bias | Storm-macro MAE |",
+        "| ERA5 | Trained target | Model | Evaluated against | Subset | Samples | Storms | MAE, m/s (kt); 95% CI | RMSE, m/s (kt) | Bias, m/s (kt) | Storm-macro MAE, m/s (kt) |",
         "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         interval = ""
         if row["mae_95ci_low_ms"] is not None:
-            interval = (
-                f" ({row['mae_95ci_low_ms']:.3f}–" f"{row['mae_95ci_high_ms']:.3f})"
+            interval = "; 95% CI " + _speed_interval(
+                row["mae_95ci_low_ms"], row["mae_95ci_high_ms"]
             )
         lines.append(
             f"| {row['era5']} | {row['trained_target']} | {row['model']} | "
             f"{row['evaluation_reference']} | {row['subset']} | {row['samples']} | "
-            f"{row['storms']} | {row['mae_ms']:.3f}{interval} | "
-            f"{row['rmse_ms']:.3f} | {row['bias_ms']:.3f} | "
-            f"{row['storm_macro_mae_ms']:.3f} |"
+            f"{row['storms']} | {_speed(row['mae_ms'])}{interval} | "
+            f"{_speed(row['rmse_ms'])} | {_speed(row['bias_ms'])} | "
+            f"{_speed(row['storm_macro_mae_ms'])} |"
         )
     return "\n".join(lines) + "\n"
 

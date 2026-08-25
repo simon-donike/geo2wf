@@ -31,7 +31,7 @@ predicted residual is zero and the physical prediction equals ERA5.
 
 ## Physical-unit objective
 
-Supervised loss is Huber in m/s over the joint SAR/ERA5 valid mask. With `delta = 2 m/s`, small errors are quadratic and large errors become linear.
+Supervised loss is Huber in m/s over the joint SAR/ERA5 valid mask. With `delta = 2 m/s (3.9 kt)`, small errors are quadratic and large errors become linear.
 
 Outside the observed SAR swath, a weak anchor penalizes correction magnitude where ERA5 is valid:
 
@@ -44,14 +44,14 @@ model:
 This discourages unconstrained corrections without pretending ERA5 is observed SAR.
 
 The checked-in default uses the selected peak-aware objective: a smooth high-wind
-weight (up to 8x from 25--50 m/s) plus a robust top-0.5% inner-core peak term.
+weight (up to 8x from 25–50 m/s (48.6–97.2 kt)) plus a robust top-0.5% inner-core peak term.
 The radial-profile and exceedance losses remain disabled in this default because
 the ablation improved the combined peak/structure score without the larger tail
 bias seen in the sampling-balanced alternative.
 
 ## Prediction bounds
 
-The default clamps physical wind to at least 0 m/s. `prediction_max_ms` is unset, so Stage 1 has no upper cap. The configured PSNR data range is 79.8 m/s, matching the current target export range.
+The default clamps physical wind to at least 0 m/s (0 kt). `prediction_max_ms` is unset, so Stage 1 has no upper cap. The configured PSNR data range is 79.8 m/s (155.1 kt), matching the current target export range.
 
 ## Diagnostics
 
@@ -60,7 +60,7 @@ The model reports:
 - MAE, RMSE, signed bias, Huber loss, and PSNR in physical units;
 - ERA5 MAE on identical common-valid pixels;
 - MAE skill versus ERA5;
-- high-wind MAE and skill for target winds ≥17 m/s; and
+- high-wind MAE and skill for target winds ≥17 m/s (33.0 kt); and
 - shared eye, inner-core, radial, RMW, contrast, and eye-displacement metrics.
 
 Validation keeps the physical reconstruction and storm-structure metrics, but
