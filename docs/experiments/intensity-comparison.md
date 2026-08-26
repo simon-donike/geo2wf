@@ -15,6 +15,11 @@ For every scalar target and ERA5 regime, the workflow compares:
 2. a learned single-field correction using that diagnostic as its anchor; and
 3. the scalar MLP output of a jointly trained U-Net+MLP.
 
+For the IBTrACS target cells it additionally compares a fourth model: the
+decoder-free U-Net encoder + MLP trained only against `USA_WIND`. The evaluator
+reports this model against both IBTrACS and SAR robust peak, but never labels or
+duplicates it as SAR-trained.
+
 The deterministic and joint U-Nets also report SAR field metrics. The
 correction model has no field metrics because it emits only a scalar.
 
@@ -68,8 +73,10 @@ flowchart LR
   D -->|GPU 1| U[Train shared field U-Net]
   U -->|GPU 1| C[Export cache v2]
   C -->|GPU 1| R[Train correction]
+  J -->|GPU 0, IBTrACS cells| I[Train encoder-only U-Net + MLP]
   J --> E[Dual-reference overall + RI evaluation]
   R --> E
+  I --> E
   C --> E
   E --> W[Consolidated files + W&B run]
 ```
@@ -78,10 +85,14 @@ GPU 0 trains the joint model while GPU 1 trains the field U-Net, exports its
 cache, and trains the correction. The second target run in each ERA5 regime
 reuses the first run's field-U-Net checkpoint.
 
+The workflow explicitly uses `trainer.deterministic=false` because CUDA does
+not provide a deterministic backward kernel for reflection padding. The random
+seed remains fixed and is recorded with every run.
+
 ## Run the complete seed-42 matrix
 
-The matrix runner trains two shared field U-Nets, four joint models, and four
-correction models. It publishes one grouped W&B evaluation run in project
+The matrix runner trains two shared field U-Nets, four joint models, four
+correction models, and two IBTrACS-only encoder models. It publishes one grouped W&B evaluation run in project
 `geo2wf` with overall and RI tables, per-sample predictions, divergence
 tables/plots, configs, checkpoint hashes, and JSON/CSV/Markdown artifacts.
 
@@ -101,7 +112,8 @@ cells and the consolidated evaluation complete successfully.
 
 Use `--smoke-test` for one epoch and one train/validation batch per stage.
 `--disable-wandb` runs locally. Epoch counts can be overridden with
-`--joint-epochs`, `--unet-epochs`, and `--correction-epochs`.
+`--joint-epochs`, `--unet-epochs`, `--correction-epochs`, and
+`--encoder-epochs`.
 
 ## Run one target/regime manually
 
@@ -141,13 +153,15 @@ uv run python scripts/run_intensity_model_comparison.py \
   --unet-config /path/to/resolved-config.yaml \
   --joint-checkpoint /path/to/joint.ckpt \
   --correction-checkpoint /path/to/correction.ckpt \
+  --encoder-checkpoint /path/to/encoder.ckpt \
   --joint-gpu 0 \
   --pipeline-gpu 1 \
   --intensity-target-source ibtracs
 ```
 
 Reused correction checkpoints must originate from the exact cache identified
-by the workflow; tensor compatibility alone is insufficient.
+by the workflow; tensor compatibility alone is insufficient. Encoder
+checkpoints are accepted only for IBTrACS-target workflows.
 
 ## Outputs and validation metrics
 

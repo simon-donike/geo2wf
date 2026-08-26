@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from geo2wf.layers import ReflectConv2d
 from geo2wf.tracking.reconstruction_media import log_wandb_reconstruction
 from geo2wf.models.base import (
     LossOutput,
@@ -45,9 +46,19 @@ class ResidualBlock(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1 = ReflectConv2d(
+            in_channels,
+            out_channels,
+            kernel_size=3,
+            padding=1,
+        )
         self.norm1 = nn.GroupNorm(_group_count(out_channels), out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv2 = ReflectConv2d(
+            out_channels,
+            out_channels,
+            kernel_size=3,
+            padding=1,
+        )
         self.norm2 = nn.GroupNorm(_group_count(out_channels), out_channels)
         self.skip = (
             nn.Identity()
@@ -76,7 +87,12 @@ class ResidualUNet(nn.Module):
             raise ValueError("channel_mults must contain positive integers")
 
         dimensions = [base_channels * int(multiplier) for multiplier in channel_mults]
-        self.stem = nn.Conv2d(in_channels, dimensions[0], kernel_size=3, padding=1)
+        self.stem = ReflectConv2d(
+            in_channels,
+            dimensions[0],
+            kernel_size=3,
+            padding=1,
+        )
         self.encoder = nn.ModuleList()
         self.downsamples = nn.ModuleList()
         for index, dimension in enumerate(dimensions):
@@ -88,7 +104,7 @@ class ResidualUNet(nn.Module):
             )
             if index + 1 < len(dimensions):
                 self.downsamples.append(
-                    nn.Conv2d(
+                    ReflectConv2d(
                         dimension,
                         dimensions[index + 1],
                         kernel_size=3,

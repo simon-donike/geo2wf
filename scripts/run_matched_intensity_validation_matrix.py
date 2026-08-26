@@ -38,6 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-epochs", type=int, default=None)
     parser.add_argument("--unet-epochs", type=int, default=None)
     parser.add_argument("--correction-epochs", type=int, default=None)
+    parser.add_argument("--encoder-epochs", type=int, default=None)
     parser.add_argument("--bootstrap-repetitions", type=int, default=2000)
     parser.add_argument("--wandb-project", default="geo2wf")
     parser.add_argument("--wandb-group", default=None)
@@ -78,6 +79,12 @@ def parse_args() -> argparse.Namespace:
         help="Reuse the correction checkpoint for the first matrix cell.",
     )
     parser.add_argument(
+        "--initial-encoder-checkpoint",
+        type=Path,
+        default=None,
+        help="Reuse the encoder-only checkpoint for the first IBTrACS cell.",
+    )
+    parser.add_argument(
         "--documentation",
         type=Path,
         default=ROOT / "docs" / "experiments" / "intensity-comparison-results.md",
@@ -88,14 +95,18 @@ def parse_args() -> argparse.Namespace:
         parser.error("--joint-gpu and --pipeline-gpu must identify different GPUs")
     if args.bootstrap_repetitions < 0:
         parser.error("--bootstrap-repetitions must be non-negative")
-    initial_artifacts = (
+    initial_core_artifacts = (
         args.initial_joint_checkpoint,
         args.initial_unet_checkpoint,
         args.initial_unet_config,
         args.initial_correction_checkpoint,
     )
-    if any(initial_artifacts) and not all(initial_artifacts):
-        parser.error("all four --initial-*-checkpoint/config arguments are required")
+    if any(initial_core_artifacts) and not all(initial_core_artifacts):
+        parser.error(
+            "all four core --initial-*-checkpoint/config arguments are required"
+        )
+    if args.initial_encoder_checkpoint is not None and not all(initial_core_artifacts):
+        parser.error("--initial-encoder-checkpoint requires the four core artifacts")
     return args
 
 
@@ -196,7 +207,7 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
         "--wandb-group",
         group,
     ]
-    for name in ("joint_epochs", "unet_epochs", "correction_epochs"):
+    for name in ("joint_epochs", "unet_epochs", "correction_epochs", "encoder_epochs"):
         value = getattr(args, name)
         if value is not None:
             common.extend([f"--{name.replace('_', '-')}", str(value)])
@@ -213,6 +224,13 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                 completed = completed_workflows.get((era5, target))
                 if completed is not None:
                     workflow_path, workflow = completed
+                    if target == "ibtracs" and not workflow.get("artifacts", {}).get(
+                        "encoder_checkpoint"
+                    ):
+                        raise ValueError(
+                            "completed IBTrACS workflow predates encoder-only results: "
+                            f"{workflow_path}"
+                        )
                     completed_unet = {
                         "checkpoint": workflow["artifacts"]["unet_checkpoint"],
                         "config": workflow["artifacts"]["unet_config"],
@@ -235,6 +253,15 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                             "result": str(result_path),
                             "unet_checkpoint": shared_unet["checkpoint"],
                             "reused_completed_workflow": True,
+                            **(
+                                {
+                                    "encoder_checkpoint": workflow["artifacts"][
+                                        "encoder_checkpoint"
+                                    ]
+                                }
+                                if target == "ibtracs"
+                                else {}
+                            ),
                         }
                     )
                     _write_json(manifest, manifest_path)
@@ -278,6 +305,15 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                             ),
                         ]
                     )
+                    if args.initial_encoder_checkpoint is not None:
+                        command.extend(
+                            [
+                                "--encoder-checkpoint",
+                                str(
+                                    args.initial_encoder_checkpoint.expanduser().resolve()
+                                ),
+                            ]
+                        )
                 _run(command, log_path=output_root / f"{era5}-{target}.log")
                 workflow_path = run_root / "workflow.json"
                 workflow = _workflow_payload(workflow_path)
@@ -300,6 +336,15 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                         "workflow": str(workflow_path),
                         "result": str(result_path),
                         "unet_checkpoint": shared_unet["checkpoint"],
+                        **(
+                            {
+                                "encoder_checkpoint": workflow["artifacts"][
+                                    "encoder_checkpoint"
+                                ]
+                            }
+                            if target == "ibtracs"
+                            else {}
+                        ),
                     }
                 )
                 _write_json(manifest, manifest_path)
