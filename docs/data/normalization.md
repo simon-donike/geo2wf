@@ -28,18 +28,17 @@ Image metrics operate on normalized values, but wind errors should be reported i
 x_{physical} = z \cdot \text{scale} + \text{offset}
 \]
 
-Standalone diffusion uses that mapping for physical MAE/RMSE. Stage 1 forms its
-prediction and Huber objective directly in m/s. Stage 2 diffuses an encoded
-signed residual, but decodes it to m/s for its physical auxiliary losses,
-recomposition, metrics, and skill against the frozen baseline.
+The ERA5-residual model forms its prediction and Huber objective directly in
+m/s. Other reconstruction targets use the same inverse mapping for physical
+MAE and RMSE.
 
 ## Three masks with distinct jobs
 
 `condition_mask`
-: Identifies pixels supported across the final condition. The diffusion model appends it as an input channel.
+: Identifies pixels supported across the final condition. Models may append it as an input channel.
 
 `target_mask`
-: Identifies observed SAR/PMW pixels. Basic diffusion loss and all target metrics ignore invalid pixels.
+: Identifies observed SAR/PMW pixels. Target losses and metrics ignore invalid pixels.
 
 `era5_wind_speed_mask`
 : Identifies valid ERA5 baseline pixels. It limits sparse completion, residual features, off-swath anchoring, and ERA5 skill comparison.
@@ -48,27 +47,10 @@ Invalid values are replaced with neutral zeros **after normalization** and multi
 
 ## Weak supervision outside the SAR swath
 
-The grouped Stage 2 preset uses:
-
-```yaml
-model:
-  sparse_target_fill: era5
-  unobserved_loss_weight: 0.1
-```
-
-For **residual diffusion**, observed baseline-valid pixels contain the encoded
-SAR-minus-baseline residual and receive the main loss. Eligible unobserved
-baseline pixels use zero encoded residual with weight 0.1. For the ERA5-baseline
-ablation that means “retain ERA5”; for deterministic-baseline Stage 2 it means
-“retain Stage 1.” It does not insert ERA5 as an absolute target after Stage 1.
-
-Standalone **absolute** conditional diffusion has a separate optional sparse
-completion path: unobserved ERA5-valid pixels can receive target-normalized
-ERA5 speed with a lower weight, and remaining pixels receive neutral normalized
-0.5 with zero weight. The current grouped `conditional_diffusion` config leaves
-that option disabled.
-
-In both cases, evaluation metrics remain restricted to observed SAR pixels.
+The ERA5-residual objective can weakly penalize corrections outside the SAR
+swath where ERA5 is valid. This regularizes the unobserved region without
+treating ERA5 as a SAR observation. Evaluation metrics remain restricted to
+observed SAR pixels.
 
 ## Physics-aware flips
 

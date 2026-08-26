@@ -97,11 +97,9 @@ when required. For the common10 + ERA5 dataset:
 10 GEO + 9 ERA5 + distance + 3 solar = 23 data condition channels
 ```
 
-Standalone conditional diffusion prepares 24 channels after appending the mask
-and concatenates one noisy target channel. The deterministic model appends its
-condition mask, explicit ERA5 wind, and ERA5 mask. Residual diffusion also adds
-the chosen baseline and baseline mask. See each model page instead of inferring
-one family's internal width from another.
+The ERA5-residual model appends its condition mask, explicit ERA5 wind, and
+ERA5 mask, producing 26 U-Net input channels. See each model page instead of
+inferring one family's internal width from another.
 
 ## Split behavior
 

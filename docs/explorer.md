@@ -14,7 +14,7 @@ forecast product.
 
 ## Nowcast view
 
-Solid teal lines show the selected ViT, U-Net, U-Net+MLP, or diffusion inference
+Solid teal lines show the selected ViT, U-Net, or U-Net+MLP inference
 series at observation time. Gray dots mark matched SAR retrievals; dashed gray
 segments only interpolate visually between those sparse acquisitions. The
 cream intensity reference is IBTrACS maximum sustained wind. Optional AIFS,
@@ -25,8 +25,8 @@ The dashboard's U-Net+MLP series is the separate single-field correction model. 
 
 The ViT series is an imported inference artifact under `inference/inf_vit`, not
 a maintained training model in this package. The exporter uses its observation
-IDs to define the displayed case-study cohort and checks that the maintained
-U-Net and diffusion artifacts cover the same IDs. The dashboard label therefore
+IDs to define the displayed case-study cohort and aligns other artifacts to
+those IDs. The dashboard label therefore
 does not imply that a reproducible ViT architecture or training config lives in
 this repository.
 
@@ -54,5 +54,5 @@ key. The [storm observation manifest](data/storm-manifest.md) exposes the same
 records as downloadable JSON and a flat CSV table.
 
 For model behavior, start with the [model overview](models/index.md) and
-[two-stage baseline + diffusion](models/two-stage.md). For data provenance and
+[ERA5-residual U-Net](models/era5-residual.md). For data provenance and
 real raster examples, see [Model inputs and training targets](data/index.md).

@@ -73,7 +73,7 @@ const tourSteps = [
   {
     kicker: "Model controls",
     title: "Choose an inference model",
-    description: "Use this selector to switch the nowcast curve among whichever ViT, UNet, UNet+MLP, and diffusion outputs are available.",
+    description: "Use this selector to switch the nowcast curve among the available ViT, UNet, and UNet+MLP outputs.",
     target: () => visible(".model-toolbar") || document.querySelector(".analytics"),
     enter: async () => { await setTourMode("nowcast"); }
   },

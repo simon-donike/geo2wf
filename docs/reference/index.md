@@ -17,16 +17,10 @@ geo2wf/
 │   ├── models/
 │   │   ├── base.py
 │   │   ├── bottleneck_unet_mlp/
-│   │   ├── conditional_diffusion/
 │   │   ├── deterministic_residual/
 │   │   ├── direct_unet/
 │   │   ├── intensity_correction/
-│   │   ├── intensity_forecast/
-│   │   └── residual_diffusion/
-│   ├── diffusion/
-│   │   ├── process.py forward_process.py beta_schedules.py
-│   │   ├── samplers/
-│   │   └── backbones/
+│   │   └── intensity_forecast/
 │   ├── objectives/ metrics/ visualization/ tracking/
 │   ├── evaluation/ preprocessing/
 │   └── training.py
@@ -48,9 +42,7 @@ geo2wf/
 | paired GeoTIFF behavior | `src/geo2wf/data/datasets/paired_geotiff.py` |
 | raster reads, normalization, derived features, augmentation, sampling | named modules under `src/geo2wf/data/` |
 | common model lifecycle contract | `src/geo2wf/models/base.py` |
-| one model's network/objective/sampling | its descriptive package under `src/geo2wf/models/` |
-| forward diffusion and schedules | `src/geo2wf/diffusion/forward_process.py`, `beta_schedules.py` |
-| reverse sampling | `src/geo2wf/diffusion/samplers/` |
+| one model's network and objective | its descriptive package under `src/geo2wf/models/` |
 | reusable loss primitives | `src/geo2wf/objectives/` |
 | physical/storm metrics | `src/geo2wf/metrics/`, framework adaptation in `evaluation/` |
 | plotting | `src/geo2wf/visualization/` |
@@ -62,15 +54,14 @@ Dashboard-only ViT and external ConvLSTM artifacts live below `inference/` and
 are not model packages. The maintained model inventory is the set of
 descriptive directories under `src/geo2wf/models/` shown above.
 
-Do not add new behavior to CamelCase `src/*.py`, the root `train.py`, or the old
-`src/DenoisingDiffusionProcess/` paths. They exist for compatible imports and
-checkpoints.
+Do not add new behavior to CamelCase `src/*.py` or the root `train.py`. They
+exist for compatible imports and checkpoints.
 
 ## Test map
 
 The suite covers composition, contract validation, metadata collation, strict
-checkpoint compatibility, data transforms and sampling, schedules, samplers,
-model learning behavior, prediction shapes/seeds, metric aggregation, and
+checkpoint compatibility, data transforms and sampling, model learning
+behavior, prediction shapes, metric aggregation, and
 architecture boundaries.
 
 ```bash

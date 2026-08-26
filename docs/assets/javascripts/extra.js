@@ -116,6 +116,55 @@ function prepareWindValues(table) {
 function markBestValues(table) {
   const headings = [...table.querySelectorAll("thead th")]
 
+  const headingNames = headings.map((heading) => heading.textContent.trim())
+  const dualReferenceColumns = {
+    era5: headingNames.indexOf("ERA5"),
+    reference: headingNames.indexOf("Evaluated against"),
+    subset: headingNames.indexOf("Subset"),
+    mae: headingNames.findIndex((name) => name.startsWith("MAE,")),
+    rmse: headingNames.findIndex((name) => name.startsWith("RMSE,")),
+    bias: headingNames.findIndex((name) => name.startsWith("Bias,")),
+    stormMae: headingNames.findIndex((name) => name.startsWith("Storm-macro MAE,"))
+  }
+  if (Object.values(dualReferenceColumns).every((index) => index >= 0)) {
+    const groups = new Map()
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      const key = [
+        row.cells[dualReferenceColumns.era5]?.textContent,
+        row.cells[dualReferenceColumns.reference]?.textContent,
+        row.cells[dualReferenceColumns.subset]?.textContent
+      ].join("\u0000")
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(row)
+    })
+
+    const metrics = [
+      [dualReferenceColumns.mae, false],
+      [dualReferenceColumns.rmse, false],
+      [dualReferenceColumns.bias, true],
+      [dualReferenceColumns.stormMae, false]
+    ]
+    groups.forEach((rows) => {
+      metrics.forEach(([index, absolute]) => {
+        const candidates = rows.map((row) => {
+          const cell = row.cells[index]
+          const match = cell?.dataset.order?.match(/^[+\-\u2212]?\d+(?:\.\d+)?/u)
+          if (!match) return null
+          const raw = Number(match[0].replace("\u2212", "-"))
+          return Number.isFinite(raw) ? { cell, value: absolute ? Math.abs(raw) : raw } : null
+        }).filter(Boolean)
+        if (!candidates.length) return
+        const best = Math.min(...candidates.map(({ value }) => value))
+        candidates.filter(({ value }) => value === best).forEach(({ cell }) => {
+          cell.classList.add("table-best-value")
+          cell.dataset.best = absolute ? "closest to zero" : "lowest"
+          cell.title = `Best value (${cell.dataset.best}) in this matched comparison`
+        })
+      })
+    })
+    return
+  }
+
   headings.forEach((heading, index) => {
     const headingText = heading.textContent
     const direction = headingText.includes("↓") ? "min" : headingText.includes("↑") ? "max" : null

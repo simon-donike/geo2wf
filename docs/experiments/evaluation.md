@@ -25,22 +25,6 @@ same common-valid pixels:
 
 Positive skill indicates lower MAE than ERA5. Zero indicates equal MAE.
 
-## Ensemble metrics
-
-Diffusion evaluation retains complete ensemble members; it does not construct
-a per-pixel best case.
-
-| Metric | Interpretation |
-|---|---|
-| `ensemble_crps_ms` | Continuous ranked probability score of the ensemble; lower is better. |
-| `ensemble_spread_ms` | Mean pixelwise ensemble standard deviation; interpret with error and calibration. |
-| `ensemble_diversity_ms` | Mean pairwise difference between complete members. |
-| `ensemble_mean_mae_ms` | MAE of the ensemble-mean field. |
-| `ensemble_best_member_mae_ms` | MAE of the best complete member for each image. |
-| `ensemble_sharpness_ratio` | Predicted-to-observed gradient magnitude ratio; one indicates matched sharpness. |
-| `ensemble_log_spectrum_error` | Difference between masked log-amplitude spectra; lower is better. |
-| `probabilistic_refinement_score` | Configured sum of CRPS, spectral error, and sharpness penalty; lower is better. |
-
 ## Storm-relative structure
 
 The exporter supplies the IBTrACS center and raster bounds. Evaluation converts
@@ -101,14 +85,12 @@ accumulate sample sums and counts. This distinction prevents differently sized
 swaths from weighting storm metrics solely by pixel count.
 
 The deterministic model computes reconstruction metrics over all validation
-batches. Diffusion validation limits reconstruction-based metrics to
-`model.validation_reconstruction_batches`; diffusion loss can still cover more
-batches. Record this value with sampler, reverse-step count, guidance, ensemble
-size, sample and storm counts, and split policy.
+batches unless validation is explicitly limited. Record the sample and storm
+counts, coverage limit, and split policy.
 
 A minimum comparison table should contain physical MAE, RMSE, bias, ERA5 skill
 where applicable, high-wind MAE, storm-relative metrics with availability
-counts, and ensemble metrics for probabilistic models. Fixed-sample images
+counts. Fixed-sample images
 should accompany the table.
 
 !!! caution "Check the split policy"

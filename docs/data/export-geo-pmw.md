@@ -69,7 +69,7 @@ while optimizer, scheduler, epoch, and step state start fresh.
 
 ```bash
 uv run geo2wf-train \
-  model=conditional_diffusion \
+  model=direct_unet \
   --weights-only-path /path/to/pmw-pretraining.ckpt
 ```
 

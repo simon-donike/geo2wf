@@ -185,4 +185,5 @@ def test_combiner_updates_the_marked_experiment_results(tmp_path: Path) -> None:
     assert "| ERA5 | Trained target | Model |" in rendered
     assert "MAE, m/s (kt); 95% CI" in rendered
     assert "kt); 95% CI" in rendered
+    assert "**1.000 (1.944 kt); 95% CI" in rendered
     assert "## Methods" in rendered

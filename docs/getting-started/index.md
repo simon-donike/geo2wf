@@ -17,7 +17,7 @@ flowchart LR
 1. [Install and verify the package](installation.md).
 2. Run the [first smoke experiment](first-experiment.md).
 3. Learn [how config groups and overrides compose](../experiments/configuration.md).
-4. Read the [two-stage scientific workflow](../models/two-stage.md).
+4. Read the [ERA5-residual field model](../models/era5-residual.md).
 5. Use the [command reference](../reference/commands.md) for evaluation and inference.
 
 ## Main runtime pieces
@@ -43,7 +43,7 @@ flowchart LR
 ## Choose a route
 
 - To verify the installation and configuration, follow [First experiment](first-experiment.md).
-- To train the main stack, use the [Stage 1 → Stage 2 sequence](../models/two-stage.md#training-sequence).
+- To train the field model, use the [ERA5-residual guide](../models/era5-residual.md).
 - To add a component, follow [Adding models, datasets, and metrics](../reference/adding-components.md).
 - To understand package ownership, read [Modular package architecture](../concepts/modular-architecture.md).
 

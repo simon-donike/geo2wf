@@ -12,14 +12,14 @@ statistics, and paths to the corresponding image overlays.
 ## Browse observations
 
 Search, sort, and page through the main observation fields below. The download
-contains the complete flattened schema, including all model metrics and
-diffusion uncertainty columns.
+contains the complete flattened schema for every maintained model and data
+source. The [full dataset page](full-dataset.md) renders every column.
 
 <div
   class="csv-table-viewer"
   data-csv-source="../../explorer/storm-data.csv"
-  data-csv-columns="storm_id,storm_name,time,category,ibtracs_msw,vit_prediction.max,unet_prediction.max,unet_mlp_prediction.max,diffusion_prediction.max,sar.max"
-  data-csv-labels="Storm ID|Storm name|Time|Category|IBTrACS max m/s|ViT max m/s|UNet max m/s|UNet+MLP max m/s|Diffusion max m/s|SAR max m/s"
+  data-csv-columns="storm_id,storm_name,time,category,ibtracs_msw,vit_prediction.max,unet_prediction.max,unet_mlp_prediction.max,sar.max"
+  data-csv-labels="Storm ID|Storm name|Time|Category|IBTrACS max m/s|ViT max m/s|UNet max m/s|UNet+MLP max m/s|SAR max m/s"
   data-csv-empty="—"
 >
   <p class="csv-table-viewer__status">Loading observation manifest…</p>
@@ -27,8 +27,7 @@ diffusion uncertainty columns.
 
 ## CSV shape
 
-Nested JSON objects use dotted column names, such as
-`diffusion_prediction.uncertainty.metrics.max.p90`. Array-valued fields such as
+Nested JSON objects use dotted column names. Array-valued fields such as
 overlay bounds and the available-model list remain compact JSON values inside
 their CSV cells. Global display configuration, NWP series, PMW observations,
 and forecast bundles remain in the source JSON because they do not map to one

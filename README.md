@@ -3,7 +3,7 @@
 `geo2wf` reconstructs tropical-cyclone surface wind fields from geostationary
 satellite imagery and optional ERA5 or PMW context, using matched SAR wind
 retrievals as spatial supervision. The main workflow trains a deterministic
-ERA5-residual baseline and then a residual-diffusion refinement. Separate model
+ERA5-residual wind-field model. Separate model
 families handle PMW brightness-temperature proxy reconstruction, current scalar
 intensity, and future scalar intensity.
 
@@ -29,23 +29,17 @@ Training uses Hydra-style config groups. The default composition is
 `configs/modular.yaml`.
 
 ```bash
-# Stage 1: deterministic correction around ERA5
+# Deterministic correction around ERA5
 uv run geo2wf-train \
   data=geo_sar_common10_era5 \
   model=deterministic_residual
-
-# Stage 2: diffusion around a frozen Stage 1 checkpoint
-GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=residual_diffusion_deterministic_baseline
 ```
 
 Switching models is a config override:
 
 ```bash
-uv run geo2wf-train model=conditional_diffusion data=geo_sar_common10_era5
-uv run geo2wf-train model=residual_diffusion data=geo_sar_common10_era5
+uv run geo2wf-train model=direct_unet data=geo_pmw_near89_common10_era5
+uv run geo2wf-train model=bottleneck_unet_mlp
 ```
 
 Override individual values on the command line:
@@ -104,7 +98,6 @@ src/geo2wf/
 ├── config/              composition, schemas, and compatibility loading
 ├── data/                contracts, datasets, collation, features, and sampling
 ├── models/              model-specific Lightning packages
-├── diffusion/           schedules, processes, samplers, and backbones
 ├── objectives/          reusable loss primitives
 ├── metrics/             physical and storm metrics
 ├── visualization/       plotting functions that return Matplotlib figures
@@ -121,8 +114,8 @@ The shared model contract consists of:
   `PredictionBatch` in `geo2wf.models.base`; and
 - `CheckpointLoader` and `PredictionService` in `geo2wf.inference`.
 
-Deterministic predictions have an ensemble dimension of one; diffusion returns
-all requested members through the same physical-unit interface.
+Deterministic predictions use an ensemble dimension of one through the shared
+physical-unit interface.
 
 ## Data
 

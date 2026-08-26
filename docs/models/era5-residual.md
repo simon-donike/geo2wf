@@ -6,7 +6,7 @@
 \hat v_{\mathrm{base}} = v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, masks)
 \]
 
-Its output becomes the frozen baseline consumed by [Stage 2 residual diffusion](residual-diffusion.md). See [Two-stage baseline + diffusion](two-stage.md) for the complete handoff.
+It is the maintained deterministic wind-field reconstruction model.
 
 ## Input and architecture
 
@@ -107,4 +107,5 @@ The older direct near-89 GHz U-Net has an equivalent preset:
 uv run geo2wf-train experiment=geo_pmw_near89_unet_no_era5
 ```
 
-After selecting a checkpoint, pass it to Stage 2 through `GEO2WF_BASELINE_CKPT` or the modular `model.baseline_checkpoint_path` override. The historical full-YAML equivalent is `model.residual.baseline.checkpoint_path`. Continue to [Stage 2 residual diffusion](residual-diffusion.md) or [Evaluation](../experiments/evaluation.md).
+After selecting a checkpoint, continue to [Evaluation](../experiments/evaluation.md)
+or run storm inference with the [command reference](../reference/commands.md).
