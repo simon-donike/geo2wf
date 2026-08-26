@@ -1,19 +1,20 @@
-# Storm observation manifest
+# StormSense case-study manifest
 
-The StormSense explorer manifest is available as a flat CSV with one row per
-geostationary observation. It includes storm metadata, IBTrACS intensity,
-predictions from every available model, SAR-match metrics, uncertainty
-statistics, and paths to the corresponding image overlays.
+This is the dashboard's three-storm case-study manifest, not the model-training
+corpus. It contains dense geostationary observations for `AL082025`, `EP112025`,
+and `EP182023`, plus IBTrACS intensity, available model outputs, sparse SAR
+matches, and paths to image overlays.
 
-[Download the complete CSV](../explorer/storm-data.csv){ .md-button .md-button--primary download }
+[Browse the full training corpus](full-dataset.md){ .md-button .md-button--primary }
+
+[Download the case-study CSV](../explorer/storm-data.csv){ .md-button download }
 [View the source JSON](../explorer/storm-data.json){ .md-button }
 [Open StormSense](../explorer/dashboard.html){ .md-button }
 
 ## Browse observations
 
 Search, sort, and page through the main observation fields below. The download
-contains the complete flattened schema for every maintained model and data
-source. The [full dataset page](full-dataset.md) renders every column.
+contains the complete flattened dashboard schema for its three storms.
 
 <div
   class="csv-table-viewer"

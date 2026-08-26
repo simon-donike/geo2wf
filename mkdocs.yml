@@ -48,8 +48,8 @@ nav:
       - Modular package architecture: concepts/modular-architecture.md
   - Data:
       - Inputs and targets: data/index.md
-      - Storm observation manifest: data/storm-manifest.md
-      - Full dataset table: data/full-dataset.md
+      - Full training corpus: data/full-dataset.md
+      - StormSense case-study manifest: data/storm-manifest.md
       - Dataset contract: data/dataset-contract.md
       - Normalization & masks: data/normalization.md
       - Export GEO–SAR: data/export-geo-sar.md
