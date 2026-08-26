@@ -6,6 +6,8 @@ import torch.nn as nn
 from inspect import isfunction
 from einops import rearrange
 
+from geo2wf.layers import ReflectConv2d
+
 
 def exists(x):
     return x is not None
@@ -51,7 +53,7 @@ def Upsample(dim):
 
 
 def Downsample(dim):
-    return nn.Conv2d(dim, dim, 4, 2, 1)
+    return ReflectConv2d(dim, dim, 4, 2, 1)
 
 
 class LayerNorm(nn.Module):
@@ -90,13 +92,13 @@ class ConvNextBlock(nn.Module):
             else None
         )
 
-        self.ds_conv = nn.Conv2d(dim, dim, 7, padding=3, groups=dim)
+        self.ds_conv = ReflectConv2d(dim, dim, 7, padding=3, groups=dim)
 
         self.net = nn.Sequential(
             LayerNorm(dim) if norm else nn.Identity(),
-            nn.Conv2d(dim, dim_out * mult, 3, padding=1),
+            ReflectConv2d(dim, dim_out * mult, 3, padding=1),
             nn.GELU(),
-            nn.Conv2d(dim_out * mult, dim_out, 3, padding=1),
+            ReflectConv2d(dim_out * mult, dim_out, 3, padding=1),
         )
 
         self.res_conv = nn.Conv2d(dim, dim_out, 1) if dim != dim_out else nn.Identity()

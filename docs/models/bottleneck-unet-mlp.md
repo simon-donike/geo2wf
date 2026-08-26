@@ -63,3 +63,28 @@ encoder. The image term additionally updates the decoder, while the continuous
 IBTrACS term updates the bottleneck MLP. Checkpoints are selected by the
 combined `val/loss`; the two component losses and image/intensity MAE, RMSE,
 and bias are logged separately.
+
+## Encoder-only IBTrACS ablation
+
+The encoder-only experiment removes the decoder and reconstruction head
+entirely. It applies the same spatial mean/max pooling and MLP to the shared
+encoder bottleneck, but its only target and loss are continuous IBTrACS
+`USA_WIND`:
+
+```bash
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
+```
+
+For strict comparison, the data module preserves the joint experiment's
+SAR-valid-center sample IDs. On first use it fingerprints the split manifest,
+IBTrACS file, crop settings, and eligibility settings, scans SAR to materialize
+that cohort, and writes a sidecar under
+`<paired-root>/.geo2wf/encoder-ibtracs-cohorts/`. Condition-only batches then
+read GEO and optional ERA5 only: they contain no SAR raster, target mask, field
+metric, or reconstruction output. Set `GEO2WF_INTENSITY_COHORT_CACHE` to place
+the sidecars elsewhere.
+
+The scalar objective remains 5 m/s Huber loss. Validation IBTrACS MAE selects
+checkpoints and drives learning-rate scheduling and early stopping; RMSE, bias,
+category accuracy, and macro F1 are also logged.

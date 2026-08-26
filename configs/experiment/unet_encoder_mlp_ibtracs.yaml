@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - override /data: encoder_geo_ibtracs
+  - override /model: bottleneck_encoder_mlp
+
+trainer:
+  max_epochs: 1000
+  checkpoint:
+    monitor: val/intensity_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/intensity_mae_ms
+    mode: min
+    patience: 50
+logging:
+  wandb:
+    name: unet-encoder-mlp-ibtracs
+    project: geo2wf
+    enabled: true
+    log_model: false

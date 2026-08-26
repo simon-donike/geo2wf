@@ -1,0 +1,14 @@
+_target_: geo2wf.models.bottleneck_unet_mlp.BottleneckEncoderMLPRegressor
+condition_channels: 23
+base_channels: 32
+channel_mults: [1, 2, 4, 8]
+intensity_hidden_features: 128
+intensity_dropout: 0.1
+initial_intensity_ms: 25.0
+intensity_huber_delta_ms: 5.0
+lr: 0.0002
+weight_decay: 0.0001
+lr_scheduler_factor: 0.5
+lr_scheduler_patience: 25
+lr_scheduler_cooldown: 0
+lr_scheduler_min_lr: 0.0

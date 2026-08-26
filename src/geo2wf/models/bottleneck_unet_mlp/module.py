@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from geo2wf.layers import ReflectConv2d
 from geo2wf.data.contracts import DataSpec
 from geo2wf.data.joint_intensity import (
     IBTRACS_MAX_WIND_COMPANION,
@@ -52,9 +53,9 @@ class ResidualBlock(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
+        self.conv1 = ReflectConv2d(in_channels, out_channels, 3, padding=1)
         self.norm1 = nn.GroupNorm(_group_count(out_channels), out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, padding=1)
+        self.conv2 = ReflectConv2d(out_channels, out_channels, 3, padding=1)
         self.norm2 = nn.GroupNorm(_group_count(out_channels), out_channels)
         self.skip = (
             nn.Identity()
@@ -81,6 +82,124 @@ class JointUNetOutput:
         """Compatibility alias for checkpoints and downstream callers."""
 
         return self.intensity_prediction_ms
+
+
+@dataclass(frozen=True)
+class EncoderMLPOutput:
+    """Encoder-only scalar prediction and its spatial bottleneck."""
+
+    intensity_prediction_ms: torch.Tensor
+    bottleneck: torch.Tensor
+
+
+class BottleneckEncoderMLP(nn.Module):
+    """U-Net encoder and pooled MLP branch, without decoder parameters."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        base_channels: int = 32,
+        channel_mults: Sequence[int] = (1, 2, 4, 8),
+        intensity_hidden_features: int = 128,
+        intensity_dropout: float = 0.1,
+        initial_intensity_ms: float = 25.0,
+        structure_outputs: int = 0,
+    ) -> None:
+        super().__init__()
+        if in_channels <= 0 or base_channels <= 0:
+            raise ValueError("input and base channel counts must be positive")
+        if not channel_mults or any(int(value) <= 0 for value in channel_mults):
+            raise ValueError("channel_mults must contain positive integers")
+        if intensity_hidden_features < 2:
+            raise ValueError("intensity_hidden_features must be at least two")
+        if not 0.0 <= intensity_dropout < 1.0:
+            raise ValueError("intensity_dropout must be in [0, 1)")
+        if initial_intensity_ms <= 0.0:
+            raise ValueError("initial_intensity_ms must be positive")
+        if structure_outputs < 0:
+            raise ValueError("structure_outputs must be non-negative")
+
+        dimensions = [base_channels * int(value) for value in channel_mults]
+        self.dimensions = tuple(dimensions)
+        self.stem = ReflectConv2d(in_channels, dimensions[0], 3, padding=1)
+        self.encoder = nn.ModuleList()
+        self.downsamples = nn.ModuleList()
+        for index, dimension in enumerate(dimensions):
+            self.encoder.append(
+                nn.Sequential(
+                    ResidualBlock(dimension, dimension),
+                    ResidualBlock(dimension, dimension),
+                )
+            )
+            if index + 1 < len(dimensions):
+                self.downsamples.append(
+                    ReflectConv2d(
+                        dimension,
+                        dimensions[index + 1],
+                        kernel_size=3,
+                        stride=2,
+                        padding=1,
+                    )
+                )
+        self.bottleneck = nn.Sequential(
+            ResidualBlock(dimensions[-1], dimensions[-1]),
+            ResidualBlock(dimensions[-1], dimensions[-1]),
+        )
+        pooled_features = 2 * dimensions[-1]
+        second_hidden = max(intensity_hidden_features // 2, 1)
+        self.intensity_mlp = nn.Sequential(
+            nn.Linear(pooled_features, intensity_hidden_features),
+            nn.LayerNorm(intensity_hidden_features),
+            nn.SiLU(),
+            nn.Dropout(intensity_dropout),
+            nn.Linear(intensity_hidden_features, second_hidden),
+            nn.SiLU(),
+        )
+        self.intensity_head = nn.Linear(second_hidden, 1)
+        nn.init.normal_(self.intensity_head.weight, std=1.0e-3)
+        nn.init.constant_(
+            self.intensity_head.bias,
+            math.log(math.expm1(float(initial_intensity_ms))),
+        )
+        self.structure_head = (
+            nn.Linear(second_hidden, int(structure_outputs))
+            if structure_outputs > 0
+            else None
+        )
+        if self.structure_head is not None:
+            nn.init.normal_(self.structure_head.weight, std=1.0e-3)
+            nn.init.constant_(self.structure_head.bias, 4.0)
+
+    def encode(self, inputs: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
+        if inputs.ndim != 4:
+            raise ValueError("U-Net inputs must have shape [B,C,H,W]")
+        hidden = self.stem(inputs)
+        skips = []
+        for index, block in enumerate(self.encoder):
+            hidden = block(hidden)
+            skips.append(hidden)
+            if index < len(self.downsamples):
+                hidden = self.downsamples[index](hidden)
+        return self.bottleneck(hidden), skips
+
+    def intensity_features(
+        self, bottleneck: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        flattened = bottleneck.flatten(2)
+        pooled = torch.cat([flattened.mean(dim=2), flattened.amax(dim=2)], dim=1)
+        features = self.intensity_mlp(pooled)
+        intensity = F.softplus(self.intensity_head(features)).squeeze(1)
+        structure = (
+            F.softplus(self.structure_head(features))
+            if self.structure_head is not None
+            else None
+        )
+        return features, intensity, structure
+
+    def forward(self, inputs: torch.Tensor) -> EncoderMLPOutput:
+        bottleneck, _ = self.encode(inputs)
+        _, intensity, _ = self.intensity_features(bottleneck)
+        return EncoderMLPOutput(intensity, bottleneck)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -118,7 +237,7 @@ class JointPredictionBatch(PredictionBatch):
         }
 
 
-class BottleneckUNetMLP(nn.Module):
+class BottleneckUNetMLP(BottleneckEncoderMLP):
     """Shared U-Net encoder with decoder and scalar bottleneck branches."""
 
     def __init__(
@@ -131,70 +250,16 @@ class BottleneckUNetMLP(nn.Module):
         initial_intensity_ms: float = 25.0,
         structure_outputs: int = 0,
     ) -> None:
-        super().__init__()
-        if in_channels <= 0 or base_channels <= 0:
-            raise ValueError("input and base channel counts must be positive")
-        if not channel_mults or any(int(value) <= 0 for value in channel_mults):
-            raise ValueError("channel_mults must contain positive integers")
-        if intensity_hidden_features < 2:
-            raise ValueError("intensity_hidden_features must be at least two")
-        if not 0.0 <= intensity_dropout < 1.0:
-            raise ValueError("intensity_dropout must be in [0, 1)")
-        if initial_intensity_ms <= 0.0:
-            raise ValueError("initial_intensity_ms must be positive")
-        if structure_outputs < 0:
-            raise ValueError("structure_outputs must be non-negative")
-
-        dimensions = [base_channels * int(value) for value in channel_mults]
-        self.stem = nn.Conv2d(in_channels, dimensions[0], 3, padding=1)
-        self.encoder = nn.ModuleList()
-        self.downsamples = nn.ModuleList()
-        for index, dimension in enumerate(dimensions):
-            self.encoder.append(
-                nn.Sequential(
-                    ResidualBlock(dimension, dimension),
-                    ResidualBlock(dimension, dimension),
-                )
-            )
-            if index + 1 < len(dimensions):
-                self.downsamples.append(
-                    nn.Conv2d(
-                        dimension,
-                        dimensions[index + 1],
-                        kernel_size=3,
-                        stride=2,
-                        padding=1,
-                    )
-                )
-
-        self.bottleneck = nn.Sequential(
-            ResidualBlock(dimensions[-1], dimensions[-1]),
-            ResidualBlock(dimensions[-1], dimensions[-1]),
+        super().__init__(
+            in_channels,
+            base_channels,
+            channel_mults,
+            intensity_hidden_features,
+            intensity_dropout,
+            initial_intensity_ms,
+            structure_outputs,
         )
-        pooled_features = 2 * dimensions[-1]
-        second_hidden = max(intensity_hidden_features // 2, 1)
-        self.intensity_mlp = nn.Sequential(
-            nn.Linear(pooled_features, intensity_hidden_features),
-            nn.LayerNorm(intensity_hidden_features),
-            nn.SiLU(),
-            nn.Dropout(intensity_dropout),
-            nn.Linear(intensity_hidden_features, second_hidden),
-            nn.SiLU(),
-        )
-        self.intensity_head = nn.Linear(second_hidden, 1)
-        nn.init.normal_(self.intensity_head.weight, std=1.0e-3)
-        nn.init.constant_(
-            self.intensity_head.bias,
-            math.log(math.expm1(float(initial_intensity_ms))),
-        )
-        self.structure_head = (
-            nn.Linear(second_hidden, int(structure_outputs))
-            if structure_outputs > 0
-            else None
-        )
-        if self.structure_head is not None:
-            nn.init.normal_(self.structure_head.weight, std=1.0e-3)
-            nn.init.constant_(self.structure_head.bias, 4.0)
+        dimensions = list(self.dimensions)
 
         self.decoder_projections = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -215,26 +280,8 @@ class BottleneckUNetMLP(nn.Module):
         nn.init.zeros_(self.reconstruction_head.bias)
 
     def forward(self, inputs: torch.Tensor) -> JointUNetOutput:
-        if inputs.ndim != 4:
-            raise ValueError("U-Net inputs must have shape [B,C,H,W]")
-        hidden = self.stem(inputs)
-        skips = []
-        for index, block in enumerate(self.encoder):
-            hidden = block(hidden)
-            skips.append(hidden)
-            if index < len(self.downsamples):
-                hidden = self.downsamples[index](hidden)
-
-        bottleneck = self.bottleneck(hidden)
-        flattened = bottleneck.flatten(2)
-        pooled = torch.cat([flattened.mean(dim=2), flattened.amax(dim=2)], dim=1)
-        intensity_features = self.intensity_mlp(pooled)
-        intensity = F.softplus(self.intensity_head(intensity_features)).squeeze(1)
-        structure = (
-            F.softplus(self.structure_head(intensity_features))
-            if self.structure_head is not None
-            else None
-        )
+        bottleneck, skips = self.encode(inputs)
+        _, intensity, structure = self.intensity_features(bottleneck)
 
         hidden = bottleneck
         for projection, block, skip in zip(
