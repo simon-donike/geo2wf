@@ -56,6 +56,28 @@ STORM_NAMES = {
     "EP182023": "OTIS",
 }
 
+# The CSV is a data manifest, not a model-results export. Keep this allowlist
+# explicit so new prediction or evaluation fields added to the dashboard JSON
+# cannot silently become columns in the downloadable dataset.
+CSV_STORM_FIELDS = (
+    ("storm_id", "id"),
+    ("storm_name", "name"),
+    ("basin", "basin"),
+    ("storm_start", "start"),
+    ("storm_end", "end"),
+)
+CSV_OBSERVATION_FIELDS = (
+    "time",
+    "lat",
+    "lon",
+    "category",
+    "ibtracs_msw",
+    "geo_overlay",
+    "sar",
+    "sar_overlay",
+    "sar_dt_minutes",
+)
+
 NWP_LABELS = {
     "aifs": "AIFS",
     "aifs2": "AIFS2",
@@ -101,28 +123,20 @@ def _flatten_csv_value(row, prefix, value):
 
 
 def build_observation_csv(payload):
-    """Return columns and one flat CSV row per explorer observation."""
-    storm_fields = (
-        ("storm_id", "id"),
-        ("storm_name", "name"),
-        ("basin", "basin"),
-        ("storm_start", "start"),
-        ("storm_end", "end"),
-        ("inference_available", "inference_available"),
-        ("available_models", "available_models"),
-    )
+    """Return data-only columns and one flat row per explorer observation."""
     rows = []
-    columns = [column for column, _ in storm_fields]
+    columns = [column for column, _ in CSV_STORM_FIELDS]
     seen_columns = set(columns)
 
     for storm in payload.get("storms", []):
         storm_values = {}
-        for column, source_key in storm_fields:
+        for column, source_key in CSV_STORM_FIELDS:
             _flatten_csv_value(storm_values, column, storm.get(source_key))
         for record in storm.get("records", []):
             row = dict(storm_values)
-            for key, value in record.items():
-                _flatten_csv_value(row, key, value)
+            for key in CSV_OBSERVATION_FIELDS:
+                if key in record:
+                    _flatten_csv_value(row, key, record[key])
             for column in row:
                 if column not in seen_columns:
                     columns.append(column)

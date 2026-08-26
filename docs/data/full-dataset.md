@@ -48,5 +48,6 @@ uv run python scripts/export_training_corpus_manifest.py
 ```
 
 This corpus table is distinct from the [three-storm StormSense case-study
-manifest](storm-manifest.md), which contains dense dashboard observations and
-model outputs rather than the paired training examples.
+manifest](storm-manifest.md), which contains dense dashboard observations
+rather than the paired training examples. Its downloadable CSV is data-only;
+model outputs remain in the dashboard JSON.
