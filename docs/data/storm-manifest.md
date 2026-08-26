@@ -2,8 +2,9 @@
 
 This is the dashboard's three-storm case-study manifest, not the model-training
 corpus. It contains dense geostationary observations for `AL082025`, `EP112025`,
-and `EP182023`, plus IBTrACS intensity, available model outputs, sparse SAR
-matches, and paths to image overlays.
+and `EP182023`, plus IBTrACS intensity, sparse SAR matches, and paths to image
+overlays. Model predictions remain available in the dashboard and source JSON,
+but are intentionally excluded from the CSV.
 
 [Browse the full training corpus](full-dataset.md){ .md-button .md-button--primary }
 
@@ -14,13 +15,14 @@ matches, and paths to image overlays.
 ## Browse observations
 
 Search, sort, and page through the main observation fields below. The download
-contains the complete flattened dashboard schema for its three storms.
+contains observation and source-data fields only; it does not include model
+predictions or performance metrics.
 
 <div
   class="csv-table-viewer"
   data-csv-source="../../explorer/storm-data.csv"
-  data-csv-columns="storm_id,storm_name,time,category,ibtracs_msw,vit_prediction.max,unet_prediction.max,unet_mlp_prediction.max,sar.max"
-  data-csv-labels="Storm ID|Storm name|Time|Category|IBTrACS max m/s|ViT max m/s|UNet max m/s|UNet+MLP max m/s|SAR max m/s"
+  data-csv-columns="storm_id,storm_name,time,lat,lon,category,ibtracs_msw,sar.max,sar_dt_minutes"
+  data-csv-labels="Storm ID|Storm name|Time|Latitude|Longitude|Category|IBTrACS max m/s|SAR max m/s|SAR offset minutes"
   data-csv-empty="—"
 >
   <p class="csv-table-viewer__status">Loading observation manifest…</p>
@@ -28,13 +30,12 @@ contains the complete flattened dashboard schema for its three storms.
 
 ## CSV shape
 
-Nested JSON objects use dotted column names. Array-valued fields such as
-overlay bounds and the available-model list remain compact JSON values inside
-their CSV cells. Global display configuration, NWP series, PMW observations,
-and forecast bundles remain in the source JSON because they do not map to one
-row per geostationary observation.
+Nested data objects use dotted column names. Array-valued fields such as overlay
+bounds remain compact JSON values inside their CSV cells. Global display
+configuration, model metadata and predictions, NWP series, PMW observations,
+and forecast bundles remain in the source JSON.
 
-The CSV is regenerated alongside `storm-data.json` by:
+The data-only CSV is regenerated alongside `storm-data.json` by:
 
 ```bash
 uv run python scripts/export_storm_explorer_data.py
