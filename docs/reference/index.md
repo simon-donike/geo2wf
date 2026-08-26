@@ -16,8 +16,12 @@ geo2wf/
 │   │   └── manifests.py raster_io.py normalization.py features.py
 │   ├── models/
 │   │   ├── base.py
+│   │   ├── bottleneck_unet_mlp/
 │   │   ├── conditional_diffusion/
 │   │   ├── deterministic_residual/
+│   │   ├── direct_unet/
+│   │   ├── intensity_correction/
+│   │   ├── intensity_forecast/
 │   │   └── residual_diffusion/
 │   ├── diffusion/
 │   │   ├── process.py forward_process.py beta_schedules.py
@@ -53,6 +57,10 @@ geo2wf/
 | W&B/CSV/media/run records | `src/geo2wf/tracking/` |
 | checkpoint evaluation and storm inference | installed CLI dispatch under `src/geo2wf/cli/`; maintained workflows under `scripts/` |
 | source pairing and export | reusable APIs under `preprocessing/`; maintained workflows under `scripts/` |
+
+Dashboard-only ViT and external ConvLSTM artifacts live below `inference/` and
+are not model packages. The maintained model inventory is the set of
+descriptive directories under `src/geo2wf/models/` shown above.
 
 Do not add new behavior to CamelCase `src/*.py`, the root `train.py`, or the old
 `src/DenoisingDiffusionProcess/` paths. They exist for compatible imports and

@@ -337,6 +337,14 @@ input {
 }
 
 /* Progressive table controls, backed by the locally vendored simple-datatables. */
+.md-typeset .csv-table-viewer__status {
+  padding: 1rem;
+  color: var(--tint-30);
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
+  border-radius: 0.5rem;
+}
+
 .md-typeset .datatable-wrapper {
   width: 100%;
   margin: 1em 0;

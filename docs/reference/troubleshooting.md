@@ -10,14 +10,23 @@ Training consumes an already exported root. Confirm `data.root/<split>/manifest.
 
 **Symptom:** convolution expects a different input width.
 
-Recalculate:
+Channel keys do not mean the same layer of assembly in every model. For the
+current common10 + ERA5 data, use these exact checks:
 
 ```text
-prepared condition = GEO + optional ERA5 + distance-to-center + 3 solar-time fields + condition mask
-unet.channels      = prepared condition + noisy target
+data condition                  = 10 GEO + 9 ERA5 + distance + 3 solar = 23
+standalone prepared condition   = 23 data + condition mask = 24
+standalone diffusion U-Net      = 1 noisy target + 24 prepared = 25
+deterministic Stage 1 U-Net     = 23 data + condition mask + ERA5 wind + mask = 26
+residual Stage 2 U-Net          = 1 noisy residual + 24 prepared + baseline + mask = 27
+direct PMW U-Net                = 23 data + condition mask = 24
 ```
 
-The residual config is different: `condition_channels` includes distance-to-center but excludes the three internally appended mask/baseline features.
+`conditional_diffusion.condition_channels` and residual diffusion's
+`base_condition_channels` describe a prepared condition that already includes
+the condition mask. Deterministic and direct U-Net `condition_channels`
+describe only `batch["condition"]`. Follow the selected model page and
+`DataSpec` error instead of copying a width from another family.
 
 Checkpoints trained before the distance channel was added have a narrower first
 convolution and are not shape-compatible with current configs. Retrain with the
@@ -64,3 +73,11 @@ The loader rejects condition rasters that look like all-zero fill, applies inter
 Modular data configs default to `include_test_in_train: false`; some historical
 full-YAML presets set it to `true`. Inspect `resolved-config.yaml`. Changing the
 flag after training cannot restore a held-out test.
+
+## Dashboard model name has no training config
+
+StormSense includes imported ViT inference and external ConvLSTM forecast
+artifacts. They are not maintained packages under `src/geo2wf/models/`, so a
+dashboard label alone is not a reproducible model definition. Use the U-Net,
+diffusion, intensity-correction, or intensity-forecast configs for maintained
+training workflows; treat imported artifacts as fixed comparison layers.

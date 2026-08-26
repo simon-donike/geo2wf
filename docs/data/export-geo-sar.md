@@ -23,7 +23,8 @@ uv run geo2wf-export geo-sar \
 2. Group records by split and storm.
 3. Match each SAR occurrence with its closest GEO occurrence within `closest_match_hours`.
 4. Optionally match the closest supported PMW swath within `pmw_max_time_gap_hours`.
-5. Match the nearest IBTrACS track row and retain every source field.
+5. If `include_ibtracs` is enabled, match the nearest IBTrACS track row and
+   retain every source field.
 6. Confirm required GEO and SAR channels exist.
 7. Select a crop center, build the shared geographic grid, and optionally shift it to include the IBTrACS center.
 8. Regrid continuous source channels and construct joint validity.
@@ -82,9 +83,13 @@ same grid as GEO and SAR. The manifest records its path, sensor, channel,
 timestamp, and signed `pmw_dt_minutes`. A missing or unreadable PMW companion
 does not discard an otherwise valid GEO–SAR pair.
 
-The nearest IBTrACS row is expanded into `ibtracs_<source-column>` manifest
-columns. Convenience fields include `ibtracs_msw_kt`, `ibtracs_msw_ms`,
-`ibtracs_mslp_hpa`, their selected WMO/USA source columns, and the signed match
-offset. `ibtracs_schema.json` records source units for every retained field.
+When `include_ibtracs` is enabled, the nearest IBTrACS row is expanded into
+`ibtracs_<source-column>` manifest columns. Convenience fields include
+`ibtracs_msw_kt`, `ibtracs_msw_ms`, `ibtracs_mslp_hpa`, their selected WMO/USA
+source columns, and the signed match offset. `ibtracs_schema.json` records
+source units for every retained field. The independent
+`ibtracs_center_lat`/`ibtracs_center_lon` already present in the source
+observation manifest remain available for crop placement and storm geometry
+even when the full-row join is disabled.
 
 See the complete [configuration reference](../reference/configuration.md).

@@ -1,8 +1,10 @@
 # Six-hour scalar intensity forecast
 
-This workflow forecasts maximum sustained wind six hours after the current
-single-field correction estimate. It also uses IBTrACS `USA_WIND` at −6 h and
-−12 h and learns a signed change around the current estimate.
+This workflow trains a one-step model for maximum sustained wind six hours
+after the current anchor. During matched fine-tuning, that anchor is the current
+single-field correction estimate; the other history values are IBTrACS
+`USA_WIND` at −6 h and −12 h. The model learns a signed change around the
+anchor.
 
 ```text
 forecast(t + 6 h) = max(0, corrected U-Net intensity(t) + learned change)
@@ -19,8 +21,10 @@ uv run geo2wf-export intensity-forecast-cache \
 ```
 
 The exporter creates storm-disjoint historical pretraining splits for
-2000–2018 and 2019–2022, plus matched `train`, `val`, and `test` splits. It
-selects one current field per storm/fix and records the source hashes and three
+2000–2018 and 2019–2022, plus matched `train`, `val`, and `test` splits. In
+historical pretraining the current anchor is IBTrACS itself; in the matched
+splits it is the frozen correction-model prediction. The exporter selects one
+current field per storm/fix and records source hashes and three
 rapid-intensification validation cases in `cache-metadata.json`.
 
 ## Train both stages
@@ -48,6 +52,16 @@ two-step diagnostic can begin inside the RI period. W&B receives a three-panel
 RI plot and a six-row forecast table. The observed +6 h intensity is never fed
 into the second forecast step.
 
+## One-step training and +12 h dashboard rollout
+
+`IntensityForecastMLP` is optimized only against a +6 h target. Its
+`predict_two_steps(...)` helper feeds the first prediction into the next
+history window and applies the same model again, producing recursive +6 h and
++12 h values without using the observed +6 h wind. StormSense's MLP forecast
+layer displays this retrospective recursive +12 h diagnostic. Error can
+compound across the two steps, so it is not equivalent to a separately trained
+12-hour model.
+
 ## Evaluate and infer
 
 ```bash
@@ -65,4 +79,6 @@ uv run geo2wf-infer intensity-forecast \
 ```
 
 IBTrACS is a retrospective best-track product. Operational use should replace
-the historical inputs with real-time advisory or ATCF data.
+the historical inputs with real-time advisory or ATCF data and re-evaluate the
+distribution shift. The dashboard's separate external ConvLSTM +12 h artifact
+is not this MLP and is not implemented in the maintained model package.

@@ -294,7 +294,7 @@ def _plot_storm_trajectories(frames: Mapping[str, pd.DataFrame], path: Path) -> 
                 storm["target_ms"],
                 color=COLORS["IBTrACS"],
                 linewidth=2.6,
-                label="IBTrACS ground truth",
+                label="IBTrACS reference",
                 zorder=5,
             )
             for model, prediction_column in PREDICTION_COLUMNS.items():
@@ -712,7 +712,7 @@ def _report_markdown(
         "(`EP112025`)**, and **684 Otis observations (`EP182023`)**, for **3,268** "
         "timestamps. All 3,268 have a valid three-hour-or-narrower IBTrACS bracket. "
         "Both conditioning regimes use exactly the same observation IDs, centers, "
-        "timestamps, and ground truth.",
+        "timestamps, and IBTrACS reference targets.",
         "",
         f"Inference was attempted for all **{dense_attempted:,}** scans. "
         f"**{dense_valid:,}** have a non-empty valid footprint after the model's "
@@ -732,7 +732,7 @@ def _report_markdown(
         "series readable. The table scores every valid individual observation, "
         "while the download also retains any explicitly flagged unusable scan.",
         "",
-        "![Predicted and ground-truth full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)",
+        "![Predicted and IBTrACS-reference full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)",
         "",
         "![Per-storm dense inference MAE](../assets/images/intensity-comparison/three-storm-mae.png)",
         "",

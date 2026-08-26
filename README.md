@@ -1,8 +1,11 @@
 # geo2wf
 
-`geo2wf` reconstructs tropical-cyclone SAR wind fields from geostationary
-satellite imagery and optional ERA5 or PMW context. The main workflow trains a
-deterministic ERA5-residual baseline and then a residual-diffusion refinement.
+`geo2wf` reconstructs tropical-cyclone surface wind fields from geostationary
+satellite imagery and optional ERA5 or PMW context, using matched SAR wind
+retrievals as spatial supervision. The main workflow trains a deterministic
+ERA5-residual baseline and then a residual-diffusion refinement. Separate model
+families handle PMW brightness-temperature proxy reconstruction, current scalar
+intensity, and future scalar intensity.
 
 ![Random GEO-SAR training pairs](docs/assets/images/geo-sar-random-pairs.png)
 
@@ -162,6 +165,8 @@ the installed commands. Compatibility removal is not part of this refactor.
 
 ## Documentation
 
+- [Scientific problem and observation limits](docs/concepts/problem.md)
+- [Complete maintained model overview](docs/models/index.md)
 - [First experiment](docs/getting-started/first-experiment.md)
 - [Configuration and Hydra overrides](docs/experiments/configuration.md)
 - [Training and checkpoints](docs/experiments/training.md)

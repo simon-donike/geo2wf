@@ -68,9 +68,9 @@ MAE before inspecting these trajectories.
 
 ![Full matched-storm IBTrACS, SAR maximum, and predicted intensity trajectories with RI windows](../assets/images/intensity-comparison/matched-ri-full-storm-trajectories.png)
 
-Blue is interpolated IBTrACS, orange is the observed SAR maximum, and green is
+Blue is interpolated IBTrACS, orange is the SAR-derived maximum, and green is
 the model prediction. A yellow interval covers the preceding 24 hours for each
-SAR observation classified as RI. Overlapping windows are merged. Lines connect
+SAR acquisition classified as RI. Overlapping windows are merged. Lines connect
 available SAR acquisition times for readability; they do not imply that SAR or
 model predictions were observed between acquisitions.
 
@@ -283,7 +283,7 @@ The raw U-Net run had media logging disabled, so its panels below were regenerat
 
 ## Humberto, Kiko, and Otis: dense full-storm inference
 
-The inference manifest contributes every listed 10-minute GEO image: **1,006 Humberto observations (`AL082025`)**, **1,578 Kiko observations (`EP112025`)**, and **684 Otis observations (`EP182023`)**, for **3,268** timestamps. All 3,268 have a valid three-hour-or-narrower IBTrACS bracket. Both conditioning regimes use exactly the same observation IDs, centers, timestamps, and ground truth.
+The inference manifest contributes every listed 10-minute GEO image: **1,006 Humberto observations (`AL082025`)**, **1,578 Kiko observations (`EP112025`)**, and **684 Otis observations (`EP182023`)**, for **3,268** timestamps. All 3,268 have a valid three-hour-or-narrower IBTrACS bracket. Both conditioning regimes use exactly the same observation IDs, centers, timestamps, and IBTrACS reference targets.
 
 Inference was attempted for all **3,268** scans. **3,266** have a non-empty valid footprint after the model's center crop and are scored; **2 scans** are retained in the download with `inference_valid = false` and excluded identically from both regimes and every model metric.
 
@@ -291,7 +291,7 @@ Across the dense common cohort, **U-Net + correction** has the lowest aggregate 
 
 The plotted curves are hourly means to keep the dense 10-minute series readable. The table scores every valid individual observation, while the download also retains any explicitly flagged unusable scan.
 
-![Predicted and ground-truth full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)
+![Predicted and IBTrACS-reference full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)
 
 ![Per-storm dense inference MAE](../assets/images/intensity-comparison/three-storm-mae.png)
 

@@ -1,6 +1,11 @@
 # Diffusion in one page
 
-A diffusion model learns to reverse a gradual corruption process. In geo2wf, the clean object is the normalized target wind field—not the GEO condition.
+A diffusion model learns to reverse a gradual corruption process. In geo2wf,
+the clean object (x_0) is the output variable chosen by the model—never the GEO
+condition:
+
+- standalone conditional diffusion uses the normalized absolute target field;
+- Stage 2 uses an encoded signed SAR-minus-baseline residual.
 
 ## Forward process
 
@@ -18,7 +23,7 @@ x_t = \sqrt{\bar\alpha_t}x_0 + \sqrt{1-\bar\alpha_t}\epsilon,
 At training time, the U-Net receives a channel concatenation:
 
 \[
-[\;x_t^{\text{target}},\; x^{\text{condition}},\; m^{\text{condition}}\;]
+[\;x_t,\; x^{\text{prepared condition}}\;]
 \]
 
 and a sinusoidal embedding of `t`. It predicts the noise \(\hat\epsilon_\theta\). The standard objective is masked mean-squared error:
@@ -27,9 +32,13 @@ and a sinusoidal embedding of `t`. It predicts the noise \(\hat\epsilon_\theta\)
 \mathcal L = \frac{\sum m\,(\epsilon - \hat\epsilon_\theta)^2}{\sum m}
 \]
 
-For residual-diffusion sparse completion, observed SAR pixels have weight 1 and
-eligible off-swath ERA5 anchor pixels have the configured lower weight (0.1 in
-the grouped default).
+Prepared condition includes the condition-validity mask. Residual diffusion
+also appends the frozen baseline and its mask. Its principal objective remains
+epsilon-prediction MSE with Min-SNR weighting. Observed SAR pixels have weight
+1, while eligible off-swath baseline pixels have the configured lower
+zero-residual anchor weight (0.1 in the grouped default). Additional physical
+structure terms act on the model's clean-residual estimate at selected lower
+noise levels; they do not change the variable being diffused.
 
 ## Reverse process
 
@@ -46,12 +55,21 @@ sequenceDiagram
     U-->>S: predicted noise ε̂
     S-->>Z: previous sample x_(t-1)
   end
-  Z-->>Z: map [-1, 1] → [0, 1]
+  Z-->>Z: decode the model-specific output variable
 ```
+
+For absolute conditional diffusion, decoding maps the sample from diffusion
+space `[-1,1]` to normalized target space `[0,1]` and then to physical units.
+For Stage 2, decoding inverts the signed residual transform, adds the result to
+the same frozen baseline in m/s, and applies the configured physical bounds.
 
 ## Why conditioning works
 
 The network does not reconstruct GEO. GEO and optional ERA5 channels remain
-fixed at every denoising step; the noisy target is the variable being refined.
+fixed at every denoising step; only the absolute target or residual latent is
+updated. Conditioning narrows the learned distribution but does not make the
+GEO-to-wind inverse mapping unique.
 
-Continue to [Conditional diffusion](../models/conditional-diffusion.md) for implementation details and [Sampling](../models/sampling.md) for DDPM/DDIM behavior.
+Continue to [Standalone conditional diffusion](../models/conditional-diffusion.md),
+[Stage 2 residual diffusion](../models/residual-diffusion.md), or
+[Sampling](../models/sampling.md).

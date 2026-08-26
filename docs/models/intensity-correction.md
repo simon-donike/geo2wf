@@ -23,8 +23,8 @@ Training targets come only from tropical IBTrACS `USA_WIND` fixes whose
 with `1 kt = 0.514444 m/s`. The exporter intentionally does not use the
 repository's WMO-first convenience intensity because IBTrACS does not
 homogenize the agencies' wind-averaging periods, while `USA_SSHS` is defined
-from US one-minute winds. See the [IBTrACS column
-documentation](https://www.ncei.noaa.gov/sites/default/files/2025-09/IBTrACS_v04r01_column_documentation.pdf).
+from US one-minute winds. See the [official IBTrACS product
+documentation](https://www.ncei.noaa.gov/products/international-best-track-archive).
 
 The model sees three image channels: physical U-Net wind, validity, and
 normalized distance to the current storm center. Its scalar metadata is limited
@@ -37,6 +37,20 @@ The learned scalar is a signed residual around the valid-pixel U-Net maximum.
 The final layer starts at zero, so a new model initially reproduces that
 baseline. The corrected value is nonnegative. TD, TS, and hurricane categories
 are derived from the corrected continuous wind without rounding.
+
+The cache and model also support an explicit matched-target comparison using a
+SAR robust peak (the mean of the highest configured fraction of valid SAR
+pixels) instead of IBTrACS intensity, and `anchor_statistic=robust_peak` instead
+of the field maximum. The checked-in grouped model defaults remain the raw
+field maximum anchor and the standard IBTrACS cache target. A run using either
+alternative must preserve that choice in cache metadata and should not label
+its scalar as `USA_WIND`.
+
+An optional five-value structure head can predict IBTrACS eye size, RMW, and
+equivalent-area R34/R50/R64 radii. It uses per-value validity masks and a masked
+Huber loss. `structure_head_enabled` is false and its loss weight is zero in the
+checked-in default, so published default scalar results do not include this
+multi-task supervision.
 
 ## Export the frozen fields
 

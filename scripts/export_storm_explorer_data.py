@@ -1,5 +1,6 @@
 """Export browser-ready metrics and SAR overlays from inference bundles."""
 
+import csv
 import json
 import math
 import re
@@ -35,6 +36,7 @@ FORECAST_ROOT = ROOT / "inference" / "forecasts"
 RAW_INPUT_ROOT = ROOT / "inference" / "inf_data"
 RAW_MANIFEST = RAW_INPUT_ROOT / "index-files" / "observation_manifest_v6.csv"
 OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.json"
+CSV_OUTPUT_PATH = ROOT / "docs" / "explorer" / "storm-data.csv"
 SAR_IMAGE_DIR = OUTPUT_PATH.parent / "sar"
 PMW_IMAGE_DIR = OUTPUT_PATH.parent / "pmw"
 GEO_IMAGE_DIR = OUTPUT_PATH.parent / "geo"
@@ -85,6 +87,59 @@ FORECAST_MODEL_SPECS = {
 def finite_number(value):
     value = float(value)
     return round(value, 3) if math.isfinite(value) else None
+
+
+def _flatten_csv_value(row, prefix, value):
+    """Flatten nested manifest values into stable, spreadsheet-friendly columns."""
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            nested_prefix = f"{prefix}.{key}" if prefix else key
+            _flatten_csv_value(row, nested_prefix, nested_value)
+    elif isinstance(value, list):
+        row[prefix] = json.dumps(value, separators=(",", ":"))
+    else:
+        row[prefix] = value
+
+
+def build_observation_csv(payload):
+    """Return columns and one flat CSV row per explorer observation."""
+    storm_fields = (
+        ("storm_id", "id"),
+        ("storm_name", "name"),
+        ("basin", "basin"),
+        ("storm_start", "start"),
+        ("storm_end", "end"),
+        ("inference_available", "inference_available"),
+        ("available_models", "available_models"),
+    )
+    rows = []
+    columns = [column for column, _ in storm_fields]
+    seen_columns = set(columns)
+
+    for storm in payload.get("storms", []):
+        storm_values = {}
+        for column, source_key in storm_fields:
+            _flatten_csv_value(storm_values, column, storm.get(source_key))
+        for record in storm.get("records", []):
+            row = dict(storm_values)
+            for key, value in record.items():
+                _flatten_csv_value(row, key, value)
+            for column in row:
+                if column not in seen_columns:
+                    columns.append(column)
+                    seen_columns.add(column)
+            rows.append(row)
+    return columns, rows
+
+
+def write_observation_csv(payload, output_path=CSV_OUTPUT_PATH):
+    """Write the flat observation view that accompanies ``storm-data.json``."""
+    columns, rows = build_observation_csv(payload)
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+    return len(rows)
 
 
 def utc_isoformat(value):
@@ -304,9 +359,7 @@ def export_forecasts(storm_id):
     if not models:
         return None
     default_model = (
-        "mlp"
-        if any(model["id"] == "mlp" for model in models)
-        else models[0]["id"]
+        "mlp" if any(model["id"] == "mlp" for model in models) else models[0]["id"]
     )
     default_metadata = next(model for model in models if model["id"] == default_model)
     return {
@@ -946,8 +999,13 @@ def main():
         "storms": storms,
     }
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    csv_rows = write_observation_csv(payload)
     print(
-        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {sum(len(s['records']) for s in storms)} observations, {sum(s['sar_matches'] for s in storms)} SAR overlays, {sum(s['pmw_matches'] for s in storms)} PMW overlays, and {sum(model['count'] for s in storms for model in s.get('forecast', {}).get('models', []))} forecasts"
+        f"Wrote {OUTPUT_PATH.relative_to(ROOT)} and "
+        f"{CSV_OUTPUT_PATH.relative_to(ROOT)} with {csv_rows} observations, "
+        f"{sum(s['sar_matches'] for s in storms)} SAR overlays, "
+        f"{sum(s['pmw_matches'] for s in storms)} PMW overlays, and "
+        f"{sum(model['count'] for s in storms for model in s.get('forecast', {}).get('models', []))} forecasts"
     )
 
 

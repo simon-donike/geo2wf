@@ -25,7 +25,11 @@ The checked-in preset uses `s = 5 m/s (9.7 kt)` and `c = 80 m/s (155.5 kt)`. Zer
 
 ## Inputs, masks, and output
 
-On observed pixels, the target is the transformed physical SAR-minus-baseline residual. Outside the SAR swath, the target is zero residual with a weak configured weight. Invalid baseline pixels receive zero loss.
+On observed pixels, the target is the transformed physical
+SAR-minus-baseline residual. On eligible baseline-valid pixels outside the SAR
+swath, the training anchor is zero correction with a weak configured weight;
+those pixels are not reclassified as SAR observations. Invalid baseline pixels
+receive zero loss.
 
 The denoiser receives:
 
@@ -51,7 +55,12 @@ The deterministic-baseline preset keeps epsilon diffusion as the generative obje
 - weak gradient, spectrum, low-frequency, and total-variation losses at low-to-medium noise; and
 - classifier-free guidance through condition dropout.
 
-The spectrum term compares amplitude rather than phase. The low-frequency term keeps members tied to the broad baseline, while total variation suppresses pixel-scale ringing in the correction without smoothing Stage 1 itself.
+The spectrum term compares amplitude rather than phase. The low-frequency term
+keeps the correction's broad scales controlled, while total variation
+suppresses pixel-scale ringing in the correction without smoothing Stage 1
+itself. These auxiliary terms operate on a clean-residual estimate at selected
+low-to-medium noise levels and on observed target support where target
+comparison is required.
 The selected structured-asinh default also adds robust peak, radial-profile, soft exceedance-area, multi-scale, and target-relative annular terms.
 
 Ten percent condition dropout trains an unconditional branch without changing U-Net shape. The checked-in preset samples at `guidance_scale: 1.2`, the compromise selected from the K=10 sweep; higher values reduce raw maximum-wind bias but narrow ensemble coverage, while lower values preserve more diversity.
