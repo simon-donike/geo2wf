@@ -34,13 +34,16 @@ uv run python scripts/export_storm_explorer_data.py
 ./scripts/sync_explorer_to_r2.sh 2026-07-30
 ```
 
-This publishes the GEO, SAR, and PMW overlays, lazy-loaded per-storm forecast JSON, and `storm-data.json` under `explorer/releases/2026-07-30/`, then advances `explorer/latest.json`. Forecast files are uploaded before the manifest that references them, and `latest.json` is advanced last. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
+This publishes the GEO, SAR, and PMW overlays, lazy-loaded per-storm forecast JSON, `storm-data.json`, and its flat observation-level `storm-data.csv` view under `explorer/releases/2026-07-30/`, then advances `explorer/latest.json`. Forecast files are uploaded before the manifest that references them, and `latest.json` is advanced last. Omit the version to use a UTC timestamp. Old releases remain available for rollback.
 
-Point the website at the public URL in `docs/explorer/data-config.js`:
+Point the website at one or more public release-pointer URLs in
+`docs/explorer/data-config.js`. They are tried in order, which permits a
+production endpoint followed by an optional fallback:
 
 ```javascript
-window.GEO2WF_EXPLORER_RELEASE_URL =
-  "https://data.example.org/explorer/latest.json";
+window.GEO2WF_EXPLORER_RELEASE_URLS = [
+  "https://data.example.org/explorer/latest.json",
+];
 ```
 
 Commit and deploy that change once the public domain and CORS policy are active. To roll back without rebuilding the website, upload a `latest.json` whose `manifest` refers to an older release.

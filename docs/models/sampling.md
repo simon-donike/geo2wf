@@ -41,9 +41,12 @@ The model exposes `sample_ensemble(...)`, which returns tensors shaped
 
 When condition dropout was enabled during training, `guidance_scale`
 combines conditional and zero-condition noise predictions. A value of `1`
-performs the original single conditional evaluation. Values above `1` usually
-increase fidelity to the baseline and GEO/ERA context at some cost to ensemble
-diversity.
+performs the original single conditional evaluation. Values above `1`
+extrapolate away from the dropped-condition prediction; their effect on bias,
+structure, and diversity is empirical rather than a general guarantee of
+fidelity. In the principal Stage 2 configuration, the dropped branch preserves
+the baseline channels while dropping the optional GEO/ERA5 condition, so
+guidance strengthens that condition relative to the same anchor.
 
 ## Clean-sample clipping
 

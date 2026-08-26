@@ -47,6 +47,13 @@ With `dim: 48` and multipliers `[1,2,4,8]`, feature widths are 48, 96, 192, and 
 8. Optimize with AdamW; `ReduceLROnPlateau` watches the configured validation monitor.
 9. Update EMA weights after the optimizer step when enabled.
 
+The current common10 + ERA5 grouped config uses cosine diffusion with 1,000
+training steps, Min-SNR γ = 5, ten-percent condition dropout, EMA decay 0.999,
+and deterministic 100-step DDIM validation. It does **not** enable sparse ERA5
+target fill in that grouped default: loss is limited to the observed target
+mask. Sparse fill remains an optional constructor capability and appears in
+some historical research presets.
+
 ## Exponential moving average
 
 The ERA5 diffusion preset keeps a non-trainable copy of the complete diffusion process:
@@ -68,6 +75,10 @@ Validation first computes the same noise-prediction loss. For the configured num
 - maps back to m/s for physical and storm metrics;
 - logs sample range and saturation diagnostics; and
 - can create W&B condition/prediction/target panels when image logging is enabled.
+
+The grouped default validates one member on one ensemble batch with guidance
+scale 1.0. This is an absolute-field research baseline, not the principal
+four-member Stage 2 residual ensemble.
 
 A checkpoint is rejected when its saved diffusion coefficients do not match the configured schedule or timestep count. This prevents silently resuming a linear-schedule model as cosine.
 

@@ -9,8 +9,8 @@ training applies the configured 192 × 192 center crop.
 
 | Family | Channels | Used by Stage 1 | Used by Stage 2 | Role |
 |---|---:|:---:|:---:|---|
-| GEO | 10 | yes | yes | cloud-top and water-vapor structure |
-| ERA5 source + derived | 9 | yes | yes | large-scale atmospheric and surface context |
+| GEO | 10 | yes | yes | infrared radiances related to cloud-top, moisture, and atmospheric structure |
+| ERA5 source + derived | 9 | yes | yes | model-assimilated large-scale atmospheric and surface context |
 | Storm geometry + solar time | 4 | yes | yes | storm-relative position and illumination |
 | Condition-validity mask | 1 | yes | yes | distinguishes data from missing pixels |
 | Explicit ERA5 wind + mask | 2 | yes | baseline computation | physical anchor |
@@ -30,15 +30,27 @@ Stage 2 additionally receives the frozen baseline and a noise latent.
   <figcaption>Four of the ten real AHI channels in the selected sample. The red plus marks the IBTrACS center. Values are shown in kelvin with per-panel 1st–99th percentile display limits.</figcaption>
 </figure>
 
-The ten-channel set is `B07` through `B16` for AHI and `CMI_C07` through `CMI_C16` for ABI. The channels span mid-level and upper-level water vapor, window infrared, and split-window information. See [Export GEO–SAR](export-geo-sar.md) for sensor-name mapping and pairing.
+The ten-channel set is `B07` through `B16` for AHI and `CMI_C07` through
+`CMI_C16` for ABI. The ABI set includes shortwave infrared Band 7 (with a
+daytime reflected component), three water-vapor bands, cloud-phase and ozone
+bands, longwave and split-window bands, and a CO₂ longwave band. The analogous
+AHI channels are harmonized by band number. These radiances are indirect
+evidence about the storm; none is a surface-wind measurement. See NOAA's [ABI
+spectral attributes](https://www.goes.noaa.gov/abispectralattributes.php),
+[band quick guide](https://goes-r.noaa.gov/mission/ABI-bands-quick-info.html),
+and [Export GEO–SAR](export-geo-sar.md) for sensor-name mapping and pairing.
 
 ## ERA5 context
 
-<span class="channel-count">9</span> The exporter stores seven ERA5 variables: precipitable water, sea-surface temperature, mean sea-level pressure, 2 m temperature, 2 m dewpoint, and the two 10 m wind components. The loader adds 10 m wind speed and relative vorticity.
+<span class="channel-count">9</span> The exporter stores seven ERA5 variables:
+precipitable water, sea-surface temperature, mean sea-level pressure, 2 m
+temperature, 2 m dewpoint, and the two 10 m wind components. New exports derive
+10 m wind speed and relative vorticity on the native ERA5 grid; the loader can
+supply compatible derived channels for legacy seven-band exports.
 
 <figure class="modality-example">
   <a href="../assets/images/data-example-era5.webp"><img src="../assets/images/data-example-era5.webp" alt="Four real ERA5 context fields for tropical cyclone WP232024: precipitable water, sea-surface temperature, pressure, and wind speed"></a>
-  <figcaption>Four of the nine real source and derived ERA5 fields on the same grid. ERA5 is smoother than GEO or SAR by construction; it supplies environmental context and the initial physical wind anchor.</figcaption>
+  <figcaption>Four of the nine real source and derived ERA5 fields on the same grid. ERA5 is a model–observation reanalysis and is smoother than GEO or SAR at this scale; it supplies environmental context and the initial physical wind anchor, not independent truth.</figcaption>
 </figure>
 
 ERA5 wind speed has two paths:
@@ -60,13 +72,15 @@ The explicit path defines the deterministic prediction as ERA5 plus a learned co
 The distance raster provides a storm-relative coordinate without passing scalar
 latitude or longitude. Local solar time varies by pixel longitude and includes
 the equation-of-time correction. Sine/cosine encoding removes the midnight
-discontinuity; solar zenith represents illumination.
+discontinuity; solar zenith represents illumination. These fields expose the
+diurnal cycle and are especially relevant to Band 7's daytime reflected
+component. They are deterministic context, not measured storm variables.
 
 ## Physical anchor, SAR target, and masks
 
 <figure class="modality-example">
   <a href="../assets/images/data-example-target.webp"><img src="../assets/images/data-example-target.webp" alt="Real ERA5 wind field, matched SAR wind target, and SAR target mask for tropical cyclone WP232024"></a>
-  <figcaption>ERA5 wind is dense; the matched SAR target is a sparse observed swath. The target mask is the authority on where SAR loss and metrics are valid. All three panels use the same 256 × 256 EPSG:4326 grid.</figcaption>
+  <figcaption>ERA5 wind is dense; the matched SAR wind retrieval is a sparse observed swath. The target mask is the authority on where SAR-supervised loss and metrics are valid. All three panels use the same 256 × 256 EPSG:4326 grid.</figcaption>
 </figure>
 
 `condition_mask`
@@ -79,6 +93,14 @@ discontinuity; solar zenith represents illumination.
 : Marks observed SAR pixels. Supervised loss and target-based metrics ignore everything outside it.
 
 The residual models may apply a weak off-swath zero-correction anchor where ERA5 is valid. That is a regularizer; it does not relabel ERA5 as observed SAR.
+
+SAR wind is inferred from ocean-surface radar backscatter through a geophysical
+model function. It is a much closer target for surface wind than GEO radiance,
+but rain, sea state, incidence angle, polarization, ancillary wind direction,
+and the retrieval's high-wind calibration can affect it. Treat
+`target_physical` as the supervised reference within its footprint, not an
+uncertainty-free ground truth. NOAA provides a [technical description of the
+tropical SAR wind product](https://www.star.nesdis.noaa.gov/socd/mecb/sar/tropical_gmf_tech_doc.php).
 
 ## Exact tensor assembly
 
@@ -131,6 +153,10 @@ flowchart LR
 ```
 
 The exporter keeps raw physical values, CRS, geotransform, band descriptions, masks, and provenance tags in the GeoTIFFs. `stats.json` is learned from valid training pixels only; validation and test samples do not update normalization statistics.
+
+The geographic CRS has constant angular spacing, not constant physical pixel
+area. Metrics derive local east/north distances from each raster's bounds and
+latitude rather than interpreting 0.027° as a fixed number of kilometres.
 
 ## Reproduce these figures
 

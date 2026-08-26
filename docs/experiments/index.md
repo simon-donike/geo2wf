@@ -24,7 +24,7 @@ uv run geo2wf-train \
 | `residual_diffusion_deterministic_baseline` | Stage 2 probabilistic refinement | frozen Stage 1 checkpoint |
 | `residual_diffusion` | residual-diffusion ablation | ERA5 |
 | `conditional_diffusion` | standalone absolute-field diffusion control | none |
-| `direct_unet` | direct wind-field control | none |
+| `direct_unet` | direct near-89 GHz PMW brightness-temperature proxy | none |
 | `bottleneck_unet_mlp` | joint field and scalar-intensity estimation | none |
 | `unet_encoder_mlp_ibtracs` | encoder-only IBTrACS intensity estimation | none |
 | `intensity_correction` | scalar correction from a frozen U-Net field | frozen U-Net checkpoint |

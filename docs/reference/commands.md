@@ -29,6 +29,16 @@ uv run geo2wf-train model=residual_diffusion
 # Frozen deterministic-baseline residual diffusion
 GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
 uv run geo2wf-train model=residual_diffusion_deterministic_baseline
+
+# Direct GEO→PMW brightness-temperature proxy
+uv run geo2wf-train experiment=geo_pmw_near89_unet
+
+# Joint current field + scalar intensity
+uv run geo2wf-train experiment=bottleneck_unet_mlp
+
+# Current scalar correction and six-hour forecast
+uv run geo2wf-train experiment=unet_intensity_correction
+uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 
 Smoke and DDP overrides:

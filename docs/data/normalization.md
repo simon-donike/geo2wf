@@ -28,7 +28,10 @@ Image metrics operate on normalized values, but wind errors should be reported i
 x_{physical} = z \cdot \text{scale} + \text{offset}
 \]
 
-The diffusion module uses that mapping for physical MAE/RMSE and skill against ERA5. The residual model learns and evaluates directly in m/s.
+Standalone diffusion uses that mapping for physical MAE/RMSE. Stage 1 forms its
+prediction and Huber objective directly in m/s. Stage 2 diffuses an encoded
+signed residual, but decodes it to m/s for its physical auxiliary losses,
+recomposition, metrics, and skill against the frozen baseline.
 
 ## Three masks with distinct jobs
 
@@ -43,9 +46,9 @@ The diffusion module uses that mapping for physical MAE/RMSE and skill against E
 
 Invalid values are replaced with neutral zeros **after normalization** and multiplied by masks. The explicit mask channel is what lets the model distinguish “physical value represented by normalized zero” from “missing.”
 
-## Sparse-target completion
+## Weak supervision outside the SAR swath
 
-The grouped residual-diffusion preset uses:
+The grouped Stage 2 preset uses:
 
 ```yaml
 model:
@@ -53,10 +56,19 @@ model:
   unobserved_loss_weight: 0.1
 ```
 
-Observed SAR pixels keep their target and weight 1. Unobserved pixels with
-valid ERA5 receive the target-normalized ERA5 speed and weight 0.1. Remaining
-pixels receive neutral 0.5 with weight 0. Metrics still use only observed SAR
-pixels.
+For **residual diffusion**, observed baseline-valid pixels contain the encoded
+SAR-minus-baseline residual and receive the main loss. Eligible unobserved
+baseline pixels use zero encoded residual with weight 0.1. For the ERA5-baseline
+ablation that means “retain ERA5”; for deterministic-baseline Stage 2 it means
+“retain Stage 1.” It does not insert ERA5 as an absolute target after Stage 1.
+
+Standalone **absolute** conditional diffusion has a separate optional sparse
+completion path: unobserved ERA5-valid pixels can receive target-normalized
+ERA5 speed with a lower weight, and remaining pixels receive neutral normalized
+0.5 with zero weight. The current grouped `conditional_diffusion` config leaves
+that option disabled.
+
+In both cases, evaluation metrics remain restricted to observed SAR pixels.
 
 ## Physics-aware flips
 

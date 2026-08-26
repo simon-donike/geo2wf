@@ -64,8 +64,20 @@ The model reports:
 - shared eye, inner-core, radial, RMW, contrast, and eye-displacement metrics.
 
 Validation keeps the physical reconstruction and storm-structure metrics, but
-image logging is disabled in the checked-in preset so training and dashboard runs
-produce numeric artifacts without large visualization payloads.
+the checked-in grouped preset also logs reconstruction images for the configured
+validation batches. Set `model.log_reconstruction_images=false` when a numeric-only
+run is preferred.
+
+Three validation choices have different purposes in the grouped default:
+
+- the training objective is the configured Huber/anchor/peak-aware loss;
+- `ReduceLROnPlateau` monitors `val/peak_structure_score`; and
+- when the trainer does not override it, checkpoint selection uses the model's
+  `val/eye_structure_score` default.
+
+Always inspect `resolved-config.yaml` before comparing a historical run: older
+full-YAML presets and completed ablations can use different objectives and
+monitors.
 
 ## Train Stage 1
 

@@ -14,9 +14,12 @@ flowchart LR
   M --> W[IBTrACS USA_WIND in m/s]
 ```
 
-The scalar target is the continuous IBTrACS `USA_WIND` value converted from
-knots to metres per second. Tropical-cyclone categories are not model targets
-and do not contribute to the loss.
+The checked-in experiment's scalar target is the continuous IBTrACS `USA_WIND`
+value converted from knots to metres per second. Tropical-cyclone categories
+are not model targets and do not contribute to the loss. The joint data module
+also supports `intensity_target_source=sar_robust_peak` for a matched-target
+comparison; this changes the scalar label contract and must be reported as a
+different experiment.
 
 The data module reuses `PairedImageDataset` for all raster loading,
 normalization, masking, and augmentation. It reads `USA_WIND` directly from
@@ -52,7 +55,7 @@ channels. The comparison preset still requires ERA5 availability to preserve
 the same cohort, but no ERA5 channel or companion tensor is passed to the
 model.
 
-The objective is
+With the optional structure head disabled, the objective is
 
 \[
 L = w_{image} L_{Huber,image} + w_{intensity} L_{Huber,IBTrACS},
@@ -63,6 +66,19 @@ encoder. The image term additionally updates the decoder, while the continuous
 IBTrACS term updates the bottleneck MLP. Checkpoints are selected by the
 combined `val/loss`; the two component losses and image/intensity MAE, RMSE,
 and bias are logged separately.
+
+## Optional storm-structure head
+
+The shared bottleneck can also predict five nonnegative IBTrACS structure
+values in kilometres: eye size, RMW, and equivalent-area R34, R50, and R64.
+Equivalent-area radii reduce the available quadrant radii to the radius of a
+circle with the same complete-quadrant area. Each value has its own validity
+mask because IBTrACS structure fields are frequently missing.
+
+This head uses a masked Huber term when
+`model.structure_head_enabled=true` and `model.structure_loss_weight>0`. The
+checked-in model config has the head disabled and weight zero, so it does not
+affect the default two-term objective or checkpoint results.
 
 ## Encoder-only IBTrACS ablation
 

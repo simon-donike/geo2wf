@@ -59,6 +59,8 @@ uv run geo2wf-train experiment=geo_pmw_near89_unet
 ```
 
 It predicts bounded normalized brightness temperature, optimizes masked Huber loss in Kelvin, and checkpoints on `val/rmse_k`.
+See [Direct PMW U-Net](../models/direct-unet.md) for its exact tensor,
+architecture, and unit contract.
 
 ## Moving from pretraining to SAR
 

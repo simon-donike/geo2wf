@@ -12,6 +12,7 @@ geo2wf reconstructs surface wind fields from geostationary satellite imagery and
 
 <div class="geo-actions" markdown>
 [Read the two-stage workflow](models/two-stage.md){ .md-button .md-button--primary }
+[Understand the scientific problem](concepts/problem.md){ .md-button }
 [Understand the data](data/index.md){ .md-button }
 [Open StormSense](explorer/dashboard.html){ .md-button }
 </div>
@@ -65,6 +66,11 @@ Validity masks and an explicit ERA5 wind anchor are appended by the model. Stage
 
 ## Scope
 
-The wind-field models operate on paired rasters on a common grid and use a 192 × 192 center crop by default. Separate scalar models estimate current intensity and six-hour intensity change. The repository does not implement joint track and wind-field forecasting or arbitrary observation-set models.
+The principal wind-field models operate on paired rasters on a common grid and
+use a 192 × 192 center crop. They reconstruct the observation time; they do not
+forecast a future wind field. Separate scalar models estimate current intensity
+and a six-hour intensity change, with an optional recursive +12 h diagnostic.
+The repository does not implement joint track and wind-field forecasting or
+arbitrary observation-set models.
 
 Start with [the two-stage workflow](models/two-stage.md), then follow the [data inputs](data/index.md) into [training](experiments/training.md) and [evaluation](experiments/evaluation.md).

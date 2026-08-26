@@ -202,48 +202,151 @@ function addWindUnitControl(wrapper) {
   wrapper.insertBefore(toolbar, container)
 }
 
-function enhanceTables() {
+function enhanceTable(table) {
   if (!window.simpleDatatables?.DataTable) return
 
-  document.querySelectorAll(".md-typeset table:not(.no-datatable)").forEach((table) => {
-    if (table.dataset.enhanced === "true") return
+  if (table.dataset.enhanced === "true") return
+  const rowCount = table.tBodies[0]?.rows.length ?? 0
+  if (rowCount < TABLE_MIN_ROWS || !table.tHead) return
 
-    const rowCount = table.tBodies[0]?.rows.length ?? 0
-    if (rowCount < TABLE_MIN_ROWS || !table.tHead) return
+  table.dataset.enhanced = "true"
+  prepareSortValues(table)
+  const hasWindValues = prepareWindValues(table)
+  markBestValues(table)
+  classifyTableWidth(table)
+  const searchable = rowCount >= TABLE_SEARCH_MIN_ROWS
+  const paging = rowCount >= TABLE_PAGE_MIN_ROWS
 
-    table.dataset.enhanced = "true"
-    prepareSortValues(table)
-    const hasWindValues = prepareWindValues(table)
-    markBestValues(table)
-    classifyTableWidth(table)
-    const searchable = rowCount >= TABLE_SEARCH_MIN_ROWS
-    const paging = rowCount >= TABLE_PAGE_MIN_ROWS
-
-    const dataTable = new simpleDatatables.DataTable(table, {
-      searchable,
-      sortable: true,
-      paging,
-      perPage: TABLE_PAGE_SIZE,
-      perPageSelect: [15, 25, 50, 100],
-      labels: {
-        placeholder: "Search table…",
-        searchTitle: "Search within this table",
-        perPage: "rows per page",
-        noRows: "No matching rows",
-        noResults: "No results match your search",
-        info: "Showing {start}–{end} of {rows} rows"
-      }
-    })
-
-    if (hasWindValues) addWindUnitControl(dataTable.wrapperDOM)
+  const dataTable = new simpleDatatables.DataTable(table, {
+    searchable,
+    sortable: true,
+    paging,
+    perPage: TABLE_PAGE_SIZE,
+    perPageSelect: [15, 25, 50, 100],
+    labels: {
+      placeholder: "Search table…",
+      searchTitle: "Search within this table",
+      perPage: "rows per page",
+      noRows: "No matching rows",
+      noResults: "No results match your search",
+      info: "Showing {start}–{end} of {rows} rows"
+    }
   })
 
+  if (hasWindValues) addWindUnitControl(dataTable.wrapperDOM)
+}
+
+function enhanceTables() {
+  document.querySelectorAll(".md-typeset table:not(.no-datatable)").forEach(enhanceTable)
+
   setWindUnit(preferredWindUnit())
+}
+
+function parseCsv(text) {
+  const rows = []
+  let row = []
+  let field = ""
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        field += '"'
+        index += 1
+      } else if (character === '"') {
+        quoted = false
+      } else {
+        field += character
+      }
+    } else if (character === '"') {
+      quoted = true
+    } else if (character === ",") {
+      row.push(field)
+      field = ""
+    } else if (character === "\n") {
+      row.push(field.endsWith("\r") ? field.slice(0, -1) : field)
+      rows.push(row)
+      row = []
+      field = ""
+    } else {
+      field += character
+    }
+  }
+
+  if (field || row.length) {
+    row.push(field.endsWith("\r") ? field.slice(0, -1) : field)
+    rows.push(row)
+  }
+  return rows
+}
+
+function renderCsvTable(viewer, csvRows) {
+  if (csvRows.length < 2) throw new Error("The CSV contains no data rows")
+
+  const headers = csvRows[0]
+  headers[0] = headers[0].replace(/^\uFEFF/u, "")
+  const requestedColumns = viewer.dataset.csvColumns
+    ? viewer.dataset.csvColumns.split(",").map((column) => column.trim())
+    : headers
+  const labels = viewer.dataset.csvLabels
+    ? viewer.dataset.csvLabels.split("|").map((label) => label.trim())
+    : requestedColumns
+  if (labels.length !== requestedColumns.length) {
+    throw new Error("CSV column and label counts do not match")
+  }
+
+  const indices = requestedColumns.map((column) => {
+    const index = headers.indexOf(column)
+    if (index === -1) throw new Error(`CSV column not found: ${column}`)
+    return index
+  })
+  const table = document.createElement("table")
+  const head = table.createTHead()
+  const headingRow = head.insertRow()
+  labels.forEach((label) => {
+    const cell = document.createElement("th")
+    cell.scope = "col"
+    cell.textContent = label
+    headingRow.append(cell)
+  })
+
+  const body = table.createTBody()
+  csvRows.slice(1).forEach((csvRow) => {
+    if (csvRow.length === 1 && !csvRow[0]) return
+    const tableRow = body.insertRow()
+    indices.forEach((index) => {
+      const cell = tableRow.insertCell()
+      cell.textContent = csvRow[index] || viewer.dataset.csvEmpty || ""
+    })
+  })
+
+  viewer.replaceChildren(table)
+  enhanceTable(table)
+  setWindUnit(preferredWindUnit())
+}
+
+function loadCsvTables() {
+  document.querySelectorAll("[data-csv-source]").forEach(async (viewer) => {
+    if (viewer.dataset.csvLoaded === "true") return
+    viewer.dataset.csvLoaded = "true"
+    try {
+      const response = await fetch(new URL(viewer.dataset.csvSource, document.baseURI))
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      renderCsvTable(viewer, parseCsv(await response.text()))
+    } catch (error) {
+      viewer.dataset.csvLoaded = "false"
+      const status = viewer.querySelector(".csv-table-viewer__status")
+      if (status) status.textContent = "The observation table could not be loaded. Use the CSV download above."
+      console.error("Could not load CSV table", error)
+    }
+  })
 }
 
 document$.subscribe(() => {
   document.querySelectorAll("[data-current-year]").forEach((node) => {
     node.textContent = new Date().getFullYear()
   })
+  loadCsvTables()
   enhanceTables()
 })

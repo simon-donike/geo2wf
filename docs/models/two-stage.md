@@ -13,7 +13,7 @@ flowchart LR
   D --> R[Sampled signed residual]
   R --> A[Add in physical m/s]
   Y --> A
-  A --> O[SAR-like wind sample]
+  A --> O[Conditional wind-field sample]
 ```
 
 ## Stage 1: deterministic baseline
@@ -78,7 +78,10 @@ At each diffusion timestep, the denoiser receives 27 channels:
 | Deterministic baseline | broad wind magnitude and placement | stable field directly comparable with ERA5 |
 | Residual diffusion | unresolved SAR-like correction | structural variation around the fixed large-scale field |
 
-The staged formulation restricts diffusion to the residual distribution instead of the complete wind field.
+The staged formulation restricts diffusion to the learned residual distribution
+instead of the complete wind field. A member is a model sample conditioned on
+the inputs; it is not a new SAR measurement, especially outside the observed
+swath.
 
 The baseline also makes evaluation clearer. Stage 2 reports `baseline_mae_ms` and `mae_skill_vs_baseline`, so refinement is measured against the exact frozen prediction it was asked to improve.
 

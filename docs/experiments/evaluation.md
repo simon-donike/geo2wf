@@ -60,6 +60,20 @@ dateline, and computes all metrics within the observed SAR footprint.
 The center is used to derive the storm-distance condition channel and the
 evaluation geometry. It is not a predicted quantity.
 
+### Optional comparison with IBTrACS radii
+
+When a batch carries valid IBTrACS structure companions, deterministic and
+joint field models additionally compare field-derived RMW/R34/R50/R64 with the
+best-track scalars. Field RMW is the peak of the annular-mean profile. R34,
+R50, and R64 are equivalent-circle radii computed from the pixel area exceeding
+34, 50, and 64 kt within the largest complete circular domain supported by the
+prediction mask. Targets outside that supported radius are omitted.
+
+These metrics answer a different question from the SAR-relative rows above:
+they compare a gridded instantaneous field statistic with retrospective
+best-track structure. Report availability counts and do not combine the two
+reference families as though they were interchangeable.
+
 ### Eye-center displacement
 
 For target and prediction, the implementation computes a masked 3 × 3 mean and

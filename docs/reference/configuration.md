@@ -87,6 +87,22 @@ Residual diffusion additionally accepts:
 
 Inspect the selected file in `configs/model/` for authoritative defaults.
 
+## Other modular models
+
+| Model choice | Contract-defining keys |
+|---|---|
+| `direct_unet` | `condition_channels`, U-Net sizing, `huber_delta_k`; target must be one channel in K |
+| `bottleneck_unet_mlp` | image/intensity Huber deltas and weights, intensity MLP sizing, optional structure head and loss |
+| `bottleneck_encoder_mlp` | encoder/MLP sizing and scalar Huber delta; no image decoder |
+| `intensity_correction` | field/metadata toggles, `anchor_statistic`, robust-peak fraction, scalar Huber delta, optional structure head |
+| `intensity_forecast` | five-feature MLP sizing, dropout, scalar Huber delta, optimizer/scheduler settings |
+
+Target source and cohort are primarily data-contract choices, not model-name
+implications. In particular, joint and correction datasets can represent
+IBTrACS intensity or a SAR robust peak, while the direct U-Net requires PMW
+brightness temperature. Inspect both selected YAML files and the resulting
+`DataSpec`/cache metadata.
+
 ## `trainer`
 
 | Key | Purpose |
