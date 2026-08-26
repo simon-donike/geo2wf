@@ -30,7 +30,6 @@ ROOT = Path(__file__).resolve().parents[1]
 VIT_ROOT = ROOT / "inference" / "inf_vit"
 UNET_ROOT = ROOT / "inference" / "inf_unet"
 UNET_MLP_ROOT = ROOT / "inference" / "inf_unet_mlp"
-DIFFUSION_ROOT = ROOT / "inference" / "inf_diffusion"
 NWP_ROOT = ROOT / "inference" / "NWP"
 FORECAST_ROOT = ROOT / "inference" / "forecasts"
 RAW_INPUT_ROOT = ROOT / "inference" / "inf_data"
@@ -709,7 +708,6 @@ def export_raw_storm(storm_id, raw_records, raw_metadata):
                 ),
                 "vit_prediction": None,
                 "unet_prediction": None,
-                "diffusion_prediction": None,
                 "geo_overlay": geo_overlay,
                 "sar": sar,
                 "sar_overlay": sar_overlay,
@@ -820,11 +818,9 @@ def export_storm(storm_id):
     )
     unet = load_prediction_table(UNET_ROOT, storm_id)
     unet_mlp = load_prediction_table(UNET_MLP_ROOT, storm_id)
-    diffusion = load_prediction_table(DIFFUSION_ROOT, storm_id)
     for label, table in (
         ("UNet", unet),
         ("UNet+MLP", unet_mlp),
-        ("Diffusion", diffusion),
     ):
         if table is None:
             continue
@@ -839,8 +835,6 @@ def export_storm(storm_id):
         available_models.append("unet")
     if unet_mlp is not None:
         available_models.append("unet_mlp")
-    if diffusion is not None:
-        available_models.append("diffusion")
 
     timestamps = pd.to_datetime(summary["observation_timestamp"])
     targets = pd.date_range(timestamps.iloc[0], timestamps.iloc[-1], freq="3h")
@@ -881,9 +875,6 @@ def export_storm(storm_id):
                 "unet_prediction": tabular_prediction(unet, row.observation_id),
                 "unet_mlp_prediction": intensity_prediction(
                     unet_mlp, row.observation_id
-                ),
-                "diffusion_prediction": tabular_prediction(
-                    diffusion, row.observation_id, include_uncertainty=True
                 ),
                 "geo_overlay": geo_overlay,
                 "sar": sar,
@@ -936,7 +927,6 @@ def main():
             "inference/inf_vit",
             "inference/inf_unet",
             "inference/inf_unet_mlp",
-            "inference/inf_diffusion",
             "inference/NWP",
             "inference/forecasts",
         ],
@@ -990,10 +980,6 @@ def main():
             "unet_mlp": {
                 "label": "UNet+MLP",
                 "metrics": ["max"],
-            },
-            "diffusion": {
-                "label": "Diffusion",
-                "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
             },
         },
         "storms": storms,

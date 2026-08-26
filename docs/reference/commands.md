@@ -23,13 +23,6 @@ uv run geo2wf-train \
   data=geo_sar_common10_era5 \
   model=deterministic_residual
 
-# ERA5-baseline residual diffusion
-uv run geo2wf-train model=residual_diffusion
-
-# Frozen deterministic-baseline residual diffusion
-GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
-uv run geo2wf-train model=residual_diffusion_deterministic_baseline
-
 # Direct GEO→PMW brightness-temperature proxy
 uv run geo2wf-train experiment=geo_pmw_near89_unet
 
@@ -123,18 +116,10 @@ uv run geo2wf-infer deterministic-residual \
   --checkpoint /path/to/stage1.ckpt \
   --storms AL082025 EP112025 \
   --output-root inference/inf_simon
-
-uv run geo2wf-infer residual-diffusion \
-  --config configs/config_geo_sar_10bands_era5_diffusion_residual_deterministic.yaml \
-  --checkpoint /path/to/stage2.ckpt \
-  --ensemble-size 10 \
-  --sampling-seed 42 \
-  --summary-aggregation medoid \
-  --output-root inference/inf_simon_diffusion
 ```
 
-Both workflows accept data, manifest, reference, statistics, device, storm,
-and limit options. Diffusion adds sampling and ensemble controls. PMW-aware
+The workflow accepts data, manifest, reference, statistics, device, storm,
+and limit options. PMW-aware
 runs write `pmw-inference-audit.csv` beside their summaries.
 
 ## Batch jobs
@@ -154,7 +139,6 @@ PBS templates.
 | `TCD_DATA_ROOT` | source archive root used by maintained exporters |
 | `GEO_SAR_OUTPUT_ROOT` | conventional GEO–SAR export destination override |
 | `GEO_PMW_OUTPUT_ROOT` | conventional GEO–PMW export destination override |
-| `GEO2WF_BASELINE_CKPT` | Stage 1 checkpoint for the deterministic-baseline Stage 2 config |
 | `GEO2WF_RUN_DIR` | inherited DDP run path; normally managed internally |
 | `WANDB_DISABLED` | disable W&B construction when true-like |
 | `WANDB_MODE` | `offline` retains local W&B artifacts |

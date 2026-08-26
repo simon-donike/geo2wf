@@ -22,7 +22,7 @@ A choice is the YAML filename without `.yaml`.
 | Group | Checked-in choices | Owns |
 |---|---|---|
 | `data` | paired raster, joint-intensity, correction-cache, and forecast-cache choices | roots, splits, normalization, companions, loader, sampling |
-| `model` | reconstruction, diffusion, joint-intensity, correction, and forecast choices | constructor, architecture, objective, optimizer, sampling |
+| `model` | reconstruction, joint-intensity, correction, and forecast choices | constructor, architecture, objective, optimizer |
 | `trainer` | `default` | devices, precision, loop bounds, checkpoint policy |
 | `logging` | `default` | optional W&B adapter |
 | `experiment` | ablations and task-specific data/model combinations | focused cross-group overrides only |
@@ -38,17 +38,6 @@ uv run geo2wf-train \
   data=geo_sar_common10_era5 \
   model=deterministic_residual
 ```
-
-Stage 2 selects the constructor that loads its baseline from the environment:
-
-```bash
-GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=residual_diffusion_deterministic_baseline
-```
-
-The ERA5-only residual-diffusion ablation uses `model=residual_diffusion`.
 
 ## Override values
 

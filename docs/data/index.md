@@ -1,25 +1,22 @@
 # Model inputs and training targets
 
-This page describes the default two-stage inputs. Figures are Matplotlib renders
+This page describes the maintained wind-field inputs. Figures are Matplotlib renders
 of exported GeoTIFFs and derived tensors for sample
 `WP232024_sar_geo_20241030095303_bb2c52ca`. They show the 256 × 256 export;
 training applies the configured 192 × 192 center crop.
 
 ## At a glance
 
-| Family | Channels | Used by Stage 1 | Used by Stage 2 | Role |
-|---|---:|:---:|:---:|---|
-| GEO | 10 | yes | yes | infrared radiances related to cloud-top, moisture, and atmospheric structure |
-| ERA5 source + derived | 9 | yes | yes | model-assimilated large-scale atmospheric and surface context |
-| Storm geometry + solar time | 4 | yes | yes | storm-relative position and illumination |
-| Condition-validity mask | 1 | yes | yes | distinguishes data from missing pixels |
-| Explicit ERA5 wind + mask | 2 | yes | baseline computation | physical anchor |
-| Frozen Stage 1 baseline + mask | 2 | output | yes | field refined by diffusion |
-| Noisy residual | 1 | no | yes | variable denoised at the current timestep |
-| SAR wind + target mask | 1 + 1 | training only | training only | supervision and observed footprint |
+| Family | Channels | Availability | Role |
+|---|---:|:---:|---|
+| GEO | 10 | input | infrared radiances related to cloud-top, moisture, and atmospheric structure |
+| ERA5 source + derived | 9 | input | model-assimilated large-scale atmospheric and surface context |
+| Storm geometry + solar time | 4 | input | storm-relative position and illumination |
+| Condition-validity mask | 1 | input | distinguishes data from missing pixels |
+| Explicit ERA5 wind + mask | 2 | input | physical anchor |
+| SAR wind + target mask | 1 + 1 | training only | supervision and observed footprint |
 
-SAR is not an inference input. Stage 1 receives observation and context tensors.
-Stage 2 additionally receives the frozen baseline and a noise latent.
+SAR is not an inference input. The model receives observation and context tensors.
 
 ## GEO imagery
 
@@ -56,7 +53,7 @@ supply compatible derived channels for legacy seven-band exports.
 ERA5 wind speed has two paths:
 
 1. its normalized form is available as a context channel; and
-2. an explicit target-normalized wind field and validity mask are appended inside Stage 1.
+2. an explicit target-normalized wind field and validity mask are appended inside the field model.
 
 The explicit path defines the deterministic prediction as ERA5 plus a learned correction in m/s.
 
@@ -92,7 +89,8 @@ component. They are deterministic context, not measured storm variables.
 `target_mask`
 : Marks observed SAR pixels. Supervised loss and target-based metrics ignore everything outside it.
 
-The residual models may apply a weak off-swath zero-correction anchor where ERA5 is valid. That is a regularizer; it does not relabel ERA5 as observed SAR.
+The field model may apply a weak off-swath zero-correction anchor where ERA5 is
+valid. That is a regularizer; it does not relabel ERA5 as observed SAR.
 
 SAR wind is inferred from ocean-surface radar backscatter through a geophysical
 model function. It is a much closer target for surface wind than GEO radiance,
@@ -115,7 +113,7 @@ The dataset returns 23 condition channels:
 23 data condition channels
 ```
 
-Stage 1 assembles:
+The ERA5-residual U-Net assembles:
 
 ```text
 23 data condition
@@ -123,21 +121,12 @@ Stage 1 assembles:
  1 explicit ERA5 wind
  1 ERA5-valid mask
 ──
-26 deterministic U-Net input channels
+26 U-Net input channels
 ```
 
-Stage 2 assembles:
-
-```text
- 1 noisy residual
-24 prepared condition channels (23 data + condition mask)
- 1 frozen Stage 1 baseline
- 1 baseline-valid mask
-──
-27 diffusion U-Net input channels
-```
-
-Continue to [the two-stage model](../models/two-stage.md) to see what each network does with these tensors, or open the [dataset contract](dataset-contract.md) for returned keys and shapes.
+Continue to [the field model](../models/era5-residual.md) to see what the network
+does with these tensors, or open the [dataset contract](dataset-contract.md) for
+returned keys and shapes.
 
 ## From source files to a batch
 
@@ -149,7 +138,7 @@ flowchart LR
   D --> E[Normalize]
   E --> F[Append derived fields]
   F --> G[PairedImageDataset sample]
-  G --> H[Stage 1 or Stage 2]
+  G --> H[Model]
 ```
 
 The exporter keeps raw physical values, CRS, geotransform, band descriptions, masks, and provenance tags in the GeoTIFFs. `stats.json` is learned from valid training pixels only; validation and test samples do not update normalization statistics.

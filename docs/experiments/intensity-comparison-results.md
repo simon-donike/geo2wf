@@ -84,54 +84,66 @@ model predictions were observed between acquisitions.
 Rows labeled `sar_field_only` are reference-aligned diagnostics from the shared
 field U-Net rather than separately trained scalar heads.
 
+Bold, shaded cells mark the best value within each matched ERA5 × evaluation
+reference × subset comparison. MAE, RMSE, and storm-macro MAE are minimized;
+bias is ranked by absolute magnitude (closest to zero).
+
 <!-- matched-validation-results:start -->
 
-Generated on `2026-08-24T12:50:55.706353+00:00` from the completed seed-42 validation matrix. All rows use the same cohort fingerprint `b9fb64003b6c6b483aeea9f9052895f6b3c2f08971392322ca62281739d579f8` (159 samples from 33 storms).
+Generated on `2026-08-26T11:32:29.260940+00:00` from the completed seed-42 validation matrix. All rows use the same cohort fingerprint `b9fb64003b6c6b483aeea9f9052895f6b3c2f08971392322ca62281739d579f8` (159 samples from 33 storms).
 
 All models use the identical SAR-center-valid cohort. RI denotes an IBTrACS gain of at least 30 kt in the preceding 24 hours.
 
 | ERA5 | Trained target | Model | Evaluated against | Subset | Samples | Storms | MAE, m/s (kt); 95% CI | RMSE, m/s (kt) | Bias, m/s (kt) | Storm-macro MAE, m/s (kt) |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|
-| with_era5 | ibtracs | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 7.641 (14.853 kt); 95% CI 5.810–9.618 m/s (11.294–18.696 kt) | 10.240 (19.905 kt) | -0.930 (-1.808 kt) | 6.379 (12.400 kt) |
-| with_era5 | ibtracs | U-Net + correction | ibtracs | overall | 159 | 33 | 6.099 (11.856 kt); 95% CI 4.999–7.042 m/s (9.717–13.689 kt) | 8.167 (15.875 kt) | -2.309 (-4.488 kt) | 5.526 (10.742 kt) |
-| with_era5 | sar_field_only | U-Net raw field maximum | ibtracs | overall | 159 | 33 | 6.733 (13.088 kt); 95% CI 5.513–7.784 m/s (10.716–15.131 kt) | 8.947 (17.392 kt) | -3.033 (-5.896 kt) | 5.936 (11.539 kt) |
-| with_era5 | ibtracs | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 9.090 (17.670 kt); 95% CI 6.535–12.928 m/s (12.703–25.130 kt) | 11.533 (22.418 kt) | -7.800 (-15.162 kt) | 10.434 (20.282 kt) |
-| with_era5 | ibtracs | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 8.109 (15.763 kt); 95% CI 5.188–11.662 m/s (10.085–22.669 kt) | 10.749 (20.894 kt) | -6.689 (-13.002 kt) | 8.585 (16.688 kt) |
-| with_era5 | sar_field_only | U-Net raw field maximum | ibtracs | rapid_intensification | 24 | 14 | 10.310 (20.041 kt); 95% CI 7.799–13.354 m/s (15.160–25.958 kt) | 12.609 (24.510 kt) | -10.059 (-19.553 kt) | 10.928 (21.242 kt) |
-| with_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 6.665 (12.956 kt); 95% CI 5.168–8.017 m/s (10.046–15.584 kt) | 8.757 (17.022 kt) | 1.283 (2.494 kt) | 6.314 (12.273 kt) |
-| with_era5 | ibtracs | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 5.634 (10.952 kt); 95% CI 4.899–6.554 m/s (9.523–12.740 kt) | 7.059 (13.722 kt) | -0.097 (-0.189 kt) | 5.944 (11.554 kt) |
-| with_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | overall | 159 | 33 | 5.192 (10.092 kt); 95% CI 4.480–5.899 m/s (8.708–11.467 kt) | 6.947 (13.504 kt) | -3.368 (-6.547 kt) | 5.630 (10.944 kt) |
-| with_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 6.562 (12.756 kt); 95% CI 4.270–10.293 m/s (8.300–20.008 kt) | 9.342 (18.159 kt) | 0.163 (0.317 kt) | 8.306 (16.146 kt) |
-| with_era5 | ibtracs | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 6.839 (13.294 kt); 95% CI 4.959–9.009 m/s (9.640–17.512 kt) | 8.381 (16.291 kt) | 1.275 (2.478 kt) | 7.212 (14.019 kt) |
-| with_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | rapid_intensification | 24 | 14 | 6.165 (11.984 kt); 95% CI 3.932–9.497 m/s (7.643–18.461 kt) | 9.033 (17.559 kt) | -5.761 (-11.198 kt) | 7.589 (14.752 kt) |
-| with_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 8.724 (16.958 kt); 95% CI 6.686–10.527 m/s (12.997–20.463 kt) | 11.246 (21.860 kt) | -2.891 (-5.620 kt) | 7.642 (14.855 kt) |
-| with_era5 | sar_robust_peak | U-Net + correction | ibtracs | overall | 159 | 33 | 7.021 (13.648 kt); 95% CI 5.513–8.254 m/s (10.716–16.045 kt) | 9.361 (18.196 kt) | -3.532 (-6.866 kt) | 6.007 (11.677 kt) |
-| with_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 13.082 (25.429 kt); 95% CI 9.970–16.419 m/s (19.380–31.916 kt) | 15.295 (29.731 kt) | -12.978 (-25.227 kt) | 12.894 (25.064 kt) |
-| with_era5 | sar_robust_peak | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 11.707 (22.757 kt); 95% CI 8.797–15.072 m/s (17.100–29.298 kt) | 14.060 (27.330 kt) | -11.677 (-22.698 kt) | 12.020 (23.365 kt) |
-| with_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 5.416 (10.528 kt); 95% CI 4.329–6.544 m/s (8.415–12.721 kt) | 7.088 (13.778 kt) | -0.678 (-1.318 kt) | 5.397 (10.491 kt) |
-| with_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 4.682 (9.101 kt); 95% CI 4.084–5.294 m/s (7.939–10.291 kt) | 6.217 (12.085 kt) | -1.319 (-2.564 kt) | 4.944 (9.610 kt) |
-| with_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 5.460 (10.613 kt); 95% CI 3.636–8.023 m/s (7.068–15.595 kt) | 7.373 (14.332 kt) | -5.014 (-9.746 kt) | 6.704 (13.032 kt) |
-| with_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 5.181 (10.071 kt); 95% CI 3.266–8.103 m/s (6.349–15.751 kt) | 7.886 (15.329 kt) | -3.713 (-7.218 kt) | 6.155 (11.964 kt) |
-| without_era5 | ibtracs | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 6.583 (12.796 kt); 95% CI 5.646–7.443 m/s (10.975–14.468 kt) | 8.602 (16.721 kt) | -0.482 (-0.937 kt) | 6.475 (12.586 kt) |
-| without_era5 | ibtracs | U-Net + correction | ibtracs | overall | 159 | 33 | 7.578 (14.730 kt); 95% CI 6.364–8.788 m/s (12.371–17.083 kt) | 9.733 (18.919 kt) | -1.503 (-2.922 kt) | 7.300 (14.190 kt) |
-| without_era5 | sar_field_only | U-Net raw field maximum | ibtracs | overall | 159 | 33 | 9.400 (18.272 kt); 95% CI 7.410–10.962 m/s (14.404–21.308 kt) | 12.176 (23.668 kt) | -6.746 (-13.113 kt) | 8.026 (15.601 kt) |
-| without_era5 | ibtracs | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 5.440 (10.575 kt); 95% CI 4.213–6.862 m/s (8.189–13.339 kt) | 6.732 (13.086 kt) | -1.502 (-2.920 kt) | 5.425 (10.545 kt) |
-| without_era5 | ibtracs | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 8.844 (17.191 kt); 95% CI 6.465–11.409 m/s (12.567–22.177 kt) | 10.685 (20.770 kt) | -5.389 (-10.475 kt) | 8.378 (16.286 kt) |
-| without_era5 | sar_field_only | U-Net raw field maximum | ibtracs | rapid_intensification | 24 | 14 | 14.897 (28.957 kt); 95% CI 11.589–18.099 m/s (22.527–35.182 kt) | 17.081 (33.203 kt) | -14.633 (-28.444 kt) | 14.261 (27.721 kt) |
-| without_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 7.371 (14.328 kt); 95% CI 6.128–8.437 m/s (11.912–16.400 kt) | 9.207 (17.897 kt) | 1.731 (3.365 kt) | 6.889 (13.391 kt) |
-| without_era5 | ibtracs | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 7.344 (14.276 kt); 95% CI 6.554–8.090 m/s (12.740–15.726 kt) | 9.182 (17.848 kt) | 0.710 (1.380 kt) | 7.399 (14.383 kt) |
-| without_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | overall | 159 | 33 | 7.798 (15.158 kt); 95% CI 6.326–9.150 m/s (12.297–17.786 kt) | 9.877 (19.199 kt) | -6.544 (-12.721 kt) | 7.577 (14.729 kt) |
-| without_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 8.769 (17.046 kt); 95% CI 6.594–11.414 m/s (12.818–22.187 kt) | 10.503 (20.416 kt) | 6.462 (12.561 kt) | 9.736 (18.925 kt) |
-| without_era5 | ibtracs | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 7.097 (13.795 kt); 95% CI 4.984–9.442 m/s (9.688–18.354 kt) | 9.030 (17.553 kt) | 2.574 (5.003 kt) | 7.276 (14.143 kt) |
-| without_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | rapid_intensification | 24 | 14 | 10.319 (20.059 kt); 95% CI 8.068–12.854 m/s (15.683–24.986 kt) | 11.882 (23.097 kt) | -10.202 (-19.831 kt) | 10.850 (21.091 kt) |
-| without_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 8.167 (15.875 kt); 95% CI 6.956–9.169 m/s (13.521–17.823 kt) | 9.865 (19.176 kt) | -3.258 (-6.333 kt) | 7.689 (14.946 kt) |
-| without_era5 | sar_robust_peak | U-Net + correction | ibtracs | overall | 159 | 33 | 8.778 (17.063 kt); 95% CI 6.965–10.180 m/s (13.539–19.788 kt) | 11.010 (21.402 kt) | -4.155 (-8.077 kt) | 8.322 (16.177 kt) |
-| without_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 10.913 (21.213 kt); 95% CI 8.801–12.861 m/s (17.108–25.000 kt) | 12.387 (24.078 kt) | -10.903 (-21.194 kt) | 10.579 (20.564 kt) |
-| without_era5 | sar_robust_peak | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 13.742 (26.712 kt); 95% CI 10.903–16.202 m/s (21.194–31.494 kt) | 15.347 (29.832 kt) | -13.099 (-25.462 kt) | 12.868 (25.013 kt) |
-| without_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 5.250 (10.205 kt); 95% CI 4.494–6.049 m/s (8.736–11.758 kt) | 6.921 (13.453 kt) | -1.046 (-2.033 kt) | 5.520 (10.730 kt) |
-| without_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 5.952 (11.570 kt); 95% CI 5.097–6.779 m/s (9.908–13.177 kt) | 7.588 (14.750 kt) | -1.942 (-3.775 kt) | 6.289 (12.225 kt) |
-| without_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 4.260 (8.281 kt); 95% CI 2.434–6.915 m/s (4.731–13.442 kt) | 6.633 (12.894 kt) | -2.939 (-5.713 kt) | 5.159 (10.028 kt) |
-| without_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 6.636 (12.899 kt); 95% CI 4.839–9.090 m/s (9.406–17.670 kt) | 8.499 (16.521 kt) | -5.135 (-9.982 kt) | 6.986 (13.580 kt) |
+| with_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | ibtracs | overall | 159 | 33 | **7.045 (13.694 kt); 95% CI 4.980–8.930 m/s (9.680–17.359 kt)** | 9.680 (18.817 kt) | -1.786 (-3.471 kt) | **5.815 (11.303 kt)** |
+| with_era5 | ibtracs | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 7.535 (14.646 kt); 95% CI 5.519–9.567 m/s (10.729–18.597 kt) | 10.850 (21.091 kt) | **-1.445 (-2.808 kt)** | 6.323 (12.291 kt) |
+| with_era5 | ibtracs | U-Net + correction | ibtracs | overall | 159 | 33 | 7.094 (13.790 kt); 95% CI 5.912–8.094 m/s (11.493–15.733 kt) | **8.928 (17.355 kt)** | -2.082 (-4.047 kt) | 7.046 (13.696 kt) |
+| with_era5 | sar_field_only | U-Net raw field maximum | ibtracs | overall | 159 | 33 | 7.122 (13.845 kt); 95% CI 5.836–8.162 m/s (11.344–15.865 kt) | 9.003 (17.500 kt) | -2.646 (-5.144 kt) | 7.122 (13.845 kt) |
+| with_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | ibtracs | rapid_intensification | 24 | 14 | 9.681 (18.819 kt); 95% CI 6.696–12.750 m/s (13.017–24.784 kt) | **11.631 (22.608 kt)** | -8.940 (-17.379 kt) | **9.135 (17.757 kt)** |
+| with_era5 | ibtracs | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | **9.435 (18.339 kt); 95% CI 6.475–14.222 m/s (12.586–27.646 kt)** | 13.123 (25.509 kt) | **-8.077 (-15.701 kt)** | 11.102 (21.580 kt) |
+| with_era5 | ibtracs | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 10.913 (21.213 kt); 95% CI 8.159–14.389 m/s (15.859–27.969 kt) | 12.930 (25.133 kt) | -10.172 (-19.774 kt) | 11.736 (22.813 kt) |
+| with_era5 | sar_field_only | U-Net raw field maximum | ibtracs | rapid_intensification | 24 | 14 | 11.194 (21.759 kt); 95% CI 8.613–14.644 m/s (16.743–28.466 kt) | 13.230 (25.717 kt) | -10.673 (-20.746 kt) | 12.038 (23.400 kt) |
+| with_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | sar_robust_peak | overall | 159 | 33 | 6.101 (11.860 kt); 95% CI 4.980–7.330 m/s (9.681–14.248 kt) | 8.001 (15.554 kt) | 0.427 (0.830 kt) | 6.184 (12.021 kt) |
+| with_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 6.880 (13.374 kt); 95% CI 5.214–8.467 m/s (10.135–16.458 kt) | 9.434 (18.339 kt) | 0.768 (1.492 kt) | 6.491 (12.618 kt) |
+| with_era5 | ibtracs | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 5.035 (9.788 kt); 95% CI 4.330–5.734 m/s (8.417–11.145 kt) | 6.501 (12.636 kt) | 0.130 (0.253 kt) | 5.552 (10.792 kt) |
+| with_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | overall | 159 | 33 | 5.177 (10.064 kt); 95% CI 4.436–5.910 m/s (8.623–11.487 kt) | 6.768 (13.156 kt) | -3.094 (-6.014 kt) | 5.779 (11.233 kt) |
+| with_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | sar_robust_peak | rapid_intensification | 24 | 14 | 6.063 (11.786 kt); 95% CI 3.947–9.049 m/s (7.672–17.589 kt) | 8.503 (16.529 kt) | -0.977 (-1.898 kt) | 6.479 (12.595 kt) |
+| with_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 6.321 (12.287 kt); 95% CI 3.716–10.558 m/s (7.222–20.524 kt) | 10.166 (19.761 kt) | **-0.114 (-0.221 kt)** | 8.315 (16.163 kt) |
+| with_era5 | ibtracs | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 5.625 (10.935 kt); 95% CI 3.716–8.424 m/s (7.223–16.374 kt) | 7.798 (15.158 kt) | -2.209 (-4.293 kt) | 6.388 (12.416 kt) |
+| with_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | rapid_intensification | 24 | 14 | 6.635 (12.897 kt); 95% CI 4.361–10.171 m/s (8.477–19.771 kt) | 9.183 (17.850 kt) | -6.416 (-12.473 kt) | 8.289 (16.113 kt) |
+| with_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 8.141 (15.825 kt); 95% CI 6.696–9.261 m/s (13.016–18.003 kt) | 10.041 (19.518 kt) | -2.176 (-4.229 kt) | 7.683 (14.934 kt) |
+| with_era5 | sar_robust_peak | U-Net + correction | ibtracs | overall | 159 | 33 | 7.264 (14.119 kt); 95% CI 5.832–8.417 m/s (11.336–16.361 kt) | 9.267 (18.013 kt) | -2.922 (-5.681 kt) | 7.065 (13.734 kt) |
+| with_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 11.920 (23.171 kt); 95% CI 9.286–14.961 m/s (18.051–29.083 kt) | 14.042 (27.296 kt) | -11.840 (-23.015 kt) | 12.044 (23.412 kt) |
+| with_era5 | sar_robust_peak | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 12.285 (23.880 kt); 95% CI 9.587–15.781 m/s (18.635–30.676 kt) | 14.356 (27.905 kt) | -11.990 (-23.306 kt) | 12.957 (25.186 kt) |
+| with_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 4.860 (9.448 kt); 95% CI 4.207–5.505 m/s (8.177–10.700 kt) | 6.359 (12.361 kt) | **0.037 (0.072 kt)** | **5.257 (10.219 kt)** |
+| with_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | overall | 159 | 33 | **4.575 (8.894 kt); 95% CI 3.985–5.192 m/s (7.746–10.092 kt)** | **6.061 (11.782 kt)** | -0.710 (-1.380 kt) | 5.275 (10.253 kt) |
+| with_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 5.270 (10.244 kt); 95% CI 3.478–7.890 m/s (6.760–15.336 kt) | **7.441 (14.465 kt)** | -3.876 (-7.535 kt) | **6.191 (12.035 kt)** |
+| with_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | **5.200 (10.108 kt); 95% CI 3.194–8.282 m/s (6.208–16.098 kt)** | 7.705 (14.977 kt) | -4.026 (-7.826 kt) | 6.513 (12.660 kt) |
+| without_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | ibtracs | overall | 159 | 33 | 12.915 (25.105 kt); 95% CI 9.866–15.256 m/s (19.178–29.655 kt) | 16.141 (31.375 kt) | -7.210 (-14.016 kt) | 11.537 (22.426 kt) |
+| without_era5 | ibtracs | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | **6.516 (12.665 kt); 95% CI 5.504–7.522 m/s (10.699–14.621 kt)** | **8.538 (16.596 kt)** | **-0.926 (-1.800 kt)** | **6.115 (11.886 kt)** |
+| without_era5 | ibtracs | U-Net + correction | ibtracs | overall | 159 | 33 | 7.322 (14.232 kt); 95% CI 6.238–8.276 m/s (12.125–16.088 kt) | 9.547 (18.559 kt) | -2.484 (-4.829 kt) | 7.360 (14.307 kt) |
+| without_era5 | sar_field_only | U-Net raw field maximum | ibtracs | overall | 159 | 33 | 8.917 (17.332 kt); 95% CI 7.048–10.438 m/s (13.700–20.290 kt) | 11.460 (22.277 kt) | -5.514 (-10.719 kt) | 8.158 (15.857 kt) |
+| without_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | ibtracs | rapid_intensification | 24 | 14 | 22.964 (44.639 kt); 95% CI 18.745–26.497 m/s (36.438–51.506 kt) | 24.738 (48.086 kt) | -22.964 (-44.639 kt) | 21.983 (42.732 kt) |
+| without_era5 | ibtracs | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | **5.394 (10.484 kt); 95% CI 4.236–6.976 m/s (8.234–13.560 kt)** | **6.602 (12.833 kt)** | **-0.948 (-1.843 kt)** | **5.896 (11.460 kt)** |
+| without_era5 | ibtracs | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 7.477 (14.534 kt); 95% CI 5.089–10.804 m/s (9.892–21.001 kt) | 9.834 (19.117 kt) | -5.388 (-10.473 kt) | 8.324 (16.181 kt) |
+| without_era5 | sar_field_only | U-Net raw field maximum | ibtracs | rapid_intensification | 24 | 14 | 12.866 (25.009 kt); 95% CI 10.365–15.839 m/s (20.148–30.789 kt) | 14.823 (28.814 kt) | -12.647 (-24.583 kt) | 12.846 (24.970 kt) |
+| without_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | sar_robust_peak | overall | 159 | 33 | 9.702 (18.860 kt); 95% CI 7.736–11.226 m/s (15.037–21.822 kt) | 11.877 (23.088 kt) | -4.998 (-9.715 kt) | 9.701 (18.858 kt) |
+| without_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 7.596 (14.765 kt); 95% CI 6.356–8.683 m/s (12.354–16.879 kt) | 9.570 (18.603 kt) | 1.286 (2.500 kt) | 7.235 (14.065 kt) |
+| without_era5 | ibtracs | U-Net + correction | sar_robust_peak | overall | 159 | 33 | 6.570 (12.771 kt); 95% CI 5.614–7.635 m/s (10.913–14.841 kt) | 8.218 (15.975 kt) | **-0.272 (-0.529 kt)** | 7.051 (13.705 kt) |
+| without_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | overall | 159 | 33 | 7.214 (14.022 kt); 95% CI 6.017–8.310 m/s (11.697–16.152 kt) | 9.084 (17.659 kt) | -5.527 (-10.743 kt) | 7.316 (14.222 kt) |
+| without_era5 | ibtracs | U-Net encoder + MLP (IBTrACS only) | sar_robust_peak | rapid_intensification | 24 | 14 | 15.060 (29.275 kt); 95% CI 11.896–18.093 m/s (23.125–35.171 kt) | 16.523 (32.118 kt) | -15.000 (-29.158 kt) | 15.428 (29.989 kt) |
+| without_era5 | ibtracs | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | 9.589 (18.640 kt); 95% CI 6.758–12.757 m/s (13.136–24.797 kt) | 12.342 (23.991 kt) | 7.016 (13.637 kt) | 10.308 (20.038 kt) |
+| without_era5 | ibtracs | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 7.072 (13.748 kt); 95% CI 5.226–9.073 m/s (10.158–17.636 kt) | 8.473 (16.471 kt) | 2.576 (5.007 kt) | 7.481 (14.542 kt) |
+| without_era5 | sar_field_only | U-Net raw field robust peak | sar_robust_peak | rapid_intensification | 24 | 14 | 8.328 (16.189 kt); 95% CI 6.427–10.989 m/s (12.493–21.361 kt) | 10.143 (19.717 kt) | -8.319 (-16.171 kt) | 9.193 (17.869 kt) |
+| without_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | overall | 159 | 33 | 7.939 (15.433 kt); 95% CI 6.699–8.999 m/s (13.023–17.493 kt) | 9.770 (18.991 kt) | -2.618 (-5.090 kt) | 7.561 (14.697 kt) |
+| without_era5 | sar_robust_peak | U-Net + correction | ibtracs | overall | 159 | 33 | 8.006 (15.563 kt); 95% CI 6.408–9.321 m/s (12.456–18.119 kt) | 10.112 (19.656 kt) | -3.106 (-6.038 kt) | 7.954 (15.461 kt) |
+| without_era5 | sar_robust_peak | Joint U-Net + MLP | ibtracs | rapid_intensification | 24 | 14 | 10.707 (20.813 kt); 95% CI 8.214–12.696 m/s (15.967–24.678 kt) | 12.631 (24.553 kt) | -10.619 (-20.642 kt) | 9.972 (19.383 kt) |
+| without_era5 | sar_robust_peak | U-Net + correction | ibtracs | rapid_intensification | 24 | 14 | 10.769 (20.933 kt); 95% CI 8.351–13.566 m/s (16.233–26.369 kt) | 12.485 (24.268 kt) | -10.382 (-20.182 kt) | 10.623 (20.650 kt) |
+| without_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | overall | 159 | 33 | 5.308 (10.319 kt); 95% CI 4.675–5.975 m/s (9.088–11.615 kt) | **6.801 (13.219 kt)** | -0.406 (-0.789 kt) | **5.690 (11.061 kt)** |
+| without_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | overall | 159 | 33 | **5.248 (10.202 kt); 95% CI 4.484–6.028 m/s (8.717–11.718 kt)** | 6.937 (13.484 kt) | -0.894 (-1.738 kt) | 6.077 (11.812 kt) |
+| without_era5 | sar_robust_peak | Joint U-Net + MLP | sar_robust_peak | rapid_intensification | 24 | 14 | **3.999 (7.773 kt); 95% CI 2.669–6.220 m/s (5.188–12.091 kt)** | **6.002 (11.667 kt)** | -2.655 (-5.161 kt) | **4.622 (8.985 kt)** |
+| without_era5 | sar_robust_peak | U-Net + correction | sar_robust_peak | rapid_intensification | 24 | 14 | 4.658 (9.054 kt); 95% CI 3.113–7.022 m/s (6.051–13.649 kt) | 6.698 (13.020 kt) | **-2.419 (-4.702 kt)** | 5.357 (10.414 kt) |
 <!-- matched-validation-results:end -->
 
 ### How the tables and metrics were calculated

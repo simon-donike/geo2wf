@@ -8,30 +8,20 @@ future forecast from being interpreted as the same product.
 
 | Model | Generated quantity | Main inputs | Role |
 |---|---|---|---|
-| [Stage 1 deterministic baseline](era5-residual.md) | surface wind in m/s | GEO, ERA5, derived context, masks | principal stable reconstruction and Stage 2 baseline |
-| [Stage 2 residual diffusion](residual-diffusion.md) | signed SAR-minus-baseline residual | the Stage 1 inputs plus its frozen field and noise | principal probabilistic refinement |
-| [Standalone conditional diffusion](conditional-diffusion.md) | absolute target field | GEO, optional ERA5, derived context, masks, noise | generative control without Stage 1 |
+| [ERA5-residual U-Net](era5-residual.md) | surface wind in m/s | GEO, ERA5, derived context, masks | maintained physical wind-field reconstruction |
 | [Direct PMW U-Net](direct-unet.md) | near-89 GHz brightness temperature in K | GEO, optional ERA5, derived context, masks | proxy reconstruction/pretraining control |
 
-The principal wind-field system is a two-stage stack:
-
-1. Stage 1 learns a physical correction around ERA5.
-2. Stage 2 freezes Stage 1 and samples the remaining signed correction.
+The principal wind-field system learns a physical correction around ERA5:
 
 ```mermaid
 flowchart LR
-  C[GEO + ERA5 + derived context] --> S1[Stage 1 deterministic baseline]
-  S1 --> B[Baseline wind field]
-  C --> S2[Stage 2 residual diffusion]
-  B --> S2
-  S2 --> O[Baseline + sampled correction]
+  C[GEO + ERA5 + derived context] --> U[ERA5-residual U-Net]
+  E[Explicit ERA5 wind anchor] --> U
+  U --> O[Reconstructed surface wind]
 ```
 
-[Start with the complete two-stage workflow.](two-stage.md)
-
-The residual-diffusion implementation can alternatively use ERA5 itself as the
-baseline. That is a portable ablation, not the intended stacked workflow. The
-direct U-Net is Kelvin-only and is not an interchangeable wind regressor.
+[Read the maintained field model.](era5-residual.md) The direct U-Net is
+Kelvin-only and is not an interchangeable wind regressor.
 
 ## 2. Current scalar intensity
 
@@ -72,7 +62,7 @@ training models in this package:
 They are useful comparison layers, but this repository does not contain enough
 model definition and training configuration to document or reproduce their
 architectures. They should not be conflated with the maintained U-Net,
-diffusion, correction, or forecast models above.
+correction, or forecast models above.
 
 ## Shared contracts
 

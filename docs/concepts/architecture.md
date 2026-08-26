@@ -49,26 +49,23 @@ callbacks, and checkpoints.
 | Export/preprocessing | pairing, grids, regridding, source reads, GeoTIFF tags, statistics | model construction |
 | Dataset | manifest selection, raster reads, normalization, features, crop, augmentation | model-specific channel concatenation |
 | DataModule | split datasets, samplers, loaders, canonical collation, `DataSpec` | scientific prediction logic |
-| Model package | network, objective composition, transforms, sampling behavior | raster I/O, concrete datasets, CLI, W&B, Matplotlib |
+| Model package | network, objective composition, and transforms | raster I/O, concrete datasets, CLI, W&B, Matplotlib |
 | Shared model base | batch validation, standardized training/predict extension contract, checkpoint metadata | architecture dispatch |
 | Metrics/evaluation | physical prediction calculations and serialization | W&B media |
 | Visualization | pure structured-input-to-`Figure` rendering | Trainer or logger access |
 | Tracking | CSV/W&B adapters, media callback, run manifest | scientific model behavior |
 | Trainer | epochs, devices, precision, DDP, callbacks | experiment semantics |
 
-## Two-stage handoff
+## Field-model calculation
 
-Stage 1 produces a deterministic physical field around ERA5. Stage 2 loads that
-checkpoint as a frozen child and samples signed residuals around the exact field:
+The field model produces a deterministic physical field around ERA5:
 
 ```text
-Stage 1: baseline = ERA5 + learned correction
-Stage 2: wind member = baseline + sampled residual
+prediction = ERA5 + learned correction
 ```
 
-Both consume the same `WindFieldBatch` and expose a `PredictionBatch`.
-Deterministic output uses shape `[B, 1, C, H, W]`; diffusion uses
-`[B, ensemble, C, H, W]`.
+It consumes a `WindFieldBatch` and exposes a `PredictionBatch`; the deterministic
+output uses shape `[B, 1, C, H, W]`.
 
 ## Shared data and prediction contracts
 
@@ -81,7 +78,7 @@ Deterministic output uses shape `[B, 1, C, H, W]`; diffusion uses
   capabilities used for preflight rejection.
 
 `PredictionRequest`
-: Ensemble size, seed, and model-specific overrides.
+: Prediction controls and model-specific overrides.
 
 `PredictionBatch`
 : All physical members, one central physical prediction, and an optional
@@ -101,8 +98,7 @@ Deterministic output uses shape `[B, 1, C, H, W]`; diffusion uses
 ```
 
 DDP children inherit `GEO2WF_RUN_DIR` and reuse the parent directory. Metrics
-are reduced before epoch values are formed; reconstruction seeds derive from
-stable sample identifiers rather than process rank.
+are reduced before epoch values are formed.
 
 Continue with [modular package ownership](modular-architecture.md), the
 [dataset contract](../data/dataset-contract.md), or [training](../experiments/training.md).

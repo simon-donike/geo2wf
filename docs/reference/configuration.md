@@ -53,40 +53,6 @@ must be represented by `DataSpec`.
 | `lr_scheduler_*` | ReduceLROnPlateau settings and monitor |
 | `validation_reconstruction_batches`, `log_reconstruction_images` | validation media coverage |
 
-## Modular diffusion `model`
-
-Both standalone and residual diffusion use descriptive flat constructor keys.
-
-| Key | Purpose |
-|---|---|
-| `_target_` | model constructor or model-specific factory |
-| `condition_channels` / `base_condition_channels` | prepared/base condition width |
-| `generated_channels` | target/residual output width |
-| `num_timesteps`, `schedule` | forward process |
-| `model_dim`, `model_dim_mults`, `model_channels`, `model_out_dim` | U-Net sizing |
-| `sampling_method`, `sampling_timesteps`, `sampling_eta` | reverse sampler |
-| `guidance_scale`, `condition_dropout_probability` | classifier-free guidance |
-| `clip_sample` | clip the clean estimate during reverse sampling |
-| `ema_decay`, `ema_update_after_step`, `ema_use_for_eval` | EMA behavior |
-| `min_snr_gamma` | optional epsilon-prediction Min-SNR cap |
-| `lr`, `lr_scheduler_*` | optimizer and scheduler |
-| `validation_seed`, `validation_ensemble_size`, `validation_ensemble_batches` | stable validation members |
-| `validation_reconstruction_batches`, `log_reconstruction_images` | reconstruction/media coverage |
-
-Residual diffusion additionally accepts:
-
-| Key | Purpose |
-|---|---|
-| `baseline_source` | `era5` or `deterministic` |
-| `baseline_checkpoint_path` | frozen Stage 1 checkpoint; environment-backed choice uses `GEO2WF_BASELINE_CKPT` |
-| `residual_transform`, `residual_soft_scale_ms`, `residual_clip_ms` | signed transform |
-| `prediction_min_ms`, `prediction_max_ms` | recomposed output bounds |
-| `*_loss_weight` and related thresholds/kernels | optional gradient, spectral, low-frequency, smoothness, peak, radial, exceedance, multiscale, annular objectives |
-| `sparse_target_fill`, `unobserved_loss_weight` | weak off-swath supervision |
-| `probabilistic_score_*` | ensemble checkpoint-score composition |
-
-Inspect the selected file in `configs/model/` for authoritative defaults.
-
 ## Other modular models
 
 | Model choice | Contract-defining keys |

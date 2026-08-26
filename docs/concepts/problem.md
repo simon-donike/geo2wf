@@ -58,31 +58,19 @@ so storm metrics use raster bounds and a local physical coordinate conversion
 instead of treating degrees as kilometres. See [Model inputs and training
 targets](../data/index.md) for real examples and exact channel assembly.
 
-## Two-stage formulation
+## ERA5-residual formulation
 
-Stage 1 estimates a deterministic baseline:
+The maintained field model estimates a deterministic physical reconstruction:
 
 \[
-\hat v_{\mathrm{base}} =
+\hat v =
 v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, m)
 \]
 
-Stage 2 models the conditional distribution of signed SAR corrections around
-that frozen field:
-
-\[
-p_\phi\left(
-v_{\mathrm{SAR}} - \hat v_{\mathrm{base}}
-\mid
-x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}},
-\hat v_{\mathrm{base}}, m
-\right)
-\]
-
-This separates broad-field estimation from probabilistic fine-structure
-refinement. It does not remove the ambiguity of the inverse problem; multiple
-diffusion members represent alternatives under the learned conditional
-distribution. [Read the full two-stage workflow.](../models/two-stage.md)
+This keeps the large-scale ERA5 structure explicit while allowing GEO and
+derived context to correct it toward the SAR-supervised field. The formulation
+does not remove the ambiguity of the inverse problem; the output is a single
+conditional estimate. [Read the field-model details.](../models/era5-residual.md)
 
 ## Scientific constraints reflected in code
 
@@ -94,8 +82,7 @@ Sparse and imperfect supervision
 
 Physical scale
 : The dataset retains `target_physical` and reversible normalization
-  parameters. The deterministic model predicts in m/s; diffusion residuals are
-  decoded and added in m/s.
+  parameters. The field model predicts in m/s.
 
 Storm geometry
 : Manifests carry IBTrACS center coordinates and raster bounds. The dataset
@@ -111,10 +98,6 @@ Solar context
   the [ABI band wavelengths and purposes](https://www.goes.noaa.gov/abispectralattributes.php)
   and notes Band 7's reflected daytime component in its [band quick
   guide](https://goes-r.noaa.gov/mission/ABI-bands-quick-info.html).
-
-Reproducible probabilistic validation
-: Validation noise is derived from the global validation seed and `sample_id`,
-  so the same sample starts from the same latent across epochs.
 
 Vector-aware augmentation
 : Flips transform ERA5 wind components and vorticity according to their

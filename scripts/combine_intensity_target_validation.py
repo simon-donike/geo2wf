@@ -162,6 +162,19 @@ def _prediction_rows(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _markdown(rows: list[dict[str, Any]]) -> str:
+    best: dict[tuple[str, str, str, str], float] = {}
+    for row in rows:
+        group = (row["era5"], row["evaluation_reference"], row["subset"])
+        for metric in ("mae_ms", "rmse_ms", "bias_ms", "storm_macro_mae_ms"):
+            value = abs(row[metric]) if metric == "bias_ms" else row[metric]
+            key = (*group, metric)
+            best[key] = min(best.get(key, value), value)
+
+    def formatted(row: dict[str, Any], metric: str, value: str) -> str:
+        group = (row["era5"], row["evaluation_reference"], row["subset"], metric)
+        candidate = abs(row[metric]) if metric == "bias_ms" else row[metric]
+        return f"**{value}**" if candidate == best[group] else value
+
     lines = [
         "# Matched IBTrACS versus SAR intensity validation",
         "",
@@ -179,9 +192,10 @@ def _markdown(rows: list[dict[str, Any]]) -> str:
         lines.append(
             f"| {row['era5']} | {row['trained_target']} | {row['model']} | "
             f"{row['evaluation_reference']} | {row['subset']} | {row['samples']} | "
-            f"{row['storms']} | {_speed(row['mae_ms'])}{interval} | "
-            f"{_speed(row['rmse_ms'])} | {_speed(row['bias_ms'])} | "
-            f"{_speed(row['storm_macro_mae_ms'])} |"
+            f"{row['storms']} | {formatted(row, 'mae_ms', _speed(row['mae_ms']) + interval)} | "
+            f"{formatted(row, 'rmse_ms', _speed(row['rmse_ms']))} | "
+            f"{formatted(row, 'bias_ms', _speed(row['bias_ms']))} | "
+            f"{formatted(row, 'storm_macro_mae_ms', _speed(row['storm_macro_mae_ms']))} |"
         )
     return "\n".join(lines) + "\n"
 

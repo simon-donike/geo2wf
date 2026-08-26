@@ -1,8 +1,7 @@
 # Modular package architecture
 
 The installable `geo2wf` package under `src/geo2wf/` is the source of truth.
-Root scripts, CamelCase model modules, and the original diffusion paths are
-compatibility adapters.
+Root scripts and CamelCase model modules are compatibility adapters.
 
 ## Package ownership
 
@@ -12,7 +11,6 @@ compatibility adapters.
 | `geo2wf.config` | Hydra composition, local environment loading, schemas, legacy loading |
 | `geo2wf.data` | contracts, collation, data module, datasets, raster I/O, features, normalization, augmentation, sampling |
 | `geo2wf.models` | Lightning modules and model-specific networks/objectives/transforms |
-| `geo2wf.diffusion` | forward process, schedules, samplers, and reusable backbone |
 | `geo2wf.objectives` | reusable masked loss primitives |
 | `geo2wf.metrics` | physical and storm tensor calculations |
 | `geo2wf.visualization` | plotting functions returning Matplotlib figures |
@@ -20,8 +18,8 @@ compatibility adapters.
 | `geo2wf.evaluation` | shared prediction evaluation |
 | `geo2wf.preprocessing` | source/feature logic reusable by export and raw inference |
 
-A model package may import shared contracts, objectives, metrics, and diffusion
-components. It must not import raster I/O, a concrete dataset, CLI code, W&B, or
+A model package may import shared contracts, objectives, and metrics. It must
+not import raster I/O, a concrete dataset, CLI code, W&B, or
 Matplotlib.
 
 ## Configuration-driven construction
@@ -37,7 +35,7 @@ configs/modular.yaml
 
 ```bash
 uv run geo2wf-train model=deterministic_residual
-uv run geo2wf-train model=residual_diffusion trainer.devices=2
+uv run geo2wf-train model=direct_unet trainer.devices=2
 ```
 
 Available choices are discoverable from filenames. Experiments contain only
@@ -70,8 +68,8 @@ request, and writes versioned metadata into new checkpoints.
 
 `PredictionBatch.samples_physical` always has shape `[B, E, C, H, W]`.
 `central_physical` has `[B, C, H, W]`; `baseline_physical` is optional.
-Deterministic models use `E=1`. This removes deterministic/diffusion branches
-from downstream metrics and serialization.
+Maintained deterministic models use `E=1`, keeping downstream metrics and
+serialization independent of the model architecture.
 
 Installed inference subcommands call the maintained workflow scripts. Modular
 models expose `predict_batch()` for physical predictions; older full-YAML

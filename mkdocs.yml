@@ -1,5 +1,5 @@
 site_name: geo2wf
-site_description: A two-stage baseline and diffusion system for tropical-cyclone wind-field reconstruction
+site_description: Satellite-based tropical-cyclone wind-field reconstruction and intensity estimation
 site_url: https://tcd.hyperalis.com/
 repo_url: https://github.com/simon-donike/geo2wf
 repo_name: simon-donike/geo2wf
@@ -44,13 +44,12 @@ nav:
       - First experiment: getting-started/first-experiment.md
   - Science and system:
       - Scientific problem and observations: concepts/problem.md
-      - Two-stage baseline + diffusion: models/two-stage.md
-      - Diffusion in one page: concepts/diffusion-primer.md
       - System architecture: concepts/architecture.md
       - Modular package architecture: concepts/modular-architecture.md
   - Data:
       - Inputs and targets: data/index.md
       - Storm observation manifest: data/storm-manifest.md
+      - Full dataset table: data/full-dataset.md
       - Dataset contract: data/dataset-contract.md
       - Normalization & masks: data/normalization.md
       - Export GEO–SAR: data/export-geo-sar.md
@@ -58,14 +57,11 @@ nav:
       - Hosting dashboard data on R2: data/r2-hosting.md
   - Models:
       - Model overview: models/index.md
-      - Stage 1 — deterministic baseline: models/era5-residual.md
-      - Stage 2 — residual diffusion: models/residual-diffusion.md
+      - ERA5-residual U-Net: models/era5-residual.md
       - Direct PMW U-Net: models/direct-unet.md
       - Single-field intensity correction: models/intensity-correction.md
       - Bottleneck U-Net + MLP: models/bottleneck-unet-mlp.md
       - Six-hour scalar intensity forecast: models/intensity-forecast.md
-      - Standalone conditional diffusion: models/conditional-diffusion.md
-      - Sampling: models/sampling.md
   - Experiments:
       - Choose an experiment: experiments/index.md
       - Configuration guide: experiments/configuration.md
@@ -73,9 +69,6 @@ nav:
       - Evaluation & metrics: experiments/evaluation.md
       - Intensity model comparison: experiments/intensity-comparison.md
       - Completed intensity benchmark: experiments/intensity-comparison-results.md
-      - Diffusion refinement ablations: experiments/ablations.md
-      - Completed ablation analysis: experiments/ablation-analysis.md
-      - Post-processing ablation: experiments/postprocessing-ablation.md
       - Visual examples: experiments/visual-examples.md
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:

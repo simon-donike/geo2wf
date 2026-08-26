@@ -345,6 +345,34 @@ input {
   border-radius: 0.5rem;
 }
 
+.md-typeset .csv-table-viewer--full .datatable-container {
+  max-height: min(68vh, 52rem);
+  overflow: auto;
+  border: 1px solid var(--divider);
+}
+
+.md-typeset .csv-table-viewer--full .datatable-table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.68rem;
+}
+
+.md-typeset .csv-table-viewer--full .datatable-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  max-width: 18rem;
+  white-space: nowrap;
+  background: var(--tint-80);
+}
+
+.md-typeset .csv-table-viewer--full .datatable-table td {
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .md-typeset .datatable-wrapper {
   width: 100%;
   margin: 1em 0;

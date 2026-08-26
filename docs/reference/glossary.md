@@ -6,12 +6,6 @@ ABI
 AHI
 : Advanced Himawari Imager, the analogous geostationary imager used by Himawari.
 
-DDIM
-: Denoising Diffusion Implicit Model sampling. It can traverse a subset of training timesteps and is deterministic when eta is zero.
-
-DDPM
-: Denoising Diffusion Probabilistic Model. Here it refers to the full ancestral reverse sampler using exact posterior coefficients.
-
 EMA
 : Exponential moving average of trained weights, used as a smoother inference model.
 
@@ -68,11 +62,9 @@ SAR
   near-surface wind-speed swath retrieved from ocean radar backscatter through
   a geophysical model function.
 
-Sparse completion
-: Weak supervision outside the SAR swath during diffusion training. Absolute
-  diffusion can use low-weight ERA5 wind; residual diffusion uses low-weight
-  zero correction around its selected baseline. These pixels remain excluded
-  from SAR metrics.
+Off-swath anchor
+: Weak regularization toward zero correction outside the SAR swath where ERA5
+  is valid. These pixels remain excluded from SAR metrics.
 
 Target mask
 : Boolean support of observed target pixels; it controls training loss and evaluation validity.

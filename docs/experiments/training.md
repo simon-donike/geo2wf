@@ -11,8 +11,8 @@ uv run geo2wf-train \
 Model switching is configuration, not Python dispatch:
 
 ```bash
-uv run geo2wf-train model=conditional_diffusion
-uv run geo2wf-train model=residual_diffusion
+uv run geo2wf-train model=direct_unet
+uv run geo2wf-train model=bottleneck_unet_mlp
 ```
 
 ## Startup sequence
@@ -39,7 +39,6 @@ uv run geo2wf-train \
 ```
 
 The selected model and data configuration must still match the checkpoint.
-Diffusion additionally checks saved schedule coefficients and timestep count.
 
 ## Initialize weights only
 
@@ -49,31 +48,13 @@ It is mutually exclusive with `--ckpt-path`.
 
 ```bash
 uv run geo2wf-train \
-  model=conditional_diffusion \
+  model=deterministic_residual \
   --weights-only-path /path/to/source.ckpt
 ```
 
 Changed condition widths or architecture keys still fail strict loading. A
 partial-load policy must be an explicit model-specific migration, not an
 implicit training flag.
-
-## Stage 1 and Stage 2
-
-```bash
-# Stage 1
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=deterministic_residual
-
-# Stage 2
-GEO2WF_BASELINE_CKPT=/path/to/stage1.ckpt \
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=residual_diffusion_deterministic_baseline
-```
-
-The baseline is loaded strictly, frozen, kept in evaluation mode, excluded from
-the optimizer, and stored inside the Stage 2 checkpoint.
 
 ## Checkpoint selection
 
@@ -118,6 +99,6 @@ the tracking layer, whose callback can also drain standardized events.
 
 - Resume only with the same architecture, channel order, schedule, and target definition.
 - Changed optimizer only: use weights-only initialization if intentional.
-- Changed diffusion schedule or target normalization: start a fresh run.
+- Changed target normalization: start a fresh run.
 - Changed bands, companions, or spatial contract: select compatible config and checkpoint.
 - Older compatible checkpoints remain strict-loadable; only new checkpoints receive `geo2wf` metadata.
