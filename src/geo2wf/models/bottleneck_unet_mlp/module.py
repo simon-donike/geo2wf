@@ -441,12 +441,32 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         )
         self.register_buffer(
             "_validation_ibtracs_radius_statistics",
-            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
             persistent=False,
         )
         self.register_buffer(
             "_test_ibtracs_radius_statistics",
-            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_validation_ri_structure_statistics",
+            torch.zeros((len(IBTRACS_STRUCTURE_TARGET_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_test_ri_structure_statistics",
+            torch.zeros((len(IBTRACS_STRUCTURE_TARGET_NAMES), 5), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_validation_ri_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_test_ri_ibtracs_radius_statistics",
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
             persistent=False,
         )
         self._evaluation_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -632,6 +652,26 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             prediction.central_physical,
             batch,
         )
+        ri = torch.as_tensor(
+            batch.get(
+                "is_rapid_intensification",
+                torch.zeros_like(intensity_target, dtype=torch.bool),
+            ),
+            device=intensity_target.device,
+            dtype=torch.bool,
+        ).reshape(-1)
+        self._accumulate_structure_statistics(
+            self._validation_ri_structure_statistics,
+            prediction,
+            batch,
+            sample_mask=ri,
+        )
+        self._accumulate_ibtracs_radius_statistics(
+            self._validation_ri_ibtracs_radius_statistics,
+            prediction.central_physical,
+            batch,
+            sample_mask=ri,
+        )
         self._record_evaluation_rows(
             "val", batch, prediction, target, mask, intensity_target
         )
@@ -646,6 +686,8 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self._validation_intensity_statistics.zero_()
         self._validation_structure_statistics.zero_()
         self._validation_ibtracs_radius_statistics.zero_()
+        self._validation_ri_structure_statistics.zero_()
+        self._validation_ri_ibtracs_radius_statistics.zero_()
         self._evaluation_rows["val"] = []
 
     def on_validation_epoch_end(self) -> None:
@@ -658,7 +700,14 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self._log_ibtracs_radius_statistics(
             "val", self._validation_ibtracs_radius_statistics
         )
+        self._log_image_quality("val")
         self._log_ri_statistics("val")
+        self._log_structure_statistics_only(
+            "val_ri", self._validation_ri_structure_statistics
+        )
+        self._log_ibtracs_radius_statistics(
+            "val_ri", self._validation_ri_ibtracs_radius_statistics
+        )
 
     @torch.no_grad()
     def test_step(self, batch: Mapping[str, Any], batch_idx: int) -> None:
@@ -687,6 +736,26 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             prediction.central_physical,
             batch,
         )
+        ri = torch.as_tensor(
+            batch.get(
+                "is_rapid_intensification",
+                torch.zeros_like(intensity_target, dtype=torch.bool),
+            ),
+            device=intensity_target.device,
+            dtype=torch.bool,
+        ).reshape(-1)
+        self._accumulate_structure_statistics(
+            self._test_ri_structure_statistics,
+            prediction,
+            batch,
+            sample_mask=ri,
+        )
+        self._accumulate_ibtracs_radius_statistics(
+            self._test_ri_ibtracs_radius_statistics,
+            prediction.central_physical,
+            batch,
+            sample_mask=ri,
+        )
         self._record_evaluation_rows(
             "test", batch, prediction, target, mask, intensity_target
         )
@@ -696,6 +765,8 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self._test_intensity_statistics.zero_()
         self._test_structure_statistics.zero_()
         self._test_ibtracs_radius_statistics.zero_()
+        self._test_ri_structure_statistics.zero_()
+        self._test_ri_ibtracs_radius_statistics.zero_()
         self._evaluation_rows["test"] = []
 
     def on_test_epoch_end(self) -> None:
@@ -710,6 +781,12 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         )
         self._log_image_quality("test")
         self._log_ri_statistics("test")
+        self._log_structure_statistics_only(
+            "test_ri", self._test_ri_structure_statistics
+        )
+        self._log_ibtracs_radius_statistics(
+            "test_ri", self._test_ri_ibtracs_radius_statistics
+        )
 
     def _record_evaluation_rows(
         self,
@@ -876,12 +953,17 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         statistics: torch.Tensor,
         prediction: torch.Tensor,
         batch: Mapping[str, Any],
+        sample_mask: torch.Tensor | None = None,
     ) -> None:
         """Evaluate generated-field radii without adding them to either loss."""
         targets = ibtracs_radius_targets(batch, prediction)
         if targets is None or not {"center", "target_bounds"}.issubset(batch):
             return
         target_radii, target_valid = targets
+        if sample_mask is not None:
+            target_valid = target_valid & sample_mask.to(
+                target_valid.device, dtype=torch.bool
+            ).reshape(-1, 1)
         prediction_mask = self._single_channel(
             batch["condition_mask"], "condition_mask"
         ).bool()
@@ -900,6 +982,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         statistics: torch.Tensor,
         prediction: JointPredictionBatch,
         batch: Mapping[str, Any],
+        sample_mask: torch.Tensor | None = None,
     ) -> None:
         output = prediction.structure_prediction_km
         if output is None:
@@ -908,6 +991,10 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         if targets is None:
             return
         target, valid = targets
+        if sample_mask is not None:
+            valid = valid & sample_mask.to(valid.device, dtype=torch.bool).reshape(
+                -1, 1
+            )
         safe_target = torch.where(valid, target, output.detach())
         error = output - safe_target
         huber = F.smooth_l1_loss(
@@ -936,14 +1023,15 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             torch.distributed.all_reduce(values)
         for index, name in enumerate(IBTRACS_RADIUS_NAMES):
-            count = values[index, 4]
+            count = values[index, 5]
             if count <= 0:
                 continue
             for metric_name, value in {
                 "predicted_mean_km": values[index, 0] / count,
                 "target_mean_km": values[index, 1] / count,
                 "mae_km": values[index, 2] / count,
-                "bias_km": values[index, 3] / count,
+                "rmse_km": torch.sqrt(values[index, 3] / count),
+                "bias_km": values[index, 4] / count,
                 "samples": count,
             }.items():
                 self.log(
@@ -1013,6 +1101,30 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 prog_bar=name in {"loss", "image_rmse_ms", "intensity_mae_ms"},
                 sync_dist=False,
             )
+
+    def _log_structure_statistics_only(
+        self, prefix: str, statistics: torch.Tensor
+    ) -> None:
+        values = statistics.clone()
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.all_reduce(values)
+        for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
+            count = values[index, 0]
+            if count <= 0:
+                continue
+            for metric_name, value in {
+                "mae_km": values[index, 1] / count,
+                "rmse_km": torch.sqrt(values[index, 2] / count),
+                "bias_km": values[index, 3] / count,
+                "samples": count,
+            }.items():
+                self.log(
+                    f"{prefix}/structure_{name}_{metric_name}",
+                    value.to(dtype=torch.float32),
+                    on_step=False,
+                    on_epoch=True,
+                    sync_dist=False,
+                )
 
     @staticmethod
     def _distributed_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

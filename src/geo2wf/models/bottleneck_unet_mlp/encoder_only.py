@@ -184,6 +184,9 @@ class BottleneckEncoderMLPRegressor(pl.LightningModule):
                         metrics[f"structure_{name}_mae_km"] = (
                             selected_error.abs().mean()
                         )
+                        metrics[f"structure_{name}_rmse_km"] = (
+                            selected_error.square().mean().sqrt()
+                        )
                         metrics[f"structure_{name}_bias_km"] = selected_error.mean()
         metrics["loss"] = intensity_loss + self.structure_loss_weight * structure_loss
         return output, target, metrics
@@ -224,6 +227,67 @@ class BottleneckEncoderMLPRegressor(pl.LightningModule):
                 prog_bar=name == "intensity_mae_ms",
                 sync_dist=True,
                 batch_size=batch_size,
+                add_dataloader_idx=False,
+            )
+        ri = torch.as_tensor(
+            batch.get(
+                "is_rapid_intensification",
+                torch.zeros_like(target, dtype=torch.bool),
+            ),
+            device=target.device,
+            dtype=torch.bool,
+        ).reshape(-1)
+        if ri.any():
+            prefix = f"{split}_ri"
+            ri_error = output.intensity_prediction_ms[ri] - target[ri]
+            ri_metrics = {
+                "intensity_mae_ms": ri_error.abs().mean(),
+                "intensity_rmse_ms": ri_error.square().mean().sqrt(),
+                "intensity_bias_ms": ri_error.mean(),
+            }
+            if output.structure_prediction_km is not None:
+                targets = ibtracs_structure_targets(
+                    batch, output.structure_prediction_km
+                )
+                if targets is not None:
+                    structure_target, structure_valid = targets
+                    structure_valid = structure_valid & ri[:, None]
+                    safe_target = torch.where(
+                        structure_valid,
+                        structure_target,
+                        output.structure_prediction_km.detach(),
+                    )
+                    structure_error = output.structure_prediction_km - safe_target
+                    for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
+                        selected = structure_valid[:, index]
+                        if selected.any():
+                            selected_error = structure_error[selected, index]
+                            ri_metrics[f"structure_{name}_mae_km"] = (
+                                selected_error.abs().mean()
+                            )
+                            ri_metrics[f"structure_{name}_rmse_km"] = (
+                                selected_error.square().mean().sqrt()
+                            )
+                            ri_metrics[f"structure_{name}_bias_km"] = (
+                                selected_error.mean()
+                            )
+            for name, value in ri_metrics.items():
+                self.log(
+                    f"{prefix}/{name}",
+                    value,
+                    on_step=False,
+                    on_epoch=True,
+                    sync_dist=True,
+                    batch_size=int(ri.sum()),
+                    add_dataloader_idx=False,
+                )
+            self.log(
+                f"{prefix}/samples",
+                ri.sum().to(torch.float32),
+                on_step=False,
+                on_epoch=True,
+                sync_dist=True,
+                reduce_fx="sum",
                 add_dataloader_idx=False,
             )
 

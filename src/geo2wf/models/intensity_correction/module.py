@@ -606,7 +606,10 @@ class UNetIntensityCorrection(pl.LightningModule):
         return torch.stack(values, dim=1), torch.stack(masks, dim=1)
 
     def _structure_loss_and_metrics(
-        self, prediction: IntensityPredictionBatch, batch: Mapping[str, Any]
+        self,
+        prediction: IntensityPredictionBatch,
+        batch: Mapping[str, Any],
+        sample_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         output = prediction.structure_prediction_km
         if output is None:
@@ -617,6 +620,10 @@ class UNetIntensityCorrection(pl.LightningModule):
                 raise KeyError("structure-supervised MLP requires IBTrACS targets")
             return output.sum() * 0.0, {}
         target, valid = targets
+        if sample_mask is not None:
+            valid = valid & sample_mask.to(valid.device, dtype=torch.bool).reshape(
+                -1, 1
+            )
         safe_target = torch.where(valid, target, output.detach())
         element_loss = F.smooth_l1_loss(
             output,
@@ -634,12 +641,15 @@ class UNetIntensityCorrection(pl.LightningModule):
                 continue
             selected_error = error[selected, index]
             metrics[f"structure_{name}_mae_km"] = selected_error.abs().mean()
+            metrics[f"structure_{name}_rmse_km"] = selected_error.square().mean().sqrt()
             metrics[f"structure_{name}_bias_km"] = selected_error.mean()
         return loss, metrics
 
     @staticmethod
     def _unet_image_structure_metrics(
-        batch: Mapping[str, Any], reference: torch.Tensor
+        batch: Mapping[str, Any],
+        reference: torch.Tensor,
+        sample_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         metrics: dict[str, torch.Tensor] = {}
         for name, image_key, target_index in zip(
@@ -666,9 +676,14 @@ class UNetIntensityCorrection(pl.LightningModule):
                 & torch.isfinite(image_value)
                 & torch.isfinite(target)
             )
+            if sample_mask is not None:
+                valid = valid & sample_mask.to(valid.device, dtype=torch.bool).reshape(
+                    -1
+                )
             if valid.any():
                 error = image_value[valid] - target[valid]
                 metrics[f"unet_image_{name}_mae_km"] = error.abs().mean()
+                metrics[f"unet_image_{name}_rmse_km"] = error.square().mean().sqrt()
                 metrics[f"unet_image_{name}_bias_km"] = error.mean()
         return metrics
 
@@ -734,6 +749,31 @@ class UNetIntensityCorrection(pl.LightningModule):
                 on_epoch=True,
                 batch_size=int(prediction.output_msw_ms.numel()),
             )
+        ri = torch.as_tensor(
+            batch.get(
+                "is_rapid_intensification",
+                torch.zeros_like(prediction.output_msw_ms, dtype=torch.bool),
+            ),
+            device=prediction.output_msw_ms.device,
+            dtype=torch.bool,
+        ).reshape(-1)
+        if ri.any():
+            _, ri_structure_metrics = self._structure_loss_and_metrics(
+                prediction, batch, sample_mask=ri
+            )
+            ri_structure_metrics.update(
+                self._unet_image_structure_metrics(
+                    batch, prediction.output_msw_ms, sample_mask=ri
+                )
+            )
+            for name, value in ri_structure_metrics.items():
+                self.log(
+                    f"{prefix}_ri/{name}",
+                    value,
+                    on_step=False,
+                    on_epoch=True,
+                    batch_size=int(ri.sum()),
+                )
         target_category = batch["target_category"].to(prediction.output_category)
         self._evaluation_rows[prefix].extend(
             _as_rows(

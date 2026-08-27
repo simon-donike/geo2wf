@@ -31,7 +31,10 @@ from geo2wf.data.features import (  # noqa: E402
     solar_time_features as _solar_time_features,
 )
 from geo2wf.config import load_config_file  # noqa: E402
-from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
+from geo2wf.data.normalization import (  # noqa: E402
+    normalization_affine_parameters,
+    normalize as _normalize,
+)
 from geo2wf.data.intensity import encode_intensity_metadata  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
@@ -479,6 +482,11 @@ def _prepare_sample(
         "condition": condition.unsqueeze(0),
         "condition_mask": valid.unsqueeze(0),
     }
+    target_offset, target_scale = normalization_affine_parameters(
+        "sar", ["wind_speed"], stats, normalization="min-max"
+    )
+    batch["target_norm_offset"] = target_offset.unsqueeze(0)
+    batch["target_norm_scale"] = target_scale.unsqueeze(0)
     if use_era5:
         assert era5_wind is not None and era5_wind_physical is not None
         era5_wind = _center_crop(torch.nan_to_num(era5_wind)) * valid

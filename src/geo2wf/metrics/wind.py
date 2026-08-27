@@ -74,7 +74,8 @@ def ibtracs_radius_metric_statistics(
     """Compare radii derived from generated fields with scalar IBTrACS radii.
 
     The returned rows follow :data:`IBTRACS_RADIUS_NAMES`; columns contain
-    predicted sum, target sum, absolute-error sum, signed-error sum, and count.
+    predicted sum, target sum, absolute-error sum, squared-error sum,
+    signed-error sum, and count.
     Wind radii are equivalent-circle radii calculated from the 34-, 50-, or
     64-knot exceedance area. RMW is the peak annular-mean bin. Only the complete
     circular domain supported by the generated image is used.
@@ -111,7 +112,7 @@ def ibtracs_radius_metric_statistics(
     if target_valid.shape != expected_radii_shape:
         raise ValueError(f"target_valid must have shape {expected_radii_shape}")
 
-    statistics = prediction_ms.new_zeros((len(IBTRACS_RADIUS_NAMES), 5))
+    statistics = prediction_ms.new_zeros((len(IBTRACS_RADIUS_NAMES), 6))
     _, _, height, width = prediction_ms.shape
     row_fraction = (
         torch.arange(height, device=device, dtype=geometry_dtype) + 0.5
@@ -227,7 +228,14 @@ def ibtracs_radius_metric_statistics(
             estimate = predicted[name]
             error = estimate - target
             statistics[radius_index] += torch.stack(
-                [estimate, target, error.abs(), error, error.new_ones(())]
+                [
+                    estimate,
+                    target,
+                    error.abs(),
+                    error.square(),
+                    error,
+                    error.new_ones(()),
+                ]
             ).to(statistics)
     return statistics
 

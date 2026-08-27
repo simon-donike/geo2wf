@@ -33,6 +33,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from geo2wf.data.intensity import tropical_category_from_wind_ms  # noqa: E402
+from geo2wf.config import instantiate_model, load_config_file  # noqa: E402
 from geo2wf.data.joint_intensity import (  # noqa: E402
     _interpolate_ibtracs_wind,
     _load_ibtracs_tracks,
@@ -49,7 +50,10 @@ from geo2wf.models.intensity_correction import (  # noqa: E402
 )
 from scripts.export_geo_sar_geotiffs import ERA5_CHANNELS, _read_manifest  # noqa: E402
 from scripts.run_storm_unet_inference import (  # noqa: E402
+    _bounds,
     _corrected_intensity,
+    _output_metrics,
+    _physical_distance_km,
     _prepare_sample,
     _sha256,
     _storm_intensity_context,
@@ -103,6 +107,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--unet-checkpoint", type=Path, default=None)
     parser.add_argument("--correction-checkpoint", type=Path, default=None)
     parser.add_argument("--joint-checkpoint", type=Path, default=None)
+    parser.add_argument(
+        "--extra-run",
+        action="append",
+        default=[],
+        metavar="NAME=RUN_DIR",
+        help=(
+            "Additional completed latent/correction experiment to evaluate; "
+            "repeat for every current model."
+        ),
+    )
     parser.add_argument("--intensity-cache-metadata", type=Path, default=None)
     parser.add_argument(
         "--ablation-max-wind-checkpoint",
@@ -249,6 +263,167 @@ def _metrics(prediction: np.ndarray, target: np.ndarray) -> dict[str, float]:
     }
 
 
+def _completed_extra_runs(values: list[str]) -> dict[str, tuple[Any, Path]]:
+    result: dict[str, tuple[Any, Path]] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--extra-run must be NAME=RUN_DIR, got {value!r}")
+        name, raw_path = value.split("=", 1)
+        name = name.strip()
+        if not name or name in result:
+            raise ValueError(f"invalid or duplicate extra-run name: {name!r}")
+        run_dir = Path(raw_path).expanduser().resolve()
+        run_result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        if run_result.get("status") != "completed":
+            raise ValueError(f"extra run has not completed: {run_dir}")
+        checkpoint = Path(run_result["best_model_path"]).expanduser().resolve()
+        config = load_config_file(run_dir / "resolved-config.yaml")
+        model = instantiate_model(config)
+        state = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        model.load_state_dict(state["state_dict"], strict=True)
+        result[name] = (model.eval(), checkpoint)
+    return result
+
+
+def _extra_columns(name: str) -> list[str]:
+    return [
+        f"{name}_max_wind_ms",
+        *(f"{name}_{radius}_km" for radius in ("eye_size", "rmw", "r34", "r50", "r64")),
+        *(f"{name}_image_{radius}_km" for radius in ("rmw", "r34", "r50", "r64")),
+    ]
+
+
+def _extra_metrics(frame: pd.DataFrame, extra_names: list[str]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    subsets = {
+        "all_three_storms": np.ones(len(frame), dtype=bool),
+        "rapid_intensification": frame["is_rapid_intensification"]
+        .astype(bool)
+        .to_numpy(),
+    }
+    target_radius_columns = {
+        "eye_size": "target_eye_size_km",
+        "rmw": "target_rmw_km",
+        "r34": "target_r34_km",
+        "r50": "target_r50_km",
+        "r64": "target_r64_km",
+    }
+    for name in extra_names:
+        model_result: dict[str, Any] = {}
+        for subset_name, subset_mask in subsets.items():
+            subset: dict[str, Any] = {}
+            prediction_column = f"{name}_max_wind_ms"
+            valid = (
+                subset_mask
+                & np.isfinite(frame[prediction_column].to_numpy(float))
+                & np.isfinite(frame["target_ms"].to_numpy(float))
+            )
+            subset["maximum_wind"] = {
+                "samples": int(valid.sum()),
+                **(
+                    _metrics(
+                        frame.loc[valid, prediction_column].to_numpy(float),
+                        frame.loc[valid, "target_ms"].to_numpy(float),
+                    )
+                    if valid.any()
+                    else {}
+                ),
+            }
+            radii = {}
+            for source, source_prefix in (
+                ("scalar_head", name),
+                ("image_derived", f"{name}_image"),
+            ):
+                source_metrics = {}
+                for radius, target_column in target_radius_columns.items():
+                    prediction = f"{source_prefix}_{radius}_km"
+                    if prediction not in frame:
+                        continue
+                    radius_valid = (
+                        subset_mask
+                        & np.isfinite(frame[prediction].to_numpy(float))
+                        & np.isfinite(frame[target_column].to_numpy(float))
+                    )
+                    if radius_valid.any():
+                        error = frame.loc[radius_valid, prediction].to_numpy(
+                            float
+                        ) - frame.loc[radius_valid, target_column].to_numpy(float)
+                        source_metrics[radius] = {
+                            "samples": int(radius_valid.sum()),
+                            "mae_km": float(np.abs(error).mean()),
+                            "rmse_km": float(np.sqrt(np.square(error).mean())),
+                            "bias_km": float(error.mean()),
+                        }
+                radii[source] = source_metrics
+            subset["radii"] = radii
+            model_result[subset_name] = subset
+        result[name] = model_result
+    return result
+
+
+def _storm_metric_rows(
+    conditioning: str,
+    core_metrics: Mapping[str, Any],
+    extra_metrics: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for model, values in core_metrics.get("models", {}).items():
+        for subset, subset_values in (
+            ("all_three_storms", values),
+            ("rapid_intensification", values.get("rapid_intensification", {})),
+        ):
+            for metric in ("mae_ms", "rmse_ms", "bias_ms"):
+                if metric in subset_values:
+                    rows.append(
+                        {
+                            "conditioning": conditioning,
+                            "experiment": model,
+                            "subset": subset,
+                            "output": "maximum_wind",
+                            "target": "maximum_wind",
+                            "metric": metric.removesuffix("_ms"),
+                            "units": "m s-1",
+                            "value": subset_values[metric],
+                            "samples": subset_values["samples"],
+                        }
+                    )
+    for model, model_values in extra_metrics.items():
+        for subset, subset_values in model_values.items():
+            wind = subset_values["maximum_wind"]
+            for metric in ("mae_ms", "rmse_ms", "bias_ms"):
+                if metric in wind:
+                    rows.append(
+                        {
+                            "conditioning": conditioning,
+                            "experiment": model,
+                            "subset": subset,
+                            "output": "maximum_wind",
+                            "target": "maximum_wind",
+                            "metric": metric.removesuffix("_ms"),
+                            "units": "m s-1",
+                            "value": wind[metric],
+                            "samples": wind["samples"],
+                        }
+                    )
+            for source, radius_values in subset_values["radii"].items():
+                for radius, values in radius_values.items():
+                    for metric in ("mae_km", "rmse_km", "bias_km"):
+                        rows.append(
+                            {
+                                "conditioning": conditioning,
+                                "experiment": model,
+                                "subset": subset,
+                                "output": source,
+                                "target": radius,
+                                "metric": metric.removesuffix("_km"),
+                                "units": "km",
+                                "value": values[metric],
+                                "samples": values["samples"],
+                            }
+                        )
+    return rows
+
+
 def _summarize(frame: pd.DataFrame) -> dict[str, Any]:
     model_columns = {
         **MODEL_COLUMNS,
@@ -289,6 +464,15 @@ def _summarize(frame: pd.DataFrame) -> dict[str, Any]:
             ),
             "per_storm": per_storm,
         }
+        ri_frame = valid_frame.loc[valid_frame["is_rapid_intensification"].astype(bool)]
+        if len(ri_frame):
+            result["models"][model]["rapid_intensification"] = {
+                "samples": len(ri_frame),
+                **_metrics(
+                    ri_frame[column].to_numpy(float),
+                    ri_frame["target_ms"].to_numpy(float),
+                ),
+            }
     return result
 
 
@@ -365,6 +549,8 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
         for name in ABLATION_COLUMNS
         if name in paths
     }
+    extra_runs = _completed_extra_runs(args.extra_run)
+    extra_models = {name: value[0] for name, value in extra_runs.items()}
     expected_channels = 23 if use_era5 else 14
     if (
         unet.condition_channels != expected_channels
@@ -372,6 +558,11 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
         or any(
             model.condition_channels != expected_channels
             for model in ablation_models.values()
+        )
+        or any(
+            getattr(model, "condition_channels", expected_channels) != expected_channels
+            for model in extra_models.values()
+            if not isinstance(model, UNetIntensityCorrection)
         )
     ):
         raise ValueError(
@@ -383,6 +574,8 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
     correction.to(args.device)
     joint.to(args.device)
     for model in ablation_models.values():
+        model.to(args.device)
+    for model in extra_models.values():
         model.to(args.device)
 
     rows: list[dict[str, Any]] = []
@@ -446,6 +639,19 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                     "is_rapid_intensification": is_ri,
                     "ibtracs_lower_fix_timestamp": label["lower_fix_timestamp"],
                     "ibtracs_upper_fix_timestamp": label["upper_fix_timestamp"],
+                    "target_eye_size_km": float(
+                        label.get("ibtracs_eye_size_km", math.nan)
+                    ),
+                    "target_rmw_km": float(label.get("ibtracs_rmw_km", math.nan)),
+                    "target_r34_km": float(
+                        label.get("ibtracs_r34_equivalent_km", math.nan)
+                    ),
+                    "target_r50_km": float(
+                        label.get("ibtracs_r50_equivalent_km", math.nan)
+                    ),
+                    "target_r64_km": float(
+                        label.get("ibtracs_r64_equivalent_km", math.nan)
+                    ),
                 }
                 if not bool(device_batch["condition_mask"].any().item()):
                     invalid_predictions: dict[str, Any] = {}
@@ -453,6 +659,10 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                         if name in ablation_models:
                             invalid_predictions[column] = np.nan
                             invalid_predictions[f"{name}_category"] = None
+                    for name in extra_models:
+                        invalid_predictions.update(
+                            {column: np.nan for column in _extra_columns(name)}
+                        )
                     rows.append(
                         {
                             **base_row,
@@ -495,6 +705,60 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                     extra_predictions[f"{name}_category"] = (
                         tropical_category_from_wind_ms(prediction_ms)
                     )
+                bounds = _bounds(*geo.center)
+                distance_km = _physical_distance_km(bounds, geo.ibtracs_center)
+                for name, model in extra_models.items():
+                    values = {column: np.nan for column in _extra_columns(name)}
+                    if isinstance(model, UNetIntensityCorrection):
+                        output = _corrected_intensity(
+                            model,
+                            raw_field,
+                            device_batch["condition_mask"],
+                            geo,
+                            intensity_context[storm],
+                        )
+                        values[f"{name}_max_wind_ms"] = float(
+                            output.output_msw_ms.item()
+                        )
+                        structure = output.structure_prediction_km
+                        image_metrics = _output_metrics(
+                            raw_field,
+                            device_batch["condition_mask"],
+                            distance_km,
+                            bounds,
+                            geo.ibtracs_center,
+                        )
+                        for radius in ("rmw", "r34", "r50", "r64"):
+                            values[f"{name}_image_{radius}_km"] = image_metrics[radius]
+                    elif hasattr(model, "predict_joint"):
+                        output = model.predict_joint(device_batch)
+                        values[f"{name}_max_wind_ms"] = float(
+                            output.intensity_prediction_ms.item()
+                        )
+                        structure = output.structure_prediction_km
+                        image_metrics = _output_metrics(
+                            output.central_physical,
+                            device_batch["condition_mask"],
+                            distance_km,
+                            bounds,
+                            geo.ibtracs_center,
+                        )
+                        for radius in ("rmw", "r34", "r50", "r64"):
+                            values[f"{name}_image_{radius}_km"] = image_metrics[radius]
+                    else:
+                        output = model.predict_batch(device_batch)
+                        values[f"{name}_max_wind_ms"] = float(
+                            output.intensity_prediction_ms.item()
+                        )
+                        structure = output.structure_prediction_km
+                    if structure is not None:
+                        for index, radius in enumerate(
+                            ("eye_size", "rmw", "r34", "r50", "r64")
+                        ):
+                            values[f"{name}_{radius}_km"] = float(
+                                structure[0, index].item()
+                            )
+                    extra_predictions.update(values)
                 rows.append(
                     {
                         **base_row,
@@ -526,6 +790,8 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
     csv_path = args.output_root.expanduser().resolve() / f"{label}.csv"
     json_path = csv_path.with_suffix(".json")
     _atomic_csv(frame, csv_path)
+    core_metrics = _summarize(frame)
+    extra_metrics = _extra_metrics(frame, list(extra_models))
     payload = {
         "schema_version": 1,
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -560,20 +826,31 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                 for name, column in ABLATION_COLUMNS.items()
                 if name in ablation_models
             },
+            **{name: _extra_columns(name) for name in extra_models},
         },
         "checkpoints": {
             name: {"path": str(path), "sha256": _sha256(path)}
             for name, path in paths.items()
             if name != "cache_metadata"
         },
+        "extra_checkpoints": {
+            name: {"path": str(checkpoint), "sha256": _sha256(checkpoint)}
+            for name, (_, checkpoint) in extra_runs.items()
+        },
         "correction_cache_scientific_evaluation": correction_cache.get(
             "scientific_evaluation", "unspecified"
         ),
-        "metrics": _summarize(frame),
+        "metrics": core_metrics,
+        "extra_metrics": extra_metrics,
     }
     _atomic_json(payload, json_path)
+    metrics_path = csv_path.with_name(f"{csv_path.stem}-metrics.csv")
+    _atomic_csv(
+        pd.DataFrame(_storm_metric_rows(label, core_metrics, extra_metrics)),
+        metrics_path,
+    )
     print(json.dumps(payload["metrics"], indent=2, sort_keys=True))
-    print(f"Wrote {csv_path} and {json_path}")
+    print(f"Wrote {csv_path}, {metrics_path}, and {json_path}")
     return csv_path, json_path
 
 
