@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate field, correction, joint, and encoder-only models on one cohort."""
+"""Evaluate the three active instantaneous models on one cohort."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ if str(ROOT) not in sys.path:
 
 from geo2wf.config import instantiate_datamodule, load_config_file  # noqa: E402
 from geo2wf.data.collation import collate_wind_field_samples  # noqa: E402
-from geo2wf.data.encoder_intensity import EncoderIBTrACSDataset  # noqa: E402
 from geo2wf.data.intensity import (  # noqa: E402
     UNetIntensityDataset,
     tropical_category_from_wind_ms,
@@ -33,10 +32,7 @@ from geo2wf.data.intensity import (  # noqa: E402
 from geo2wf.data.joint_intensity import (  # noqa: E402
     JointPairedIntensityDataModule,
 )
-from geo2wf.models.bottleneck_unet_mlp import (  # noqa: E402
-    BottleneckEncoderMLPRegressor,
-    BottleneckUNetMLPRegressor,
-)
+from geo2wf.models.bottleneck_unet_mlp import BottleneckUNetMLPRegressor  # noqa: E402
 from geo2wf.models.intensity_correction import (  # noqa: E402
     UNetIntensityCorrection,
     rows_for_intensity_reference,
@@ -48,13 +44,11 @@ MODEL_LABELS = {
     "unet_raw_max": "U-Net raw field diagnostic",
     "unet_correction": "U-Net + correction",
     "joint_unet_mlp": "Joint U-Net + MLP",
-    "encoder_mlp_ibtracs": "U-Net encoder + MLP (IBTrACS only)",
 }
 MODEL_ORDER = (
     "unet_raw_max",
     "unet_correction",
     "joint_unet_mlp",
-    "encoder_mlp_ibtracs",
 )
 
 
@@ -91,12 +85,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument("--joint-checkpoint", type=Path, required=True)
     parser.add_argument("--correction-checkpoint", type=Path, required=True)
-    parser.add_argument(
-        "--encoder-checkpoint",
-        type=Path,
-        default=None,
-        help="Optional IBTrACS-only U-Net encoder + MLP checkpoint.",
-    )
     parser.add_argument(
         "--intensity-target-source",
         choices=("ibtracs",),
@@ -446,78 +434,6 @@ def _joint_and_field_rows(
         "unet_raw_max": _summarize_field(unet_field),
         "joint_unet_mlp": _summarize_field(joint_field),
     }
-
-
-def _encoder_rows(
-    dataset: EncoderIBTrACSDataset,
-    correction_rows: Mapping[str, Mapping[str, Any]],
-    checkpoint: Path,
-    *,
-    batch_size: int,
-    num_workers: int,
-    device: str,
-) -> list[dict[str, Any]]:
-    """Evaluate the scalar-only encoder on the exact comparison cohort."""
-
-    loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        collate_fn=collate_wind_field_samples,
-    )
-    model = BottleneckEncoderMLPRegressor.load_from_checkpoint(
-        checkpoint, map_location="cpu"
-    ).eval()
-    model.validate_data_spec(dataset.data_spec)
-    model.to(device)
-    rows: list[dict[str, Any]] = []
-    with torch.inference_mode():
-        for batch in tqdm(loader, desc="evaluate encoder-only model", unit="batch"):
-            device_batch = {
-                key: value.to(device) if torch.is_tensor(value) else value
-                for key, value in batch.items()
-            }
-            predictions = (
-                model.predict_batch(device_batch).intensity_prediction_ms.detach().cpu()
-            )
-            for index, sample_id in enumerate(batch["sample_id"]):
-                sample_id = str(sample_id)
-                reference = correction_rows[sample_id]
-                ibtracs_target = float(reference["ibtracs_target_ms"])
-                dataset_target = float(batch["intensity_target_ms"][index])
-                if not math.isclose(
-                    dataset_target,
-                    ibtracs_target,
-                    rel_tol=1.0e-6,
-                    abs_tol=1.0e-4,
-                ):
-                    raise ValueError(
-                        f"encoder IBTrACS target mismatch for {sample_id}: "
-                        f"dataset={dataset_target}, cache={ibtracs_target}"
-                    )
-                predicted_ms = float(predictions[index])
-                rows.append(
-                    {
-                        **dict(reference),
-                        "prediction_ms": predicted_ms,
-                        "target_ms": ibtracs_target,
-                        "target_category": tropical_category_from_wind_ms(
-                            ibtracs_target
-                        ),
-                        "correction_ms": predicted_ms - float(reference["raw_unet_ms"]),
-                        "prediction_category": tropical_category_from_wind_ms(
-                            predicted_ms
-                        ),
-                    }
-                )
-    expected = set(dataset.samples["sample_id"].astype(str))
-    actual = {str(row["sample_id"]) for row in rows}
-    if actual != expected or actual != set(correction_rows):
-        raise ValueError(
-            "encoder-only evaluation cohort differs from comparison cohort"
-        )
-    return rows
 
 
 def _raw_rows(
@@ -892,8 +808,6 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         args.joint_checkpoint,
         args.correction_checkpoint,
     ]
-    if args.encoder_checkpoint is not None:
-        required_paths.append(args.encoder_checkpoint)
     for path in required_paths:
         if not Path(path).expanduser().exists():
             raise FileNotFoundError(path)
@@ -905,10 +819,6 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         if int(cache_metadata.get("schema_version", 1)) == 1
         else str(cache_metadata.get("target", {}).get("source", "ibtracs"))
     )
-    if args.encoder_checkpoint is not None and target_source != "ibtracs":
-        raise ValueError(
-            "the encoder-only checkpoint is trained only for the IBTrACS target"
-        )
     if (
         args.intensity_target_source is not None
         and args.intensity_target_source != target_source
@@ -959,21 +869,6 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         "unet_correction": correction_rows,
         "joint_unet_mlp": joint_rows,
     }
-    if args.encoder_checkpoint is not None:
-        encoder_dataset = EncoderIBTrACSDataset(
-            joint_dataset.paired_dataset,
-            datamodule.ibtracs_tracks,
-            joint_dataset.samples["sample_id"].astype(str).tolist(),
-            max_bracket_hours=datamodule.max_ibtracs_bracket_hours,
-        )
-        rows_by_model["encoder_mlp_ibtracs"] = _encoder_rows(
-            encoder_dataset,
-            correction,
-            args.encoder_checkpoint,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            device=args.device,
-        )
     summaries = {
         name: summarize_intensity_rows(rows) for name, rows in rows_by_model.items()
     }
@@ -1034,16 +929,6 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
                     "path": str(args.joint_checkpoint.resolve()),
                     "sha256": _sha256(args.joint_checkpoint),
                 },
-                **(
-                    {
-                        "encoder": {
-                            "path": str(args.encoder_checkpoint.resolve()),
-                            "sha256": _sha256(args.encoder_checkpoint),
-                        }
-                    }
-                    if args.encoder_checkpoint is not None
-                    else {}
-                ),
             },
             "models": {
                 name: {

@@ -58,7 +58,6 @@ must be represented by `DataSpec`.
 | Model choice | Contract-defining keys |
 |---|---|
 | `bottleneck_unet_mlp` | image/intensity Huber deltas and weights, intensity MLP sizing, optional structure head and loss |
-| `bottleneck_encoder_mlp` | encoder/MLP sizing and scalar Huber delta; no image decoder |
 | `intensity_correction` | field/metadata toggles, `anchor_statistic`, robust-peak fraction, scalar Huber delta, optional structure head |
 | `intensity_forecast` | five-feature MLP sizing, dropout, scalar Huber delta, optimizer/scheduler settings |
 

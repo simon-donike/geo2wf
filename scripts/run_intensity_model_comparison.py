@@ -53,7 +53,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-epochs", type=int, default=None)
     parser.add_argument("--unet-epochs", type=int, default=None)
     parser.add_argument("--correction-epochs", type=int, default=None)
-    parser.add_argument("--encoder-epochs", type=int, default=None)
     parser.add_argument("--bootstrap-repetitions", type=int, default=2000)
     parser.add_argument(
         "--protected-storm",
@@ -98,22 +97,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Reuse a correction checkpoint instead of retraining it.",
     )
-    parser.add_argument(
-        "--encoder-checkpoint",
-        type=Path,
-        default=None,
-        help=(
-            "Reuse an IBTrACS-only encoder + MLP checkpoint instead of retraining "
-            "it. Valid only for --intensity-target-source=ibtracs."
-        ),
-    )
     args = parser.parse_args()
     for name in ("image_batch_size", "correction_batch_size"):
         if getattr(args, name) <= 0:
             parser.error(f"--{name.replace('_', '-')} must be positive")
     if args.num_workers < 0:
         parser.error("--num-workers must be non-negative")
-    for name in ("joint_epochs", "unet_epochs", "correction_epochs", "encoder_epochs"):
+    for name in ("joint_epochs", "unet_epochs", "correction_epochs"):
         value = getattr(args, name)
         if value is not None and value <= 0:
             parser.error(f"--{name.replace('_', '-')} must be positive")
@@ -134,11 +124,6 @@ def parse_args() -> argparse.Namespace:
         parser.error("--unet-config is required with --unet-checkpoint")
     if args.unet_config is not None and args.unet_checkpoint is None:
         parser.error("--unet-config is only valid with --unet-checkpoint")
-    if (
-        args.intensity_target_source != "ibtracs"
-        and args.encoder_checkpoint is not None
-    ):
-        parser.error("--encoder-checkpoint is valid only for the IBTrACS target")
     if (
         args.joint_checkpoint is None
         and args.unet_checkpoint is None
@@ -421,7 +406,6 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
     correction_checkpoint = _checked_path(
         args.correction_checkpoint, "correction checkpoint"
     )
-    encoder_checkpoint = _checked_path(args.encoder_checkpoint, "encoder checkpoint")
 
     environment = os.environ.copy()
     environment.pop("GEO2WF_RUN_DIR", None)
@@ -622,40 +606,6 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             joint_checkpoint, _ = _training_result(output_root / "joint-runs")
         assert joint_checkpoint is not None and correction_checkpoint is not None
 
-        if args.intensity_target_source == "ibtracs":
-            encoder_experiment = (
-                "unet_encoder_mlp_ibtracs"
-                if args.era5 == "with"
-                else "unet_encoder_mlp_ibtracs_no_era5"
-            )
-            if encoder_checkpoint is None:
-                overrides = [
-                    *common,
-                    "logging.wandb.name=intensity-comparison-"
-                    f"{args.era5}-era5-ibtracs-encoder-{timestamp}",
-                    *smoke,
-                ]
-                if args.encoder_epochs is not None and not args.smoke_test:
-                    overrides.append(f"trainer.max_epochs={args.encoder_epochs}")
-                command = _training_command(
-                    encoder_experiment,
-                    output_root / "encoder-runs",
-                    args.joint_gpu,
-                    overrides,
-                )
-                manifest["stages"]["encoder_training"] = {"command": command}
-                _run_stage(
-                    "encoder-only training",
-                    command,
-                    environment=environment.copy(),
-                    log_path=output_root / "encoder-training.log",
-                )
-                encoder_checkpoint, _ = _training_result(output_root / "encoder-runs")
-            else:
-                manifest["stages"]["encoder_training"] = {
-                    "reused_checkpoint": str(encoder_checkpoint)
-                }
-
         evaluation_output = output_root / f"{args.split}-comparison.json"
         evaluate_command = [
             sys.executable,
@@ -685,8 +635,6 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
             "--device",
             f"cuda:{args.pipeline_gpu}",
         ]
-        if encoder_checkpoint is not None:
-            evaluate_command.extend(["--encoder-checkpoint", str(encoder_checkpoint)])
         manifest["stages"]["evaluation"] = {"command": evaluate_command}
         _run_stage(
             "common-cohort evaluation",
@@ -703,11 +651,6 @@ def run_workflow(args: argparse.Namespace) -> dict[str, Any]:
                     "unet_config": str(unet_config),
                     "joint_checkpoint": str(joint_checkpoint),
                     "correction_checkpoint": str(correction_checkpoint),
-                    **(
-                        {"encoder_checkpoint": str(encoder_checkpoint)}
-                        if encoder_checkpoint is not None
-                        else {}
-                    ),
                     "cache_root": str(cache_root),
                     "comparison_json": str(evaluation_output),
                     "comparison_csv": str(evaluation_output.with_suffix(".csv")),

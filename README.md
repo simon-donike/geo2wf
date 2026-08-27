@@ -3,7 +3,7 @@
 `geo2wf` reconstructs tropical-cyclone surface wind fields from geostationary
 satellite imagery with optional ERA5 context, using matched SAR wind retrievals
 as spatial supervision. Active experiments compare three instantaneous
-field/intensity paths with and without ERA5, plus an encoder/latent-MLP
+field/intensity paths with and without ERA5, plus a joint U-Net/latent-MLP
 structure study. The six-hour scalar intensity forecast remains active.
 
 ![Random GEO-SAR training pairs](docs/assets/images/geo-sar-random-pairs.png)
@@ -41,7 +41,8 @@ uv run geo2wf-train experiment=intensity_comparison_unet
 uv run geo2wf-train experiment=intensity_comparison_unet_no_era5
 uv run geo2wf-train experiment=bottleneck_unet_mlp
 uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
 uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 

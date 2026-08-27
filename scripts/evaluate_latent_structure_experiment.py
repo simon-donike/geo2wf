@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -48,6 +49,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-wind-run", type=Path, required=True)
     parser.add_argument("--radii-run", type=Path, required=True)
     parser.add_argument(
+        "--max-wind-checkpoint",
+        type=Path,
+        help="Override the run result's selected checkpoint.",
+    )
+    parser.add_argument(
+        "--radii-checkpoint",
+        type=Path,
+        help="Override the run result's selected checkpoint.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("docs/assets/data/latent-structure"),
@@ -79,7 +90,42 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _completed_run(run_dir: Path) -> tuple[dict[str, Any], Path, dict[str, Any]]:
+def _display_path(path: str | Path) -> str:
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(ROOT))
+    except ValueError:
+        return str(resolved)
+
+
+def _checkpoint_selection(checkpoint: Path) -> dict[str, object]:
+    """Describe the validation-selected checkpoint independently of run status."""
+
+    match = re.search(r"epoch=(\d+)-step=(\d+)", checkpoint.name)
+    selection: dict[str, object] = {
+        "run_path": str(checkpoint.parent.parent.resolve()),
+        "epoch": int(match.group(1)) if match else None,
+        "step": int(match.group(2)) if match else None,
+    }
+    metrics_path = checkpoint.parent.parent / "metrics" / "metrics.csv"
+    if not metrics_path.is_file() or selection["epoch"] is None:
+        return selection
+    with metrics_path.open(encoding="utf-8", newline="") as stream:
+        for row in csv.DictReader(stream):
+            if row.get("epoch") != str(selection["epoch"]) or not row.get("val/loss"):
+                continue
+            selection["validation_loss"] = float(row["val/loss"])
+            if row.get("val/intensity_mae_ms"):
+                selection["validation_intensity_mae_ms"] = float(
+                    row["val/intensity_mae_ms"]
+                )
+            break
+    return selection
+
+
+def _completed_run(
+    run_dir: Path, checkpoint_override: Path | None = None
+) -> tuple[dict[str, Any], Path, dict[str, Any]]:
     run_dir = run_dir.resolve()
     result_path = run_dir / "result.json"
     config_path = run_dir / "resolved-config.yaml"
@@ -88,7 +134,7 @@ def _completed_run(run_dir: Path) -> tuple[dict[str, Any], Path, dict[str, Any]]
     result = json.loads(result_path.read_text(encoding="utf-8"))
     if result.get("status") != "completed":
         raise ValueError(f"run has not completed successfully: {run_dir}")
-    checkpoint_value = result.get("best_model_path")
+    checkpoint_value = checkpoint_override or result.get("best_model_path")
     if not checkpoint_value:
         raise ValueError(f"run has no best validation checkpoint: {run_dir}")
     checkpoint = Path(checkpoint_value).resolve()
@@ -287,8 +333,11 @@ def _write_docs_page(
     radii_run: Path,
     max_checkpoint: dict[str, str],
     radii_checkpoint: dict[str, str],
+    max_selection: dict[str, object],
+    radii_selection: dict[str, object],
 ) -> None:
     intensity_lines = []
+    field_lines = []
     for variant, label in (
         ("max_wind_only", "Maximum wind only"),
         ("max_wind_plus_radii", "Maximum wind + radii"),
@@ -298,6 +347,19 @@ def _write_docs_page(
         bias, _ = _row_value(rows, variant, "latent_mlp", "maximum_wind", "bias_ms")
         intensity_lines.append(
             f"| {label} | {mae:.3f} | {rmse:.3f} | {bias:.3f} | {samples} |"
+        )
+        field_mae, _ = _row_value(
+            rows, variant, "2d_unet_field", "wind_field", "mae_ms"
+        )
+        field_rmse, _ = _row_value(
+            rows, variant, "2d_unet_field", "wind_field", "rmse_ms"
+        )
+        field_bias, _ = _row_value(
+            rows, variant, "2d_unet_field", "wind_field", "bias_ms"
+        )
+        field_lines.append(
+            f"| {label} | {field_mae:.3f} | {field_rmse:.3f} | "
+            f"{field_bias:.3f} | {samples} |"
         )
 
     radius_lines = []
@@ -327,6 +389,16 @@ test metric was used for checkpoint selection.
 
 ![Maximum-wind MAE](../assets/images/latent-structure/maximum-wind-mae.png)
 
+On this single seeded comparison, adding radii supervision coincided with a
+lower maximum-wind error. This is an observed paired-run result, not a causal
+or multi-seed uncertainty estimate.
+
+## 2D wind-field reconstruction
+
+| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | Scenes |
+|---|---:|---:|---:|---:|
+{chr(10).join(field_lines)}
+
 ## Radii from two sources
 
 Both columns evaluate the radii-supervised run. “Latent MLP” is the direct
@@ -342,9 +414,11 @@ because a target outside the image's complete circular domain is excluded.
 
 ## Provenance
 
-- Maximum-wind run: `{max_run.resolve()}`
+- Maximum-wind training run: `{_display_path(str(max_selection['run_path']))}`
+- Maximum-wind selected checkpoint: epoch {max_selection['epoch']}, validation loss {float(max_selection['validation_loss']):.6f}
 - Maximum-wind checkpoint SHA-256: `{max_checkpoint['sha256']}`
-- Radii-supervised run: `{radii_run.resolve()}`
+- Radii-supervised training run: `{_display_path(str(radii_selection['run_path']))}`
+- Radii-supervised selected checkpoint: epoch {radii_selection['epoch']}, validation loss {float(radii_selection['validation_loss']):.6f}
 - Radii-supervised checkpoint SHA-256: `{radii_checkpoint['sha256']}`
 - Machine-readable metrics: [summary.csv](../assets/data/latent-structure/summary.csv)
 - Full result metadata: [results.json](../assets/data/latent-structure/results.json)
@@ -354,6 +428,13 @@ The two arms use the same ERA5-conditioned cohort (568 train, 159 validation,
 only in the enabled structure head and its `0.25` masked-loss weight. Strict
 CUDA determinism is disabled for both because reflection-padding backward has
 no deterministic CUDA implementation.
+
+The original launch accidentally disabled the configured early-stopping
+callback. Training was stopped after each validation history had exceeded the
+intended 50-epoch patience, and the global minimum `val/loss` checkpoint was
+selected. One-epoch resume runs at `{_display_path(max_run)}` and
+`{_display_path(radii_run)}` completed the run manifests cleanly without
+changing checkpoint selection. The checked-in presets now enable the callback.
 """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -361,8 +442,12 @@ no deterministic CUDA implementation.
 
 def main() -> None:
     args = parse_args()
-    max_config, max_checkpoint_path, max_result = _completed_run(args.max_wind_run)
-    radii_config, radii_checkpoint_path, radii_result = _completed_run(args.radii_run)
+    max_config, max_checkpoint_path, max_result = _completed_run(
+        args.max_wind_run, args.max_wind_checkpoint
+    )
+    radii_config, radii_checkpoint_path, radii_result = _completed_run(
+        args.radii_run, args.radii_checkpoint
+    )
     if max_config["data"] != radii_config["data"]:
         raise ValueError("the paired runs do not use identical data configurations")
     if max_config.get("seed") != radii_config.get("seed"):
@@ -403,6 +488,8 @@ def main() -> None:
         "path": str(radii_checkpoint_path),
         "sha256": _sha256(radii_checkpoint_path),
     }
+    max_selection = _checkpoint_selection(max_checkpoint_path)
+    radii_selection = _checkpoint_selection(radii_checkpoint_path)
     payload = {
         "schema_version": 1,
         "created_utc": created_utc,
@@ -412,12 +499,14 @@ def main() -> None:
             "max_wind_only": {
                 "path": str(args.max_wind_run.resolve()),
                 "checkpoint": max_checkpoint,
+                "checkpoint_selection": max_selection,
                 "fit_result": max_result,
                 "test_metrics": max_metrics,
             },
             "max_wind_plus_radii": {
                 "path": str(args.radii_run.resolve()),
                 "checkpoint": radii_checkpoint,
+                "checkpoint_selection": radii_selection,
                 "fit_result": radii_result,
                 "test_metrics": radii_metrics,
             },
@@ -436,6 +525,8 @@ def main() -> None:
         radii_run=args.radii_run,
         max_checkpoint=max_checkpoint,
         radii_checkpoint=radii_checkpoint,
+        max_selection=max_selection,
+        radii_selection=radii_selection,
     )
     print(
         f"Wrote {summary_path}, {args.output_dir / 'results.json'}, and {args.docs_page}"

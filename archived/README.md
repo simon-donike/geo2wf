@@ -8,6 +8,8 @@ Archived here:
 
 - conditional and residual diffusion models and their compatibility modules;
 - the direct GEO-to-PMW proxy model and its paired-data presets;
+- the retired decoder-free U-Net encoder/MLP intensity model, data adapter,
+  ERA5/no-ERA5 presets, and Lightning module;
 - Stage 1/Stage 2 ablation configurations and launchers;
 - the matched SAR-versus-IBTrACS target matrix and report builders;
 - historical full-YAML and `v1` run presets;

@@ -210,7 +210,6 @@ def test_table_marks_scalar_only_correction_field_metrics_as_missing() -> None:
             "unet_raw_max",
             "unet_correction",
             "joint_unet_mlp",
-            "encoder_mlp_ibtracs",
         )
     }
     fields = {
@@ -221,14 +220,11 @@ def test_table_marks_scalar_only_correction_field_metrics_as_missing() -> None:
 
     rows = _table_rows(summaries, fields, bootstrap)
     correction = next(row for row in rows if row["model_key"] == "unet_correction")
-    encoder = next(row for row in rows if row["model_key"] == "encoder_mlp_ibtracs")
     markdown = _markdown_table(rows, split="val")
 
     assert correction["field_mae_ms"] is None
-    assert encoder["field_mae_ms"] is None
-    assert encoder["model"] == "U-Net encoder + MLP (IBTrACS only)"
     assert "U-Net + correction" in markdown
-    assert "U-Net encoder + MLP (IBTrACS only)" in markdown
+    assert "Joint U-Net + MLP" in markdown
     assert "—" in markdown
     assert "## Metric definitions" in markdown
     assert "Field bias" in markdown
