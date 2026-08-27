@@ -9,11 +9,11 @@ env PYTHONUNBUFFERED=1 .venv/bin/python \
   --joint-gpu 0 \
   --pipeline-gpu 1 \
   --era5 with \
-  --split val
+  --split test
 
 env PYTHONUNBUFFERED=1 .venv/bin/python \
   scripts/run_intensity_model_comparison.py \
   --joint-gpu 0 \
   --pipeline-gpu 1 \
   --era5 without \
-  --split val
+  --split test

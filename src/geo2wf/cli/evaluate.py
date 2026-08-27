@@ -10,6 +10,14 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "three-storm-nowcasts":
+        sys.argv.pop(1)
+        from scripts.build_three_storm_nowcast_results import (
+            main as nowcast_results_main,
+        )
+
+        nowcast_results_main()
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "latent-structure":
         sys.argv.pop(1)
         from scripts.evaluate_latent_structure_experiment import (

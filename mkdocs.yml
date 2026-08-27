@@ -38,6 +38,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Results: results.md
   - Start here:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md

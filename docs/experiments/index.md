@@ -19,7 +19,8 @@ matrix](intensity-comparison.md).
 
 This matched pair keeps the U-Net decoder so the radii-supervised run can be
 evaluated using both direct latent-head predictions and diagnoses from its 2D
-wind field.
+wind field. Its completed held-out metrics and figures are collected on the
+[current results page](../results.md).
 
 ```bash
 uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
