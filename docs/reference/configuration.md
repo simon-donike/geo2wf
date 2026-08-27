@@ -1,7 +1,7 @@
 # Configuration reference
 
-This page describes the composed training schema first. Historical full YAML
-keys are retained in a separate compatibility section.
+This page describes the active composed training schema. Historical full-YAML
+presets are listed in the archive rather than accepted as active choices.
 
 ## Composition root
 
@@ -28,7 +28,7 @@ instantiation mechanism.
 | `random_flips` | paired physics-aware train augmentation |
 | `include_test_in_train` | explicitly merge test into train; modular default is false |
 | `require_era5`, `use_era5` | filter for ERA5 availability and include ERA5 as model input, respectively |
-| `include_pmw`, `include_ibtracs` | request optional companions/metadata |
+| `include_ibtracs` | request optional best-track metadata |
 | `normalization`, `target_normalization` | condition and target transforms |
 | `robust_clip`, `max_era5_time_gap_hours` | robust range and context freshness |
 | `loader.batch_size`, `num_workers` | per-process loader size/workers |
@@ -57,16 +57,13 @@ must be represented by `DataSpec`.
 
 | Model choice | Contract-defining keys |
 |---|---|
-| `direct_unet` | `condition_channels`, U-Net sizing, `huber_delta_k`; target must be one channel in K |
 | `bottleneck_unet_mlp` | image/intensity Huber deltas and weights, intensity MLP sizing, optional structure head and loss |
 | `bottleneck_encoder_mlp` | encoder/MLP sizing and scalar Huber delta; no image decoder |
 | `intensity_correction` | field/metadata toggles, `anchor_statistic`, robust-peak fraction, scalar Huber delta, optional structure head |
 | `intensity_forecast` | five-feature MLP sizing, dropout, scalar Huber delta, optimizer/scheduler settings |
 
 Target source and cohort are primarily data-contract choices, not model-name
-implications. In particular, joint and correction datasets can represent
-IBTrACS intensity or a SAR robust peak, while the direct U-Net requires PMW
-brightness temperature. Inspect both selected YAML files and the resulting
+implications. Inspect both selected YAML files and the resulting
 `DataSpec`/cache metadata.
 
 ## `trainer`
@@ -93,24 +90,11 @@ brightness temperature. Inspect both selected YAML files and the resulting
 
 CSV metrics and run manifests are always configured independently of W&B.
 
-## Legacy full-YAML reference
+## Archived configuration
 
-Legacy configs remain accepted through `--config`. Their top-level sections are:
-
-| Section | Translation |
-|---|---|
-| `export` | maintained exporter defaults |
-| `data` | adapted to `PairedDataModule.from_config` |
-| `model.type` | compatibility model factory only |
-| `model.unet`, `model.sampling`, `model.residual` | translated into model constructor arguments |
-| `optimization` | translated into optimizer, scheduler, EMA, and objective arguments |
-| `validation` | translated into model validation/sampling settings |
-| `trainer`, `logging` | consumed by the shared training runtime |
-
-These files may also contain PMW keys such as `pmw_as_condition`,
-`max_pmw_time_gap_hours`, and `pmw_include_time_offset`. They preserve historical
-experiments but are not templates for new grouped configs. A full YAML file
-cannot be combined with Hydra overrides.
+Retired full-YAML, diffusion, PMW-proxy, and ablation presets are stored under
+`archived/configs/`. They are preserved for provenance and excluded from Hydra's
+active config search path.
 
 ## Export configuration
 

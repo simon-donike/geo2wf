@@ -658,11 +658,6 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert comparison_no_era5["data"]["use_era5"] is False
     assert comparison_no_era5["model"]["condition_channels"] == 14
     assert comparison_no_era5["model"]["use_era5"] is False
-    direct_config = compose_config(["experiment=geo_pmw_near89_unet_no_era5"])
-    assert direct_config["data"]["use_era5"] is False
-    assert direct_config["model"]["condition_channels"] == 14
-
-
 def test_encoder_only_lightning_checkpoint_and_hydra_presets(tmp_path: Path) -> None:
     root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
     _write_joint_fixture(root, ibtracs_file)
@@ -703,15 +698,14 @@ def test_encoder_only_lightning_checkpoint_and_hydra_presets(tmp_path: Path) -> 
     assert without_era5["model"]["condition_channels"] == 14
 
 
-@pytest.mark.parametrize("target_source", ["ibtracs", "sar_robust_peak"])
 @pytest.mark.parametrize("use_era5", [True, False])
-def test_one_epoch_joint_smoke_for_target_era5_matrix(
+def test_one_epoch_joint_smoke_for_era5_matrix(
     tmp_path: Path,
-    target_source: str,
     use_era5: bool,
 ) -> None:
-    root = tmp_path / f"paired-{target_source}-{use_era5}"
-    ibtracs_file = tmp_path / f"ibtracs-{target_source}-{use_era5}.csv"
+    target_source = "ibtracs"
+    root = tmp_path / f"paired-{use_era5}"
+    ibtracs_file = tmp_path / f"ibtracs-{use_era5}.csv"
     _write_joint_fixture(root, ibtracs_file)
     datamodule = _joint_datamodule(
         root,

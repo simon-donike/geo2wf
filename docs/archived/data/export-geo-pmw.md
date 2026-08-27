@@ -1,4 +1,8 @@
-# PMW proxy pretraining
+# Archived PMW proxy pretraining
+
+!!! archive "Retired experiment family"
+    This export workflow is preserved for provenance and is not part of the
+    active experiment matrix.
 
 `geo2wf-export geo-pmw` creates a larger GEO-to-PMW paired dataset with the same one-channel target shape as GEO-to-SAR. The intent is initialization on a related satellite image reconstruction task before SAR fine-tuning.
 

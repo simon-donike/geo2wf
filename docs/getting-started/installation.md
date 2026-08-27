@@ -28,7 +28,7 @@ uv run geo2wf-train --help
 ```
 
 The test suite covers config composition, data/model contracts, checkpoint
-compatibility, data transforms, schedules/samplers, learning behavior,
+compatibility, data transforms, learning behavior,
 prediction shapes, metrics, and architecture boundaries. The strict docs build
 checks pages, internal links, Markdown extensions, and assets.
 
@@ -48,8 +48,6 @@ their forwarding environment module.
 |---|---|
 | `TCD_DATA_ROOT` | source-observation archive for exporters |
 | `GEO_SAR_OUTPUT_ROOT` | conventional GEO–SAR export destination |
-| `GEO_PMW_OUTPUT_ROOT` | conventional GEO–PMW export destination |
-| `GEO2WF_BASELINE_CKPT` | frozen Stage 1 checkpoint for composed Stage 2 |
 | `WANDB_MODE=offline` | keep W&B activity local |
 | `WANDB_DISABLED=true` | disable W&B construction completely |
 | `WANDB_PROJECT`, `WANDB_NAME` | override tracking names |

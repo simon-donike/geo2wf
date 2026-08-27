@@ -18,7 +18,6 @@ geo2wf/
 │   │   ├── base.py
 │   │   ├── bottleneck_unet_mlp/
 │   │   ├── deterministic_residual/
-│   │   ├── direct_unet/
 │   │   ├── intensity_correction/
 │   │   └── intensity_forecast/
 │   ├── objectives/ metrics/ visualization/ tracking/
@@ -26,7 +25,8 @@ geo2wf/
 │   └── training.py
 ├── scripts/                            maintained workflow implementations
 ├── tests/
-├── train.py and legacy modules         forwarding compatibility adapters
+├── archived/                           retired configs, code, scripts, tests
+├── train.py and legacy modules         limited forwarding adapters
 ├── mkdocs.yml
 └── pyproject.toml
 ```
@@ -51,8 +51,8 @@ geo2wf/
 | source pairing and export | reusable APIs under `preprocessing/`; maintained workflows under `scripts/` |
 
 Dashboard-only ViT and external ConvLSTM artifacts live below `inference/` and
-are not model packages. The maintained model inventory is the set of
-descriptive directories under `src/geo2wf/models/` shown above.
+are not model packages. Retired diffusion and direct-PMW packages are under
+`archived/` and are not part of the maintained model inventory.
 
 Do not add new behavior to CamelCase `src/*.py` or the root `train.py`. They
 exist for compatible imports and checkpoints.

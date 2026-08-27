@@ -1,5 +1,5 @@
-seed: 42  # Global random seed for reproducibility across dataloading and model init.
-
+# GEO-SAR export defaults. Training uses configs/modular.yaml and the grouped
+# data/model/experiment choices; this file is intentionally export-only.
 export:
   data_root: /lustre/scratch/1054/tropical_cyclone_dynamics/data
   manifest_file: /lustre/scratch/1054/tropical_cyclone_dynamics/data/index-files/observation_manifest_v5.csv
@@ -17,54 +17,3 @@ export:
   shift_center: true
   pad: 8
   limit: null
-
-data:
-  root: data/geotiff/geo_sar
-  stats_file: data/geotiff/geo_sar/stats.json
-  train_split: train
-  val_split: val
-  test_split: test
-  target_size: [256, 256]
-  random_flips: true
-  include_test_in_train: true  # Add the test split to training; validation stays separate.
-  include_pmw: false  # Return PMW companions and filter unmatched rows when enabled.
-  include_ibtracs: false  # Return complete prefixed IBTrACS metadata when enabled.
-  loader:
-    batch_size: 4  # Number of samples per optimization step.
-    num_workers: 0  # Number of worker processes used by PyTorch DataLoader.
-    pin_memory: false  # Pin CPU memory for faster transfer to GPU (usually true when training on CUDA).
-    persistent_workers: false
-
-model:
-  in_channels: 9  # Four GEO + distance + three solar-time fields + valid mask.
-  out_channels: 1  # SAR wind_speed target channel.
-  num_timesteps: 1000  # Number of diffusion denoising steps.
-  schedule: linear  # Beta schedule variant for the forward process.
-  unet:
-    dim: 48  # Base UNet width. Previous setting was 64; 48 reduces parameter count to about half (30M instead of 55M).
-    dim_mults: [1, 2, 4, 8]  # Width multipliers per UNet level.
-    channels: 10  # Nine condition channels plus one noisy target channel.
-    out_dim: 1  # UNet output channels; should match model.out_channels.
-
-optimization:
-  lr: 0.0001  # AdamW learning rate.
-  reduce_lr_on_plateau:
-    factor: 0.5  # Multiplicative LR drop factor when metric plateaus.
-    patience: 25  # Number of bad validation epochs before LR is reduced.
-
-trainer:
-  max_epochs: 100  # Total number of training epochs.
-  accelerator: auto  # Lightning accelerator selection: auto/cpu/gpu/mps.
-  devices: 1  # Number of devices to use (e.g. 1 for single GPU/CPU process).
-  precision: 32  # Numeric precision used by Lightning.
-  log_every_n_steps: 10  # Logging frequency in training steps.
-  enable_checkpointing: false  # Disable Lightning checkpoint callback by default.
-  limit_val_batches: 50  # Validation coverage per epoch. Float in [0,1] or int number of batches.
-
-logging:
-  wandb:
-    enabled: true  # Set false or export WANDB_DISABLED=true for local smoke tests.
-    project: dif_img_rec  # Weights & Biases project name.
-    name: null  # Optional run name; null lets W&B auto-generate one.
-    save_dir: logs  # Local directory used by W&B for run files.
-    log_model: false  # Whether to upload model artifacts automatically.

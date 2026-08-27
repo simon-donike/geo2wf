@@ -9,8 +9,8 @@ import torch
 from rasterio.transform import from_origin
 from torch.utils.data import DataLoader
 
-from data.datamodule import PairedDataModule
-from data.dataset import PairedImageDataset
+from geo2wf.data.datamodule import PairedDataModule
+from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
 
 
 def _write_tiff(path, values: np.ndarray) -> None:

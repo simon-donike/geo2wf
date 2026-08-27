@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", choices=("val", "test"), default="val")
     parser.add_argument(
         "--intensity-target-source",
-        choices=("ibtracs", "sar_robust_peak"),
+        choices=("ibtracs",),
         default="ibtracs",
     )
     parser.add_argument("--seed", type=int, default=42)

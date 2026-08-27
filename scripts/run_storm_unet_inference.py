@@ -19,7 +19,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import yaml
 import xarray as xr
 from tqdm.auto import tqdm
 
@@ -31,6 +30,7 @@ from geo2wf.data.features import (  # noqa: E402
     normalized_distance_to_center as _normalized_distance_to_center,
     solar_time_features as _solar_time_features,
 )
+from geo2wf.config import load_config_file  # noqa: E402
 from geo2wf.data.normalization import normalize as _normalize  # noqa: E402
 from geo2wf.data.intensity import encode_intensity_metadata  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
@@ -59,15 +59,8 @@ from scripts.pmw_conditioning import (
 DEFAULT_DATA_ROOT = ROOT / "inference" / "inf_data"
 DEFAULT_REFERENCE_ROOT = ROOT / "inference" / "inf_vit"
 DEFAULT_OUTPUT_ROOT = ROOT / "inference" / "inf_unet"
-DEFAULT_CONFIG = ROOT / "configs" / "config_geo_sar_10bands_era5_residual.yaml"
+DEFAULT_CONFIG = ROOT / "configs" / "modular.yaml"
 DEFAULT_STATS = ROOT / "data" / "geotiff" / "geo_sar_10bands_era5" / "stats.json"
-DEFAULT_CHECKPOINT = (
-    ROOT
-    / "logs"
-    / "20260730-132206_config_geo_sar_10bands_era5_residual"
-    / "checkpoints"
-    / "epoch=038-step=4758.ckpt"
-)
 DEFAULT_IBTRACS_FILE = ROOT / "data" / "IBTrACs" / "ibtracs.ALL.list.v04r01.csv"
 DEFAULT_INTENSITY_CACHE_METADATA = (
     ROOT / "data" / "unet_intensity_geostat_nopmw_v2" / "cache-metadata.json"
@@ -91,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--stats", type=Path, default=None)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument(
         "--correction-checkpoint",
         type=Path,
@@ -466,7 +459,7 @@ def main() -> None:
             args.checkpoint, args.intensity_cache_metadata
         )
         intensity_context = _storm_intensity_context(args.ibtracs_file, args.storms)
-    config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
+    config = load_config_file(args.config)
     stats_path = args.stats or Path(config["data"]["stats_file"])
     stats = json.loads(stats_path.read_text(encoding="utf-8"))
     records = _read_manifest(args.manifest, args.data_root)

@@ -35,7 +35,7 @@ configs/modular.yaml
 
 ```bash
 uv run geo2wf-train model=deterministic_residual
-uv run geo2wf-train model=direct_unet trainer.devices=2
+uv run geo2wf-train experiment=bottleneck_unet_mlp trainer.devices=2
 ```
 
 Available choices are discoverable from filenames. Experiments contain only
@@ -72,8 +72,9 @@ Maintained deterministic models use `E=1`, keeping downstream metrics and
 serialization independent of the model architecture.
 
 Installed inference subcommands call the maintained workflow scripts. Modular
-models expose `predict_batch()` for physical predictions; older full-YAML
-checkpoints continue through their workflow-specific compatibility paths.
+models expose `predict_batch()` for physical predictions. Retired full-YAML
+presets and model families are stored outside the active package under
+`archived/`.
 
 ## Tracking and visualization boundary
 
@@ -90,8 +91,8 @@ machine-readable manifests remain independent.
 - `geo2wf-evaluate`, `geo2wf-infer`, and `geo2wf-export` are installed entry
   points over maintained workflows and retain their argparse and full-YAML
   options.
-- Root scripts and legacy imports forward to the same source implementation and
-  remain supported with deprecation warnings.
+- The root training script and deterministic-model legacy imports forward to
+  the active source implementation with deprecation warnings.
 
 See [Configuration](../experiments/configuration.md), [Commands](../reference/commands.md),
 and [Adding components](../reference/adding-components.md).

@@ -55,9 +55,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument(
         "--intensity-target-source",
-        choices=("ibtracs", "sar_robust_peak"),
+        choices=("ibtracs",),
         default=None,
-        help="Override the scalar label source while reusing a field-only U-Net config.",
+        help="Use the active IBTrACS scalar label contract.",
     )
     parser.add_argument("--splits", nargs="+", default=["train", "val", "test"])
     parser.add_argument("--batch-size", type=int, default=None)

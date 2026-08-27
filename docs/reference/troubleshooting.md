@@ -16,11 +16,10 @@ current common10 + ERA5 data, use these exact checks:
 ```text
 data condition          = 10 GEO + 9 ERA5 + distance + 3 solar = 23
 ERA5-residual U-Net     = 23 data + condition mask + ERA5 wind + mask = 26
-direct PMW U-Net        = 23 data + condition mask = 24
 ```
 
-Deterministic and direct U-Net `condition_channels` describe only
-`batch["condition"]`. Follow the selected model page and
+The U-Net `condition_channels` setting describes only `batch["condition"]`.
+Follow the selected model page and
 `DataSpec` error instead of copying a width from another family.
 
 Checkpoints trained before the distance channel was added have a narrower first
@@ -58,9 +57,9 @@ The loader rejects condition rasters that look like all-zero fill, applies inter
 
 ## Test results are not held out
 
-Modular data configs default to `include_test_in_train: false`; some historical
-full-YAML presets set it to `true`. Inspect `resolved-config.yaml`. Changing the
-flag after training cannot restore a held-out test.
+Active data configs use `include_test_in_train: false`. Inspect
+`resolved-config.yaml`; changing the flag after training cannot restore a
+held-out test. Historical presets with different split policies are archived.
 
 ## Dashboard model name has no training config
 

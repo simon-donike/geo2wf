@@ -14,12 +14,9 @@ flowchart LR
   M --> W[IBTrACS USA_WIND in m/s]
 ```
 
-The checked-in experiment's scalar target is the continuous IBTrACS `USA_WIND`
-value converted from knots to metres per second. Tropical-cyclone categories
-are not model targets and do not contribute to the loss. The joint data module
-also supports `intensity_target_source=sar_robust_peak` for a matched-target
-comparison; this changes the scalar label contract and must be reported as a
-different experiment.
+The experiment's scalar target is the continuous IBTrACS `USA_WIND` value
+converted from knots to metres per second. Tropical-cyclone categories are not
+model targets and do not contribute to the loss.
 
 The data module reuses `PairedImageDataset` for all raster loading,
 normalization, masking, and augmentation. It reads `USA_WIND` directly from
@@ -80,12 +77,11 @@ This head uses a masked Huber term when
 checked-in model config has the head disabled and weight zero, so it does not
 affect the default two-term objective or checkpoint results.
 
-## Encoder-only IBTrACS ablation
+## Encoder/latent-MLP experiment
 
-The encoder-only experiment removes the decoder and reconstruction head
-entirely. It applies the same spatial mean/max pooling and MLP to the shared
-encoder bottleneck, but its only target and loss are continuous IBTrACS
-`USA_WIND`:
+The encoder/latent-MLP experiment removes the decoder and reconstruction head.
+It applies spatial mean/max pooling and an MLP to the encoder bottleneck. The
+checked-in baseline trains only against continuous IBTrACS `USA_WIND`:
 
 ```bash
 uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
@@ -104,3 +100,9 @@ the sidecars elsewhere.
 The scalar objective remains 5 m/s Huber loss. Validation IBTrACS MAE selects
 checkpoints and drives learning-rate scheduling and early stopping; RMSE, bias,
 category accuracy, and macro F1 are also logged.
+
+For the next experiment cycle, this track will be evaluated as maximum wind
+only and with storm radii from two explicitly labeled sources: values predicted
+by an MLP structure head and values diagnosed from a predicted 2D U-Net wind
+field. The final radii training/evaluation configs are not yet checked in; they
+will be added before the new runs rather than inferred from archived results.

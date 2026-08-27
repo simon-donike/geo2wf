@@ -53,12 +53,10 @@ nav:
       - Dataset contract: data/dataset-contract.md
       - Normalization & masks: data/normalization.md
       - Export GEO–SAR: data/export-geo-sar.md
-      - PMW proxy pretraining: data/export-geo-pmw.md
       - Hosting dashboard data on R2: data/r2-hosting.md
   - Models:
       - Model overview: models/index.md
       - ERA5-residual U-Net: models/era5-residual.md
-      - Direct PMW U-Net: models/direct-unet.md
       - Single-field intensity correction: models/intensity-correction.md
       - Bottleneck U-Net + MLP: models/bottleneck-unet-mlp.md
       - Six-hour scalar intensity forecast: models/intensity-forecast.md
@@ -67,8 +65,7 @@ nav:
       - Configuration guide: experiments/configuration.md
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
-      - Intensity model comparison: experiments/intensity-comparison.md
-      - Completed intensity benchmark: experiments/intensity-comparison-results.md
+      - Active experiment matrix: experiments/intensity-comparison.md
       - Visual examples: experiments/visual-examples.md
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:
@@ -79,6 +76,11 @@ nav:
       - Troubleshooting: reference/troubleshooting.md
       - Glossary: reference/glossary.md
   - StormSense: explorer.md
+  - Archived:
+      - Archive overview: archived/index.md
+      - Previous intensity benchmark: archived/results/intensity-comparison-results.md
+      - Direct PMW U-Net: archived/models/direct-unet.md
+      - PMW proxy pretraining: archived/data/export-geo-pmw.md
 
 plugins:
   - search:

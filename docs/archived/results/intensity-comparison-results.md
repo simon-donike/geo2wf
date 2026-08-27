@@ -1,4 +1,8 @@
-# Intensity reconstruction benchmark
+# Archived intensity reconstruction benchmark
+
+!!! archive "Archived result set"
+    These seed-42 validation results predate the streamlined experiment matrix.
+    They are preserved for provenance and are not current results.
 
 This report compares the raw U-Net field maximum, a separately trained U-Net plus correction network, and the jointly trained U-Net+MLP. Every model is evaluated once with ERA5 conditioning and once without it.
 
@@ -66,7 +70,7 @@ plotted timestamps. The prediction is from the with-ERA5, IBTrACS-trained
 U-Net + correction model, selected because it had the lowest overall IBTrACS
 MAE before inspecting these trajectories.
 
-![Full matched-storm IBTrACS, SAR maximum, and predicted intensity trajectories with RI windows](../assets/images/intensity-comparison/matched-ri-full-storm-trajectories.png)
+![Full matched-storm IBTrACS, SAR maximum, and predicted intensity trajectories with RI windows](intensity-comparison/images/matched-ri-full-storm-trajectories.png)
 
 Blue is interpolated IBTrACS, orange is the SAR-derived maximum, and green is
 the model prediction. A yellow interval covers the preceding 24 hours for each
@@ -74,10 +78,10 @@ SAR acquisition classified as RI. Overlapping windows are merged. Lines connect
 available SAR acquisition times for readability; they do not imply that SAR or
 model predictions were observed between acquisitions.
 
-[Download the plotted observations](../assets/data/intensity-comparison/matched-ri-full-storm-trajectories.csv){ .md-button }
-[Download all matrix metrics](../assets/data/intensity-comparison/matched-target-validation.csv){ .md-button }
-[Download all per-sample predictions](../assets/data/intensity-comparison/matched-target-predictions.csv){ .md-button }
-[Download SAR–IBTrACS divergence statistics](../assets/data/intensity-comparison/matched-sar-ibtracs-divergence.csv){ .md-button }
+[Download the plotted observations](intensity-comparison/data/matched-ri-full-storm-trajectories.csv){ .md-button }
+[Download all matrix metrics](intensity-comparison/data/matched-target-validation.csv){ .md-button }
+[Download all per-sample predictions](intensity-comparison/data/matched-target-predictions.csv){ .md-button }
+[Download SAR–IBTrACS divergence statistics](intensity-comparison/data/matched-sar-ibtracs-divergence.csv){ .md-button }
 
 ### Complete dual-reference validation table
 
@@ -202,15 +206,15 @@ The trajectory asset is reproducible with:
 ```
 
 For the experiment design, cohort contract, cache schema, and runner interface,
-see [Matched IBTrACS versus SAR intensity comparison](intensity-comparison.md).
+see the [active experiment matrix](../../experiments/intensity-comparison.md).
 
 ## Earlier IBTrACS-only benchmark
 
 On the matched **232-observation, 34-storm** validation cohort, the joint model has the lowest intensity MAE: **6.344 m/s (12.332 kt) with ERA5** and **6.738 m/s (13.098 kt) without ERA5**. With ERA5, the separate correction reaches **6.786 m/s (13.191 kt)**, versus **7.910 m/s (15.376 kt)** for the raw field maximum. The storm-bootstrap intervals for both learned scalar heads' improvement over the raw maximum exclude zero in both regimes.
 
-![Validation intensity MAE comparison](../assets/images/intensity-comparison/validation-intensity-mae.png)
+![Validation intensity MAE comparison](intensity-comparison/images/validation-intensity-mae.png)
 
-[Download validation results as CSV](../assets/data/intensity-comparison/validation-results.csv){ .md-button }
+[Download validation results as CSV](intensity-comparison/data/validation-results.csv){ .md-button }
 
 ### Matched validation tables
 
@@ -256,7 +260,7 @@ The 95% intervals use 2,000 paired cluster-bootstrap repetitions over storm IDs 
 
 All six runs logged metrics to Weights & Biases. Training allowed up to 1,000 epochs but stopped after **50 validation epochs without improvement**. The vertical dashed lines below mark the checkpoint selected by each stage-specific validation monitor.
 
-![Validation monitor histories](../assets/images/intensity-comparison/training-validation-curves.png)
+![Validation monitor histories](intensity-comparison/images/training-validation-curves.png)
 
 | Conditioning | Raw U-Net | Separate correction | Joint U-Net + MLP |
 |---|---|---|---|
@@ -271,27 +275,27 @@ The raw U-Net run had media logging disabled, so its panels below were regenerat
 
 === "Raw U-Net · without ERA5"
 
-    ![Raw U-Net reconstruction samples without ERA5, set 1](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-03.jpg)
+    ![Raw U-Net reconstruction samples without ERA5, set 1](intensity-comparison/images/unet-without-era5-epoch077-batch-03.jpg)
 
-    ![Raw U-Net reconstruction samples without ERA5, set 2](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-23.jpg)
+    ![Raw U-Net reconstruction samples without ERA5, set 2](intensity-comparison/images/unet-without-era5-epoch077-batch-23.jpg)
 
-    ![Raw U-Net reconstruction samples without ERA5, set 3](../assets/images/intensity-comparison/unet-without-era5-epoch077-batch-31.jpg)
+    ![Raw U-Net reconstruction samples without ERA5, set 3](intensity-comparison/images/unet-without-era5-epoch077-batch-31.jpg)
 
 === "Correction · with ERA5"
 
-    ![W&B correction validation media with ERA5](../assets/images/intensity-comparison/wandb-correction-with-era5-best.png)
+    ![W&B correction validation media with ERA5](intensity-comparison/images/wandb-correction-with-era5-best.png)
 
 === "Correction · without ERA5"
 
-    ![W&B correction validation media without ERA5](../assets/images/intensity-comparison/wandb-correction-without-era5-best.png)
+    ![W&B correction validation media without ERA5](intensity-comparison/images/wandb-correction-without-era5-best.png)
 
 === "Joint · with ERA5"
 
-    ![W&B joint validation reconstruction with ERA5](../assets/images/intensity-comparison/wandb-joint-with-era5-best.jpg)
+    ![W&B joint validation reconstruction with ERA5](intensity-comparison/images/wandb-joint-with-era5-best.jpg)
 
 === "Joint · without ERA5"
 
-    ![W&B joint validation reconstruction without ERA5](../assets/images/intensity-comparison/wandb-joint-without-era5-best.jpg)
+    ![W&B joint validation reconstruction without ERA5](intensity-comparison/images/wandb-joint-without-era5-best.jpg)
 
 ## Humberto, Kiko, and Otis: dense full-storm inference
 
@@ -303,9 +307,9 @@ Across the dense common cohort, **U-Net + correction** has the lowest aggregate 
 
 The plotted curves are hourly means to keep the dense 10-minute series readable. The table scores every valid individual observation, while the download also retains any explicitly flagged unusable scan.
 
-![Predicted and IBTrACS-reference full-storm intensity trajectories](../assets/images/intensity-comparison/three-storm-intensity-trajectories.png)
+![Predicted and IBTrACS-reference full-storm intensity trajectories](intensity-comparison/images/three-storm-intensity-trajectories.png)
 
-![Per-storm dense inference MAE](../assets/images/intensity-comparison/three-storm-mae.png)
+![Per-storm dense inference MAE](intensity-comparison/images/three-storm-mae.png)
 
 Every wind-speed value below is shown in m/s with knots in parentheses; the sample count is unitless.
 
@@ -318,7 +322,7 @@ Every wind-speed value below is shown in m/s with knots in parentheses; the samp
 | Without ERA5 | U-Net + correction | 3266 / 3268 | 7.345 (14.278 kt) | 9.452 (18.373 kt) | -1.483 (-2.883 kt) | 8.338 (16.208 kt) | 7.160 (13.918 kt) | 6.314 (12.273 kt) |
 | Without ERA5 | Joint U-Net + MLP | 3266 / 3268 | 7.243 (14.079 kt) | 9.159 (17.804 kt) | 0.071 (0.138 kt) | 7.631 (14.833 kt) | 6.962 (13.533 kt) | 7.318 (14.225 kt) |
 
-[Download all six dense prediction series](../assets/data/intensity-comparison/three-storm-inference.csv){ .md-button } [Download dense metrics](../assets/data/intensity-comparison/three-storm-metrics.csv){ .md-button } [Download JSON summary](../assets/data/intensity-comparison/three-storm-summary.json){ .md-button }
+[Download all six dense prediction series](intensity-comparison/data/three-storm-inference.csv){ .md-button } [Download dense metrics](intensity-comparison/data/three-storm-metrics.csv){ .md-button } [Download JSON summary](intensity-comparison/data/three-storm-summary.json){ .md-button }
 
 ### Split audit
 

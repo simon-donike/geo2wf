@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from data.datamodule import PairedDataModule
-from data.dataset import (
+from geo2wf.data.datamodule import PairedDataModule
+from geo2wf.data.datasets.paired_geotiff import (
     EARTH_RADIUS_M,
     ERA5_RELATIVE_VORTICITY_10M,
     ERA5_WIND_SPEED_10M,
