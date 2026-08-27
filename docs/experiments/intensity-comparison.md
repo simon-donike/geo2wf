@@ -1,11 +1,11 @@
 # Active experiment matrix
 
-The next experiment cycle uses one fixed, storm-disjoint cohort and keeps ERA5
-conditioning as the only input-regime difference. No results are reported on
-this page until the new matrix has been run.
+The completed experiment matrix uses one fixed, storm-disjoint cohort and keeps
+ERA5 conditioning as the only input-regime difference. Its held-out results are
+reported on the [final results page](../results.md).
 
-The [previous seed-42 benchmark](../archived/results/intensity-comparison-results.md)
-and all of its published artifacts are archived for provenance.
+Earlier exploratory benchmarks and their published artifacts remain
+[archived for provenance](../archived/results/intensity-comparison-results.md).
 
 ## Three-model ERA5 comparison
 
@@ -39,9 +39,12 @@ two structure-ablation arms to the same figure.
 
 The separate structure study uses the joint U-Net + latent MLP so every model
 retains both the decoded 2D wind field and the bottleneck outputs. Two runs use
-the same ERA5-conditioned cohort, architecture, seed, and optimizer. Strict
-CUDA determinism is disabled in both because reflection-padding backward has no
-deterministic CUDA implementation:
+the same strict ERA5-conditioned cohort, architecture, seed, and optimizer.
+This cohort requires a valid SAR pixel at the storm center and is smaller than
+the standard six-model cohort; comparisons are paired within the two structure
+arms, not across the two experiment families. Strict CUDA determinism is
+disabled in both because reflection-padding backward has no deterministic CUDA
+implementation:
 
 ```bash
 uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind

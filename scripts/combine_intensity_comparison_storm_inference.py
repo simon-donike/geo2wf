@@ -33,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         "--parts-root", type=Path, default=DEFAULT_OUTPUT_ROOT / "parts"
     )
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument(
+        "--regime",
+        choices=("with", "without", "both"),
+        default="both",
+        help="Combine one conditioning regime or verify both (default: both).",
+    )
     return parser.parse_args()
 
 
@@ -102,6 +108,12 @@ def _combine_regime(parts_root: Path, output_root: Path, regime: str) -> pd.Data
 
 
 def combine(args: argparse.Namespace) -> None:
+    if args.regime == "with":
+        _combine_regime(args.parts_root, args.output_root, "with")
+        return
+    if args.regime == "without":
+        _combine_regime(args.parts_root, args.output_root, "without")
+        return
     with_era5 = _combine_regime(args.parts_root, args.output_root, "with")
     without_era5 = _combine_regime(args.parts_root, args.output_root, "without")
     columns = [

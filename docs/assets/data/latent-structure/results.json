@@ -1,5 +1,16 @@
 {
-  "created_utc": "2026-08-27T09:55:19.147187+00:00",
+  "created_utc": "2026-08-27T10:50:07.885965+00:00",
+  "image_quality": {
+    "data_range_ms": 79.8,
+    "physical_range_ms": [
+      0.2,
+      80.0
+    ],
+    "psnr_aggregation": "pooled_valid_pixel_mse",
+    "ssim_aggregation": "mean_of_scene_means",
+    "ssim_mask": "complete_window_valid_in_prediction_and_target",
+    "ssim_window_pixels": 7
+  },
   "runs": {
     "max_wind_only": {
       "checkpoint": {
@@ -124,12 +135,49 @@
         "test/image_bias_ms": 0.10568708341321201,
         "test/image_loss": 3.6651912932822226,
         "test/image_mae_ms": 2.6381440886538443,
+        "test/image_psnr_db": 26.523859135034137,
         "test/image_rmse_ms": 3.7653897374054086,
+        "test/image_ssim": 0.8258880376815796,
         "test/intensity_bias_ms": 1.1334618973217423,
         "test/intensity_loss": 21.926605464743197,
         "test/intensity_mae_ms": 6.471179584805056,
         "test/intensity_rmse_ms": 8.181394829098073,
-        "test/loss": 25.59179675802542
+        "test/loss": 25.59179675802542,
+        "test_ri/field_bias_ms": 0.9066740870475769,
+        "test_ri/field_mae_ms": 2.5677127838134766,
+        "test_ri/field_psnr_db": 26.591617584228516,
+        "test_ri/field_rmse_ms": 3.736130475997925,
+        "test_ri/field_ssim": 0.8138980269432068,
+        "test_ri/ibtracs_bias_ms": -0.8565670893742487,
+        "test_ri/ibtracs_category_accuracy": 0.46153846153846156,
+        "test_ri/ibtracs_category_macro_f1": 0.29292929292929293,
+        "test_ri/ibtracs_category_within_one_accuracy": 0.8461538461538461,
+        "test_ri/ibtracs_mae_ms": 9.232371110182543,
+        "test_ri/ibtracs_raw_unet_bias_ms": -17.719763389000526,
+        "test_ri/ibtracs_raw_unet_category_accuracy": 0.07692307692307693,
+        "test_ri/ibtracs_raw_unet_category_macro_f1": 0.0625,
+        "test_ri/ibtracs_raw_unet_category_within_one_accuracy": 0.3076923076923077,
+        "test_ri/ibtracs_raw_unet_mae_ms": 17.719763389000526,
+        "test_ri/ibtracs_raw_unet_rmse_ms": 20.40426749195725,
+        "test_ri/ibtracs_raw_unet_storm_macro_mae_ms": 18.88422625405448,
+        "test_ri/ibtracs_rmse_ms": 10.838694419266556,
+        "test_ri/ibtracs_storm_macro_mae_ms": 8.38927800314767,
+        "test_ri/samples": 13.0,
+        "test_ri/sar_robust_peak_bias_ms": 10.426396003136269,
+        "test_ri/sar_robust_peak_category_accuracy": 0.07692307692307693,
+        "test_ri/sar_robust_peak_category_macro_f1": 0.04,
+        "test_ri/sar_robust_peak_category_within_one_accuracy": 0.6923076923076923,
+        "test_ri/sar_robust_peak_mae_ms": 12.519084343543419,
+        "test_ri/sar_robust_peak_raw_unet_bias_ms": -8.614716016329252,
+        "test_ri/sar_robust_peak_raw_unet_category_accuracy": 0.15384615384615385,
+        "test_ri/sar_robust_peak_raw_unet_category_macro_f1": 0.16,
+        "test_ri/sar_robust_peak_raw_unet_category_within_one_accuracy": 0.6153846153846154,
+        "test_ri/sar_robust_peak_raw_unet_mae_ms": 9.812775685237003,
+        "test_ri/sar_robust_peak_raw_unet_rmse_ms": 11.987840683431118,
+        "test_ri/sar_robust_peak_raw_unet_storm_macro_mae_ms": 10.479923929486956,
+        "test_ri/sar_robust_peak_rmse_ms": 14.578051187024013,
+        "test_ri/sar_robust_peak_storm_macro_mae_ms": 11.522589070456368,
+        "test_ri/storms": 7.0
       }
     },
     "max_wind_plus_radii": {
@@ -268,7 +316,9 @@
         "test/image_bias_ms": -0.1846963390026816,
         "test/image_loss": 3.5183754492481363,
         "test/image_mae_ms": 2.565493723872751,
+        "test/image_psnr_db": 26.713197987176184,
         "test/image_rmse_ms": 3.6841982505442736,
+        "test/image_ssim": 0.8294652700424194,
         "test/intensity_bias_ms": 0.13204917633276192,
         "test/intensity_loss": 17.82584477242806,
         "test/intensity_mae_ms": 5.5334059214420455,
@@ -286,18 +336,54 @@
         "test/structure_r64_equivalent_rmse_km": 27.143574144713607,
         "test/structure_rmw_bias_km": -10.362779009169426,
         "test/structure_rmw_mae_km": 22.59746537692305,
-        "test/structure_rmw_rmse_km": 34.09580502102218
+        "test/structure_rmw_rmse_km": 34.09580502102218,
+        "test_ri/field_bias_ms": 0.8510042428970337,
+        "test_ri/field_mae_ms": 2.526339530944824,
+        "test_ri/field_psnr_db": 26.179109573364258,
+        "test_ri/field_rmse_ms": 3.917846441268921,
+        "test_ri/field_ssim": 0.8139141201972961,
+        "test_ri/ibtracs_bias_ms": 0.0919192387507512,
+        "test_ri/ibtracs_category_accuracy": 0.38461538461538464,
+        "test_ri/ibtracs_category_macro_f1": 0.2361111111111111,
+        "test_ri/ibtracs_category_within_one_accuracy": 0.9230769230769231,
+        "test_ri/ibtracs_mae_ms": 9.956961118257963,
+        "test_ri/ibtracs_raw_unet_bias_ms": -15.357705923227163,
+        "test_ri/ibtracs_raw_unet_category_accuracy": 0.07692307692307693,
+        "test_ri/ibtracs_raw_unet_category_macro_f1": 0.08333333333333333,
+        "test_ri/ibtracs_raw_unet_category_within_one_accuracy": 0.38461538461538464,
+        "test_ri/ibtracs_raw_unet_mae_ms": 16.8006832416241,
+        "test_ri/ibtracs_raw_unet_rmse_ms": 19.11720902350797,
+        "test_ri/ibtracs_raw_unet_storm_macro_mae_ms": 17.218718937465123,
+        "test_ri/ibtracs_rmse_ms": 10.814296854485992,
+        "test_ri/ibtracs_storm_macro_mae_ms": 9.297751017979213,
+        "test_ri/samples": 13.0,
+        "test_ri/sar_robust_peak_bias_ms": 11.374882331261269,
+        "test_ri/sar_robust_peak_category_accuracy": 0.38461538461538464,
+        "test_ri/sar_robust_peak_category_macro_f1": 0.22000000000000003,
+        "test_ri/sar_robust_peak_category_within_one_accuracy": 0.5384615384615384,
+        "test_ri/sar_robust_peak_mae_ms": 11.778861706073467,
+        "test_ri/sar_robust_peak_raw_unet_bias_ms": -5.2480489290677586,
+        "test_ri/sar_robust_peak_raw_unet_category_accuracy": 0.15384615384615385,
+        "test_ri/sar_robust_peak_raw_unet_category_macro_f1": 0.10158730158730159,
+        "test_ri/sar_robust_peak_raw_unet_category_within_one_accuracy": 0.6153846153846154,
+        "test_ri/sar_robust_peak_raw_unet_mae_ms": 8.61538784320538,
+        "test_ri/sar_robust_peak_raw_unet_rmse_ms": 10.356738094939379,
+        "test_ri/sar_robust_peak_raw_unet_storm_macro_mae_ms": 8.462411267416817,
+        "test_ri/sar_robust_peak_rmse_ms": 14.999147628550316,
+        "test_ri/sar_robust_peak_storm_macro_mae_ms": 10.490420137132917,
+        "test_ri/storms": 7.0
       }
     }
   },
   "samples": 139,
-  "schema_version": 1,
+  "schema_version": 2,
   "split": "test",
   "summary": [
     {
       "metric": "mae_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 6.471179584805056,
       "variant": "max_wind_only"
@@ -306,6 +392,7 @@
       "metric": "rmse_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 8.181394829098073,
       "variant": "max_wind_only"
@@ -314,14 +401,34 @@
       "metric": "bias_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 1.1334618973217423,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "psnr_db",
+      "samples": 139,
+      "source": "2d_unet_field",
+      "subset": "all",
+      "target": "wind_field",
+      "value": 26.523859135034137,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "ssim",
+      "samples": 139,
+      "source": "2d_unet_field",
+      "subset": "all",
+      "target": "wind_field",
+      "value": 0.8258880376815796,
       "variant": "max_wind_only"
     },
     {
       "metric": "mae_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": 2.6381440886538443,
       "variant": "max_wind_only"
@@ -330,6 +437,7 @@
       "metric": "rmse_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": 3.7653897374054086,
       "variant": "max_wind_only"
@@ -338,6 +446,7 @@
       "metric": "bias_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": 0.10568708341321201,
       "variant": "max_wind_only"
@@ -346,6 +455,7 @@
       "metric": "mae_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 5.5334059214420455,
       "variant": "max_wind_plus_radii"
@@ -354,6 +464,7 @@
       "metric": "rmse_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 7.312647848341663,
       "variant": "max_wind_plus_radii"
@@ -362,14 +473,34 @@
       "metric": "bias_ms",
       "samples": 139,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "maximum_wind",
       "value": 0.13204917633276192,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "psnr_db",
+      "samples": 139,
+      "source": "2d_unet_field",
+      "subset": "all",
+      "target": "wind_field",
+      "value": 26.713197987176184,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "ssim",
+      "samples": 139,
+      "source": "2d_unet_field",
+      "subset": "all",
+      "target": "wind_field",
+      "value": 0.8294652700424194,
       "variant": "max_wind_plus_radii"
     },
     {
       "metric": "mae_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": 2.565493723872751,
       "variant": "max_wind_plus_radii"
@@ -378,6 +509,7 @@
       "metric": "rmse_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": 3.6841982505442736,
       "variant": "max_wind_plus_radii"
@@ -386,6 +518,7 @@
       "metric": "bias_ms",
       "samples": 139,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "wind_field",
       "value": -0.1846963390026816,
       "variant": "max_wind_plus_radii"
@@ -394,6 +527,7 @@
       "metric": "mae_km",
       "samples": 138,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "rmw",
       "value": 22.59746537692305,
       "variant": "max_wind_plus_radii"
@@ -402,6 +536,7 @@
       "metric": "rmse_km",
       "samples": 138,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "rmw",
       "value": 34.09580502102218,
       "variant": "max_wind_plus_radii"
@@ -410,6 +545,7 @@
       "metric": "bias_km",
       "samples": 138,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "rmw",
       "value": -10.362779009169426,
       "variant": "max_wind_plus_radii"
@@ -418,6 +554,7 @@
       "metric": "mae_km",
       "samples": 132,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "rmw",
       "value": 34.89335250854492,
       "variant": "max_wind_plus_radii"
@@ -426,6 +563,7 @@
       "metric": "bias_km",
       "samples": 132,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "rmw",
       "value": -16.264549255371094,
       "variant": "max_wind_plus_radii"
@@ -434,6 +572,7 @@
       "metric": "mae_km",
       "samples": 116,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r34",
       "value": 44.96857235349458,
       "variant": "max_wind_plus_radii"
@@ -442,6 +581,7 @@
       "metric": "rmse_km",
       "samples": 116,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r34",
       "value": 60.37286065307182,
       "variant": "max_wind_plus_radii"
@@ -450,6 +590,7 @@
       "metric": "bias_km",
       "samples": 116,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r34",
       "value": -21.223596244022765,
       "variant": "max_wind_plus_radii"
@@ -458,6 +599,7 @@
       "metric": "mae_km",
       "samples": 53,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r34",
       "value": 51.20945358276367,
       "variant": "max_wind_plus_radii"
@@ -466,6 +608,7 @@
       "metric": "bias_km",
       "samples": 53,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r34",
       "value": -48.38205337524414,
       "variant": "max_wind_plus_radii"
@@ -474,6 +617,7 @@
       "metric": "mae_km",
       "samples": 72,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r50",
       "value": 32.693382289674545,
       "variant": "max_wind_plus_radii"
@@ -482,6 +626,7 @@
       "metric": "rmse_km",
       "samples": 72,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r50",
       "value": 50.89317568126572,
       "variant": "max_wind_plus_radii"
@@ -490,6 +635,7 @@
       "metric": "bias_km",
       "samples": 72,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r50",
       "value": -21.25949846373664,
       "variant": "max_wind_plus_radii"
@@ -498,6 +644,7 @@
       "metric": "mae_km",
       "samples": 58,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r50",
       "value": 35.123809814453125,
       "variant": "max_wind_plus_radii"
@@ -506,6 +653,7 @@
       "metric": "bias_km",
       "samples": 58,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r50",
       "value": -30.930408477783203,
       "variant": "max_wind_plus_radii"
@@ -514,6 +662,7 @@
       "metric": "mae_km",
       "samples": 48,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r64",
       "value": 20.377193212509155,
       "variant": "max_wind_plus_radii"
@@ -522,6 +671,7 @@
       "metric": "rmse_km",
       "samples": 48,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r64",
       "value": 27.143574144713607,
       "variant": "max_wind_plus_radii"
@@ -530,6 +680,7 @@
       "metric": "bias_km",
       "samples": 48,
       "source": "latent_mlp",
+      "subset": "all",
       "target": "r64",
       "value": -7.532394806543986,
       "variant": "max_wind_plus_radii"
@@ -538,6 +689,7 @@
       "metric": "mae_km",
       "samples": 46,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r64",
       "value": 29.922231674194336,
       "variant": "max_wind_plus_radii"
@@ -546,8 +698,153 @@
       "metric": "bias_km",
       "samples": 46,
       "source": "2d_unet_field",
+      "subset": "all",
       "target": "r64",
       "value": -18.55006980895996,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "mae_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": 9.232371110182543,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "rmse_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": 10.838694419266556,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "bias_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": -0.8565670893742487,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "mae_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 2.5677127838134766,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "rmse_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 3.736130475997925,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "bias_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 0.9066740870475769,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "psnr_db",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 26.591617584228516,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "ssim",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 0.8138980269432068,
+      "variant": "max_wind_only"
+    },
+    {
+      "metric": "mae_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": 9.956961118257963,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "rmse_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": 10.814296854485992,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "bias_ms",
+      "samples": 13,
+      "source": "latent_mlp",
+      "subset": "rapid_intensification",
+      "target": "maximum_wind",
+      "value": 0.0919192387507512,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "mae_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 2.526339530944824,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "rmse_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 3.917846441268921,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "bias_ms",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 0.8510042428970337,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "psnr_db",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 26.179109573364258,
+      "variant": "max_wind_plus_radii"
+    },
+    {
+      "metric": "ssim",
+      "samples": 13,
+      "source": "2d_unet_field",
+      "subset": "rapid_intensification",
+      "target": "wind_field",
+      "value": 0.8139141201972961,
       "variant": "max_wind_plus_radii"
     }
   ]

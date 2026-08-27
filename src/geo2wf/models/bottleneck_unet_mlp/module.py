@@ -37,6 +37,10 @@ from geo2wf.metrics.wind import (
     ibtracs_radius_metric_statistics,
     ibtracs_radius_targets,
 )
+from geo2wf.metrics.image_quality import (
+    WIND_SPEED_DATA_RANGE_MS,
+    masked_ssim_sum_count,
+)
 from geo2wf.tracking.reconstruction_media import log_wandb_reconstruction
 
 
@@ -351,6 +355,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         validation_reconstruction_batches: int = 1,
         log_reconstruction_images: bool = True,
         sar_robust_peak_fraction: float = 0.005,
+        psnr_data_range_ms: float = WIND_SPEED_DATA_RANGE_MS,
     ) -> None:
         super().__init__()
         if condition_channels <= 0:
@@ -373,6 +378,8 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             raise ValueError("validation_reconstruction_batches must be positive")
         if not 0.0 < sar_robust_peak_fraction <= 1.0:
             raise ValueError("sar_robust_peak_fraction must be in (0, 1]")
+        if psnr_data_range_ms <= 0.0:
+            raise ValueError("psnr_data_range_ms must be positive")
         self.save_hyperparameters()
         self.condition_channels = int(condition_channels)
         self.image_huber_delta_ms = float(image_huber_delta_ms)
@@ -391,6 +398,7 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         self.validation_reconstruction_batches = int(validation_reconstruction_batches)
         self.log_reconstruction_images = bool(log_reconstruction_images)
         self.sar_robust_peak_fraction = float(sar_robust_peak_fraction)
+        self.psnr_data_range_ms = float(psnr_data_range_ms)
         self.model = BottleneckUNetMLP(
             self.condition_channels + 1,
             base_channels,
@@ -623,6 +631,94 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             prediction.central_physical,
             batch,
         )
+        self._record_evaluation_rows(
+            "val", batch, prediction, target, mask, intensity_target
+        )
+        if (
+            self.log_reconstruction_images
+            and batch_idx < self.validation_reconstruction_batches
+        ):
+            self._log_reconstruction(batch, "images/val_reconstruction")
+
+    def on_validation_epoch_start(self) -> None:
+        self._validation_field_statistics.zero_()
+        self._validation_intensity_statistics.zero_()
+        self._validation_structure_statistics.zero_()
+        self._validation_ibtracs_radius_statistics.zero_()
+        self._evaluation_rows["val"] = []
+
+    def on_validation_epoch_end(self) -> None:
+        self._log_statistics(
+            "val",
+            self._validation_field_statistics,
+            self._validation_intensity_statistics,
+            self._validation_structure_statistics,
+        )
+        self._log_ibtracs_radius_statistics(
+            "val", self._validation_ibtracs_radius_statistics
+        )
+        self._log_ri_statistics("val")
+
+    @torch.no_grad()
+    def test_step(self, batch: Mapping[str, Any], batch_idx: int) -> None:
+        del batch_idx
+        _, _, prediction, target, mask = self._losses(batch)
+        intensity_target = self._intensity_target(batch, prediction.central_physical)
+        self._accumulate(
+            self._test_field_statistics,
+            prediction.central_physical,
+            target,
+            mask,
+            self.image_huber_delta_ms,
+        )
+        self._accumulate(
+            self._test_intensity_statistics,
+            prediction.intensity_prediction_ms,
+            intensity_target,
+            torch.ones_like(intensity_target),
+            self.intensity_huber_delta_ms,
+        )
+        self._accumulate_structure_statistics(
+            self._test_structure_statistics, prediction, batch
+        )
+        self._accumulate_ibtracs_radius_statistics(
+            self._test_ibtracs_radius_statistics,
+            prediction.central_physical,
+            batch,
+        )
+        self._record_evaluation_rows(
+            "test", batch, prediction, target, mask, intensity_target
+        )
+
+    def on_test_epoch_start(self) -> None:
+        self._test_field_statistics.zero_()
+        self._test_intensity_statistics.zero_()
+        self._test_structure_statistics.zero_()
+        self._test_ibtracs_radius_statistics.zero_()
+        self._evaluation_rows["test"] = []
+
+    def on_test_epoch_end(self) -> None:
+        self._log_statistics(
+            "test",
+            self._test_field_statistics,
+            self._test_intensity_statistics,
+            self._test_structure_statistics,
+        )
+        self._log_ibtracs_radius_statistics(
+            "test", self._test_ibtracs_radius_statistics
+        )
+        self._log_image_quality("test")
+        self._log_ri_statistics("test")
+
+    def _record_evaluation_rows(
+        self,
+        prefix: str,
+        batch: Mapping[str, Any],
+        prediction: JointPredictionBatch,
+        target: torch.Tensor,
+        mask: torch.Tensor,
+        intensity_target: torch.Tensor,
+    ) -> None:
         ibtracs_target = batch.get("ibtracs_target_ms", intensity_target).to(
             prediction.intensity_prediction_ms
         )
@@ -657,7 +753,16 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 .detach()
                 .cpu()
             )
-            self._evaluation_rows["val"].append(
+            field_ssim = None
+            if prefix == "test":
+                ssim_sum, ssim_count = masked_ssim_sum_count(
+                    prediction.central_physical[index : index + 1],
+                    target[index : index + 1],
+                    mask[index : index + 1],
+                )
+                if ssim_count:
+                    field_ssim = ssim_sum / ssim_count
+            self._evaluation_rows[prefix].append(
                 {
                     "sample_id": str(sample_id),
                     "storm_id": storm_ids[index],
@@ -678,78 +783,10 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                         field_error.square().sum().detach().cpu()
                     ),
                     "field_signed_error_sum": float(field_error.sum().detach().cpu()),
+                    "field_ssim": field_ssim,
                     "is_rapid_intensification": bool(is_ri[index].detach().cpu()),
                 }
             )
-        if (
-            self.log_reconstruction_images
-            and batch_idx < self.validation_reconstruction_batches
-        ):
-            self._log_reconstruction(batch, "images/val_reconstruction")
-
-    def on_validation_epoch_start(self) -> None:
-        self._validation_field_statistics.zero_()
-        self._validation_intensity_statistics.zero_()
-        self._validation_structure_statistics.zero_()
-        self._validation_ibtracs_radius_statistics.zero_()
-        self._evaluation_rows["val"] = []
-
-    def on_validation_epoch_end(self) -> None:
-        self._log_statistics(
-            "val",
-            self._validation_field_statistics,
-            self._validation_intensity_statistics,
-            self._validation_structure_statistics,
-        )
-        self._log_ibtracs_radius_statistics(
-            "val", self._validation_ibtracs_radius_statistics
-        )
-        self._log_ri_statistics()
-
-    @torch.no_grad()
-    def test_step(self, batch: Mapping[str, Any], batch_idx: int) -> None:
-        del batch_idx
-        _, _, prediction, target, mask = self._losses(batch)
-        intensity_target = self._intensity_target(batch, prediction.central_physical)
-        self._accumulate(
-            self._test_field_statistics,
-            prediction.central_physical,
-            target,
-            mask,
-            self.image_huber_delta_ms,
-        )
-        self._accumulate(
-            self._test_intensity_statistics,
-            prediction.intensity_prediction_ms,
-            intensity_target,
-            torch.ones_like(intensity_target),
-            self.intensity_huber_delta_ms,
-        )
-        self._accumulate_structure_statistics(
-            self._test_structure_statistics, prediction, batch
-        )
-        self._accumulate_ibtracs_radius_statistics(
-            self._test_ibtracs_radius_statistics,
-            prediction.central_physical,
-            batch,
-        )
-
-    def on_test_epoch_start(self) -> None:
-        self._test_field_statistics.zero_()
-        self._test_intensity_statistics.zero_()
-        self._test_structure_statistics.zero_()
-        self._test_ibtracs_radius_statistics.zero_()
-
-    def on_test_epoch_end(self) -> None:
-        self._log_statistics(
-            "test",
-            self._test_field_statistics,
-            self._test_intensity_statistics,
-            self._test_structure_statistics,
-        )
-        self._log_ibtracs_radius_statistics(
-            "test", self._test_ibtracs_radius_statistics
-        )
 
     def configure_optimizers(self) -> dict[str, Any]:
         optimizer = torch.optim.AdamW(
@@ -946,6 +983,11 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             "image_mae_ms": field[1] / field_count,
             "image_rmse_ms": torch.sqrt(field[2] / field_count),
             "image_bias_ms": field[3] / field_count,
+            "image_psnr_db": 20.0
+            * torch.log10(
+                image_loss.new_tensor(self.psnr_data_range_ms)
+                / (field[2] / field_count).clamp_min(1.0e-12).sqrt()
+            ),
             "intensity_mae_ms": intensity[1] / intensity_count,
             "intensity_rmse_ms": torch.sqrt(intensity[2] / intensity_count),
             "intensity_bias_ms": intensity[3] / intensity_count,
@@ -986,12 +1028,30 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         # DistributedSampler may pad validation with repeated samples.
         return list({str(row["sample_id"]): row for row in combined}.values())
 
-    def _log_ri_statistics(self) -> None:
-        rows = self._distributed_rows(self._evaluation_rows["val"])
+    def _log_image_quality(self, prefix: str) -> None:
+        rows = self._distributed_rows(self._evaluation_rows[prefix])
+        scores = [
+            float(row["field_ssim"])
+            for row in rows
+            if row.get("field_ssim") is not None
+            and math.isfinite(float(row["field_ssim"]))
+        ]
+        if scores:
+            self.log(
+                f"{prefix}/image_ssim",
+                torch.tensor(sum(scores) / len(scores), device=self.device),
+                on_epoch=True,
+                sync_dist=False,
+            )
+
+    def _log_ri_statistics(self, prefix: str = "val") -> None:
+        rows = self._distributed_rows(self._evaluation_rows[prefix])
         rows = [row for row in rows if bool(row.get("is_rapid_intensification", False))]
-        self.log("val_ri/samples", float(len(rows)), on_epoch=True, sync_dist=False)
         self.log(
-            "val_ri/storms",
+            f"{prefix}_ri/samples", float(len(rows)), on_epoch=True, sync_dist=False
+        )
+        self.log(
+            f"{prefix}_ri/storms",
             float(len({str(row["storm_id"]) for row in rows})),
             on_epoch=True,
             sync_dist=False,
@@ -1069,29 +1129,42 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             }
             for name, value in metrics.items():
                 self.log(
-                    f"val_ri/{reference}_{name}",
+                    f"{prefix}_ri/{reference}_{name}",
                     value.to(self.device),
                     on_epoch=True,
                     sync_dist=False,
                 )
         field_count = sum(int(row.get("field_valid_pixels", 0)) for row in rows)
         if field_count:
-            for name, value in {
+            field_mse = (
+                sum(float(row["field_squared_error_sum"]) for row in rows) / field_count
+            )
+            field_metrics = {
                 "field_mae_ms": sum(
                     float(row["field_absolute_error_sum"]) for row in rows
                 )
                 / field_count,
-                "field_rmse_ms": math.sqrt(
-                    sum(float(row["field_squared_error_sum"]) for row in rows)
-                    / field_count
-                ),
+                "field_rmse_ms": math.sqrt(field_mse),
                 "field_bias_ms": sum(
                     float(row["field_signed_error_sum"]) for row in rows
                 )
                 / field_count,
-            }.items():
+                "field_psnr_db": 20.0
+                * math.log10(
+                    self.psnr_data_range_ms / math.sqrt(max(field_mse, 1.0e-12))
+                ),
+            }
+            ssim_scores = [
+                float(row["field_ssim"])
+                for row in rows
+                if row.get("field_ssim") is not None
+                and math.isfinite(float(row["field_ssim"]))
+            ]
+            if ssim_scores:
+                field_metrics["field_ssim"] = sum(ssim_scores) / len(ssim_scores)
+            for name, value in field_metrics.items():
                 self.log(
-                    f"val_ri/{name}",
+                    f"{prefix}_ri/{name}",
                     torch.tensor(value, device=self.device),
                     on_epoch=True,
                     sync_dist=False,

@@ -1,8 +1,8 @@
 # Joint U-Net/latent-MLP structure results
 
-Generated `2026-08-27T09:55:19.147187+00:00` from the best validation checkpoint of each seed-42
-run. The table below is the first evaluation of the held-out test split; no
-test metric was used for checkpoint selection.
+Generated `2026-08-27T10:50:07.885965+00:00` from the best validation checkpoint of each seed-42
+run. These are the canonical paper-facing held-out test results; no test metric
+was used for checkpoint selection.
 
 ## Maximum wind
 
@@ -19,10 +19,29 @@ or multi-seed uncertainty estimate.
 
 ## 2D wind-field reconstruction
 
-| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | Scenes |
+| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | PSNR (dB) | SSIM | Scenes |
+|---|---:|---:|---:|---:|---:|---:|
+| Maximum wind only | 2.638 | 3.765 | 0.106 | 26.524 | 0.826 | 139 |
+| Maximum wind + radii | 2.565 | 3.684 | -0.185 | 26.713 | 0.829 | 139 |
+
+## Rapid-intensification phases
+
+RI observations are the held-out samples where IBTrACS maximum wind increased
+by at least 30 kt during the preceding 24 hours.
+
+| Training objective | MLP MAE (m/s) | MLP RMSE (m/s) | MLP bias (m/s) | Samples |
 |---|---:|---:|---:|---:|
-| Maximum wind only | 2.638 | 3.765 | 0.106 | 139 |
-| Maximum wind + radii | 2.565 | 3.684 | -0.185 | 139 |
+| Maximum wind only | 9.232 | 10.839 | -0.857 | 13 |
+| Maximum wind + radii | 9.957 | 10.814 | 0.092 | 13 |
+
+| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | PSNR (dB) | SSIM | Scenes |
+|---|---:|---:|---:|---:|---:|---:|
+| Maximum wind only | 2.568 | 3.736 | 0.907 | 26.592 | 0.814 | 13 |
+| Maximum wind + radii | 2.526 | 3.918 | 0.851 | 26.179 | 0.814 | 13 |
+
+PSNR uses the fixed 0.2–80.0 m/s SAR export range (79.8 m/s). SSIM is
+scene-averaged after clipping to that range and excludes every 7×7 window that
+touches an invalid prediction or target pixel.
 
 ## Radii from two sources
 
@@ -62,6 +81,6 @@ callback. Training was stopped after each validation history had exceeded the
 intended 50-epoch patience, and the global minimum `val/loss` checkpoint was
 selected. One-epoch resume runs at
 `logs/latent-structure/max-wind/20260827-115409_modular` and
-`logs/latent-structure/max-wind-radii/20260827-114638_modular`
-completed the run manifests cleanly without changing checkpoint selection. The
-checked-in presets now enable the callback.
+`logs/latent-structure/max-wind-radii/20260827-114638_modular` completed the run
+manifests cleanly without changing checkpoint selection. The checked-in presets
+now enable the callback.

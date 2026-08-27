@@ -128,8 +128,6 @@ def _read_frame(path: Path, storms: Sequence[str]) -> pd.DataFrame:
         "observation_timestamp",
         "target_ms",
         "inference_valid",
-        "is_rapid_intensification",
-        "ri_24h_change_ms",
         *(column for _, _, column, _ in CORE_MODELS),
     }
     missing = required.difference(frame.columns)
@@ -186,6 +184,32 @@ def load_frames(
         atol=1.0e-6,
     ):
         raise ValueError("ERA5/no-ERA5 cohorts use different maximum-wind targets")
+    ri_columns = ("ri_24h_change_ms", "is_rapid_intensification")
+    reference_has_ri = all(column in reference for column in ri_columns)
+    candidate_has_ri = all(column in candidate for column in ri_columns)
+    if not reference_has_ri:
+        raise ValueError("with-ERA5 inference is missing RI diagnostics")
+    if not candidate_has_ri:
+        # RI is defined entirely by the shared IBTrACS storm trajectory and
+        # observation timestamp.  Schema-1 no-ERA5 outputs can therefore inherit
+        # it from a verified, row-identical with-ERA5 inference result.
+        for column in ri_columns:
+            candidate[column] = reference[column].to_numpy(copy=True)
+    else:
+        if not np.allclose(
+            reference["ri_24h_change_ms"].to_numpy(float),
+            candidate["ri_24h_change_ms"].to_numpy(float),
+            rtol=1.0e-7,
+            atol=1.0e-6,
+            equal_nan=True,
+        ):
+            raise ValueError("ERA5/no-ERA5 cohorts use different RI changes")
+        if (
+            not reference["is_rapid_intensification"]
+            .astype(bool)
+            .equals(candidate["is_rapid_intensification"].astype(bool))
+        ):
+            raise ValueError("ERA5/no-ERA5 cohorts use different RI labels")
     return frames
 
 

@@ -11,8 +11,8 @@ comparison must use the same sample IDs, masks, split policy, and aggregation.
 | MAE | Mean absolute prediction error over valid pixels; lower is better. |
 | RMSE | Square root of mean squared error; gives greater weight to large errors; lower is better. |
 | Bias | Mean signed error, prediction minus target. Positive values indicate overestimation. |
-| PSNR | Reconstruction fidelity at the configured physical or normalized data range; higher is better. |
-| SSIM | Local luminance, contrast, and structural similarity; higher is better. |
+| PSNR | `20 log10(79.8 m/s / RMSE)` in physical space, using the fixed 0.2–80.0 m/s SAR range; higher is better. |
+| SSIM | Scene-level structural similarity after clipping to 0.2–80.0 m/s. Every 7×7 window touching an invalid prediction or target pixel is excluded, then valid scene means are averaged equally; higher is better. |
 | High-wind MAE | MAE where target wind meets the configured threshold. The deterministic default is 17 m/s (33.0 kt). |
 
 When ERA5 is available, the deterministic model also evaluates ERA5 on the
