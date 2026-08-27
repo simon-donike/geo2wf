@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 import torch
 import xarray as xr
-import yaml
 from tqdm.auto import tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +30,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from geo2wf.data.intensity import KNOT_TO_MS  # noqa: E402
+from geo2wf.config import load_config_file  # noqa: E402
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor  # noqa: E402
 from scripts.export_geo_sar_geotiffs import (  # noqa: E402
     ERA5_CHANNELS,
@@ -44,7 +44,7 @@ from scripts.run_storm_unet_inference import _prepare_sample  # noqa: E402
 DEFAULT_DATA_ROOT = Path("data")
 DEFAULT_MANIFEST = Path("data/index-files/observation_manifest_v6.csv")
 DEFAULT_IBTRACS = Path("data/IBTrACs/ibtracs.ALL.list.v04r01.csv")
-DEFAULT_CONFIG = Path("configs/config_geo_sar_10bands_era5_residual.yaml")
+DEFAULT_CONFIG = Path("configs/modular.yaml")
 DEFAULT_OUTPUT_ROOT = Path("data/unet_intensity")
 
 
@@ -168,7 +168,7 @@ def export_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
     for path in paths:
         if not Path(path).expanduser().is_file():
             raise FileNotFoundError(path)
-    config = yaml.safe_load(args.config.read_text(encoding="utf-8")) or {}
+    config = load_config_file(args.config)
     stats_path = args.stats or Path(config["data"]["stats_file"])
     if not stats_path.is_file():
         raise FileNotFoundError(stats_path)

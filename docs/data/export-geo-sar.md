@@ -38,7 +38,10 @@ Failures caused by missing channels, file I/O, or invalid geometry are recorded 
 
 ```bash
 uv run geo2wf-export geo-sar \
-  --config configs/v1/config_geo_sar_10bands_era5.yaml
+  --config configs/config.yaml \
+  --geo-channel-set common10 \
+  --include-era5 \
+  --output-root data/geotiff/geo_sar_10bands_era5
 ```
 
 The configured seven source fields are precipitable water, sea-surface temperature, mean sea-level pressure, 2 m temperature, 2 m dewpoint, and 10 m u/v wind. New exports calculate 10 m wind speed and relative vorticity on the native ERA5 grid before continuous interpolation, preserving more structure than deriving them after nearest-neighbor regridding.

@@ -17,7 +17,6 @@ def main() -> None:
         "workflow",
         choices=(
             "deterministic-residual",
-            "residual-diffusion",
             "intensity-correction",
             "intensity-forecast",
         ),
@@ -26,8 +25,6 @@ def main() -> None:
     sys.argv = [sys.argv[0], *remaining]
     if args.workflow == "deterministic-residual":
         from scripts.run_storm_unet_inference import main as inference_main
-    elif args.workflow == "residual-diffusion":
-        from scripts.run_storm_diffusion_inference import main as inference_main
     elif args.workflow == "intensity-correction":
         from scripts.run_intensity_correction_inference import main as inference_main
     else:

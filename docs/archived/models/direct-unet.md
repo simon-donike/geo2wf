@@ -1,4 +1,8 @@
-# Direct PMW U-Net
+# Archived direct PMW U-Net
+
+!!! archive "Retired experiment family"
+    This proxy model is preserved for provenance and is not part of the active
+    experiment matrix.
 
 `DirectUNetRegressor` is a deterministic image-to-image control for the
 GEO→near-89 GHz passive-microwave proxy task. It predicts brightness

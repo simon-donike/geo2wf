@@ -6,10 +6,9 @@ Full exports are intended for batch workers, not login nodes:
 
 ```bash
 qsub scripts/hpc/export_geo_sar_geotiffs_cpu.pbs
-qsub scripts/hpc/export_geo_pmw_geotiffs_cpu.pbs
 ```
 
-The PBS files are site templates. Review account, queue, walltime, memory,
+The PBS file is a site template. Review account, queue, walltime, memory,
 source root, output root, and environment activation before submission. Their
 legacy script calls remain supported; new launchers should prefer
 `geo2wf-export`.

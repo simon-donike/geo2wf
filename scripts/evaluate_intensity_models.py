@@ -99,7 +99,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--intensity-target-source",
-        choices=("ibtracs", "sar_robust_peak"),
+        choices=("ibtracs",),
         default=None,
     )
     parser.add_argument("--split", choices=("val", "test"), default="val")

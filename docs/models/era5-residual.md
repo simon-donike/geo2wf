@@ -1,6 +1,8 @@
-# Stage 1: deterministic baseline
+# Field U-Net
 
-`ERA5ResidualRegressor` is the first stage of the main workflow. It asks whether GEO and ERA5 context can learn a useful physical correction to ERA5 10 m wind:
+`ERA5ResidualRegressor` is the field-producing model in the active comparison.
+With ERA5, it asks whether GEO and environmental context can learn a useful
+physical correction to ERA5 10 m wind:
 
 \[
 \hat v_{\mathrm{base}} = v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, masks)
@@ -75,24 +77,22 @@ Three validation choices have different purposes in the grouped default:
 - when the trainer does not override it, checkpoint selection uses the model's
   `val/eye_structure_score` default.
 
-Always inspect `resolved-config.yaml` before comparing a historical run: older
-full-YAML presets and completed ablations can use different objectives and
-monitors.
+Always inspect `resolved-config.yaml` before comparing runs. Retired full-YAML
+presets and completed ablations are preserved in the code archive.
 
-## Train Stage 1
+## Train with ERA5
 
 ```bash
 uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=deterministic_residual
+  experiment=intensity_comparison_unet
 ```
 
-## No-ERA5 ablation
+## Train without ERA5
 
-The same U-Net can be trained without ERA5:
+The same U-Net can be trained without ERA5 on the matched cohort:
 
 ```bash
-uv run geo2wf-train experiment=deterministic_unet_no_era5
+uv run geo2wf-train experiment=intensity_comparison_unet_no_era5
 ```
 
 In this mode the 14-channel condition contains ten GEO bands, storm-center
@@ -100,12 +100,6 @@ distance, and three solar-time channels. The U-Net predicts absolute physical
 wind speed. The comparison preset retains ERA5 availability filtering to keep
 the same cohort, but disables ERA5 inputs, residual addition, off-swath
 anchoring, and ERA5 comparison metrics.
-
-The older direct near-89 GHz U-Net has an equivalent preset:
-
-```bash
-uv run geo2wf-train experiment=geo_pmw_near89_unet_no_era5
-```
 
 After selecting a checkpoint, continue to [Evaluation](../experiments/evaluation.md)
 or run storm inference with the [command reference](../reference/commands.md).

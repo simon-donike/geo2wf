@@ -8,7 +8,8 @@ from pathlib import Path
 import yaml
 
 from src.experiment_tracking import initialize_run_manifest, record_run_failure
-from train import build_model, resolve_runtime_config
+from geo2wf.config import compose_config
+from train import build_model
 
 
 def _run_git(repository: Path, *arguments: str) -> None:
@@ -18,32 +19,6 @@ def _run_git(repository: Path, *arguments: str) -> None:
         check=True,
         capture_output=True,
         text=True,
-    )
-
-
-def test_runtime_config_materializes_environment_baseline(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    checkpoint = tmp_path / "baseline.ckpt"
-    checkpoint.write_bytes(b"baseline")
-    monkeypatch.setenv("GEO2WF_BASELINE_CKPT", str(checkpoint))
-    config = {
-        "model": {
-            "type": "diffusion_residual",
-            "residual": {
-                "baseline": {
-                    "source": "deterministic",
-                    "checkpoint_path": None,
-                }
-            },
-        }
-    }
-
-    resolved = resolve_runtime_config(config)
-
-    assert resolved["model"]["residual"]["baseline"]["checkpoint_path"] == str(
-        checkpoint.resolve()
     )
 
 
@@ -144,33 +119,14 @@ def test_record_run_failure_is_durable_and_idempotent(tmp_path: Path) -> None:
 
 
 def test_builder_wires_image_logging_switch() -> None:
-    diffusion = build_model(
-        {
-            "model": {
-                "type": "diffusion",
-                "in_channels": 2,
-                "out_channels": 1,
-                "num_timesteps": 4,
-                "unet": {
-                    "dim": 4,
-                    "dim_mults": [1, 2],
-                    "channels": 4,
-                    "out_dim": 1,
-                },
-            },
-            "validation": {"log_reconstruction_images": False},
-        }
+    config = compose_config(
+        [
+            "model=deterministic_residual",
+            "model.base_channels=4",
+            "model.channel_mults=[1,2]",
+            "model.log_reconstruction_images=false",
+        ]
     )
-    deterministic = build_model(
-        {
-            "model": {
-                "type": "deterministic_residual",
-                "condition_channels": 2,
-                "residual": {"base_channels": 4, "channel_mults": [1, 2]},
-            },
-            "validation": {"log_reconstruction_images": False},
-        }
-    )
+    deterministic = build_model(config)
 
-    assert diffusion.log_reconstruction_images is False
     assert deterministic.log_reconstruction_images is False

@@ -12,13 +12,13 @@ import torch
 from rasterio.transform import from_origin
 from torch.utils.data import SequentialSampler, TensorDataset
 
-from data.datamodule import (
+from geo2wf.data.datamodule import (
     DistributedWeightedSampler,
     PairedDataModule,
     _balanced_intensity_weights,
     _storm_stratified_indices,
 )
-from data.dataset import (
+from geo2wf.data.datasets.paired_geotiff import (
     DISTANCE_TO_IBTRACS_CENTER,
     ERA5_RELATIVE_VORTICITY_10M,
     ERA5_WIND_SPEED_10M,

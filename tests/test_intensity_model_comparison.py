@@ -8,7 +8,6 @@ import pytest
 
 from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
 from scripts.combine_intensity_comparison_reports import combined_markdown_report
-from scripts.combine_intensity_target_validation import _metric_rows
 from scripts.evaluate_intensity_models import (
     _assert_common_cohort,
     _cluster_bootstrap,
@@ -276,41 +275,6 @@ def test_combined_report_requires_and_documents_the_same_cohort() -> None:
     different = {**payload, "cohort": {**payload["cohort"], "sha256": "other"}}
     with pytest.raises(ValueError, match="exact same cohort"):
         combined_markdown_report(payload, different)
-
-
-def test_matched_validation_labels_encoder_as_ibtracs_trained() -> None:
-    summary = {
-        "samples": 2,
-        "storms": 2,
-        "regression": {"mae_ms": 1.0, "rmse_ms": 1.2, "bias_ms": 0.1},
-        "storm_macro_mae_ms": 1.0,
-        "category": {
-            "accuracy": 0.5,
-            "macro_f1": 0.4,
-            "within_one_accuracy": 1.0,
-        },
-    }
-    result = {
-        "conditioning": {"label": "with_era5"},
-        "target_fingerprint": {"source": "ibtracs"},
-        "checkpoints": {"unet": {"sha256": "unet"}},
-        "models": {
-            "encoder_mlp_ibtracs": {"label": "U-Net encoder + MLP (IBTrACS only)"}
-        },
-        "reference_evaluation": {
-            "ibtracs": {
-                "overall": {"encoder_mlp_ibtracs": summary},
-                "overall_storm_bootstrap": {"models": {}},
-                "rapid_intensification": None,
-                "rapid_intensification_storm_bootstrap": None,
-            }
-        },
-    }
-
-    rows = _metric_rows([result])
-
-    assert rows[0]["model_key"] == "encoder_mlp_ibtracs"
-    assert rows[0]["trained_target"] == "ibtracs"
 
 
 def test_training_result_uses_recorded_best_checkpoint(tmp_path: Path) -> None:

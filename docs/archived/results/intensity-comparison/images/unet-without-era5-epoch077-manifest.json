@@ -10,8 +10,8 @@
   ],
   "max_samples": 4,
   "images": [
-    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-03.jpg",
-    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-23.jpg",
-    "docs/assets/images/intensity-comparison/unet-without-era5-epoch077-batch-31.jpg"
+    "docs/archived/results/intensity-comparison/images/unet-without-era5-epoch077-batch-03.jpg",
+    "docs/archived/results/intensity-comparison/images/unet-without-era5-epoch077-batch-23.jpg",
+    "docs/archived/results/intensity-comparison/images/unet-without-era5-epoch077-batch-31.jpg"
   ]
 }

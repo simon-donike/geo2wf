@@ -25,7 +25,7 @@ A choice is the YAML filename without `.yaml`.
 | `model` | reconstruction, joint-intensity, correction, and forecast choices | constructor, architecture, objective, optimizer |
 | `trainer` | `default` | devices, precision, loop bounds, checkpoint policy |
 | `logging` | `default` | optional W&B adapter |
-| `experiment` | ablations and task-specific data/model combinations | focused cross-group overrides only |
+| `experiment` | retained task-specific data/model combinations | focused cross-group overrides only |
 
 List filenames below `configs/<group>/` to discover new choices. Each data and
 model config has a local `_target_`; adding one does not require a central
@@ -109,17 +109,9 @@ Every run writes `resolved-config.yaml` before training and records its absolute
 path in `run-manifest.json`. Environment-backed checkpoint paths are materialized
 there, making the actual run input inspectable.
 
-## Legacy full YAML files
+## Archived full YAML files
 
-Existing files such as `configs/config_geo_sar_10bands_era5_residual.yaml` are
-still accepted:
-
-```bash
-uv run geo2wf-train \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml
-```
-
-A full YAML file cannot be combined with Hydra overrides. Use the grouped
-configuration for new work. Legacy keys (`model.type`, `optimization`, and
-`validation`) are translated by the compatibility construction path and are
-documented in the [configuration reference](../reference/configuration.md#legacy-full-yaml-reference).
+Historical full-YAML presets are preserved under `archived/configs/` for
+provenance. Active training requires grouped configs with a model `_target_`;
+archived presets are not accepted as current launch choices. Use git history or
+an older checkout for exact historical reproduction.

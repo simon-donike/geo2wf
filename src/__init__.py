@@ -1,4 +1,3 @@
-from .PixelDiffusion import PixelDiffusionConditional
-from .DenoisingDiffusionProcess.DenoisingDiffusionProcess import DenoisingDiffusionConditionalProcess
+from .ERA5Residual import ERA5ResidualRegressor
 
-__all__ = ["PixelDiffusionConditional", "DenoisingDiffusionConditionalProcess"]
+__all__ = ["ERA5ResidualRegressor"]

@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 
-from data.dataset import (
+from geo2wf.data.datasets.paired_geotiff import (
     _condition_timestamp,
     _manifest_ibtracs_center,
     _append_era5_derived_channels,

@@ -8,11 +8,13 @@ uv run geo2wf-train \
   model=deterministic_residual
 ```
 
-Model switching is configuration, not Python dispatch:
+Select one of the retained experiments through configuration:
 
 ```bash
-uv run geo2wf-train model=direct_unet
-uv run geo2wf-train model=bottleneck_unet_mlp
+uv run geo2wf-train experiment=intensity_comparison_unet
+uv run geo2wf-train experiment=bottleneck_unet_mlp
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
+uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 
 ## Startup sequence

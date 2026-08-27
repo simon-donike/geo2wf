@@ -1,11 +1,10 @@
 # geo2wf
 
 `geo2wf` reconstructs tropical-cyclone surface wind fields from geostationary
-satellite imagery and optional ERA5 or PMW context, using matched SAR wind
-retrievals as spatial supervision. The main workflow trains a deterministic
-ERA5-residual wind-field model. Separate model
-families handle PMW brightness-temperature proxy reconstruction, current scalar
-intensity, and future scalar intensity.
+satellite imagery with optional ERA5 context, using matched SAR wind retrievals
+as spatial supervision. Active experiments compare three instantaneous
+field/intensity paths with and without ERA5, plus an encoder/latent-MLP
+structure study. The six-hour scalar intensity forecast remains active.
 
 ![Random GEO-SAR training pairs](docs/assets/images/geo-sar-random-pairs.png)
 
@@ -35,11 +34,15 @@ uv run geo2wf-train \
   model=deterministic_residual
 ```
 
-Switching models is a config override:
+The retained experiment presets are:
 
 ```bash
-uv run geo2wf-train model=direct_unet data=geo_pmw_near89_common10_era5
-uv run geo2wf-train model=bottleneck_unet_mlp
+uv run geo2wf-train experiment=intensity_comparison_unet
+uv run geo2wf-train experiment=intensity_comparison_unet_no_era5
+uv run geo2wf-train experiment=bottleneck_unet_mlp
+uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
+uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 
 Override individual values on the command line:
@@ -58,21 +61,17 @@ The other installed entry points provide the maintained export, evaluation,
 and storm-inference workflows:
 
 ```bash
-uv run geo2wf-export geo-sar --config configs/config_geo_sar_10bands_era5.yaml
+uv run geo2wf-export geo-sar --config configs/config.yaml
 
-uv run geo2wf-evaluate \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml \
-  --checkpoint /path/to/model.ckpt \
-  --output logs/evaluation.json
+uv run geo2wf-evaluate intensity-comparison --help
 
 uv run geo2wf-infer deterministic-residual \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml \
+  --config /path/to/run/resolved-config.yaml \
   --checkpoint /path/to/model.ckpt
 ```
 
-Training is the first command migrated to native Hydra composition. Export,
-evaluation, and storm inference use canonical package entry points but retain
-their established argparse/full-YAML interfaces for compatibility.
+Training uses Hydra composition. Export, evaluation, and storm inference use
+their workflow-specific argparse interfaces.
 
 ## Configuration layout
 
@@ -83,7 +82,7 @@ configs/
 ├── model/                         model constructors and hyperparameters
 ├── trainer/                       Lightning runtime and checkpoints
 ├── logging/                       W&B settings
-├── experiment/ablations/          focused overrides
+├── experiment/                    retained experiment overrides
 └── export/                        reusable export settings
 ```
 
@@ -151,10 +150,10 @@ Use `WANDB_MODE=offline` instead to keep local W&B artifacts for later sync.
 
 ## Compatibility
 
-Existing full YAML files, `python train.py --config ...`, the old `data.*` and
-CamelCase `src.*` imports, and existing checkpoints remain supported through
-deprecated forwarding adapters. New work should import from `geo2wf` and use
-the installed commands. Compatibility removal is not part of this refactor.
+Retired diffusion, direct-PMW, ablation, and historical full-YAML files are
+preserved under [`archived/`](archived/README.md). They are reference material,
+not active config choices. The deprecated `train.py` and deterministic-model
+import adapters remain for compatible imports.
 
 ## Documentation
 
@@ -166,4 +165,4 @@ the installed commands. Compatibility removal is not part of this refactor.
 - [Commands and environment](docs/reference/commands.md)
 - [Modular architecture](docs/concepts/modular-architecture.md)
 - [Adding a model, dataset, or metric](docs/reference/adding-components.md)
-- [Two-stage scientific workflow](docs/models/two-stage.md)
+- [Archived work](docs/archived/index.md)

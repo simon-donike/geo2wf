@@ -16,7 +16,8 @@ from src.ERA5Residual import (
     storm_radius_grid_km,
 )
 from src.wind_metrics import RADIAL_METRIC_NAMES
-from train import build_model, load_config
+from geo2wf.config import compose_config
+from train import build_model
 
 
 def _batch(
@@ -392,18 +393,16 @@ def test_validation_can_disable_images_without_disabling_statistics() -> None:
 
 
 def test_train_builder_selects_residual_model_and_eye_checkpoint_metric() -> None:
-    config = {
-        "model": {
-            "type": "deterministic_residual",
-            "condition_channels": 3,
-            "residual": {
-                "base_channels": 4,
-                "channel_mults": [1, 2],
-            },
-        },
-        "optimization": {"off_swath_anchor_weight": 0.02},
-        "validation": {"reconstruction_batches": 2},
-    }
+    config = compose_config(
+        [
+            "model=deterministic_residual",
+            "model.condition_channels=3",
+            "model.base_channels=4",
+            "model.channel_mults=[1,2]",
+            "model.off_swath_anchor_weight=0.02",
+            "model.validation_reconstruction_batches=2",
+        ]
+    )
 
     model = build_model(config)
 
@@ -412,20 +411,20 @@ def test_train_builder_selects_residual_model_and_eye_checkpoint_metric() -> Non
     assert model.off_swath_anchor_weight == pytest.approx(0.02)
     assert model.validation_reconstruction_batches == 2
     scheduler_config = model.configure_optimizers()["lr_scheduler"]
-    assert scheduler_config["monitor"] == "val/eye_structure_score"
+    assert scheduler_config["monitor"] == "val/peak_structure_score"
 
 
 def test_residual_training_config_builds() -> None:
-    config = load_config("configs/config_geo_sar_10bands_era5_residual.yaml")
+    config = compose_config(["experiment=intensity_comparison_unet"])
 
     model = build_model(config)
 
     assert isinstance(model, ERA5ResidualRegressor)
     assert model.condition_channels == 23
-    assert config["trainer"]["checkpoint"]["monitor"] == "val/peak_structure_score"
+    assert config["trainer"]["checkpoint"]["monitor"] == "val/eye_structure_score"
     assert config["trainer"]["limit_val_batches"] == 1.0
 
 
-def test_unknown_model_type_is_rejected() -> None:
-    with pytest.raises(ValueError, match="Unsupported model.type"):
+def test_model_without_target_is_rejected() -> None:
+    with pytest.raises(ValueError, match="legacy model config has no _target_"):
         build_model({"model": {"type": "not-a-model"}})

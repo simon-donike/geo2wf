@@ -1,64 +1,47 @@
 # Choose an experiment
 
-The modular workflow composes a data choice and model choice. Start with the
-maintained field reconstruction:
+Active work is intentionally limited to the instantaneous three-model matrix,
+the encoder/latent-MLP structure study, and the retained scalar forecast.
 
-```bash
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=deterministic_residual
-```
+## Instantaneous three-model matrix
 
-## Principal model choices
-
-| Choice | Scientific role | Baseline |
+| Path | Scientific role | ERA5 regimes |
 |---|---|---|
-| `deterministic_residual` | physical wind-field correction around ERA5 | ERA5 |
-| `direct_unet` | direct near-89 GHz PMW brightness-temperature proxy | none |
-| `bottleneck_unet_mlp` | joint field and scalar-intensity estimation | none |
-| `unet_encoder_mlp_ibtracs` | encoder-only IBTrACS intensity estimation | none |
-| `intensity_correction` | scalar correction from a frozen U-Net field | frozen U-Net checkpoint |
-| `intensity_forecast` | six-hour scalar forecast | current intensity and recent history |
+| `deterministic_residual` | raw 2D wind-field U-Net and image-derived maximum | with and without |
+| `intensity_correction` | scalar correction from a frozen U-Net field | with and without |
+| `bottleneck_unet_mlp` | joint 2D field and bottleneck-MLP maximum | with and without |
 
-Data choices cover GEO–SAR reconstruction, GEO–PMW proxy training, joint
-field–intensity training, single-field correction, and intensity forecasting.
-List `configs/data/*.yaml` for the current set. Model and data contracts must
-match; incompatible pairs are rejected by `DataSpec` validation.
+Use the checked-in experiment pairs to keep model width, data inputs, and
+cohort filtering aligned. The complete design is in the [active experiment
+matrix](intensity-comparison.md).
 
-## Experiment overrides
+## Encoder/latent-MLP study
 
-`experiment=ablations/stage1_peak_aware` applies only the selected Stage 1
-objective differences on top of the model/data/trainer groups:
+`bottleneck_encoder_mlp` keeps the U-Net encoder and pooled latent MLP but
+removes the image decoder. The next study compares maximum wind alone with
+radii predicted by the MLP and radii diagnosed from a 2D U-Net field.
 
 ```bash
-uv run geo2wf-train \
-  model=deterministic_residual \
-  experiment=ablations/stage1_peak_aware
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
+uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
 ```
 
-New ablations should be similarly short instead of copying full configs.
+## Forecast retained
 
-## Historical presets
+The six-hour scalar forecast remains active and separate from the
+instantaneous ERA5 matrix:
 
-Complete `configs/config*.yaml` and `configs/v1/*.yaml` files preserve past
-runs, PMW candidates, proxy pretraining, and exact checkpoint reproduction.
-They remain launchable with `geo2wf-train --config ...`, but cannot be mixed
-with Hydra overrides. Prefer adding missing grouped choices when starting a new
-experiment.
+```bash
+uv run geo2wf-train experiment=intensity_forecast_pretrain
+uv run geo2wf-train experiment=intensity_forecast_finetune
+```
 
-Notable compatibility presets include:
+## Archived work
 
-| Full YAML | Purpose |
-|---|---|
-| `configs/config_geo_sar_10bands_era5_residual.yaml` | historical Stage 1 |
-| `configs/config_geo_sar_10bands_era5_pmw_residual.yaml` | PMW-conditioned Stage 1 candidate |
-| `configs/v1/config_pretrain_geo_pmw*.yaml` | GEO→PMW proxy pretraining |
-
-## Comparability checks
-
-- Keep the export root, filtering, channel order, normalization, and split policy constant.
-- Modular data defaults keep test held out; historical presets may merge test into train.
-- Record validation coverage and the exact comparison baseline.
+Diffusion, direct-PMW proxy training, historical full-YAML presets, ablation
+suites, and previous results are preserved under the repository's `archived/`
+tree and the documentation [archive](../archived/index.md). They are not active
+configuration choices.
 
 Continue to [configuration](configuration.md), [training](training.md), and
 [evaluation](evaluation.md).

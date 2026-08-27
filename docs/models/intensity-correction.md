@@ -38,13 +38,8 @@ The final layer starts at zero, so a new model initially reproduces that
 baseline. The corrected value is nonnegative. TD, TS, and hurricane categories
 are derived from the corrected continuous wind without rounding.
 
-The cache and model also support an explicit matched-target comparison using a
-SAR robust peak (the mean of the highest configured fraction of valid SAR
-pixels) instead of IBTrACS intensity, and `anchor_statistic=robust_peak` instead
-of the field maximum. The checked-in grouped model defaults remain the raw
-field maximum anchor and the standard IBTrACS cache target. A run using either
-alternative must preserve that choice in cache metadata and should not label
-its scalar as `USA_WIND`.
+The active cache uses the raw field maximum as its anchor and continuous
+IBTrACS wind as its scalar target.
 
 An optional five-value structure head can predict IBTrACS eye size, RMW, and
 equivalent-area R34/R50/R64 radii. It uses per-value validity masks and a masked
@@ -59,7 +54,7 @@ uv run geo2wf-export intensity-cache \
   --data-root /path/to/archive \
   --manifest /path/to/observation_manifest_v6.csv \
   --ibtracs-file /path/to/ibtracs.ALL.list.v04r01.csv \
-  --config configs/config_geo_sar_10bands_era5_residual.yaml \
+  --config /path/to/unet-run/resolved-config.yaml \
   --checkpoint /path/to/frozen-unet.ckpt \
   --stats data/geotiff/geo_sar_10bands_era5/stats.json \
   --output-root data/unet_intensity
@@ -75,24 +70,12 @@ config declares `include_test_in_train: true`, provenance marks the result as
 development-only. A clean end-to-end generalization claim requires an upstream
 checkpoint that did not train on or select against the final evaluation storms.
 
-## Train and run ablations
+## Train
 
 ```bash
 uv run geo2wf-train \
   experiment=unet_intensity_correction \
   data.root=data/unet_intensity
-
-# Image-only comparator
-uv run geo2wf-train \
-  experiment=unet_intensity_correction \
-  data.root=data/unet_intensity \
-  model.use_metadata=false
-
-# Metadata-only comparator; the raw field maximum remains the residual anchor
-uv run geo2wf-train \
-  experiment=unet_intensity_correction \
-  data.root=data/unet_intensity \
-  model.use_field=false
 ```
 
 Training uses storm-balanced, capped category-aware Huber weights. Checkpoints
@@ -118,8 +101,6 @@ uv run geo2wf-evaluate intensity-correction \
   --cache-root data/unet_intensity \
   --checkpoint /path/to/intensity.ckpt \
   --split test \
-  --comparison-checkpoint image_only=/path/to/image-only.ckpt \
-  --comparison-checkpoint metadata_only=/path/to/metadata-only.ckpt \
   --output logs/intensity-evaluation.json
 
 uv run geo2wf-infer intensity-correction \
