@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ import xarray as xr
 from scripts.publish_current_experiment_results import (
     _regime_series,
     add_era5_maximum_wind,
+    figure_data_rows,
     storm_metric_rows,
     storm_prediction_rows,
 )
@@ -104,3 +106,42 @@ def test_storm_exports_include_each_regime_ri_metrics_and_era5_reference() -> No
     assert ri["mae_ms"] == 2.0
     era5 = selected.loc[("era5_max_wind", "reference", "all_three_storms")]
     assert era5["mae_ms"] == 3.0
+
+
+def test_figure_download_contains_exact_smoothed_plot_series() -> None:
+    frames = {regime: _storm_frame(regime) for regime in ("with_era5", "without_era5")}
+    series = {regime: _regime_series(frame, regime) for regime, frame in frames.items()}
+
+    result = figure_data_rows(frames, series, "core", smoothing_hours=3)
+
+    assert set(result["conditioning"]) == {"with_era5", "without_era5"}
+    assert set(result["series_key"]) == {
+        "ibtracs_best_track",
+        "era5_max_wind",
+        "unet_raw",
+    }
+    plotted = result.loc[
+        (result["conditioning"] == "with_era5") & (result["series_key"] == "unet_raw")
+    ]
+    assert plotted["maximum_wind_ms"].tolist() == [26.5, 26.5]
+    assert plotted["is_rapid_intensification"].tolist() == [False, True]
+    assert plotted["smoothing_hours"].unique().tolist() == [3]
+
+
+def test_results_page_exposes_one_csv_download_per_table_and_figure() -> None:
+    root = Path(__file__).resolve().parents[1]
+    page = (root / "docs/results.md").read_text(encoding="utf-8")
+    downloads = re.findall(r"\[Download CSV\]\(([^)]+)\)", page)
+
+    assert len(downloads) == 7
+    assert all(download.endswith(".csv") for download in downloads)
+    assert all((root / "docs" / download).is_file() for download in downloads)
+    assert "](assets/data/final-results/current-validation-results.json" not in page
+
+
+def test_results_are_linked_from_the_persistent_site_header() -> None:
+    root = Path(__file__).resolve().parents[1]
+    header = (root / "docs/overrides/partials/header.html").read_text(encoding="utf-8")
+
+    assert 'class="results-link"' in header
+    assert "'results/' | url" in header

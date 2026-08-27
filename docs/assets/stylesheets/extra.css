@@ -125,6 +125,21 @@ input {
   white-space: nowrap;
 }
 
+.results-link {
+  margin-left: 1rem;
+  color: var(--secondary);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.results-link:hover {
+  color: var(--highlight);
+}
+
 .dashboard-link {
   display: inline-flex;
   align-items: center;
@@ -266,6 +281,16 @@ input {
   color: var(--main);
   background: var(--highlight);
   border-color: var(--highlight);
+}
+
+.md-typeset .md-button.result-download {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.15rem 0.25rem 0.35rem 0;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.025em;
+  line-height: 1.15;
 }
 
 .md-sidebar,
@@ -886,8 +911,12 @@ input {
     display: none;
   }
 
-  .dashboard-link {
+  .results-link {
     margin-left: auto;
+  }
+
+  .dashboard-link {
+    margin-left: 0.75rem;
   }
 
   .fdl-footer {
@@ -936,6 +965,10 @@ input {
   }
 
   .md-header__title {
+    display: none;
+  }
+
+  .results-link {
     display: none;
   }
 
