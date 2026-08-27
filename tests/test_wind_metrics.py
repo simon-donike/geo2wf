@@ -214,7 +214,7 @@ def test_generated_field_radii_are_compared_with_combined_ibtracs_targets() -> N
     )
     predicted = initial[:, 0]
 
-    assert initial[:, 4].tolist() == [1.0, 1.0, 1.0, 1.0]
+    assert initial[:, 5].tolist() == [1.0, 1.0, 1.0, 1.0]
     assert predicted[1] > predicted[2] > predicted[3] > predicted[0]
 
     matched = ibtracs_radius_metric_statistics(
@@ -225,7 +225,7 @@ def test_generated_field_radii_are_compared_with_combined_ibtracs_targets() -> N
         predicted[None],
         valid,
     )
-    assert torch.count_nonzero(matched[:, 2:4]) == 0
+    assert torch.count_nonzero(matched[:, 2:5]) == 0
 
 
 def test_generated_field_radius_metrics_respect_ground_truth_validity() -> None:
@@ -241,4 +241,4 @@ def test_generated_field_radius_metrics_respect_ground_truth_validity() -> None:
         valid,
     )
 
-    assert statistics[:, 4].tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert statistics[:, 5].tolist() == [1.0, 0.0, 1.0, 0.0]

@@ -40,6 +40,7 @@ from geo2wf.data.joint_intensity import (
     JointPairedIntensityDataModule,
     JointPairedIntensityDataset,
     _interpolate_ibtracs_wind,
+    _ri_diagnostics,
 )
 
 
@@ -147,6 +148,8 @@ class EncoderIBTrACSDataset(Dataset):
         eligible_sample_ids: list[str],
         *,
         max_bracket_hours: float,
+        ri_threshold_kt: float,
+        ri_window_hours: float,
     ) -> None:
         self.paired = paired
         self.root = paired.root
@@ -172,6 +175,16 @@ class EncoderIBTrACSDataset(Dataset):
                 raise ValueError(
                     f"cached sample {row['sample_id']} no longer has an IBTrACS label"
                 )
+            ri_change_ms, is_ri = _ri_diagnostics(
+                ibtracs_tracks[storm_id],
+                label["observation_timestamp"],
+                current_wind_ms=float(label["target_wind_ms"]),
+                max_bracket_hours=max_bracket_hours,
+                threshold_kt=ri_threshold_kt,
+                window_hours=ri_window_hours,
+            )
+            label["ri_24h_change_ms"] = ri_change_ms
+            label["is_rapid_intensification"] = is_ri
             self.labels.append(label)
 
     def __len__(self) -> int:
@@ -320,6 +333,12 @@ class EncoderIBTrACSDataset(Dataset):
             "intensity_target_ms": torch.tensor(
                 float(label["target_wind_ms"]), dtype=torch.float32
             ),
+            "ri_24h_change_ms": torch.tensor(
+                float(label["ri_24h_change_ms"]), dtype=torch.float32
+            ),
+            "is_rapid_intensification": torch.tensor(
+                bool(label["is_rapid_intensification"]), dtype=torch.bool
+            ),
             "meta": {
                 "storm_id": str(row["storm_id"]),
                 "condition_source_type": condition_source_type,
@@ -376,6 +395,8 @@ class EncoderIBTrACSDataModule(JointPairedIntensityDataModule):
             self.ibtracs_tracks,
             eligible_ids,
             max_bracket_hours=self.max_ibtracs_bracket_hours,
+            ri_threshold_kt=self.ri_threshold_kt,
+            ri_window_hours=self.ri_window_hours,
         )
 
 

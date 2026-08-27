@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-lane="${1:?usage: run_latent_mlp_matrix.sh <era5|no-era5> <gpu-index>}"
-gpu_index="${2:?usage: run_latent_mlp_matrix.sh <era5|no-era5> <gpu-index>}"
+lane="${1:?usage: run_latent_mlp_matrix.sh <era5|no-era5|no-sar-era5|no-sar-no-era5> <gpu-index>}"
+gpu_index="${2:?usage: run_latent_mlp_matrix.sh <era5|no-era5|no-sar-era5|no-sar-no-era5> <gpu-index>}"
 
 case "${lane}" in
   era5)
@@ -17,6 +17,18 @@ case "${lane}" in
     experiments=(
       latent_mlp_sar_no_era5_max_wind
       latent_mlp_sar_no_era5_max_wind_radii
+      latent_mlp_no_sar_no_era5_max_wind
+      latent_mlp_no_sar_no_era5_max_wind_radii
+    )
+    ;;
+  no-sar-era5)
+    experiments=(
+      latent_mlp_no_sar_era5_max_wind
+      latent_mlp_no_sar_era5_max_wind_radii
+    )
+    ;;
+  no-sar-no-era5)
+    experiments=(
       latent_mlp_no_sar_no_era5_max_wind
       latent_mlp_no_sar_no_era5_max_wind_radii
     )

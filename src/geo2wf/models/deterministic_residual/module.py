@@ -664,12 +664,12 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
         )
         self.register_buffer(
             "_validation_ibtracs_radius_statistics",
-            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
             persistent=False,
         )
         self.register_buffer(
             "_test_ibtracs_radius_statistics",
-            torch.zeros((len(IBTRACS_RADIUS_NAMES), 5), dtype=torch.float64),
+            torch.zeros((len(IBTRACS_RADIUS_NAMES), 6), dtype=torch.float64),
             persistent=False,
         )
         exceedance_statistic_shape = (
@@ -1670,14 +1670,15 @@ class ERA5ResidualRegressor(WindFieldLightningModule):
     ) -> None:
         statistics = self._distributed_sum(statistics)
         for index, name in enumerate(IBTRACS_RADIUS_NAMES):
-            count = statistics[index, 4]
+            count = statistics[index, 5]
             if count <= 0:
                 continue
             for metric_name, value in {
                 "predicted_mean_km": statistics[index, 0] / count,
                 "target_mean_km": statistics[index, 1] / count,
                 "mae_km": statistics[index, 2] / count,
-                "bias_km": statistics[index, 3] / count,
+                "rmse_km": torch.sqrt(statistics[index, 3] / count),
+                "bias_km": statistics[index, 4] / count,
                 "samples": count,
             }.items():
                 self.log(
