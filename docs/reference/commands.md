@@ -19,9 +19,9 @@ uv run geo2wf-train experiment=intensity_comparison_unet_no_era5
 uv run geo2wf-train experiment=bottleneck_unet_mlp
 uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
 
-# Encoder/latent MLP: matched pair
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
+# Joint U-Net/latent MLP structure pair
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
 
 # Scalar correction and retained forecast
 uv run geo2wf-train experiment=unet_intensity_correction
@@ -66,6 +66,7 @@ uv run geo2wf-export intensity-forecast-cache --help
 ## Evaluation and inference
 
 ```bash
+uv run geo2wf-evaluate latent-structure --help
 uv run geo2wf-evaluate intensity-comparison --help
 uv run geo2wf-evaluate intensity-correction --help
 uv run geo2wf-evaluate intensity-forecast --help

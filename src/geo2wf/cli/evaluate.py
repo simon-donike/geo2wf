@@ -10,6 +10,14 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "latent-structure":
+        sys.argv.pop(1)
+        from scripts.evaluate_latent_structure_experiment import (
+            main as latent_structure_main,
+        )
+
+        latent_structure_main()
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "intensity-forecast":
         sys.argv.pop(1)
         from scripts.evaluate_intensity_forecast import main as forecast_main

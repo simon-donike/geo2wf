@@ -1,7 +1,7 @@
 # Active model overview
 
 The active inventory is limited to three instantaneous comparison paths, one
-encoder/latent-MLP study, and the retained forecast.
+joint latent-structure study, and the retained forecast.
 
 ## Instantaneous comparison models
 
@@ -15,12 +15,12 @@ The with-ERA5 U-Net predicts a physical correction around an ERA5 anchor. The
 no-ERA5 version uses the same architecture to predict absolute wind and keeps
 ERA5 only as a cohort-availability filter.
 
-## Encoder/latent-MLP study
+## Joint latent-structure study
 
-The encoder-only variant documented with the [bottleneck
-model](bottleneck-unet-mlp.md#encoderlatent-mlp-experiment) removes the decoder.
-The next evaluation separates maximum wind, radii predicted directly by the MLP
-head, and radii diagnosed from a 2D U-Net image output.
+The structure variant of the [bottleneck model](bottleneck-unet-mlp.md#joint-latent-structure-experiment)
+retains the decoder. Its evaluation separates maximum wind, radii predicted
+directly by the latent MLP, and radii diagnosed from the same model's 2D U-Net
+image output.
 
 ## Forecast
 

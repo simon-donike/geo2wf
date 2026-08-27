@@ -220,6 +220,43 @@ def test_joint_optional_structure_head_outputs_and_contributes_to_loss() -> None
     assert torch.allclose(objective.loss, expected)
 
 
+def test_joint_structure_loss_masks_nan_companions_before_huber() -> None:
+    model = BottleneckUNetMLPRegressor(
+        condition_channels=3,
+        base_channels=4,
+        channel_mults=(1, 2),
+        intensity_hidden_features=8,
+        intensity_dropout=0.0,
+        structure_head_enabled=True,
+        structure_loss_weight=0.25,
+        log_reconstruction_images=False,
+    )
+    batch = _batch()
+    structure_keys = (
+        "ibtracs_eye_size_km",
+        "ibtracs_rmw_km",
+        "ibtracs_r34_equivalent_km",
+        "ibtracs_r50_equivalent_km",
+        "ibtracs_r64_equivalent_km",
+    )
+    for index, key in enumerate(structure_keys):
+        values = torch.full((2,), 30.0 + 10.0 * index)
+        valid = torch.ones(2, dtype=torch.bool)
+        values[0] = torch.nan
+        valid[0] = False
+        batch[key] = values
+        batch[f"{key}_valid"] = valid
+
+    objective = model.compute_training_objective(batch)
+    assert torch.isfinite(objective.loss)
+    assert torch.isfinite(objective.components["structure_loss"])
+    objective.loss.backward()
+    assert all(
+        parameter.grad is None or torch.isfinite(parameter.grad).all()
+        for parameter in model.parameters()
+    )
+
+
 def test_model_rejects_data_without_continuous_ibtracs_companion() -> None:
     model = BottleneckUNetMLPRegressor(
         condition_channels=3, base_channels=4, channel_mults=(1, 2)
@@ -647,6 +684,26 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert config["trainer"]["checkpoint"]["monitor"] == "val/loss"
     assert isinstance(instantiate_model(config), BottleneckUNetMLPRegressor)
 
+    max_wind_config = compose_config(["experiment=bottleneck_unet_mlp_max_wind"])
+    assert max_wind_config["data"]["use_era5"] is True
+    assert max_wind_config["model"]["structure_head_enabled"] is False
+    assert max_wind_config["model"]["structure_loss_weight"] == 0.0
+    assert max_wind_config["trainer"]["deterministic"] is False
+    assert max_wind_config["trainer"]["default_root_dir"] == (
+        "logs/latent-structure/max-wind"
+    )
+
+    radii_config = compose_config(["experiment=bottleneck_unet_mlp_max_wind_radii"])
+    assert radii_config["data"] == max_wind_config["data"]
+    assert radii_config["model"]["structure_head_enabled"] is True
+    assert radii_config["model"]["structure_loss_weight"] == 0.25
+    assert radii_config["model"]["condition_channels"] == 23
+    assert radii_config["trainer"]["deterministic"] is False
+    assert radii_config["trainer"]["default_root_dir"] == (
+        "logs/latent-structure/max-wind-radii"
+    )
+    assert isinstance(instantiate_model(radii_config), BottleneckUNetMLPRegressor)
+
     no_era5_config = compose_config(["experiment=bottleneck_unet_mlp_no_era5"])
     assert no_era5_config["data"]["use_era5"] is False
     assert no_era5_config["model"]["condition_channels"] == 14
@@ -658,6 +715,8 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert comparison_no_era5["data"]["use_era5"] is False
     assert comparison_no_era5["model"]["condition_channels"] == 14
     assert comparison_no_era5["model"]["use_era5"] is False
+
+
 def test_encoder_only_lightning_checkpoint_and_hydra_presets(tmp_path: Path) -> None:
     root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
     _write_joint_fixture(root, ibtracs_file)

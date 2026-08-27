@@ -557,9 +557,14 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 )
             return output.sum() * 0.0
         target, valid = targets
+        # Invalid IBTrACS companions are represented by NaN. Masking a loss
+        # after it is evaluated is too late because NaN * 0 is still NaN.
+        # Substitute the detached prediction before Smooth L1 so invalid
+        # entries contribute exactly zero loss and zero gradient.
+        safe_target = torch.where(valid, target, output.detach())
         element_loss = F.smooth_l1_loss(
             output,
-            target,
+            safe_target,
             reduction="none",
             beta=self.structure_huber_delta_km,
         )
@@ -637,6 +642,10 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
             field_error = (prediction.central_physical[index] - target[index])[
                 mask[index].bool()
             ]
+            if field_values.numel() == 0:
+                # Global intensity and field accumulators above remain valid;
+                # only this optional raw-field RI diagnostic lacks support.
+                continue
             raw_max = float(field_values.max().detach().cpu())
             robust_count = max(
                 1,
@@ -861,10 +870,11 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
         if targets is None:
             return
         target, valid = targets
-        error = output - target
+        safe_target = torch.where(valid, target, output.detach())
+        error = output - safe_target
         huber = F.smooth_l1_loss(
             output,
-            target,
+            safe_target,
             reduction="none",
             beta=self.structure_huber_delta_km,
         )
