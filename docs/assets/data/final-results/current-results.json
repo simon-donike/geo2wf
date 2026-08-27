@@ -1,0 +1,524 @@
+{
+  "created_utc": "2026-08-27T20:56:42.463127+00:00",
+  "inputs": {
+    "validation_csv": {
+      "path": "/work/code/geo2wf/logs/current-experiment-evaluation/validation-metrics.csv",
+      "sha256": "c93c25eb718804e9e9eb96ce30a0a85d6374ace5e21d6f843b6f3773a760673f"
+    },
+    "validation_json": {
+      "path": "/work/code/geo2wf/logs/current-experiment-evaluation/validation-results.json",
+      "sha256": "5f9f52593ccf125aca000d79175a43a49864ae3712571dda6bfc81b4cd752468"
+    },
+    "with_era5_csv": {
+      "path": "/work/code/geo2wf/logs/current-experiment-evaluation/three-storm/with-era5.csv",
+      "sha256": "0be9bf0529a7942a00e88c5ebfc119ef99760bc320d79535b04575b870004d79"
+    },
+    "without_era5_csv": {
+      "path": "/work/code/geo2wf/logs/current-experiment-evaluation/three-storm/without-era5.csv",
+      "sha256": "f71e1bde663801a41b6df2736c986d493bb4ad3578fdf94a12c0e6f595fb750c"
+    }
+  },
+  "interpretation": "canonical_current_validation_and_dense_storm_case_studies",
+  "schema_version": 1,
+  "series": {
+    "with_era5": [
+      {
+        "color": "#D55E00",
+        "column": "unet_raw_max_ms",
+        "family": "core",
+        "key": "unet_raw",
+        "label": "Raw field U-Net",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#0072B2",
+        "column": "unet_correction_ms",
+        "family": "core",
+        "key": "unet_correction",
+        "label": "U-Net + standard MLP",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#009E73",
+        "column": "joint_unet_mlp_ms",
+        "family": "core",
+        "key": "joint_unet_mlp",
+        "label": "Joint U-Net + latent MLP",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#AA4499",
+        "column": "correction_image_radii_max_wind_ms",
+        "family": "radii",
+        "key": "correction_image_radii",
+        "label": "Standard MLP \u00b7 image radii",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#44AA99",
+        "column": "correction_mlp_radii_max_wind_ms",
+        "family": "radii",
+        "key": "correction_mlp_radii",
+        "label": "Standard MLP \u00b7 MLP radii",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#CC79A7",
+        "column": "latent_sar_era5_max_wind_max_wind_ms",
+        "column_template": "latent_sar_{era5}_max_wind_max_wind_ms",
+        "family": "latent",
+        "key": "latent_sar_max_wind",
+        "label": "Latent MLP \u00b7 SAR \u00b7 wind only",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#E69F00",
+        "column": "latent_sar_era5_max_wind_radii_max_wind_ms",
+        "column_template": "latent_sar_{era5}_max_wind_radii_max_wind_ms",
+        "family": "latent,radii",
+        "key": "latent_sar_max_wind_radii",
+        "label": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#56B4E9",
+        "column": "latent_no_sar_era5_max_wind_max_wind_ms",
+        "column_template": "latent_no_sar_{era5}_max_wind_max_wind_ms",
+        "family": "latent",
+        "key": "latent_no_sar_max_wind",
+        "label": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+        "regime": "with_era5"
+      },
+      {
+        "color": "#332288",
+        "column": "latent_no_sar_era5_max_wind_radii_max_wind_ms",
+        "column_template": "latent_no_sar_{era5}_max_wind_radii_max_wind_ms",
+        "family": "latent,radii",
+        "key": "latent_no_sar_max_wind_radii",
+        "label": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+        "regime": "with_era5"
+      }
+    ],
+    "without_era5": [
+      {
+        "color": "#D55E00",
+        "column": "unet_raw_max_ms",
+        "family": "core",
+        "key": "unet_raw",
+        "label": "Raw field U-Net",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#0072B2",
+        "column": "unet_correction_ms",
+        "family": "core",
+        "key": "unet_correction",
+        "label": "U-Net + standard MLP",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#009E73",
+        "column": "joint_unet_mlp_ms",
+        "family": "core",
+        "key": "joint_unet_mlp",
+        "label": "Joint U-Net + latent MLP",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#CC79A7",
+        "column": "latent_sar_no_era5_max_wind_max_wind_ms",
+        "column_template": "latent_sar_{era5}_max_wind_max_wind_ms",
+        "family": "latent",
+        "key": "latent_sar_max_wind",
+        "label": "Latent MLP \u00b7 SAR \u00b7 wind only",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#E69F00",
+        "column": "latent_sar_no_era5_max_wind_radii_max_wind_ms",
+        "column_template": "latent_sar_{era5}_max_wind_radii_max_wind_ms",
+        "family": "latent,radii",
+        "key": "latent_sar_max_wind_radii",
+        "label": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#56B4E9",
+        "column": "latent_no_sar_no_era5_max_wind_max_wind_ms",
+        "column_template": "latent_no_sar_{era5}_max_wind_max_wind_ms",
+        "family": "latent",
+        "key": "latent_no_sar_max_wind",
+        "label": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+        "regime": "without_era5"
+      },
+      {
+        "color": "#332288",
+        "column": "latent_no_sar_no_era5_max_wind_radii_max_wind_ms",
+        "column_template": "latent_no_sar_{era5}_max_wind_radii_max_wind_ms",
+        "family": "latent,radii",
+        "key": "latent_no_sar_max_wind_radii",
+        "label": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+        "regime": "without_era5"
+      }
+    ]
+  },
+  "storm_figure_processing": {
+    "aggregation": "hourly mean",
+    "era5_reference": {
+      "crop_degrees": 5.184,
+      "statistic": "maximum",
+      "time_matching": "nearest ERA5 analysis",
+      "variable": "sqrt(u_wind_10m^2 + v_wind_10m^2)"
+    },
+    "metrics_use_smoothed_values": false,
+    "ri_definition": "IBTrACS maximum wind increase >=30 kt in preceding 24 h",
+    "smoothing": "centred 3-hour rolling mean"
+  },
+  "storm_metrics": [
+    {
+      "bias_ms": -6.559778423184998,
+      "conditioning": "with_era5",
+      "mae_ms": 9.065692669845252,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw",
+      "rmse_ms": 12.02573186332995,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -15.403696342986004,
+      "conditioning": "with_era5",
+      "mae_ms": 15.542186878434086,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw",
+      "rmse_ms": 18.402550183119622,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -4.561005585073686,
+      "conditioning": "with_era5",
+      "mae_ms": 7.608827971844139,
+      "model": "U-Net + standard MLP",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.4531844170853,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -10.7699682522004,
+      "conditioning": "with_era5",
+      "mae_ms": 13.400538372411162,
+      "model": "U-Net + standard MLP",
+      "model_key": "unet_correction",
+      "rmse_ms": 16.61426643214849,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -0.3869552600899784,
+      "conditioning": "with_era5",
+      "mae_ms": 8.402446261853289,
+      "model": "Joint U-Net + latent MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 10.50891880952775,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -4.668649465104519,
+      "conditioning": "with_era5",
+      "mae_ms": 11.912155694066524,
+      "model": "Joint U-Net + latent MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 14.270866535454045,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -6.781196870790464,
+      "conditioning": "with_era5",
+      "mae_ms": 9.135102979376954,
+      "model": "Standard MLP \u00b7 image radii",
+      "model_key": "correction_image_radii",
+      "rmse_ms": 12.14727934108607,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -15.624539426854726,
+      "conditioning": "with_era5",
+      "mae_ms": 15.741201954569638,
+      "model": "Standard MLP \u00b7 image radii",
+      "model_key": "correction_image_radii",
+      "rmse_ms": 18.58693053781996,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -7.319994544981221,
+      "conditioning": "with_era5",
+      "mae_ms": 9.405086042821424,
+      "model": "Standard MLP \u00b7 MLP radii",
+      "model_key": "correction_mlp_radii",
+      "rmse_ms": 12.507267454586971,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -16.195431284001945,
+      "conditioning": "with_era5",
+      "mae_ms": 16.263347954476053,
+      "model": "Standard MLP \u00b7 MLP radii",
+      "model_key": "correction_mlp_radii",
+      "rmse_ms": 19.056956576078882,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -3.6877883402158695,
+      "conditioning": "with_era5",
+      "mae_ms": 7.325137345254959,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind only",
+      "model_key": "latent_sar_max_wind",
+      "rmse_ms": 9.638372304108483,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -10.187166529538784,
+      "conditioning": "with_era5",
+      "mae_ms": 11.049194036773223,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind only",
+      "model_key": "latent_sar_max_wind",
+      "rmse_ms": 13.92598784699327,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -0.19746151078330476,
+      "conditioning": "with_era5",
+      "mae_ms": 6.413040218628507,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+      "model_key": "latent_sar_max_wind_radii",
+      "rmse_ms": 8.502338382226528,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -5.648376796765366,
+      "conditioning": "with_era5",
+      "mae_ms": 10.103439730813832,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+      "model_key": "latent_sar_max_wind_radii",
+      "rmse_ms": 13.098240369831974,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -2.268885239338399,
+      "conditioning": "with_era5",
+      "mae_ms": 7.420697278933692,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+      "model_key": "latent_no_sar_max_wind",
+      "rmse_ms": 10.001208923863304,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -6.7462464528820325,
+      "conditioning": "with_era5",
+      "mae_ms": 9.36055909192884,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+      "model_key": "latent_no_sar_max_wind",
+      "rmse_ms": 12.700054735108505,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -3.111939787089195,
+      "conditioning": "with_era5",
+      "mae_ms": 7.37031559396086,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+      "model_key": "latent_no_sar_max_wind_radii",
+      "rmse_ms": 9.93514158219249,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -11.598773485987973,
+      "conditioning": "with_era5",
+      "mae_ms": 12.367271259175217,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+      "model_key": "latent_no_sar_max_wind_radii",
+      "rmse_ms": 15.571925528352093,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -4.960846035477352,
+      "conditioning": "without_era5",
+      "mae_ms": 9.196521809975422,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw",
+      "rmse_ms": 11.443747042367248,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -11.749636212518775,
+      "conditioning": "without_era5",
+      "mae_ms": 12.203312880247761,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw",
+      "rmse_ms": 14.332949339259457,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -1.4645926965777214,
+      "conditioning": "without_era5",
+      "mae_ms": 7.382577662165352,
+      "model": "U-Net + standard MLP",
+      "model_key": "unet_correction",
+      "rmse_ms": 9.43870957112365,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -4.553159337573787,
+      "conditioning": "without_era5",
+      "mae_ms": 7.759670922595943,
+      "model": "U-Net + standard MLP",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.08229579032888,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -0.31554815046325013,
+      "conditioning": "without_era5",
+      "mae_ms": 7.190648623888021,
+      "model": "Joint U-Net + latent MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 9.229090160448584,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -1.8265355486501214,
+      "conditioning": "without_era5",
+      "mae_ms": 5.021486568506506,
+      "model": "Joint U-Net + latent MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 6.6901695236926555,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -2.1396370092037533,
+      "conditioning": "without_era5",
+      "mae_ms": 7.908542804840057,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind only",
+      "model_key": "latent_sar_max_wind",
+      "rmse_ms": 10.236734146922323,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -5.593155849008579,
+      "conditioning": "without_era5",
+      "mae_ms": 6.981549825031286,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind only",
+      "model_key": "latent_sar_max_wind",
+      "rmse_ms": 9.606125365522862,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": 1.288553972561311,
+      "conditioning": "without_era5",
+      "mae_ms": 7.433671453893619,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+      "model_key": "latent_sar_max_wind_radii",
+      "rmse_ms": 9.331051171744924,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -0.7650308080783504,
+      "conditioning": "without_era5",
+      "mae_ms": 5.441127930504655,
+      "model": "Latent MLP \u00b7 SAR \u00b7 wind + radii",
+      "model_key": "latent_sar_max_wind_radii",
+      "rmse_ms": 7.602361743350211,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": 0.029129403805712797,
+      "conditioning": "without_era5",
+      "mae_ms": 7.484444627865806,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+      "model_key": "latent_no_sar_max_wind",
+      "rmse_ms": 9.300944059231393,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -3.847649480527029,
+      "conditioning": "without_era5",
+      "mae_ms": 5.8069384469309915,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind only",
+      "model_key": "latent_no_sar_max_wind",
+      "rmse_ms": 7.781548620219396,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": 0.4433122501460248,
+      "conditioning": "without_era5",
+      "mae_ms": 7.038953745851307,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+      "model_key": "latent_no_sar_max_wind_radii",
+      "rmse_ms": 9.329522385696624,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -1.9256741564447566,
+      "conditioning": "without_era5",
+      "mae_ms": 6.0435825548855036,
+      "model": "Latent MLP \u00b7 no SAR \u00b7 wind + radii",
+      "model_key": "latent_no_sar_max_wind_radii",
+      "rmse_ms": 8.560250949981354,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    },
+    {
+      "bias_ms": -22.116624698522077,
+      "conditioning": "reference",
+      "mae_ms": 22.118767894170904,
+      "model": "ERA5 10 m maximum",
+      "model_key": "era5_max_wind",
+      "rmse_ms": 27.208222445887476,
+      "samples": 3266,
+      "subset": "all_three_storms"
+    },
+    {
+      "bias_ms": -40.550453503703,
+      "conditioning": "reference",
+      "mae_ms": 40.550453503703,
+      "model": "ERA5 10 m maximum",
+      "model_key": "era5_max_wind",
+      "rmse_ms": 41.657330747485354,
+      "samples": 466,
+      "subset": "ri_three_storms"
+    }
+  ],
+  "storms": [
+    "AL082025",
+    "EP112025",
+    "EP182023"
+  ]
+}

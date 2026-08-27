@@ -1,0 +1,35 @@
+model_key,model,conditioning,subset,samples,mae_ms,rmse_ms,bias_ms
+unet_raw,Raw field U-Net,with_era5,all_three_storms,3266,9.065692669845252,12.02573186332995,-6.559778423184998
+unet_raw,Raw field U-Net,with_era5,ri_three_storms,466,15.542186878434086,18.402550183119622,-15.403696342986004
+unet_correction,U-Net + standard MLP,with_era5,all_three_storms,3266,7.608827971844139,10.4531844170853,-4.561005585073686
+unet_correction,U-Net + standard MLP,with_era5,ri_three_storms,466,13.400538372411162,16.61426643214849,-10.7699682522004
+joint_unet_mlp,Joint U-Net + latent MLP,with_era5,all_three_storms,3266,8.402446261853289,10.50891880952775,-0.3869552600899784
+joint_unet_mlp,Joint U-Net + latent MLP,with_era5,ri_three_storms,466,11.912155694066524,14.270866535454045,-4.668649465104519
+correction_image_radii,Standard MLP · image radii,with_era5,all_three_storms,3266,9.135102979376954,12.14727934108607,-6.781196870790464
+correction_image_radii,Standard MLP · image radii,with_era5,ri_three_storms,466,15.741201954569638,18.58693053781996,-15.624539426854726
+correction_mlp_radii,Standard MLP · MLP radii,with_era5,all_three_storms,3266,9.405086042821424,12.507267454586971,-7.319994544981221
+correction_mlp_radii,Standard MLP · MLP radii,with_era5,ri_three_storms,466,16.263347954476053,19.056956576078882,-16.195431284001945
+latent_sar_max_wind,Latent MLP · SAR · wind only,with_era5,all_three_storms,3266,7.325137345254959,9.638372304108483,-3.6877883402158695
+latent_sar_max_wind,Latent MLP · SAR · wind only,with_era5,ri_three_storms,466,11.049194036773223,13.92598784699327,-10.187166529538784
+latent_sar_max_wind_radii,Latent MLP · SAR · wind + radii,with_era5,all_three_storms,3266,6.413040218628507,8.502338382226528,-0.19746151078330476
+latent_sar_max_wind_radii,Latent MLP · SAR · wind + radii,with_era5,ri_three_storms,466,10.103439730813832,13.098240369831974,-5.648376796765366
+latent_no_sar_max_wind,Latent MLP · no SAR · wind only,with_era5,all_three_storms,3266,7.420697278933692,10.001208923863304,-2.268885239338399
+latent_no_sar_max_wind,Latent MLP · no SAR · wind only,with_era5,ri_three_storms,466,9.36055909192884,12.700054735108505,-6.7462464528820325
+latent_no_sar_max_wind_radii,Latent MLP · no SAR · wind + radii,with_era5,all_three_storms,3266,7.37031559396086,9.93514158219249,-3.111939787089195
+latent_no_sar_max_wind_radii,Latent MLP · no SAR · wind + radii,with_era5,ri_three_storms,466,12.367271259175217,15.571925528352093,-11.598773485987973
+unet_raw,Raw field U-Net,without_era5,all_three_storms,3266,9.196521809975422,11.443747042367248,-4.960846035477352
+unet_raw,Raw field U-Net,without_era5,ri_three_storms,466,12.203312880247761,14.332949339259457,-11.749636212518775
+unet_correction,U-Net + standard MLP,without_era5,all_three_storms,3266,7.382577662165352,9.43870957112365,-1.4645926965777214
+unet_correction,U-Net + standard MLP,without_era5,ri_three_storms,466,7.759670922595943,10.08229579032888,-4.553159337573787
+joint_unet_mlp,Joint U-Net + latent MLP,without_era5,all_three_storms,3266,7.190648623888021,9.229090160448584,-0.31554815046325013
+joint_unet_mlp,Joint U-Net + latent MLP,without_era5,ri_three_storms,466,5.021486568506506,6.6901695236926555,-1.8265355486501214
+latent_sar_max_wind,Latent MLP · SAR · wind only,without_era5,all_three_storms,3266,7.908542804840057,10.236734146922323,-2.1396370092037533
+latent_sar_max_wind,Latent MLP · SAR · wind only,without_era5,ri_three_storms,466,6.981549825031286,9.606125365522862,-5.593155849008579
+latent_sar_max_wind_radii,Latent MLP · SAR · wind + radii,without_era5,all_three_storms,3266,7.433671453893619,9.331051171744924,1.288553972561311
+latent_sar_max_wind_radii,Latent MLP · SAR · wind + radii,without_era5,ri_three_storms,466,5.441127930504655,7.602361743350211,-0.7650308080783504
+latent_no_sar_max_wind,Latent MLP · no SAR · wind only,without_era5,all_three_storms,3266,7.484444627865806,9.300944059231393,0.029129403805712797
+latent_no_sar_max_wind,Latent MLP · no SAR · wind only,without_era5,ri_three_storms,466,5.8069384469309915,7.781548620219396,-3.847649480527029
+latent_no_sar_max_wind_radii,Latent MLP · no SAR · wind + radii,without_era5,all_three_storms,3266,7.038953745851307,9.329522385696624,0.4433122501460248
+latent_no_sar_max_wind_radii,Latent MLP · no SAR · wind + radii,without_era5,ri_three_storms,466,6.0435825548855036,8.560250949981354,-1.9256741564447566
+era5_max_wind,ERA5 10 m maximum,reference,all_three_storms,3266,22.118767894170904,27.208222445887476,-22.116624698522077
+era5_max_wind,ERA5 10 m maximum,reference,ri_three_storms,466,40.550453503703,41.657330747485354,-40.550453503703

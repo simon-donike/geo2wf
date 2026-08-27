@@ -1115,8 +1115,8 @@ dialog #confirmDialog:hover {
   font-family: var(--font-main);
 }
 
-.leaflet-tile-pane {
-  filter: saturate(0.72) contrast(1.04) brightness(0.88);
+.dark-basemap-tiles {
+  filter: grayscale(1) invert(0.92) brightness(0.42) contrast(1.35);
 }
 
 .leaflet-bar a {
