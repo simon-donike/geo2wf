@@ -1,7 +1,7 @@
 # Choose an experiment
 
 Active work is intentionally limited to the instantaneous three-model matrix,
-the encoder/latent-MLP structure study, and the retained scalar forecast.
+the joint U-Net/latent-MLP structure study, and the retained scalar forecast.
 
 ## Instantaneous three-model matrix
 
@@ -15,15 +15,15 @@ Use the checked-in experiment pairs to keep model width, data inputs, and
 cohort filtering aligned. The complete design is in the [active experiment
 matrix](intensity-comparison.md).
 
-## Encoder/latent-MLP study
+## Joint latent-structure study
 
-`bottleneck_encoder_mlp` keeps the U-Net encoder and pooled latent MLP but
-removes the image decoder. The next study compares maximum wind alone with
-radii predicted by the MLP and radii diagnosed from a 2D U-Net field.
+This matched pair keeps the U-Net decoder so the radii-supervised run can be
+evaluated using both direct latent-head predictions and diagnoses from its 2D
+wind field.
 
 ```bash
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
 ```
 
 ## Forecast retained

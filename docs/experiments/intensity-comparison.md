@@ -23,17 +23,25 @@ crop settings, and evaluation code. The no-ERA5 runs still require ERA5
 availability while selecting the cohort, but do not pass ERA5 values to the
 model. This isolates conditioning rather than changing data availability.
 
-## Encoder/latent-MLP structure experiment
+## Joint U-Net/latent-MLP structure experiment
 
-The separate U-Net encoder + latent MLP track remains active for the next
-study. Its maximum-wind-only baseline uses:
+The separate structure study uses the joint U-Net + latent MLP so every model
+retains both the decoded 2D wind field and the bottleneck outputs. Two runs use
+the same ERA5-conditioned cohort, architecture, seed, and optimizer. Strict
+CUDA determinism is disabled in both because reflection-padding backward has no
+deterministic CUDA implementation:
 
 ```bash
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
 ```
 
-The planned evaluation has three output views over the same trained cohort:
+The maximum-wind baseline optimizes the field and scalar maximum-wind losses.
+The multi-task run additionally predicts RMW and equivalent-area R34, R50, and
+R64 with a masked latent-head loss weighted by `0.25`. Eye size is excluded
+from reporting because the frozen cohort contains no valid eye-size labels.
+
+Evaluation has three explicitly labeled output views:
 
 1. maximum wind only;
 2. maximum wind plus radii predicted directly by the latent MLP head; and
@@ -41,8 +49,8 @@ The planned evaluation has three output views over the same trained cohort:
 
 The radii comparison must report MLP-derived and image-derived values as
 different sources. It must not silently substitute one when the other is
-missing. The final structure-target configuration and reporting commands will
-be added before the new experiments are launched.
+missing. Checkpoints are selected on validation data; the held-out test split
+is evaluated once after both runs finish.
 
 ## Retained forecast
 

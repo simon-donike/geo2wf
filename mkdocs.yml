@@ -66,6 +66,7 @@ nav:
       - Training & checkpoints: experiments/training.md
       - Evaluation & metrics: experiments/evaluation.md
       - Active experiment matrix: experiments/intensity-comparison.md
+      - Latent-structure results: experiments/latent-structure-results.md
       - Visual examples: experiments/visual-examples.md
       - HPC & multi-GPU: experiments/hpc.md
   - Reference:

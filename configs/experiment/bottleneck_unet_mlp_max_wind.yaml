@@ -1,0 +1,36 @@
+# @package _global_
+defaults:
+  - override /data: joint_geo_sar_ibtracs
+  - override /model: bottleneck_unet_mlp
+
+# Explicit maximum-wind-only baseline for the latent-structure experiment.
+model:
+  structure_head_enabled: false
+  structure_loss_weight: 0.0
+
+trainer:
+  max_epochs: 1000
+  accelerator: gpu
+  devices: 1
+  # Reflection-padding backward has no deterministic CUDA implementation.
+  deterministic: false
+  default_root_dir: logs/latent-structure/max-wind
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: false
+    monitor: val/loss
+    mode: min
+    patience: 50
+
+logging:
+  wandb:
+    name: bottleneck-unet-mlp-max-wind
+    group: latent-structure
+    project: geo2wf
+    tags: [joint-unet-mlp, max-wind-only, era5]
+    enabled: true
+    log_model: false

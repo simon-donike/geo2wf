@@ -77,32 +77,19 @@ This head uses a masked Huber term when
 checked-in model config has the head disabled and weight zero, so it does not
 affect the default two-term objective or checkpoint results.
 
-## Encoder/latent-MLP experiment
+## Joint latent-structure experiment
 
-The encoder/latent-MLP experiment removes the decoder and reconstruction head.
-It applies spatial mean/max pooling and an MLP to the encoder bottleneck. The
-checked-in baseline trains only against continuous IBTrACS `USA_WIND`:
+The active structure experiment retains the decoder and reconstruction head so
+radii can be evaluated from both the bottleneck MLP and its decoded wind field.
+Its paired presets are:
 
 ```bash
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs
-uv run geo2wf-train experiment=unet_encoder_mlp_ibtracs_no_era5
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
+uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
 ```
 
-For strict comparison, the data module preserves the joint experiment's
-SAR-valid-center sample IDs. On first use it fingerprints the split manifest,
-IBTrACS file, crop settings, and eligibility settings, scans SAR to materialize
-that cohort, and writes a sidecar under
-`<paired-root>/.geo2wf/encoder-ibtracs-cohorts/`. Condition-only batches then
-read GEO and optional ERA5 only: they contain no SAR raster, target mask, field
-metric, or reconstruction output. Set `GEO2WF_INTENSITY_COHORT_CACHE` to place
-the sidecars elsewhere.
-
-The scalar objective remains 5 m/s Huber loss. Validation IBTrACS MAE selects
-checkpoints and drives learning-rate scheduling and early stopping; RMSE, bias,
-category accuracy, and macro F1 are also logged.
-
-For the next experiment cycle, this track will be evaluated as maximum wind
-only and with storm radii from two explicitly labeled sources: values predicted
-by an MLP structure head and values diagnosed from a predicted 2D U-Net wind
-field. The final radii training/evaluation configs are not yet checked in; they
-will be added before the new runs rather than inferred from archived results.
+The first preset disables the structure head. The second enables its masked
+Huber objective at weight `0.25`; missing radii do not contribute to the loss.
+Both use the same ERA5-conditioned, storm-disjoint cohort and seed. Held-out
+RMW, R34, R50, and R64 results are reported separately for the latent head and
+the diagnostic extraction from the 2D field.
