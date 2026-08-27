@@ -1,0 +1,641 @@
+experiment,subset,output,target,metric,units,value,available,availability_reason
+correction_image_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,2.4101945465379693,True,
+correction_image_radii,all_validation,image_reconstruction,wind_field,psnr,dB,26.97469743188915,True,
+correction_image_radii,all_validation,image_reconstruction,wind_field,ssim,1,0.8330619368913039,True,
+correction_image_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,7.001053333282471,True,
+correction_image_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,8.696772575378418,True,
+correction_image_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,all_validation,image_derived_radius,rmw,mae,km,20.617450714111328,True,
+correction_image_radii,all_validation,image_derived_radius,rmw,rmse,km,27.783727645874023,True,
+correction_image_radii,all_validation,image_derived_radius,rmw,bias,km,-5.705417156219482,True,
+correction_image_radii,all_validation,image_derived_radius,r34,mae,km,78.2499008178711,True,
+correction_image_radii,all_validation,image_derived_radius,r34,rmse,km,91.3329849243164,True,
+correction_image_radii,all_validation,image_derived_radius,r34,bias,km,-77.0293960571289,True,
+correction_image_radii,all_validation,image_derived_radius,r50,mae,km,33.91309356689453,True,
+correction_image_radii,all_validation,image_derived_radius,r50,rmse,km,39.47386932373047,True,
+correction_image_radii,all_validation,image_derived_radius,r50,bias,km,-30.8284912109375,True,
+correction_image_radii,all_validation,image_derived_radius,r64,mae,km,20.4389705657959,True,
+correction_image_radii,all_validation,image_derived_radius,r64,rmse,km,24.136703491210938,True,
+correction_image_radii,all_validation,image_derived_radius,r64,bias,km,-18.22404670715332,True,
+correction_image_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,2.4476729600385743,True,
+correction_image_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,26.819840654016424,True,
+correction_image_radii,ri_validation,image_reconstruction,wind_field,ssim,1,0.819333146015803,True,
+correction_image_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,10.239367485046387,True,
+correction_image_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,12.22792911529541,True,
+correction_image_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_image_radii,ri_validation,image_derived_radius,rmw,mae,km,12.7923583984375,True,
+correction_image_radii,ri_validation,image_derived_radius,rmw,rmse,km,14.630938529968262,True,
+correction_image_radii,ri_validation,image_derived_radius,rmw,bias,km,0.3091619908809662,True,
+correction_image_radii,ri_validation,image_derived_radius,r34,mae,km,84.2020034790039,True,
+correction_image_radii,ri_validation,image_derived_radius,r34,rmse,km,89.16463470458984,True,
+correction_image_radii,ri_validation,image_derived_radius,r34,bias,km,-81.51667022705078,True,
+correction_image_radii,ri_validation,image_derived_radius,r50,mae,km,26.40689468383789,True,
+correction_image_radii,ri_validation,image_derived_radius,r50,rmse,km,27.278825759887695,True,
+correction_image_radii,ri_validation,image_derived_radius,r50,bias,km,-26.40689468383789,True,
+correction_image_radii,ri_validation,image_derived_radius,r64,mae,km,15.238435745239258,True,
+correction_image_radii,ri_validation,image_derived_radius,r64,rmse,km,16.132421493530273,True,
+correction_image_radii,ri_validation,image_derived_radius,r64,bias,km,-14.4288969039917,True,
+correction_mlp_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,2.4101945465379693,True,
+correction_mlp_radii,all_validation,image_reconstruction,wind_field,psnr,dB,26.97469743188915,True,
+correction_mlp_radii,all_validation,image_reconstruction,wind_field,ssim,1,0.8330619368913039,True,
+correction_mlp_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,7.264364719390869,True,
+correction_mlp_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,9.026344299316406,True,
+correction_mlp_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,all_validation,scalar_radius_head,rmw,mae,km,24.658063888549805,True,
+correction_mlp_radii,all_validation,scalar_radius_head,rmw,rmse,km,32.54267883300781,True,
+correction_mlp_radii,all_validation,scalar_radius_head,rmw,bias,km,-4.950565338134766,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,42.77737045288086,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,53.6435432434082,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,-18.53187370300293,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,16.924482345581055,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,20.55787467956543,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,1.4209046363830566,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,13.77267074584961,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,15.757564544677734,True,
+correction_mlp_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,4.175065994262695,True,
+correction_mlp_radii,all_validation,image_derived_radius,rmw,mae,km,20.617450714111328,True,
+correction_mlp_radii,all_validation,image_derived_radius,rmw,rmse,km,27.783727645874023,True,
+correction_mlp_radii,all_validation,image_derived_radius,rmw,bias,km,-5.705417156219482,True,
+correction_mlp_radii,all_validation,image_derived_radius,r34,mae,km,78.2499008178711,True,
+correction_mlp_radii,all_validation,image_derived_radius,r34,rmse,km,91.3329849243164,True,
+correction_mlp_radii,all_validation,image_derived_radius,r34,bias,km,-77.0293960571289,True,
+correction_mlp_radii,all_validation,image_derived_radius,r50,mae,km,33.91309356689453,True,
+correction_mlp_radii,all_validation,image_derived_radius,r50,rmse,km,39.47386932373047,True,
+correction_mlp_radii,all_validation,image_derived_radius,r50,bias,km,-30.8284912109375,True,
+correction_mlp_radii,all_validation,image_derived_radius,r64,mae,km,20.4389705657959,True,
+correction_mlp_radii,all_validation,image_derived_radius,r64,rmse,km,24.136703491210938,True,
+correction_mlp_radii,all_validation,image_derived_radius,r64,bias,km,-18.22404670715332,True,
+correction_mlp_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,2.4476729600385743,True,
+correction_mlp_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,26.819840654016424,True,
+correction_mlp_radii,ri_validation,image_reconstruction,wind_field,ssim,1,0.819333146015803,True,
+correction_mlp_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,11.044281005859375,True,
+correction_mlp_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,12.957219123840332,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+correction_mlp_radii,ri_validation,scalar_radius_head,rmw,mae,km,22.14317512512207,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,rmw,rmse,km,24.03281593322754,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,rmw,bias,km,22.14317512512207,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,55.024837493896484,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,60.1363525390625,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,-32.73609924316406,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,22.309309005737305,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,24.6803035736084,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,-5.60856294631958,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,15.8568754196167,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,16.84880828857422,True,
+correction_mlp_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,-3.309713363647461,True,
+correction_mlp_radii,ri_validation,image_derived_radius,rmw,mae,km,12.7923583984375,True,
+correction_mlp_radii,ri_validation,image_derived_radius,rmw,rmse,km,14.630938529968262,True,
+correction_mlp_radii,ri_validation,image_derived_radius,rmw,bias,km,0.3091619908809662,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r34,mae,km,84.2020034790039,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r34,rmse,km,89.16463470458984,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r34,bias,km,-81.51667022705078,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r50,mae,km,26.40689468383789,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r50,rmse,km,27.278825759887695,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r50,bias,km,-26.40689468383789,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r64,mae,km,15.238435745239258,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r64,rmse,km,16.132421493530273,True,
+correction_mlp_radii,ri_validation,image_derived_radius,r64,bias,km,-14.4288969039917,True,
+latent_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,l1,m s-1,2.5651236318581208,True,
+latent_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,psnr,dB,26.60427463266556,True,
+latent_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,ssim,1,0.839873194694519,True,
+latent_sar_era5_max_wind,all_validation,scalar_head,maximum_wind,mae,m s-1,5.795075272614101,True,
+latent_sar_era5_max_wind,all_validation,scalar_head,maximum_wind,rmse,m s-1,7.7228472221288404,True,
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,all_validation,image_derived_radius,rmw,mae,km,32.11734390258789,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,rmw,rmse,km,41.96491622924805,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,rmw,bias,km,-19.478181838989258,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r34,mae,km,55.674041748046875,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r34,rmse,km,66.93698120117188,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r34,bias,km,-53.827239990234375,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r50,mae,km,41.41096878051758,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r50,rmse,km,52.725013732910156,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r50,bias,km,-39.26228332519531,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r64,mae,km,34.71661376953125,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r64,rmse,km,41.81056213378906,True,
+latent_sar_era5_max_wind,all_validation,image_derived_radius,r64,bias,km,-33.45500946044922,True,
+latent_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,l1,m s-1,2.675466775894165,True,
+latent_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,psnr,dB,26.39470863342285,True,
+latent_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,ssim,1,0.8180417418479919,True,
+latent_sar_era5_max_wind,ri_validation,scalar_head,maximum_wind,mae,m s-1,8.12827475865682,True,
+latent_sar_era5_max_wind,ri_validation,scalar_head,maximum_wind,rmse,m s-1,9.958029629701784,True,
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,mae,km,12.961837768554688,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,rmse,km,16.886804580688477,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,bias,km,-8.024170875549316,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r34,mae,km,31.216625213623047,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r34,rmse,km,39.32322311401367,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r34,bias,km,-27.714826583862305,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r50,mae,km,19.395788192749023,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r50,rmse,km,28.446046829223633,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r50,bias,km,-17.072357177734375,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r64,mae,km,20.947416305541992,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r64,rmse,km,28.204769134521484,True,
+latent_sar_era5_max_wind,ri_validation,image_derived_radius,r64,bias,km,-16.44361686706543,True,
+latent_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,2.4017400469868218,True,
+latent_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,psnr,dB,27.138928900112926,True,
+latent_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,ssim,1,0.8400554060935974,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,5.859387571706712,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,7.662070618917832,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,mae,km,19.513711869341773,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,rmse,km,29.694984697371996,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,bias,km,-5.638106262159048,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,44.46690321297481,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,60.61193237633538,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,5.578231522132611,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,20.185317087655115,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,24.572404226939486,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,6.64762753188008,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,13.177655537923178,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,16.79505343781412,True,
+latent_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,5.799017588297526,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,mae,km,28.646265029907227,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,rmse,km,38.67689895629883,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,bias,km,-17.075584411621094,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,mae,km,38.99151611328125,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,rmse,km,49.63420486450195,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,bias,km,-34.75431823730469,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,mae,km,28.023765563964844,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,rmse,km,35.920894622802734,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,bias,km,-21.757883071899414,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,mae,km,27.07023048400879,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,rmse,km,33.427650451660156,True,
+latent_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,bias,km,-19.9588565826416,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,2.494049072265625,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,26.629810333251953,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,ssim,1,0.8161777853965759,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,7.315856377283732,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,8.87932104407014,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,mae,km,13.783679962158203,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,rmse,km,18.472562789916992,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,bias,km,1.8445030450820923,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,51.55125045776367,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,58.937469482421875,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,20.457149505615234,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,23.396974563598633,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,26.626493453979492,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,14.467015266418457,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,12.49573802947998,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,14.57465648651123,True,
+latent_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,4.589977741241455,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,mae,km,14.242056846618652,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,rmse,km,17.531896591186523,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,bias,km,-7.190837860107422,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,mae,km,28.795026779174805,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,rmse,km,34.61101531982422,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,bias,km,-20.822437286376953,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,mae,km,14.374688148498535,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,rmse,km,17.977375030517578,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,bias,km,-6.309747219085693,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,mae,km,14.284668922424316,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,rmse,km,18.449260711669922,True,
+latent_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,bias,km,0.49146005511283875,True,
+latent_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,l1,m s-1,4.106260835594526,True,
+latent_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,psnr,dB,23.201783772444152,True,
+latent_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,ssim,1,0.8000980019569397,True,
+latent_sar_no_era5_max_wind,all_validation,scalar_head,maximum_wind,mae,m s-1,6.6939299241551815,True,
+latent_sar_no_era5_max_wind,all_validation,scalar_head,maximum_wind,rmse,m s-1,9.099280348823388,True,
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,mae,km,27.301773071289062,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,rmse,km,38.82020950317383,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,bias,km,-15.81302261352539,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,mae,km,59.073585510253906,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,rmse,km,76.40353393554688,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,bias,km,-46.99617385864258,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,mae,km,44.774574279785156,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,rmse,km,56.19504165649414,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,bias,km,-38.83073806762695,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,mae,km,32.950706481933594,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,rmse,km,38.87137222290039,True,
+latent_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,bias,km,-32.01011657714844,True,
+latent_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,l1,m s-1,3.3512845039367676,True,
+latent_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,psnr,dB,24.501659393310547,True,
+latent_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,ssim,1,0.802253246307373,True,
+latent_sar_no_era5_max_wind,ri_validation,scalar_head,maximum_wind,mae,m s-1,6.867000182469686,True,
+latent_sar_no_era5_max_wind,ri_validation,scalar_head,maximum_wind,rmse,m s-1,9.393946800068717,True,
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,mae,km,13.038504600524902,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,rmse,km,15.87841796875,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,bias,km,-6.774170875549316,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,mae,km,30.06290626525879,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,rmse,km,39.57526779174805,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,bias,km,-18.642593383789062,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,mae,km,25.564208984375,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,rmse,km,34.17184829711914,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,bias,km,-23.483673095703125,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,mae,km,20.916027069091797,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,rmse,km,26.890893936157227,True,
+latent_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,bias,km,-20.648571014404297,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,3.8644991105319586,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,psnr,dB,23.831396020197303,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,ssim,1,0.8105074167251587,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,6.343737026430526,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,8.519357814115084,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,mae,km,18.244256733348536,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,rmse,km,26.87978845764987,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,bias,km,0.22088851568833837,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,65.82088423104122,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,89.85087905561231,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,-5.303332914155105,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,28.14129409404716,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,35.00076344195494,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,-2.878923358339252,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,15.32981424967448,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,18.587782013529615,True,
+latent_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,3.142786610921224,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,mae,km,24.01626968383789,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,rmse,km,33.343284606933594,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,bias,km,-11.197637557983398,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,mae,km,58.624691009521484,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,rmse,km,76.4701919555664,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,bias,km,-41.04344177246094,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,mae,km,42.507572174072266,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,rmse,km,55.32085037231445,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,bias,km,-34.27987289428711,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,mae,km,29.644603729248047,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,rmse,km,36.883949279785156,True,
+latent_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,bias,km,-24.70711326599121,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,3.5064303874969482,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,24.643217086791992,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,ssim,1,0.805899977684021,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,5.468732833862305,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,7.468589964930892,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,mae,km,11.184795379638672,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,rmse,km,13.670111656188965,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,bias,km,2.074193239212036,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,73.50499725341797,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,86.25375366210938,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,6.056478977203369,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,28.922138214111328,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,33.69831085205078,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,4.10994815826416,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,17.3092041015625,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,20.5997371673584,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,-0.1279466599225998,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,mae,km,14.9988374710083,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,rmse,km,18.019033432006836,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,bias,km,-8.857504844665527,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,mae,km,32.25312042236328,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,rmse,km,41.72338104248047,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,bias,km,-10.183205604553223,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,mae,km,24.57158088684082,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,rmse,km,30.98211097717285,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,bias,km,-14.327630996704102,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,mae,km,13.376203536987305,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,rmse,km,19.706493377685547,True,
+latent_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,bias,km,-7.6548662185668945,True,
+latent_no_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,all_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,all_validation,scalar_head,maximum_wind,mae,m s-1,5.446097373962402,True,
+latent_no_sar_era5_max_wind,all_validation,scalar_head,maximum_wind,rmse,m s-1,6.889429569244385,True,
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,all_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,ri_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind,ri_validation,scalar_head,maximum_wind,mae,m s-1,6.554695129394531,True,
+latent_no_sar_era5_max_wind,ri_validation,scalar_head,maximum_wind,rmse,m s-1,7.210424900054932,True,
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind,ri_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,5.687938213348389,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,6.84486722946167,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,mae,km,20.707416534423828,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,rmse,km,25.99271583557129,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,bias,km,-4.408252239227295,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,42.818824768066406,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,50.650291442871094,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,4.500377178192139,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,20.39339828491211,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,22.38909149169922,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,7.157114028930664,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,12.990649223327637,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,14.314276695251465,True,
+latent_no_sar_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,6.600046634674072,True,
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,all_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,6.903645992279053,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,7.4535040855407715,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,mae,km,16.270172119140625,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,rmse,km,16.980756759643555,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,bias,km,5.571918964385986,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,41.87377166748047,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,44.06471252441406,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,13.581169128417969,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,18.434953689575195,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,18.80200958251953,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,10.070588111877441,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,10.001204490661621,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,10.12291145324707,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,2.8250579833984375,True,
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_era5_max_wind_radii,ri_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,all_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,all_validation,scalar_head,maximum_wind,mae,m s-1,6.827935218811035,True,
+latent_no_sar_no_era5_max_wind,all_validation,scalar_head,maximum_wind,rmse,m s-1,8.245262145996094,True,
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,all_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,ri_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_head,maximum_wind,mae,m s-1,6.644543170928955,True,
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_head,maximum_wind,rmse,m s-1,7.262924671173096,True,
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,rmw,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r34_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r50_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,scalar_radius_head,r64_equivalent,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind,ri_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,mae,m s-1,6.297308921813965,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_head,maximum_wind,rmse,m s-1,7.779012203216553,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,mae,km,19.436235427856445,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,rmse,km,24.418441772460938,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,rmw,bias,km,-2.1926519870758057,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,mae,km,56.72981643676758,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,rmse,km,67.2209701538086,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r34_equivalent,bias,km,1.8366233110427856,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,mae,km,25.892763137817383,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,rmse,km,28.95130729675293,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r50_equivalent,bias,km,2.6319003105163574,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,mae,km,13.470316886901855,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,rmse,km,15.114792823791504,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,scalar_radius_head,r64_equivalent,bias,km,3.712923288345337,True,
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,all_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,l1,m s-1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,psnr,dB,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_reconstruction,wind_field,ssim,1,,False,not_applicable: model has no jointly evaluated image decoder
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,mae,m s-1,7.197956562042236,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_head,maximum_wind,rmse,m s-1,7.633882522583008,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,mae,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,rmse,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,eye_size,bias,km,,False,not_applicable: radius head disabled or target unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,mae,km,13.13792896270752,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,rmse,km,13.410090446472168,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,rmw,bias,km,2.6839687824249268,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,mae,km,69.07877349853516,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,rmse,km,75.4364242553711,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r34_equivalent,bias,km,1.6365712881088257,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,mae,km,24.879941940307617,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,rmse,km,25.842065811157227,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r50_equivalent,bias,km,1.6659761667251587,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,mae,km,14.63438606262207,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,rmse,km,14.927836418151855,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,scalar_radius_head,r64_equivalent,bias,km,-2.8677659034729004,True,
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,rmw,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r34,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r50,bias,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,mae,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,rmse,km,,False,not_applicable: no image output or image-radius metric unavailable
+latent_no_sar_no_era5_max_wind_radii,ri_validation,image_derived_radius,r64,bias,km,,False,not_applicable: no image output or image-radius metric unavailable

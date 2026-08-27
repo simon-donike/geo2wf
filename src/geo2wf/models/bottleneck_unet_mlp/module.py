@@ -831,15 +831,12 @@ class BottleneckUNetMLPRegressor(WindFieldLightningModule):
                 .detach()
                 .cpu()
             )
-            field_ssim = None
-            if prefix == "test":
-                ssim_sum, ssim_count = masked_ssim_sum_count(
-                    prediction.central_physical[index : index + 1],
-                    target[index : index + 1],
-                    mask[index : index + 1],
-                )
-                if ssim_count:
-                    field_ssim = ssim_sum / ssim_count
+            ssim_sum, ssim_count = masked_ssim_sum_count(
+                prediction.central_physical[index : index + 1],
+                target[index : index + 1],
+                mask[index : index + 1],
+            )
+            field_ssim = ssim_sum / ssim_count if ssim_count else None
             self._evaluation_rows[prefix].append(
                 {
                     "sample_id": str(sample_id),
