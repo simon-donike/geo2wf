@@ -21,7 +21,7 @@ trainer:
     save_top_k: 2
     save_last: true
   early_stopping:
-    enabled: false
+    enabled: true
     monitor: val/loss
     mode: min
     patience: 50
@@ -32,5 +32,5 @@ logging:
     group: latent-structure
     project: geo2wf
     tags: [joint-unet-mlp, max-wind-only, era5]
-    enabled: true
+    enabled: false
     log_model: false

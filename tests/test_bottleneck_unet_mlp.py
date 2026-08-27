@@ -19,12 +19,10 @@ from geo2wf.data.joint_intensity import (
     IBTRACS_STRUCTURE_COMPANION,
     JointPairedIntensityDataModule,
 )
-from geo2wf.data.encoder_intensity import EncoderIBTrACSDataModule
 from geo2wf.models.base import PredictionRequest
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor
 from geo2wf.models.bottleneck_unet_mlp import (
     BottleneckEncoderMLP,
-    BottleneckEncoderMLPRegressor,
     BottleneckUNetMLP,
     BottleneckUNetMLPRegressor,
 )
@@ -483,67 +481,6 @@ def _joint_datamodule(
     )
 
 
-def _encoder_datamodule(
-    root: Path, ibtracs_file: Path, *, use_era5: bool = True
-) -> EncoderIBTrACSDataModule:
-    return EncoderIBTrACSDataModule(
-        root=root,
-        ibtracs_file=ibtracs_file,
-        eligibility_cache_dir=root / "cohort-cache",
-        max_ibtracs_bracket_hours=3.0,
-        stats_file=root / "stats.json",
-        batch_size=1,
-        num_workers=0,
-        target_size=(8, 8),
-        random_flips=False,
-        use_era5=use_era5,
-        intensity_target_source="ibtracs",
-        require_sar_valid_center=True,
-        normalization="min-max",
-        target_normalization="min-max",
-    )
-
-
-def test_encoder_dataset_reuses_cached_joint_cohort_without_reading_sar(
-    tmp_path: Path, monkeypatch
-) -> None:
-    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
-    _write_joint_fixture(root, ibtracs_file)
-    joint = _joint_datamodule(root, ibtracs_file, require_sar_valid_center=True)
-    joint.setup(None)
-    encoder = _encoder_datamodule(root, ibtracs_file)
-    encoder.setup(None)
-
-    for split in ("train_dataset", "val_dataset", "test_dataset"):
-        assert (
-            getattr(encoder, split).samples["sample_id"].tolist()
-            == getattr(joint, split).samples["sample_id"].tolist()
-        )
-
-    original_open = rasterio.open
-
-    def reject_sar(path, *args, **kwargs):
-        if str(path).endswith("-sar.tif"):
-            raise AssertionError(f"condition-only loader opened SAR: {path}")
-        return original_open(path, *args, **kwargs)
-
-    monkeypatch.setattr(rasterio, "open", reject_sar)
-    cached = _encoder_datamodule(root, ibtracs_file)
-    cached.setup("fit")
-    batch = next(iter(cached.train_dataloader()))
-
-    assert batch["condition"].shape[1] == 14
-    assert batch["intensity_target_ms"].item() == pytest.approx(45.0 * 0.514444)
-    assert {
-        "target",
-        "target_physical",
-        "target_mask",
-        "target_norm_offset",
-        "target_norm_scale",
-    }.isdisjoint(batch)
-    assert cached.data_spec.target_channels == ()
-
-
 def test_data_adapter_filters_and_joins_exact_continuous_target(tmp_path: Path) -> None:
     root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
     _write_joint_fixture(root, ibtracs_file)
@@ -689,6 +626,8 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert max_wind_config["model"]["structure_head_enabled"] is False
     assert max_wind_config["model"]["structure_loss_weight"] == 0.0
     assert max_wind_config["trainer"]["deterministic"] is False
+    assert max_wind_config["trainer"]["early_stopping"]["enabled"] is True
+    assert max_wind_config["logging"]["wandb"]["enabled"] is False
     assert max_wind_config["trainer"]["default_root_dir"] == (
         "logs/latent-structure/max-wind"
     )
@@ -699,6 +638,8 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert radii_config["model"]["structure_loss_weight"] == 0.25
     assert radii_config["model"]["condition_channels"] == 23
     assert radii_config["trainer"]["deterministic"] is False
+    assert radii_config["trainer"]["early_stopping"]["enabled"] is True
+    assert radii_config["logging"]["wandb"]["enabled"] is False
     assert radii_config["trainer"]["default_root_dir"] == (
         "logs/latent-structure/max-wind-radii"
     )
@@ -715,46 +656,6 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert comparison_no_era5["data"]["use_era5"] is False
     assert comparison_no_era5["model"]["condition_channels"] == 14
     assert comparison_no_era5["model"]["use_era5"] is False
-
-
-def test_encoder_only_lightning_checkpoint_and_hydra_presets(tmp_path: Path) -> None:
-    root, ibtracs_file = tmp_path / "paired", tmp_path / "ibtracs.csv"
-    _write_joint_fixture(root, ibtracs_file)
-    datamodule = _encoder_datamodule(root, ibtracs_file)
-    model = BottleneckEncoderMLPRegressor(
-        condition_channels=14,
-        base_channels=4,
-        channel_mults=(1, 2),
-        intensity_hidden_features=8,
-        intensity_dropout=0.0,
-    )
-    trainer = pl.Trainer(
-        max_epochs=1,
-        accelerator="cpu",
-        devices=1,
-        logger=False,
-        enable_checkpointing=False,
-        limit_train_batches=1,
-        limit_val_batches=1,
-        num_sanity_val_steps=0,
-    )
-    trainer.fit(model, datamodule=datamodule)
-    checkpoint = tmp_path / "encoder-only.ckpt"
-    trainer.save_checkpoint(checkpoint)
-    restored = BottleneckEncoderMLPRegressor.load_from_checkpoint(
-        checkpoint, map_location="cpu"
-    )
-    restored.validate_data_spec(datamodule.data_spec)
-    prediction = restored.predict_batch(next(iter(datamodule.train_dataloader())))
-    assert prediction.intensity_prediction_ms.shape == (1,)
-
-    with_era5 = compose_config(["experiment=unet_encoder_mlp_ibtracs"])
-    assert with_era5["model"]["condition_channels"] == 23
-    assert with_era5["trainer"]["checkpoint"]["monitor"] == ("val/intensity_mae_ms")
-    assert isinstance(instantiate_model(with_era5), BottleneckEncoderMLPRegressor)
-    without_era5 = compose_config(["experiment=unet_encoder_mlp_ibtracs_no_era5"])
-    assert without_era5["data"]["use_era5"] is False
-    assert without_era5["model"]["condition_channels"] == 14
 
 
 @pytest.mark.parametrize("use_era5", [True, False])

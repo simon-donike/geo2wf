@@ -12,6 +12,8 @@ provenance and should not be read as the current experiment plan.
 
 - [Direct PMW U-Net](models/direct-unet.md)
 - [PMW proxy pretraining and export](data/export-geo-pmw.md)
+- Decoder-free U-Net encoder/MLP intensity regression (code and presets under
+  `archived/code/` and `archived/configs/`)
 
 The matching code, configurations, launchers, and tests are preserved in the
 repository's top-level `archived/` directory. Large ignored local run folders
