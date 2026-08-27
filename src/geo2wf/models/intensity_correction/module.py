@@ -19,6 +19,8 @@ from geo2wf.data.intensity import (
     IBTRACS_STRUCTURE_TARGET_NAMES,
     INTENSITY_METADATA_NAMES,
     IntensityDataSpec,
+    UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS,
+    UNET_IMAGE_STRUCTURE_TARGET_NAMES,
     category_macro_f1_tensor,
     tropical_category_from_wind_ms_tensor,
 )
@@ -615,16 +617,17 @@ class UNetIntensityCorrection(pl.LightningModule):
                 raise KeyError("structure-supervised MLP requires IBTrACS targets")
             return output.sum() * 0.0, {}
         target, valid = targets
+        safe_target = torch.where(valid, target, output.detach())
         element_loss = F.smooth_l1_loss(
             output,
-            target,
+            safe_target,
             reduction="none",
             beta=self.structure_huber_delta_km,
         )
         weight = valid.to(output)
         loss = (element_loss * weight).sum() / weight.sum().clamp_min(1.0)
         metrics: dict[str, torch.Tensor] = {"structure_loss": loss}
-        error = output - target
+        error = output - safe_target
         for index, name in enumerate(IBTRACS_STRUCTURE_TARGET_NAMES):
             selected = valid[:, index]
             if not selected.any():
@@ -633,6 +636,41 @@ class UNetIntensityCorrection(pl.LightningModule):
             metrics[f"structure_{name}_mae_km"] = selected_error.abs().mean()
             metrics[f"structure_{name}_bias_km"] = selected_error.mean()
         return loss, metrics
+
+    @staticmethod
+    def _unet_image_structure_metrics(
+        batch: Mapping[str, Any], reference: torch.Tensor
+    ) -> dict[str, torch.Tensor]:
+        metrics: dict[str, torch.Tensor] = {}
+        for name, image_key, target_index in zip(
+            UNET_IMAGE_STRUCTURE_TARGET_NAMES,
+            UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS,
+            range(1, len(IBTRACS_STRUCTURE_TARGET_NAMES)),
+        ):
+            valid_key = f"{image_key}_valid"
+            target_key = IBTRACS_STRUCTURE_MANIFEST_COLUMNS[target_index]
+            target_valid_key = f"{target_key}_valid"
+            if not {image_key, valid_key, target_key, target_valid_key}.issubset(batch):
+                continue
+            image_value = torch.as_tensor(batch[image_key], device=reference.device).to(
+                reference
+            )
+            target = torch.as_tensor(batch[target_key], device=reference.device).to(
+                reference
+            )
+            valid = (
+                torch.as_tensor(batch[valid_key], device=reference.device).bool()
+                & torch.as_tensor(
+                    batch[target_valid_key], device=reference.device
+                ).bool()
+                & torch.isfinite(image_value)
+                & torch.isfinite(target)
+            )
+            if valid.any():
+                error = image_value[valid] - target[valid]
+                metrics[f"unet_image_{name}_mae_km"] = error.abs().mean()
+                metrics[f"unet_image_{name}_bias_km"] = error.mean()
+        return metrics
 
     def training_step(self, batch: Mapping[str, Any], batch_idx: int) -> torch.Tensor:
         del batch_idx
@@ -660,6 +698,9 @@ class UNetIntensityCorrection(pl.LightningModule):
         }
         _, structure_metrics = self._structure_loss_and_metrics(prediction, batch)
         metrics.update(structure_metrics)
+        metrics.update(
+            self._unet_image_structure_metrics(batch, prediction.output_msw_ms)
+        )
         for name, value in metrics.items():
             self.log(
                 f"train/{name}",
@@ -682,6 +723,9 @@ class UNetIntensityCorrection(pl.LightningModule):
         )
         target = batch["target_wind_ms"].to(prediction.output_msw_ms)
         _, structure_metrics = self._structure_loss_and_metrics(prediction, batch)
+        structure_metrics.update(
+            self._unet_image_structure_metrics(batch, prediction.output_msw_ms)
+        )
         for name, value in structure_metrics.items():
             self.log(
                 f"{prefix}/{name}",

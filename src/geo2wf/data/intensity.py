@@ -84,6 +84,15 @@ IBTRACS_STRUCTURE_MANIFEST_COLUMNS = (
     "ibtracs_r50_equivalent_km",
     "ibtracs_r64_equivalent_km",
 )
+UNET_IMAGE_STRUCTURE_TARGET_NAMES = (
+    "rmw",
+    "r34_equivalent",
+    "r50_equivalent",
+    "r64_equivalent",
+)
+UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS = tuple(
+    f"unet_image_{name}_km" for name in UNET_IMAGE_STRUCTURE_TARGET_NAMES
+)
 V3_MANIFEST_COLUMNS = frozenset(
     column
     for value_column in IBTRACS_STRUCTURE_MANIFEST_COLUMNS
@@ -479,6 +488,20 @@ class UNetIntensityDataset(Dataset):
             "observation_timestamp": str(row["observation_timestamp"]),
         }
         for column in IBTRACS_STRUCTURE_MANIFEST_COLUMNS:
+            value = pd.to_numeric(row.get(column), errors="coerce")
+            valid_value = row.get(f"{column}_valid", False)
+            valid = (
+                bool(valid_value)
+                if isinstance(valid_value, (bool, np.bool_))
+                else str(valid_value).strip().lower() in {"1", "true", "yes"}
+            )
+            sample[column] = torch.tensor(float(value), dtype=torch.float32)
+            sample[f"{column}_valid"] = torch.tensor(
+                valid and math.isfinite(float(value)), dtype=torch.bool
+            )
+        for column in UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS:
+            if column not in row.index:
+                continue
             value = pd.to_numeric(row.get(column), errors="coerce")
             valid_value = row.get(f"{column}_valid", False)
             valid = (

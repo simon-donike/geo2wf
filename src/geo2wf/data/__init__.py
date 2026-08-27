@@ -7,6 +7,7 @@ from .intensity_forecast import (
     IntensityForecastDataSpec,
     IntensityForecastDataset,
 )
+from .encoder_intensity import EncoderIBTrACSDataModule, EncoderIBTrACSDataset
 from .joint_intensity import (
     JointPairedIntensityDataModule,
     JointPairedIntensityDataset,
@@ -14,6 +15,8 @@ from .joint_intensity import (
 
 __all__ = [
     "DataSpec",
+    "EncoderIBTrACSDataModule",
+    "EncoderIBTrACSDataset",
     "IntensityDataSpec",
     "IntensityForecastDataModule",
     "IntensityForecastDataSpec",

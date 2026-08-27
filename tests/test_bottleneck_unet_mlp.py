@@ -23,6 +23,7 @@ from geo2wf.models.base import PredictionRequest
 from geo2wf.models.deterministic_residual import ERA5ResidualRegressor
 from geo2wf.models.bottleneck_unet_mlp import (
     BottleneckEncoderMLP,
+    BottleneckEncoderMLPRegressor,
     BottleneckUNetMLP,
     BottleneckUNetMLPRegressor,
 )
@@ -140,6 +141,46 @@ def test_encoder_only_architecture_has_no_decoder_and_backpropagates() -> None:
     assert all("decoder" not in name for name, _ in model.named_parameters())
     assert model.stem.weight.grad is not None
     assert model.intensity_head.weight.grad is not None
+
+
+def test_encoder_only_regressor_trains_optional_masked_radius_head() -> None:
+    model = BottleneckEncoderMLPRegressor(
+        condition_channels=3,
+        base_channels=4,
+        channel_mults=(1, 2),
+        intensity_hidden_features=8,
+        intensity_dropout=0.0,
+        structure_head_enabled=True,
+        structure_loss_weight=0.25,
+    )
+    batch = {
+        "condition": torch.randn(2, 3, 16, 16),
+        "condition_mask": torch.ones(2, 1, 16, 16, dtype=torch.bool),
+        "intensity_target_ms": torch.tensor([30.0, 45.0]),
+    }
+    structure_keys = (
+        "ibtracs_eye_size_km",
+        "ibtracs_rmw_km",
+        "ibtracs_r34_equivalent_km",
+        "ibtracs_r50_equivalent_km",
+        "ibtracs_r64_equivalent_km",
+    )
+    for index, key in enumerate(structure_keys):
+        values = torch.tensor([30.0 + 10.0 * index, float("nan")])
+        batch[key] = values
+        batch[f"{key}_valid"] = torch.tensor([True, False])
+
+    output, _, metrics = model._metrics(batch)
+
+    assert output.structure_prediction_km is not None
+    assert output.structure_prediction_km.shape == (2, 5)
+    assert torch.isfinite(metrics["structure_loss"])
+    assert torch.isfinite(metrics["loss"])
+    metrics["loss"].backward()
+    assert all(
+        parameter.grad is None or torch.isfinite(parameter.grad).all()
+        for parameter in model.parameters()
+    )
 
 
 def test_joint_objective_uses_continuous_ibtracs_target_and_masks_image() -> None:
@@ -656,6 +697,38 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert comparison_no_era5["data"]["use_era5"] is False
     assert comparison_no_era5["model"]["condition_channels"] == 14
     assert comparison_no_era5["model"]["use_era5"] is False
+
+
+@pytest.mark.parametrize("with_sar", [True, False])
+@pytest.mark.parametrize("with_era5", [True, False])
+@pytest.mark.parametrize("with_radii", [True, False])
+def test_latent_mlp_experiment_matrix_composes(
+    with_sar: bool,
+    with_era5: bool,
+    with_radii: bool,
+) -> None:
+    sar_name = "sar" if with_sar else "no_sar"
+    era5_name = "era5" if with_era5 else "no_era5"
+    target_name = "max_wind_radii" if with_radii else "max_wind"
+    config = compose_config(
+        [f"experiment=latent_mlp_{sar_name}_{era5_name}_{target_name}"]
+    )
+    model = instantiate_model(config)
+
+    expected_data = (
+        "geo2wf.data.joint_intensity.JointPairedIntensityDataModule"
+        if with_sar
+        else "geo2wf.data.encoder_intensity.EncoderIBTrACSDataModule"
+    )
+    assert config["data"]["_target_"] == expected_data
+    assert config["data"]["use_era5"] is with_era5
+    assert config["model"]["condition_channels"] == (23 if with_era5 else 14)
+    assert config["model"]["structure_head_enabled"] is with_radii
+    assert config["model"]["structure_loss_weight"] == (0.25 if with_radii else 0.0)
+    assert isinstance(
+        model,
+        BottleneckUNetMLPRegressor if with_sar else BottleneckEncoderMLPRegressor,
+    )
 
 
 @pytest.mark.parametrize("use_era5", [True, False])

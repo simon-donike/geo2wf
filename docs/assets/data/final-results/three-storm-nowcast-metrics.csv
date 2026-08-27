@@ -1,0 +1,65 @@
+model_key,model,conditioning,scope,samples,mae_ms,rmse_ms,bias_ms
+unet_raw_max,Raw field U-Net,with ERA5,all_three_storms,3266,9.065692669845252,12.02573186332995,-6.559778423184998
+unet_raw_max,Raw field U-Net,with ERA5,AL082025,1006,7.956644484875262,10.01732393825267,-6.025599961695464
+unet_raw_max,Raw field U-Net,with ERA5,EP112025,1576,10.710103260131111,13.347004469133129,-8.040959306713678
+unet_raw_max,Raw field U-Net,with ERA5,EP182023,684,6.9079607748003635,11.510333822048329,-3.9326475164851007
+unet_raw_max,Raw field U-Net,with ERA5,rapid_intensification_all_storms,466,15.542186878434086,18.402550183119622,-15.403696342986004
+unet_raw_max,Raw field U-Net,with ERA5,AL082025_rapid_intensification,207,10.363194932356096,12.926694528521434,-10.051423968497131
+unet_raw_max,Raw field U-Net,with ERA5,EP112025_rapid_intensification,126,20.903062416204047,22.168870077848236,-20.903062416204047
+unet_raw_max,Raw field U-Net,with ERA5,EP182023_rapid_intensification,133,18.523999021886187,21.468512427412254,-18.523999021886187
+unet_raw_max,Raw field U-Net,without ERA5,all_three_storms,3266,9.196521809975422,11.443747042367248,-4.960846035477352
+unet_raw_max,Raw field U-Net,without ERA5,AL082025,1006,11.318033870410822,13.556895791686456,-9.132844639077947
+unet_raw_max,Raw field U-Net,without ERA5,EP112025,1576,8.731415382028347,10.61456074049474,-4.137013048018686
+unet_raw_max,Raw field U-Net,without ERA5,EP182023,684,7.147934964429477,9.767388097344973,-0.7230246802326977
+unet_raw_max,Raw field U-Net,without ERA5,rapid_intensification_all_storms,466,12.203312880247761,14.332949339259457,-11.749636212518775
+unet_raw_max,Raw field U-Net,without ERA5,AL082025_rapid_intensification,207,11.131016925899974,12.906727542617526,-10.22595168501861
+unet_raw_max,Raw field U-Net,without ERA5,EP112025_rapid_intensification,126,12.421352302300816,14.193395041478412,-12.413159526286275
+unet_raw_max,Raw field U-Net,without ERA5,EP182023_rapid_intensification,133,13.66566096574631,16.421644147366564,-13.492484029494928
+unet_correction,U-Net + correction,with ERA5,all_three_storms,3266,7.608827971844139,10.4531844170853,-4.561005585073686
+unet_correction,U-Net + correction,with ERA5,AL082025,1006,5.743012391018812,6.675910966815119,-1.6521396925789626
+unet_correction,U-Net + correction,with ERA5,EP112025,1576,9.21035751444192,11.92322160247271,-6.732196003586292
+unet_correction,U-Net + correction,with ERA5,EP182023,684,6.6629214150841625,11.341866387037594,-3.8366239889827845
+unet_correction,U-Net + correction,with ERA5,rapid_intensification_all_storms,466,13.400538372411162,16.61426643214849,-10.7699682522004
+unet_correction,U-Net + correction,with ERA5,AL082025_rapid_intensification,207,7.971595312024063,8.570309545406408,-2.595923886379785
+unet_correction,U-Net + correction,with ERA5,EP112025_rapid_intensification,126,18.392127026397695,20.792909212826835,-18.392127026397695
+unet_correction,U-Net + correction,with ERA5,EP182023_rapid_intensification,133,17.12122290698129,21.0534768126234,-16.270984629463634
+unet_correction,U-Net + correction,without ERA5,all_three_storms,3266,7.382577662165352,9.43870957112365,-1.4645926965777214
+unet_correction,U-Net + correction,without ERA5,AL082025,1006,8.30096877258638,10.36819908415446,-4.742680259980825
+unet_correction,U-Net + correction,without ERA5,EP112025,1576,7.242340549360684,9.19901097539864,-0.7194578253621647
+unet_correction,U-Net + correction,without ERA5,EP182023,684,6.354963967277346,8.503262320053306,1.6398276714746265
+unet_correction,U-Net + correction,without ERA5,rapid_intensification_all_storms,466,7.759670922595943,10.08229579032888,-4.553159337573787
+unet_correction,U-Net + correction,without ERA5,AL082025_rapid_intensification,207,7.511226550983724,8.449105202391062,-3.62492336242098
+unet_correction,U-Net + correction,without ERA5,EP112025_rapid_intensification,126,6.532692969079137,10.021222292448648,-4.627448116732631
+unet_correction,U-Net + correction,without ERA5,EP182023_rapid_intensification,133,9.308747667459446,12.244203316336119,-5.927478590826541
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,all_three_storms,3266,8.40244626185329,10.50891880952775,-0.3869552600899784
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,AL082025,1006,7.360442850274508,9.045804613575445,0.7171830292322598
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,EP112025,1576,8.75425816756014,11.02863295395909,-2.927134125904774
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,EP182023,684,9.124375894388749,11.257282945669484,3.841931835620471
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,rapid_intensification_all_storms,466,11.912155694066524,14.270866535454045,-4.668649465104519
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,AL082025_rapid_intensification,207,8.822015995434764,10.097219904136807,7.291773471682516
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,EP112025_rapid_intensification,126,17.24726963491917,17.94328213068219,-17.24726963491917
+joint_unet_mlp,Joint U-Net + MLP,with ERA5,EP182023_rapid_intensification,133,11.667302769775848,15.80731637402963,-11.367156281031361
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,all_three_storms,3266,7.190648623888021,9.229090160448584,-0.3155481504632503
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,AL082025,1006,7.760745396196332,10.45316581611828,-3.4993823152578067
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,EP112025,1576,6.923131362252103,8.694190344652347,0.49816112294981
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,EP182023,684,6.968557763355927,8.475342065263673,2.4922462280226285
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,rapid_intensification_all_storms,466,5.021486568506506,6.6901695236926555,-1.8265355486501214
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,AL082025_rapid_intensification,207,3.889898403117755,4.8249723256574235,1.5270021530164917
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,EP112025_rapid_intensification,126,4.387053759959788,5.414267210270154,-2.596330783426425
+joint_unet_mlp,Joint U-Net + MLP,without ERA5,EP182023_rapid_intensification,133,7.383721787396415,9.634198580921627,-6.31667167393715
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,all_three_storms,3266,7.086210332917349,9.46660915066615,-1.9428298591893565
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,AL082025,1006,4.651647102593093,5.947810031993586,-0.4592387903446634
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,EP112025,1576,8.450208533088045,10.937852089743945,-4.1416835669276955
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,EP182023,684,7.524089640281658,10.011112836737308,0.9415280766847088
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,rapid_intensification_all_storms,466,9.840534651535387,13.291687346812783,-7.92118734390232
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,AL082025_rapid_intensification,207,3.097918380041958,4.157871662575977,1.0964591288335959
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,EP112025_rapid_intensification,126,18.040436385872482,18.379889316692868,-18.040436385872482
+ablation_max_wind_only,Joint ablation: max wind only,with ERA5,EP182023_rapid_intensification,133,12.566353822006562,16.494194810175458,-12.36951396471506
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,all_three_storms,3266,7.058053649336472,10.550239617607165,-4.082230495543465
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,AL082025,1006,3.6694964561371446,4.51757779836885,-0.8346753418728966
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,EP112025,1576,9.193322149271753,12.658720887777228,-7.005508784043997
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,EP182023,684,7.121950404395712,11.499822752603837,-2.123098773198076
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,rapid_intensification_all_storms,466,13.889563508179613,18.43580726699309,-11.834445499430373
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,AL082025_rapid_intensification,207,5.075680958260117,5.54259546585308,-0.6050017233056414
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,EP112025_rapid_intensification,126,23.61049030389355,24.864400580851193,-23.61049030389355
+ablation_max_wind_radii,Joint ablation: max wind + radii,with ERA5,EP182023_rapid_intensification,133,18.398111715498267,23.60808661775886,-18.155597501651886

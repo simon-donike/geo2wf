@@ -86,14 +86,29 @@ The corresponding U-Net image metrics on exactly those RI observations are:
 <!-- three-storm-nowcast:start -->
 ## Three-storm maximum-wind nowcasts
 
-The six comparison checkpoints are available. Full inference is intentionally
-pending and will be run in a detached session after this documentation pass;
-the interrupted partial Otis shards are not published here. The paper figure
-will contain one panel each for Humberto 2025, Kiko 2025, and Otis 2023, with
-IBTrACS and every model/conditioning series on the same combined figure. The
-max-wind-only and radii-supervised joint ablation arms will also be included.
-The generated table and CSV will report MAE, RMSE, and bias for all
-observations and for RI phases only.
+Humberto 2025, Kiko 2025, and Otis 2023 are validation-storm case
+studies, not held-out test estimates. Each prediction is an independent
+single-observation nowcast. The figure uses hourly means for readability;
+the metrics use every native GEO observation. RI columns apply the same
+metrics only where IBTrACS increased by at least 30 kt in the preceding
+24 hours.
+
+| Model | Conditioning | All n | All MAE | All RMSE | All bias | RI n | RI MAE | RI RMSE | RI bias |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Raw field U-Net | with ERA5 | 3266 | 9.066 | 12.026 | -6.560 | 466 | 15.542 | 18.403 | -15.404 |
+| Raw field U-Net | without ERA5 | 3266 | 9.197 | 11.444 | -4.961 | 466 | 12.203 | 14.333 | -11.750 |
+| U-Net + correction | with ERA5 | 3266 | 7.609 | 10.453 | -4.561 | 466 | 13.401 | 16.614 | -10.770 |
+| U-Net + correction | without ERA5 | 3266 | 7.383 | 9.439 | -1.465 | 466 | 7.760 | 10.082 | -4.553 |
+| Joint U-Net + MLP | with ERA5 | 3266 | 8.402 | 10.509 | -0.387 | 466 | 11.912 | 14.271 | -4.669 |
+| Joint U-Net + MLP | without ERA5 | 3266 | 7.191 | 9.229 | -0.316 | 466 | 5.021 | 6.690 | -1.827 |
+| Joint ablation: max wind only | with ERA5 | 3266 | 7.086 | 9.467 | -1.943 | 466 | 9.841 | 13.292 | -7.921 |
+| Joint ablation: max wind + radii | with ERA5 | 3266 | 7.058 | 10.550 | -4.082 | 466 | 13.890 | 18.436 | -11.834 |
+
+![All-model maximum-wind nowcasts](assets/images/final-results/three-storm-nowcasts.png)
+
+[Download predictions](assets/data/final-results/three-storm-nowcast-predictions.csv){ .md-button }
+[Download metrics](assets/data/final-results/three-storm-nowcast-metrics.csv){ .md-button }
+[Download provenance](assets/data/final-results/three-storm-nowcast.json){ .md-button }
 <!-- three-storm-nowcast:end -->
 
 ## Joint U-Net/latent-MLP radii ablation

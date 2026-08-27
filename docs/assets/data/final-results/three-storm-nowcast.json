@@ -1,0 +1,756 @@
+{
+  "cohort": {
+    "samples": 3268,
+    "sha256": "e0855f1aee5d46f000cb7ae8f87a0cfc07a0bb69d55e15b5f458dc31469d3b7f"
+  },
+  "created_utc": "2026-08-27T11:55:07.851867+00:00",
+  "inputs": {
+    "with_era5": {
+      "path": "/work/code/geo2wf/logs/intensity-comparisons/final-three-storm-inference/with-era5.csv",
+      "sha256": "7296f0f8913305217dad765232cbfd49918e53d24a71bab7321521c689fc01df"
+    },
+    "without_era5": {
+      "path": "/work/code/geo2wf/logs/intensity-comparisons/final-three-storm-inference/without-era5.csv",
+      "sha256": "0097a7b0e7e395425c04ca0b6fb9948557b6e24f119964a5ea46f7ddbc494490"
+    }
+  },
+  "interpretation": "dense_validation_storm_case_study",
+  "metrics": [
+    {
+      "bias_ms": -6.559778423184998,
+      "conditioning": "with ERA5",
+      "mae_ms": 9.065692669845252,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 12.02573186332995,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -6.025599961695464,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.956644484875262,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 10.01732393825267,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -8.040959306713678,
+      "conditioning": "with ERA5",
+      "mae_ms": 10.710103260131111,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 13.347004469133129,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": -3.9326475164851007,
+      "conditioning": "with ERA5",
+      "mae_ms": 6.9079607748003635,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 11.510333822048329,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -15.403696342986004,
+      "conditioning": "with ERA5",
+      "mae_ms": 15.542186878434086,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 18.402550183119622,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": -10.051423968497131,
+      "conditioning": "with ERA5",
+      "mae_ms": 10.363194932356096,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 12.926694528521434,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -20.903062416204047,
+      "conditioning": "with ERA5",
+      "mae_ms": 20.903062416204047,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 22.168870077848236,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -18.523999021886187,
+      "conditioning": "with ERA5",
+      "mae_ms": 18.523999021886187,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 21.468512427412254,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -4.960846035477352,
+      "conditioning": "without ERA5",
+      "mae_ms": 9.196521809975422,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 11.443747042367248,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -9.132844639077947,
+      "conditioning": "without ERA5",
+      "mae_ms": 11.318033870410822,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 13.556895791686456,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -4.137013048018686,
+      "conditioning": "without ERA5",
+      "mae_ms": 8.731415382028347,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 10.61456074049474,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": -0.7230246802326977,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.147934964429477,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 9.767388097344973,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -11.749636212518775,
+      "conditioning": "without ERA5",
+      "mae_ms": 12.203312880247761,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 14.332949339259457,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": -10.22595168501861,
+      "conditioning": "without ERA5",
+      "mae_ms": 11.131016925899974,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 12.906727542617526,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -12.413159526286275,
+      "conditioning": "without ERA5",
+      "mae_ms": 12.421352302300816,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 14.193395041478412,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -13.492484029494928,
+      "conditioning": "without ERA5",
+      "mae_ms": 13.66566096574631,
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "rmse_ms": 16.421644147366564,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -4.561005585073686,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.608827971844139,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.4531844170853,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -1.6521396925789626,
+      "conditioning": "with ERA5",
+      "mae_ms": 5.743012391018812,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 6.675910966815119,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -6.732196003586292,
+      "conditioning": "with ERA5",
+      "mae_ms": 9.21035751444192,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 11.92322160247271,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": -3.8366239889827845,
+      "conditioning": "with ERA5",
+      "mae_ms": 6.6629214150841625,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 11.341866387037594,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -10.7699682522004,
+      "conditioning": "with ERA5",
+      "mae_ms": 13.400538372411162,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 16.61426643214849,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": -2.595923886379785,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.971595312024063,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 8.570309545406408,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -18.392127026397695,
+      "conditioning": "with ERA5",
+      "mae_ms": 18.392127026397695,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 20.792909212826835,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -16.270984629463634,
+      "conditioning": "with ERA5",
+      "mae_ms": 17.12122290698129,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 21.0534768126234,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -1.4645926965777214,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.382577662165352,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 9.43870957112365,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -4.742680259980825,
+      "conditioning": "without ERA5",
+      "mae_ms": 8.30096877258638,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.36819908415446,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -0.7194578253621647,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.242340549360684,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 9.19901097539864,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": 1.6398276714746265,
+      "conditioning": "without ERA5",
+      "mae_ms": 6.354963967277346,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 8.503262320053306,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -4.553159337573787,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.759670922595943,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.08229579032888,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": -3.62492336242098,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.511226550983724,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 8.449105202391062,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -4.627448116732631,
+      "conditioning": "without ERA5",
+      "mae_ms": 6.532692969079137,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 10.021222292448648,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -5.927478590826541,
+      "conditioning": "without ERA5",
+      "mae_ms": 9.308747667459446,
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "rmse_ms": 12.244203316336119,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -0.3869552600899784,
+      "conditioning": "with ERA5",
+      "mae_ms": 8.40244626185329,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 10.50891880952775,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": 0.7171830292322598,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.360442850274508,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 9.045804613575445,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -2.927134125904774,
+      "conditioning": "with ERA5",
+      "mae_ms": 8.75425816756014,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 11.02863295395909,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": 3.841931835620471,
+      "conditioning": "with ERA5",
+      "mae_ms": 9.124375894388749,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 11.257282945669484,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -4.668649465104519,
+      "conditioning": "with ERA5",
+      "mae_ms": 11.912155694066524,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 14.270866535454045,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": 7.291773471682516,
+      "conditioning": "with ERA5",
+      "mae_ms": 8.822015995434764,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 10.097219904136807,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -17.24726963491917,
+      "conditioning": "with ERA5",
+      "mae_ms": 17.24726963491917,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 17.94328213068219,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -11.367156281031361,
+      "conditioning": "with ERA5",
+      "mae_ms": 11.667302769775848,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 15.80731637402963,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -0.3155481504632503,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.190648623888021,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 9.229090160448584,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -3.4993823152578067,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.760745396196332,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 10.45316581611828,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": 0.49816112294981,
+      "conditioning": "without ERA5",
+      "mae_ms": 6.923131362252103,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 8.694190344652347,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": 2.4922462280226285,
+      "conditioning": "without ERA5",
+      "mae_ms": 6.968557763355927,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 8.475342065263673,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -1.8265355486501214,
+      "conditioning": "without ERA5",
+      "mae_ms": 5.021486568506506,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 6.6901695236926555,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": 1.5270021530164917,
+      "conditioning": "without ERA5",
+      "mae_ms": 3.889898403117755,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 4.8249723256574235,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -2.596330783426425,
+      "conditioning": "without ERA5",
+      "mae_ms": 4.387053759959788,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 5.414267210270154,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -6.31667167393715,
+      "conditioning": "without ERA5",
+      "mae_ms": 7.383721787396415,
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "rmse_ms": 9.634198580921627,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -1.9428298591893565,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.086210332917349,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 9.46660915066615,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -0.4592387903446634,
+      "conditioning": "with ERA5",
+      "mae_ms": 4.651647102593093,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 5.947810031993586,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -4.1416835669276955,
+      "conditioning": "with ERA5",
+      "mae_ms": 8.450208533088045,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 10.937852089743945,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": 0.9415280766847088,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.524089640281658,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 10.011112836737308,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -7.92118734390232,
+      "conditioning": "with ERA5",
+      "mae_ms": 9.840534651535387,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 13.291687346812783,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": 1.0964591288335959,
+      "conditioning": "with ERA5",
+      "mae_ms": 3.097918380041958,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 4.157871662575977,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -18.040436385872482,
+      "conditioning": "with ERA5",
+      "mae_ms": 18.040436385872482,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 18.379889316692868,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -12.36951396471506,
+      "conditioning": "with ERA5",
+      "mae_ms": 12.566353822006562,
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "rmse_ms": 16.494194810175458,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    },
+    {
+      "bias_ms": -4.082230495543465,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.058053649336472,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 10.550239617607165,
+      "samples": 3266,
+      "scope": "all_three_storms"
+    },
+    {
+      "bias_ms": -0.8346753418728966,
+      "conditioning": "with ERA5",
+      "mae_ms": 3.6694964561371446,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 4.51757779836885,
+      "samples": 1006,
+      "scope": "AL082025"
+    },
+    {
+      "bias_ms": -7.005508784043997,
+      "conditioning": "with ERA5",
+      "mae_ms": 9.193322149271753,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 12.658720887777228,
+      "samples": 1576,
+      "scope": "EP112025"
+    },
+    {
+      "bias_ms": -2.123098773198076,
+      "conditioning": "with ERA5",
+      "mae_ms": 7.121950404395712,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 11.499822752603837,
+      "samples": 684,
+      "scope": "EP182023"
+    },
+    {
+      "bias_ms": -11.834445499430373,
+      "conditioning": "with ERA5",
+      "mae_ms": 13.889563508179613,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 18.43580726699309,
+      "samples": 466,
+      "scope": "rapid_intensification_all_storms"
+    },
+    {
+      "bias_ms": -0.6050017233056414,
+      "conditioning": "with ERA5",
+      "mae_ms": 5.075680958260117,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 5.54259546585308,
+      "samples": 207,
+      "scope": "AL082025_rapid_intensification"
+    },
+    {
+      "bias_ms": -23.61049030389355,
+      "conditioning": "with ERA5",
+      "mae_ms": 23.61049030389355,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 24.864400580851193,
+      "samples": 126,
+      "scope": "EP112025_rapid_intensification"
+    },
+    {
+      "bias_ms": -18.155597501651886,
+      "conditioning": "with ERA5",
+      "mae_ms": 18.398111715498267,
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "rmse_ms": 23.60808661775886,
+      "samples": 133,
+      "scope": "EP182023_rapid_intensification"
+    }
+  ],
+  "schema_version": 1,
+  "series": [
+    {
+      "color": "#E69F00",
+      "column": "unet_raw_max_ms",
+      "conditioning": "with ERA5",
+      "key": "unet_raw_max_with_era5",
+      "label": "Raw field U-Net \u00b7 with ERA5",
+      "linestyle": "-",
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "regime": "with_era5"
+    },
+    {
+      "color": "#E69F00",
+      "column": "unet_raw_max_ms",
+      "conditioning": "without ERA5",
+      "key": "unet_raw_max_without_era5",
+      "label": "Raw field U-Net \u00b7 without ERA5",
+      "linestyle": "--",
+      "model": "Raw field U-Net",
+      "model_key": "unet_raw_max",
+      "regime": "without_era5"
+    },
+    {
+      "color": "#0072B2",
+      "column": "unet_correction_ms",
+      "conditioning": "with ERA5",
+      "key": "unet_correction_with_era5",
+      "label": "U-Net + correction \u00b7 with ERA5",
+      "linestyle": "-",
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "regime": "with_era5"
+    },
+    {
+      "color": "#0072B2",
+      "column": "unet_correction_ms",
+      "conditioning": "without ERA5",
+      "key": "unet_correction_without_era5",
+      "label": "U-Net + correction \u00b7 without ERA5",
+      "linestyle": "--",
+      "model": "U-Net + correction",
+      "model_key": "unet_correction",
+      "regime": "without_era5"
+    },
+    {
+      "color": "#009E73",
+      "column": "joint_unet_mlp_ms",
+      "conditioning": "with ERA5",
+      "key": "joint_unet_mlp_with_era5",
+      "label": "Joint U-Net + MLP \u00b7 with ERA5",
+      "linestyle": "-",
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "regime": "with_era5"
+    },
+    {
+      "color": "#009E73",
+      "column": "joint_unet_mlp_ms",
+      "conditioning": "without ERA5",
+      "key": "joint_unet_mlp_without_era5",
+      "label": "Joint U-Net + MLP \u00b7 without ERA5",
+      "linestyle": "--",
+      "model": "Joint U-Net + MLP",
+      "model_key": "joint_unet_mlp",
+      "regime": "without_era5"
+    },
+    {
+      "color": "#CC79A7",
+      "column": "ablation_max_wind_only_ms",
+      "conditioning": "with ERA5",
+      "key": "ablation_max_wind_only",
+      "label": "Joint ablation: max wind only",
+      "linestyle": ":",
+      "model": "Joint ablation: max wind only",
+      "model_key": "ablation_max_wind_only",
+      "regime": "with_era5"
+    },
+    {
+      "color": "#56B4E9",
+      "column": "ablation_max_wind_radii_ms",
+      "conditioning": "with ERA5",
+      "key": "ablation_max_wind_radii",
+      "label": "Joint ablation: max wind + radii",
+      "linestyle": ":",
+      "model": "Joint ablation: max wind + radii",
+      "model_key": "ablation_max_wind_radii",
+      "regime": "with_era5"
+    }
+  ],
+  "storms": [
+    "AL082025",
+    "EP112025",
+    "EP182023"
+  ]
+}

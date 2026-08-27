@@ -70,6 +70,13 @@ GRID_RESOLUTION_DEGREES = 0.027
 CROP_SIZE = 192
 ROBUST_CLIP = 4.0
 R64_THRESHOLD_MS = 64.0 * 0.514444
+WIND_RADIUS_THRESHOLDS_MS = {
+    "r34": 34.0 * 0.514444,
+    "r50": 50.0 * 0.514444,
+    "r64": R64_THRESHOLD_MS,
+}
+EARTH_RADIUS_KM = 6371.0
+RADIAL_BIN_KM = 10.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -260,41 +267,103 @@ def _physical_distance_km(
 
 
 def _output_metrics(
-    output: torch.Tensor, valid: torch.Tensor, distance_km: torch.Tensor
+    output: torch.Tensor,
+    valid: torch.Tensor,
+    distance_km: torch.Tensor,
+    bounds: torch.Tensor,
+    center: tuple[float, float],
 ) -> dict[str, float]:
-    """Calculate physical wind metrics over valid pixels only."""
+    """Calculate physical metrics directly from a predicted wind image.
+
+    R34/R50/R64 are equivalent-circle radii of threshold-exceedance area in
+    the largest complete storm-centred circle supported by the image. RMW is
+    the peak 10-km annular-mean bin. The centre locates the polar geometry; no
+    IBTrACS radius value is used in these estimates.
+    """
     field = output.squeeze().cpu()
     valid = valid.squeeze().cpu().bool() & torch.isfinite(field)
     if int(valid.sum()) < math.ceil(0.05 * field.numel()):
         return {
-            key: math.nan for key in ("msw", "r64", "p90", "core_mean", "rmw", "mean")
+            key: math.nan
+            for key in (
+                "msw",
+                "r34",
+                "r50",
+                "r64",
+                "p90",
+                "core_mean",
+                "rmw",
+                "mean",
+            )
         }
     values = field[valid]
     core = field[valid & (distance_km <= 100.0)]
-    bin_width = float(
-        torch.nanmedian(torch.abs(torch.diff(distance_km[:, CROP_SIZE // 2])))
+    left, right, bottom, top = bounds.cpu().to(torch.float64).tolist()
+    center_lat, center_lon = center
+    height, width = field.shape
+    row_fraction = (torch.arange(height, dtype=torch.float64) + 0.5) / height
+    column_fraction = (torch.arange(width, dtype=torch.float64) + 0.5) / width
+    latitudes = top - row_fraction * (top - bottom)
+    longitudes = left + column_fraction * (right - left)
+    latitude_grid, longitude_grid = torch.meshgrid(latitudes, longitudes, indexing="ij")
+    delta_lon = torch.remainder(longitude_grid - center_lon + 180.0, 360.0) - 180.0
+    north_km = torch.deg2rad(latitude_grid - center_lat) * EARTH_RADIUS_KM
+    east_km = (
+        torch.deg2rad(delta_lon) * EARTH_RADIUS_KM * math.cos(math.radians(center_lat))
     )
-    bin_width = bin_width if math.isfinite(bin_width) and bin_width > 0 else 3.0
-    radii = torch.arange(0.0, float(distance_km[valid].max()) + bin_width, bin_width)
+    radius_km = torch.sqrt(north_km.square() + east_km.square())
+    geometry_valid = valid & torch.isfinite(radius_km)
+    directional_extents = torch.stack(
+        (
+            north_km[geometry_valid].max(),
+            -north_km[geometry_valid].min(),
+            east_km[geometry_valid].max(),
+            -east_km[geometry_valid].min(),
+        )
+    )
+    complete_radius = float(directional_extents.min())
+    if complete_radius <= 0.0:
+        return {
+            "msw": float(values.max()),
+            "r34": math.nan,
+            "r50": math.nan,
+            "r64": math.nan,
+            "p90": float(torch.quantile(values, 0.9, interpolation="linear")),
+            "core_mean": float(core.mean()) if core.numel() else math.nan,
+            "rmw": math.nan,
+            "mean": float(values.mean()),
+        }
+    complete_domain = geometry_valid & (radius_km <= complete_radius)
+
     radial_distance, radial_wind = [], []
-    for radius in radii:
-        annulus = valid & (distance_km >= radius) & (distance_km < radius + bin_width)
-        if annulus.any():
-            radial_distance.append(float(radius))
+    for lower in torch.arange(0.0, complete_radius, RADIAL_BIN_KM):
+        upper = float(lower) + RADIAL_BIN_KM
+        if upper > complete_radius:
+            continue
+        annulus = complete_domain & (radius_km >= lower) & (radius_km < upper)
+        if int(annulus.sum()) >= 4:
+            radial_distance.append(float(lower) + RADIAL_BIN_KM / 2.0)
             radial_wind.append(float(field[annulus].mean()))
-    r64 = [
-        radius
-        for radius, wind in zip(radial_distance, radial_wind)
-        if wind >= R64_THRESHOLD_MS
-    ]
-    rmw = (
-        radial_distance[radial_wind.index(max(radial_wind))]
-        if radial_wind
-        else math.nan
+    rmw = radial_distance[int(np.argmax(radial_wind))] if radial_wind else math.nan
+
+    latitude_edges = torch.linspace(top, bottom, height + 1, dtype=torch.float64)
+    longitude_width_rad = math.radians(abs(right - left) / width)
+    row_area_km2 = (
+        EARTH_RADIUS_KM**2
+        * longitude_width_rad
+        * (
+            torch.sin(torch.deg2rad(latitude_edges[:-1]))
+            - torch.sin(torch.deg2rad(latitude_edges[1:]))
+        ).abs()
     )
+    pixel_area_km2 = row_area_km2[:, None].expand(height, width)
+    wind_radii = {}
+    for name, threshold_ms in WIND_RADIUS_THRESHOLDS_MS.items():
+        area_km2 = pixel_area_km2[complete_domain & (field >= threshold_ms)].sum()
+        wind_radii[name] = math.sqrt(float(area_km2) / math.pi)
     return {
         "msw": float(values.max()),
-        "r64": max(r64) if r64 else math.nan,
+        **wind_radii,
         "p90": float(torch.quantile(values, 0.9, interpolation="linear")),
         "core_mean": float(core.mean()) if core.numel() else math.nan,
         "rmw": rmw,
@@ -563,8 +632,13 @@ def main() -> None:
                     )
                 batch = {key: value.to(args.device) for key, value in batch.items()}
                 prediction = model.predict_physical(batch)
+                bounds = _bounds(*geo.center)
                 metrics = _output_metrics(
-                    prediction, batch["condition_mask"], distance_km
+                    prediction,
+                    batch["condition_mask"],
+                    distance_km,
+                    bounds,
+                    geo.ibtracs_center,
                 )
                 if correction_model is not None:
                     corrected = _corrected_intensity(
@@ -593,28 +667,17 @@ def main() -> None:
                     )
             table = table.iloc[kept_indices].copy().reset_index(drop=True)
             table["original_input_path"] = local_paths
-            output_columns = {"output_msw_ms": "msw"}
-            if correction_model is None:
-                output_columns.update(
-                    {
-                        "output_r64_km": "r64",
-                        "output_p90_ms": "p90",
-                        "output_core_mean_ms": "core_mean",
-                        "output_rmw_km": "rmw",
-                        "output_mean_ms": "mean",
-                    }
-                )
-            else:
-                table = table.drop(
-                    columns=[
-                        "output_r64_km",
-                        "output_p90_ms",
-                        "output_core_mean_ms",
-                        "output_rmw_km",
-                        "output_mean_ms",
-                    ],
-                    errors="ignore",
-                )
+            output_columns = {
+                "output_msw_ms": "msw",
+                "output_r34_km": "r34",
+                "output_r50_km": "r50",
+                "output_r64_km": "r64",
+                "output_p90_ms": "p90",
+                "output_core_mean_ms": "core_mean",
+                "output_rmw_km": "rmw",
+                "output_mean_ms": "mean",
+            }
+            if correction_model is not None:
                 output_columns.update(
                     {
                         "raw_unet_max_wind_ms": "raw_unet_max_wind_ms",

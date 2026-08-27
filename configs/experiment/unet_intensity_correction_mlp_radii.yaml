@@ -1,0 +1,36 @@
+# @package _global_
+defaults:
+  - override /data: unet_intensity_structure
+  - override /model: intensity_correction
+
+# The standard correction network jointly predicts intensity and five IBTrACS
+# structure scalars; missing eye-size targets remain masked.
+model:
+  structure_head_enabled: true
+  structure_loss_weight: 0.25
+  structure_huber_delta_km: 20.0
+
+trainer:
+  max_epochs: 200
+  accelerator: gpu
+  devices: 1
+  default_root_dir: logs/intensity-structure/mlp-radii
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/loss
+    mode: min
+    patience: 50
+
+logging:
+  wandb:
+    name: unet-correction-mlp-radii
+    group: intensity-structure
+    project: geo2wf
+    tags: [unet-correction, mlp-radii]
+    enabled: false
+    log_model: false

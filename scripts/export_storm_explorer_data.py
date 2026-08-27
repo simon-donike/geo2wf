@@ -751,6 +751,8 @@ METRIC_COLUMNS = {
     "mean": "output_mean_ms",
     "core_mean": "output_core_mean_ms",
     "rmw": "output_rmw_km",
+    "r34": "output_r34_km",
+    "r50": "output_r50_km",
     "r64": "output_r64_km",
 }
 
@@ -980,16 +982,34 @@ def main():
                 "note": "Within 100 km",
             },
             "rmw": {"label": "Radius of maximum wind", "unit": "km"},
+            "r34": {"label": "Radius of 34-knot winds", "unit": "km"},
+            "r50": {"label": "Radius of 50-knot winds", "unit": "km"},
             "r64": {"label": "Radius of 64-knot winds", "unit": "km"},
         },
         "models": {
             "vit": {
                 "label": "ViT",
-                "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
+                "metrics": [
+                    "max",
+                    "p90",
+                    "mean",
+                    "core_mean",
+                    "rmw",
+                    "r64",
+                ],
             },
             "unet": {
                 "label": "UNet",
-                "metrics": ["max", "p90", "mean", "core_mean", "rmw", "r64"],
+                "metrics": [
+                    "max",
+                    "p90",
+                    "mean",
+                    "core_mean",
+                    "rmw",
+                    "r34",
+                    "r50",
+                    "r64",
+                ],
             },
             "unet_mlp": {
                 "label": "UNet+MLP",
