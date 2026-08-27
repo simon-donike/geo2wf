@@ -109,6 +109,28 @@ def test_nowcast_builder_rejects_different_regime_targets(tmp_path: Path) -> Non
         load_frames(with_path, without_path)
 
 
+def test_nowcast_builder_inherits_ri_for_legacy_no_era5_csv(tmp_path: Path) -> None:
+    with_path = tmp_path / "with.csv"
+    without_path = tmp_path / "without.csv"
+    with_frame = _inference_frame(include_ablations=False)
+    without_frame = _inference_frame(include_ablations=False).drop(
+        columns=["is_rapid_intensification", "ri_24h_change_ms"]
+    )
+    with_frame.to_csv(with_path, index=False)
+    without_frame.to_csv(without_path, index=False)
+
+    frames = load_frames(with_path, without_path)
+
+    assert (
+        frames["without_era5"]["is_rapid_intensification"].tolist()
+        == frames["with_era5"]["is_rapid_intensification"].tolist()
+    )
+    assert (
+        frames["without_era5"]["ri_24h_change_ms"].tolist()
+        == frames["with_era5"]["ri_24h_change_ms"].tolist()
+    )
+
+
 def test_storm_inference_resolves_new_completed_workflow(tmp_path: Path) -> None:
     artifacts = {}
     for name in ("unet", "correction", "joint"):

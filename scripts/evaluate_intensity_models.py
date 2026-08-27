@@ -38,6 +38,10 @@ from geo2wf.models.intensity_correction import (  # noqa: E402
     rows_for_intensity_reference,
     summarize_intensity_rows,
 )
+from geo2wf.metrics.image_quality import (  # noqa: E402
+    masked_ssim_sum_count,
+    psnr_db_from_mse,
+)
 
 
 MODEL_LABELS = {
@@ -179,8 +183,8 @@ def _target_fingerprint(frame: pd.DataFrame) -> dict[str, Any]:
 
 
 def _field_statistics() -> np.ndarray:
-    # valid pixels, absolute error, squared error, signed error
-    return np.zeros(4, dtype=np.float64)
+    # valid pixels, absolute error, squared error, signed error, SSIM sum/scenes
+    return np.zeros(6, dtype=np.float64)
 
 
 def _accumulate_field(
@@ -193,12 +197,15 @@ def _accumulate_field(
     error = (prediction - target)[valid].double()
     if not error.numel():
         return
+    ssim_sum, ssim_scenes = masked_ssim_sum_count(prediction, target, valid)
     statistics += np.asarray(
         [
             error.numel(),
             float(error.abs().sum()),
             float(error.square().sum()),
             float(error.sum()),
+            ssim_sum,
+            ssim_scenes,
         ],
         dtype=np.float64,
     )
@@ -208,11 +215,16 @@ def _summarize_field(statistics: np.ndarray) -> dict[str, float | int]:
     count = int(statistics[0])
     if count <= 0:
         raise ValueError("field evaluation has no valid pixels")
+    mse = float(statistics[2] / count)
+    ssim_scenes = int(statistics[5])
     return {
         "valid_pixels": count,
         "mae_ms": float(statistics[1] / count),
-        "rmse_ms": float(math.sqrt(statistics[2] / count)),
+        "rmse_ms": float(math.sqrt(mse)),
         "bias_ms": float(statistics[3] / count),
+        "psnr_db": psnr_db_from_mse(mse),
+        "ssim": float(statistics[4] / ssim_scenes) if ssim_scenes else None,
+        "ssim_scenes": ssim_scenes,
     }
 
 
@@ -333,7 +345,11 @@ def _joint_and_field_rows(
     batch_size: int,
     num_workers: int,
     device: str,
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, float | int]]]:
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, dict[str, float | int]],
+    dict[str, dict[str, float | int]],
+]:
     loader = DataLoader(
         joint_dataset,
         batch_size=batch_size,
@@ -353,6 +369,8 @@ def _joint_and_field_rows(
     joint_rows: list[dict[str, Any]] = []
     unet_field = _field_statistics()
     joint_field = _field_statistics()
+    unet_field_ri = _field_statistics()
+    joint_field_ri = _field_statistics()
     with torch.inference_mode():
         for batch in tqdm(loader, desc="evaluate joint model", unit="batch"):
             device_batch = {
@@ -379,6 +397,20 @@ def _joint_and_field_rows(
                 unet_field, cached_field, target_field, common_mask & cached_mask
             )
             _accumulate_field(joint_field, joint_prediction, target_field, common_mask)
+            is_ri = batch["is_rapid_intensification"].bool()
+            if bool(is_ri.any()):
+                _accumulate_field(
+                    unet_field_ri,
+                    cached_field[is_ri],
+                    target_field[is_ri],
+                    (common_mask & cached_mask)[is_ri],
+                )
+                _accumulate_field(
+                    joint_field_ri,
+                    joint_prediction[is_ri],
+                    target_field[is_ri],
+                    common_mask[is_ri],
+                )
 
             for index, sample_id in enumerate(batch["sample_id"]):
                 sample_id = str(sample_id)
@@ -416,10 +448,14 @@ def _joint_and_field_rows(
                             reference["sar_robust_peak_target_ms"]
                         ),
                         "sar_max_wind_ms": float(reference["sar_max_wind_ms"]),
+                        # RI is a property of the IBTrACS trajectory, not of the
+                        # frozen U-Net cache.  Read it from the current paired
+                        # dataset so schema-1 caches from otherwise valid completed
+                        # runs can be evaluated without changing their cohort.
                         "is_rapid_intensification": bool(
-                            reference["is_rapid_intensification"]
+                            batch["is_rapid_intensification"][index]
                         ),
-                        "ri_24h_change_ms": float(reference["ri_24h_change_ms"]),
+                        "ri_24h_change_ms": float(batch["ri_24h_change_ms"][index]),
                         "intensity_target_source": str(
                             reference["intensity_target_source"]
                         ),
@@ -430,10 +466,17 @@ def _joint_and_field_rows(
                         "target_category": int(reference["target_category"]),
                     }
                 )
-    return joint_rows, {
-        "unet_raw_max": _summarize_field(unet_field),
-        "joint_unet_mlp": _summarize_field(joint_field),
-    }
+    return (
+        joint_rows,
+        {
+            "unet_raw_max": _summarize_field(unet_field),
+            "joint_unet_mlp": _summarize_field(joint_field),
+        },
+        {
+            "unet_raw_max": _summarize_field(unet_field_ri),
+            "joint_unet_mlp": _summarize_field(joint_field_ri),
+        },
+    )
 
 
 def _raw_rows(
@@ -635,6 +678,9 @@ def _table_rows(
                 "field_mae_ms": field.get("mae_ms"),
                 "field_rmse_ms": field.get("rmse_ms"),
                 "field_bias_ms": field.get("bias_ms"),
+                "field_psnr_db": field.get("psnr_db"),
+                "field_ssim": field.get("ssim"),
+                "field_ssim_scenes": field.get("ssim_scenes"),
             }
         )
     return rows
@@ -648,8 +694,8 @@ def _format_number(value: Any, digits: int = 3) -> str:
 
 def _markdown_result_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     lines = [
-        "| Model | Samples | Storms | Intensity MAE (m/s; 95% CI) | Δ MAE vs raw U-Net (m/s; 95% CI) | Intensity RMSE (m/s) | Intensity bias (m/s) | Storm-macro MAE (m/s) | Category accuracy | Category macro F1 | Within one category | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Model | Samples | Storms | Intensity MAE (m/s; 95% CI) | Δ MAE vs raw U-Net (m/s; 95% CI) | Intensity RMSE (m/s) | Intensity bias (m/s) | Storm-macro MAE (m/s) | Category accuracy | Category macro F1 | Within one category | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | Field PSNR (dB) | Field SSIM | SSIM scenes |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         low = row["intensity_mae_95ci_low_ms"]
@@ -671,7 +717,8 @@ def _markdown_result_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
         lines.append(
             "| {model} | {samples} | {storms} | {mae_ci} | {delta_ci} | {rmse} | "
             "{bias} | {macro} | {accuracy} | {f1} | {within} | {field_mae} | "
-            "{field_rmse} | {field_bias} |".format(
+            "{field_rmse} | {field_bias} | {field_psnr} | {field_ssim} | "
+            "{field_ssim_scenes} |".format(
                 model=row["model"],
                 samples=row["samples"],
                 storms=row["storms"],
@@ -686,6 +733,13 @@ def _markdown_result_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
                 field_mae=_format_number(row["field_mae_ms"]),
                 field_rmse=_format_number(row["field_rmse_ms"]),
                 field_bias=_format_number(row["field_bias_ms"]),
+                field_psnr=_format_number(row.get("field_psnr_db")),
+                field_ssim=_format_number(row.get("field_ssim")),
+                field_ssim_scenes=(
+                    str(int(row["field_ssim_scenes"]))
+                    if row.get("field_ssim_scenes") is not None
+                    else "—"
+                ),
             )
         )
     return lines
@@ -749,6 +803,8 @@ def _methodology_markdown(
         "| **Field MAE** | Mean absolute U-Net-versus-SAR wind error over all valid pixels. | Typical pixel-level wind-field miss; lower is better. |",
         "| **Field RMSE** | Square root of mean squared U-Net-versus-SAR error over all valid pixels. | More sensitive than field MAE to large pixel errors; lower is better. |",
         "| **Field bias** | Mean signed U-Net-minus-SAR error over all valid pixels. | Zero is ideal; negative means field underprediction and positive means overprediction. |",
+        "| **Field PSNR** | `20 log10(79.8 m/s / field RMSE)` using the fixed 0.2–80.0 m/s SAR export range. | Peak signal-to-noise ratio in physical space; higher is better. |",
+        "| **Field SSIM** | Mean scene-level structural similarity after clipping to 0.2–80.0 m/s; only complete 7×7 windows containing valid pixels in both prediction and target are retained. | Local structural fidelity on a 0–1 scale; higher is better. |",
         "",
         "### Intensity categories",
         "",
@@ -845,7 +901,6 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         )
     config = load_config_file(args.data_config)
     config["data"]["intensity_target_source"] = target_source
-    config["data"]["require_sar_valid_center"] = True
     datamodule = instantiate_datamodule(config)
     if not isinstance(datamodule, JointPairedIntensityDataModule):
         raise TypeError("comparison requires JointPairedIntensityDataModule")
@@ -869,7 +924,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         device=args.device,
     )
     _assert_common_cohort(joint_dataset, cache_dataset, correction)
-    joint_rows, field_metrics = _joint_and_field_rows(
+    joint_rows, field_metrics, ri_field_metrics = _joint_and_field_rows(
         joint_dataset,
         cache_dataset,
         correction,
@@ -878,7 +933,14 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         num_workers=args.num_workers,
         device=args.device,
     )
-    correction_rows = [correction[str(row["sample_id"])] for row in joint_rows]
+    correction_rows = []
+    for joint_row in joint_rows:
+        correction_row = dict(correction[str(joint_row["sample_id"])])
+        correction_row["is_rapid_intensification"] = joint_row[
+            "is_rapid_intensification"
+        ]
+        correction_row["ri_24h_change_ms"] = joint_row["ri_24h_change_ms"]
+        correction_rows.append(correction_row)
     raw_rows = _raw_rows(correction_rows)
     rows_by_model = {
         "unet_raw_max": raw_rows,
@@ -908,7 +970,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
     ri_summaries = target_reference.get("rapid_intensification")
     ri_bootstrap = target_reference.get("rapid_intensification_storm_bootstrap")
     ri_table_rows = (
-        _table_rows(ri_summaries, {}, ri_bootstrap)
+        _table_rows(ri_summaries, ri_field_metrics, ri_bootstrap)
         if ri_summaries and ri_bootstrap
         else []
     )
@@ -943,6 +1005,14 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
                 "path": str(args.cache_root.resolve()),
                 "metadata": cache_metadata,
             },
+            "image_quality": {
+                "physical_range_ms": [0.2, 80.0],
+                "data_range_ms": 79.8,
+                "psnr_aggregation": "pooled_valid_pixel_mse",
+                "ssim_aggregation": "mean_of_scene_means",
+                "ssim_window_pixels": 7,
+                "ssim_mask": "complete_window_valid_in_prediction_and_target",
+            },
             "checkpoints": {
                 "unet": cache_metadata["unet_checkpoint"],
                 "correction": {
@@ -967,6 +1037,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
             "paired_storm_bootstrap": bootstrap,
             "table": table_rows,
             "rapid_intensification_table": ri_table_rows,
+            "rapid_intensification_field": ri_field_metrics,
         }
     )
 

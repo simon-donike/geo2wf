@@ -211,6 +211,20 @@ def _summary_rows(
                     "samples": samples,
                 }
             )
+        for metric, metric_key in (
+            ("psnr_db", "test/image_psnr_db"),
+            ("ssim", "test/image_ssim"),
+        ):
+            rows.append(
+                {
+                    "variant": variant,
+                    "source": "2d_unet_field",
+                    "target": "wind_field",
+                    "metric": metric,
+                    "value": _metric(metrics, metric_key),
+                    "samples": samples,
+                }
+            )
         for metric in ("mae", "rmse", "bias"):
             rows.append(
                 {
@@ -253,6 +267,52 @@ def _summary_rows(
                     ),
                 }
             )
+    for row in rows:
+        row["subset"] = "all"
+    for variant, metrics in (
+        ("max_wind_only", max_metrics),
+        ("max_wind_plus_radii", radii_metrics),
+    ):
+        ri_samples = int(_metric(metrics, "test_ri/samples"))
+        for metric in ("mae", "rmse", "bias"):
+            rows.append(
+                {
+                    "variant": variant,
+                    "subset": "rapid_intensification",
+                    "source": "latent_mlp",
+                    "target": "maximum_wind",
+                    "metric": f"{metric}_ms",
+                    "value": _metric(metrics, f"test_ri/ibtracs_{metric}_ms"),
+                    "samples": ri_samples,
+                }
+            )
+        for metric in ("mae", "rmse", "bias"):
+            rows.append(
+                {
+                    "variant": variant,
+                    "subset": "rapid_intensification",
+                    "source": "2d_unet_field",
+                    "target": "wind_field",
+                    "metric": f"{metric}_ms",
+                    "value": _metric(metrics, f"test_ri/field_{metric}_ms"),
+                    "samples": ri_samples,
+                }
+            )
+        for metric, metric_key in (
+            ("psnr_db", "test_ri/field_psnr_db"),
+            ("ssim", "test_ri/field_ssim"),
+        ):
+            rows.append(
+                {
+                    "variant": variant,
+                    "subset": "rapid_intensification",
+                    "source": "2d_unet_field",
+                    "target": "wind_field",
+                    "metric": metric,
+                    "value": _metric(metrics, metric_key),
+                    "samples": ri_samples,
+                }
+            )
     return rows
 
 
@@ -261,14 +321,28 @@ def _write_summary_csv(path: Path, rows: list[dict[str, object]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(
             stream,
-            fieldnames=("variant", "source", "target", "metric", "value", "samples"),
+            fieldnames=(
+                "variant",
+                "subset",
+                "source",
+                "target",
+                "metric",
+                "value",
+                "samples",
+            ),
+            lineterminator="\n",
         )
         writer.writeheader()
         writer.writerows(rows)
 
 
 def _row_value(
-    rows: list[dict[str, object]], variant: str, source: str, target: str, metric: str
+    rows: list[dict[str, object]],
+    variant: str,
+    source: str,
+    target: str,
+    metric: str,
+    subset: str = "all",
 ) -> tuple[float, int]:
     matches = [
         row
@@ -277,6 +351,7 @@ def _row_value(
         and row["source"] == source
         and row["target"] == target
         and row["metric"] == metric
+        and row["subset"] == subset
     ]
     if len(matches) != 1:
         raise KeyError((variant, source, target, metric))
@@ -338,6 +413,8 @@ def _write_docs_page(
 ) -> None:
     intensity_lines = []
     field_lines = []
+    ri_intensity_lines = []
+    ri_field_lines = []
     for variant, label in (
         ("max_wind_only", "Maximum wind only"),
         ("max_wind_plus_radii", "Maximum wind + radii"),
@@ -357,9 +434,87 @@ def _write_docs_page(
         field_bias, _ = _row_value(
             rows, variant, "2d_unet_field", "wind_field", "bias_ms"
         )
+        field_psnr, _ = _row_value(
+            rows, variant, "2d_unet_field", "wind_field", "psnr_db"
+        )
+        field_ssim, _ = _row_value(rows, variant, "2d_unet_field", "wind_field", "ssim")
         field_lines.append(
             f"| {label} | {field_mae:.3f} | {field_rmse:.3f} | "
-            f"{field_bias:.3f} | {samples} |"
+            f"{field_bias:.3f} | {field_psnr:.3f} | {field_ssim:.3f} | "
+            f"{samples} |"
+        )
+        ri_mae, ri_samples = _row_value(
+            rows,
+            variant,
+            "latent_mlp",
+            "maximum_wind",
+            "mae_ms",
+            "rapid_intensification",
+        )
+        ri_rmse, _ = _row_value(
+            rows,
+            variant,
+            "latent_mlp",
+            "maximum_wind",
+            "rmse_ms",
+            "rapid_intensification",
+        )
+        ri_bias, _ = _row_value(
+            rows,
+            variant,
+            "latent_mlp",
+            "maximum_wind",
+            "bias_ms",
+            "rapid_intensification",
+        )
+        ri_intensity_lines.append(
+            f"| {label} | {ri_mae:.3f} | {ri_rmse:.3f} | {ri_bias:.3f} | "
+            f"{ri_samples} |"
+        )
+        ri_field_mae, _ = _row_value(
+            rows,
+            variant,
+            "2d_unet_field",
+            "wind_field",
+            "mae_ms",
+            "rapid_intensification",
+        )
+        ri_field_rmse, _ = _row_value(
+            rows,
+            variant,
+            "2d_unet_field",
+            "wind_field",
+            "rmse_ms",
+            "rapid_intensification",
+        )
+        ri_field_bias, _ = _row_value(
+            rows,
+            variant,
+            "2d_unet_field",
+            "wind_field",
+            "bias_ms",
+            "rapid_intensification",
+        )
+        ri_field_psnr, _ = _row_value(
+            rows,
+            variant,
+            "2d_unet_field",
+            "wind_field",
+            "psnr_db",
+            "rapid_intensification",
+        )
+        ri_field_ssim, _ = _row_value(
+            rows,
+            variant,
+            "2d_unet_field",
+            "wind_field",
+            "ssim",
+            "rapid_intensification",
+        )
+        ri_field_lines.append(
+            f"| {label} | {ri_field_mae:.3f} | {ri_field_rmse:.3f} | "
+            f"{ri_field_bias:.3f} | {ri_field_psnr:.3f} | "
+            f"{ri_field_ssim:.3f} | {ri_samples} |"
         )
 
     radius_lines = []
@@ -378,8 +533,8 @@ def _write_docs_page(
     content = f"""# Joint U-Net/latent-MLP structure results
 
 Generated `{created_utc}` from the best validation checkpoint of each seed-42
-run. The table below is the first evaluation of the held-out test split; no
-test metric was used for checkpoint selection.
+run. These are the canonical paper-facing held-out test results; no test metric
+was used for checkpoint selection.
 
 ## Maximum wind
 
@@ -395,9 +550,26 @@ or multi-seed uncertainty estimate.
 
 ## 2D wind-field reconstruction
 
-| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | Scenes |
-|---|---:|---:|---:|---:|
+| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | PSNR (dB) | SSIM | Scenes |
+|---|---:|---:|---:|---:|---:|---:|
 {chr(10).join(field_lines)}
+
+## Rapid-intensification phases
+
+RI observations are the held-out samples where IBTrACS maximum wind increased
+by at least 30 kt during the preceding 24 hours.
+
+| Training objective | MLP MAE (m/s) | MLP RMSE (m/s) | MLP bias (m/s) | Samples |
+|---|---:|---:|---:|---:|
+{chr(10).join(ri_intensity_lines)}
+
+| Training objective | Field MAE (m/s) | Field RMSE (m/s) | Field bias (m/s) | PSNR (dB) | SSIM | Scenes |
+|---|---:|---:|---:|---:|---:|---:|
+{chr(10).join(ri_field_lines)}
+
+PSNR uses the fixed 0.2–80.0 m/s SAR export range (79.8 m/s). SSIM is
+scene-averaged after clipping to that range and excludes every 7×7 window that
+touches an invalid prediction or target pixel.
 
 ## Radii from two sources
 
@@ -432,7 +604,8 @@ no deterministic CUDA implementation.
 The original launch accidentally disabled the configured early-stopping
 callback. Training was stopped after each validation history had exceeded the
 intended 50-epoch patience, and the global minimum `val/loss` checkpoint was
-selected. One-epoch resume runs at `{_display_path(max_run)}` and
+selected. One-epoch resume runs at
+`{_display_path(max_run)}` and
 `{_display_path(radii_run)}` completed the run manifests cleanly without
 changing checkpoint selection. The checked-in presets now enable the callback.
 """
@@ -491,10 +664,18 @@ def main() -> None:
     max_selection = _checkpoint_selection(max_checkpoint_path)
     radii_selection = _checkpoint_selection(radii_checkpoint_path)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_utc": created_utc,
         "split": "test",
         "samples": max_samples,
+        "image_quality": {
+            "physical_range_ms": [0.2, 80.0],
+            "data_range_ms": 79.8,
+            "psnr_aggregation": "pooled_valid_pixel_mse",
+            "ssim_aggregation": "mean_of_scene_means",
+            "ssim_window_pixels": 7,
+            "ssim_mask": "complete_window_valid_in_prediction_and_target",
+        },
         "runs": {
             "max_wind_only": {
                 "path": str(args.max_wind_run.resolve()),
