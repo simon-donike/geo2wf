@@ -31,6 +31,8 @@ All wind errors are in m s⁻¹.
 | Latent MLP · no SAR · wind only | Without | No | None | 6.828 | 8.245 | 6.645 | 7.263 |
 | Latent MLP · no SAR · wind + radii | Without | No | MLP head | 6.297 | 7.779 | 7.198 | 7.634 |
 
+[Download CSV](assets/data/final-results/current-validation-maximum-wind.csv){ .md-button .result-download download }
+
 ### Wind-field reconstruction
 
 L1 is pooled valid-pixel MAE in m s⁻¹. PSNR uses the fixed 79.8 m s⁻¹
@@ -45,6 +47,8 @@ Encoder-only no-SAR models have no image output and are therefore omitted.
 | Latent MLP · SAR · wind + radii | With | 2.402 | 27.139 | 0.840 | 2.494 | 26.630 | 0.816 |
 | Latent MLP · SAR · wind only | Without | 4.106 | 23.202 | 0.800 | 3.351 | 24.502 | 0.802 |
 | Latent MLP · SAR · wind + radii | Without | 3.864 | 23.831 | 0.811 | 3.506 | 24.643 | 0.806 |
+
+[Download CSV](assets/data/final-results/current-validation-image-reconstruction.csv){ .md-button .result-download download }
 
 ### Wind radii
 
@@ -66,8 +70,7 @@ explicit not-applicable reasons for every experiment/metric combination.
 | Latent MLP · SAR · wind + radii | Diagnosed from 2D image | 24.02 | 58.62 | 42.51 | 29.64 |
 | Latent MLP · no SAR · wind + radii | Direct MLP head | 19.44 | 56.73 | 25.89 | 13.47 |
 
-[Canonical validation CSV](assets/data/final-results/current-validation-metrics.csv){ .md-button .md-button--primary }
-[Validation provenance JSON](assets/data/final-results/current-validation-results.json){ .md-button }
+[Download CSV](assets/data/final-results/current-validation-radii.csv){ .md-button .result-download download }
 
 ## Complete-storm nowcasts
 
@@ -86,19 +89,19 @@ without-ERA5 panels, not an input to those models.
 
 ![Core field and scalar architectures](assets/images/final-results/current-three-storm-core-nowcasts.png)
 
-[Vector PDF](assets/images/final-results/current-three-storm-core-nowcasts.pdf){ .md-button }
+[Download CSV](assets/data/final-results/current-three-storm-core-nowcasts.csv){ .md-button .result-download download }
 
 ### SAR/no-SAR and ERA5/no-ERA5 latent-MLP matrix
 
 ![SAR/no-SAR and ERA5/no-ERA5 latent-MLP matrix](assets/images/final-results/current-three-storm-latent-nowcasts.png)
 
-[Vector PDF](assets/images/final-results/current-three-storm-latent-nowcasts.pdf){ .md-button }
+[Download CSV](assets/data/final-results/current-three-storm-latent-nowcasts.csv){ .md-button .result-download download }
 
 ### Radii-supervised correction and latent experiments
 
 ![Radii-supervised correction and latent experiments](assets/images/final-results/current-three-storm-radii-nowcasts.png)
 
-[Vector PDF](assets/images/final-results/current-three-storm-radii-nowcasts.pdf){ .md-button }
+[Download CSV](assets/data/final-results/current-three-storm-radii-nowcasts.csv){ .md-button .result-download download }
 
 ### Dense three-storm metrics
 
@@ -125,8 +128,4 @@ consistently from every model series and the ERA5 reference.
 | Latent MLP · no SAR · wind + radii | Without ERA5 | 3266 | 7.039 | 9.330 | 0.443 | 466 | 6.044 | 8.560 |
 | ERA5 10 m maximum | Reanalysis reference | 3266 | 22.119 | 27.208 | -22.117 | 466 | 40.550 | 41.657 |
 
-[Long-form predictions CSV](assets/data/final-results/current-three-storm-predictions.csv){ .md-button .md-button--primary }
-[Storm metrics CSV](assets/data/final-results/current-three-storm-metrics.csv){ .md-button }
-[Publication provenance JSON](assets/data/final-results/current-results.json){ .md-button }
-[With-ERA5 source predictions](assets/data/final-results/current-three-storm-with-era5.csv){ .md-button }
-[Without-ERA5 source predictions](assets/data/final-results/current-three-storm-without-era5.csv){ .md-button }
+[Download CSV](assets/data/final-results/current-three-storm-metrics.csv){ .md-button .result-download download }

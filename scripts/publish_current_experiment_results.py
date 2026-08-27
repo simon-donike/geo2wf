@@ -453,6 +453,55 @@ def _ri_spans(
     return spans
 
 
+def figure_data_rows(
+    frames: Mapping[str, pd.DataFrame],
+    series: Mapping[str, Sequence[Mapping[str, str]]],
+    family: str,
+    smoothing_hours: int,
+) -> pd.DataFrame:
+    """Return the exact hourly, smoothed values rendered in one figure family."""
+
+    reference = frames["with_era5"]
+    rows: list[dict[str, Any]] = []
+    for storm_id in reference["storm_id"].drop_duplicates():
+        ri_spans = _ri_spans(reference, storm_id)
+        for regime, _ in REGIMES:
+            sources = [
+                ("ibtracs_best_track", "IBTrACS best track", reference, "target_ms"),
+                (
+                    "era5_max_wind",
+                    "ERA5 10 m maximum",
+                    reference,
+                    "era5_max_wind_ms",
+                ),
+            ]
+            sources.extend(
+                (item["key"], item["label"], frames[regime], item["column"])
+                for item in series[regime]
+                if family in item["family"].split(",")
+            )
+            for series_key, label, source, column in sources:
+                values = _hourly_smoothed(source, storm_id, column, smoothing_hours)
+                for timestamp, value in values.items():
+                    rows.append(
+                        {
+                            "storm_id": storm_id,
+                            "storm": STORM_NAMES.get(storm_id, storm_id),
+                            "conditioning": regime,
+                            "observation_timestamp": timestamp.isoformat(),
+                            "series_key": series_key,
+                            "series": label,
+                            "maximum_wind_ms": float(value),
+                            "is_rapid_intensification": any(
+                                start <= timestamp < end for start, end in ri_spans
+                            ),
+                            "aggregation": "hourly mean",
+                            "smoothing_hours": smoothing_hours,
+                        }
+                    )
+    return pd.DataFrame(rows)
+
+
 def write_family_figure(
     frames: Mapping[str, pd.DataFrame],
     series: Mapping[str, Sequence[Mapping[str, str]]],
@@ -725,6 +774,13 @@ def _relative(path: Path, docs_page: Path) -> str:
     return path.resolve().relative_to(docs_page.parent.resolve()).as_posix()
 
 
+def _download_csv(docs_page: Path, download: Path) -> str:
+    return (
+        f"[Download CSV]({_relative(download, docs_page)})"
+        "{ .md-button .result-download download }"
+    )
+
+
 def write_docs(
     path: Path,
     validation_metrics: pd.DataFrame,
@@ -740,14 +796,14 @@ def write_docs(
         "radii": "Radii-supervised correction and latent experiments",
     }
     for family in ("core", "latent", "radii"):
-        png, pdf = figures[family]
+        png, _ = figures[family]
         figure_sections.extend(
             [
                 f"### {captions[family]}",
                 "",
                 f"![{captions[family]}]({_relative(png, path)})",
                 "",
-                f"[Vector PDF]({_relative(pdf, path)}){{ .md-button }}",
+                _download_csv(path, data_paths[f"figure_{family}"]),
                 "",
             ]
         )
@@ -775,6 +831,8 @@ def write_docs(
             "",
             _validation_wind_table(validation_metrics),
             "",
+            _download_csv(path, data_paths["validation_wind"]),
+            "",
             "### Wind-field reconstruction",
             "",
             "L1 is pooled valid-pixel MAE in m s⁻¹. PSNR uses the fixed 79.8 m s⁻¹",
@@ -782,6 +840,8 @@ def write_docs(
             "Encoder-only no-SAR models have no image output and are therefore omitted.",
             "",
             _validation_image_table(validation_metrics),
+            "",
+            _download_csv(path, data_paths["validation_image"]),
             "",
             "### Wind radii",
             "",
@@ -791,10 +851,7 @@ def write_docs(
             "",
             _validation_radius_table(validation_metrics),
             "",
-            f"[Canonical validation CSV]({_relative(data_paths['validation_csv'], path)})"
-            "{ .md-button .md-button--primary }",
-            f"[Validation provenance JSON]({_relative(data_paths['validation_json'], path)})"
-            "{ .md-button }",
+            _download_csv(path, data_paths["validation_radii"]),
             "",
             "## Complete-storm nowcasts",
             "",
@@ -817,16 +874,7 @@ def write_docs(
             "",
             _storm_table(storm_metrics),
             "",
-            f"[Long-form predictions CSV]({_relative(data_paths['storm_predictions'], path)})"
-            "{ .md-button .md-button--primary }",
-            f"[Storm metrics CSV]({_relative(data_paths['storm_metrics'], path)})"
-            "{ .md-button }",
-            f"[Publication provenance JSON]({_relative(data_paths['publication_json'], path)})"
-            "{ .md-button }",
-            f"[With-ERA5 source predictions]({_relative(data_paths['with_era5'], path)})"
-            "{ .md-button }",
-            f"[Without-ERA5 source predictions]({_relative(data_paths['without_era5'], path)})"
-            "{ .md-button }",
+            _download_csv(path, data_paths["storm_metrics"]),
             "",
         ]
     )
@@ -864,15 +912,50 @@ def publish(args: argparse.Namespace) -> dict[str, Any]:
     data_paths = {
         "validation_csv": args.data_output / "current-validation-metrics.csv",
         "validation_json": args.data_output / "current-validation-results.json",
+        "validation_wind": args.data_output / "current-validation-maximum-wind.csv",
+        "validation_image": args.data_output
+        / "current-validation-image-reconstruction.csv",
+        "validation_radii": args.data_output / "current-validation-radii.csv",
         "storm_predictions": args.data_output / "current-three-storm-predictions.csv",
         "storm_metrics": args.data_output / "current-three-storm-metrics.csv",
         "publication_json": args.data_output / "current-results.json",
         "with_era5": args.data_output / "current-three-storm-with-era5.csv",
         "without_era5": args.data_output / "current-three-storm-without-era5.csv",
+        **{
+            f"figure_{family}": args.data_output
+            / f"current-three-storm-{family}-nowcasts.csv"
+            for family in ("core", "latent", "radii")
+        },
     }
     args.data_output.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(args.validation_csv, data_paths["validation_csv"])
     shutil.copyfile(args.validation_json, data_paths["validation_json"])
+    _atomic_csv(
+        validation.loc[
+            (validation["output"] == "scalar_head")
+            & (validation["target"] == "maximum_wind")
+            & validation["metric"].isin(("mae", "rmse"))
+            & validation["available"].astype(bool)
+        ],
+        data_paths["validation_wind"],
+    )
+    _atomic_csv(
+        validation.loc[
+            (validation["output"] == "image_reconstruction")
+            & validation["metric"].isin(("l1", "psnr", "ssim"))
+            & validation["available"].astype(bool)
+        ],
+        data_paths["validation_image"],
+    )
+    _atomic_csv(
+        validation.loc[
+            validation["output"].isin(("scalar_radius_head", "image_derived_radius"))
+            & (validation["subset"] == "all_validation")
+            & (validation["metric"] == "mae")
+            & validation["available"].astype(bool)
+        ],
+        data_paths["validation_radii"],
+    )
     _atomic_csv(predictions, data_paths["storm_predictions"])
     _atomic_csv(storm_metrics, data_paths["storm_metrics"])
     _atomic_csv(frames["with_era5"], data_paths["with_era5"])
@@ -886,6 +969,15 @@ def publish(args: argparse.Namespace) -> dict[str, Any]:
         for family in ("core", "latent", "radii")
     }
     for family, (png_path, pdf_path) in figures.items():
+        _atomic_csv(
+            figure_data_rows(
+                frames,
+                series,
+                family,
+                args.smoothing_hours,
+            ),
+            data_paths[f"figure_{family}"],
+        )
         write_family_figure(
             frames,
             series,
