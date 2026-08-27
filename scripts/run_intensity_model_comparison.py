@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         default="with",
         help="Run the matched-cohort comparison with or without ERA5 features.",
     )
-    parser.add_argument("--split", choices=("val", "test"), default="val")
+    parser.add_argument("--split", choices=("val", "test"), default="test")
     parser.add_argument(
         "--intensity-target-source",
         choices=("ibtracs",),

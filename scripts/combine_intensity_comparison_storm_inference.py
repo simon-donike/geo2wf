@@ -104,7 +104,14 @@ def _combine_regime(parts_root: Path, output_root: Path, regime: str) -> pd.Data
 def combine(args: argparse.Namespace) -> None:
     with_era5 = _combine_regime(args.parts_root, args.output_root, "with")
     without_era5 = _combine_regime(args.parts_root, args.output_root, "without")
-    columns = ["observation_id", "storm_id", "observation_timestamp", "target_ms"]
+    columns = [
+        "observation_id",
+        "storm_id",
+        "observation_timestamp",
+        "target_ms",
+        "ri_24h_change_ms",
+        "is_rapid_intensification",
+    ]
     if (
         not with_era5[columns]
         .reset_index(drop=True)

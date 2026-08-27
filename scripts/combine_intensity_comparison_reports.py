@@ -56,6 +56,10 @@ def combined_markdown_report(
     split = str(with_era5["split"])
     with_rows = with_era5["table"]
     without_rows = without_era5["table"]
+    with_ri_rows = with_era5.get("rapid_intensification_table", [])
+    without_ri_rows = without_era5.get("rapid_intensification_table", [])
+    if bool(with_ri_rows) != bool(without_ri_rows):
+        raise ValueError("ERA5 reports do not have matching RI result coverage")
     samples = int(with_cohort["samples"])
     storms = int(with_cohort["storms"])
     lines = [
@@ -71,10 +75,30 @@ def combined_markdown_report(
         "",
         *_markdown_result_table(with_rows),
         "",
+        *(
+            [
+                "### With ERA5: rapid-intensification phases",
+                "",
+                *_markdown_result_table(with_ri_rows),
+                "",
+            ]
+            if with_ri_rows
+            else []
+        ),
         "## Without ERA5",
         "",
         *_markdown_result_table(without_rows),
         "",
+        *(
+            [
+                "### Without ERA5: rapid-intensification phases",
+                "",
+                *_markdown_result_table(without_ri_rows),
+                "",
+            ]
+            if without_ri_rows
+            else []
+        ),
         *_methodology_markdown(
             split=split,
             samples=samples,

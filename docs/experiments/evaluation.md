@@ -93,6 +93,22 @@ where applicable, high-wind MAE, storm-relative metrics with availability
 counts. Fixed-sample images
 should accompany the table.
 
+## Rapid-intensification subsets
+
+Scalar comparison and three-storm nowcast reports repeat MAE, RMSE, and signed
+bias on rapid-intensification phases. At observation time \(t\), the subset is
+defined from IBTrACS as
+
+\[
+V(t) - V(t - 24\ \mathrm{h}) \ge 30\ \mathrm{kt}.
+\]
+
+Both winds are linearly interpolated only inside the configured three-hour
+IBTrACS bracket. An observation without a valid 24-hour reference has an
+unavailable change and is not included in the RI subset. Reports retain
+`ri_24h_change_ms` and `is_rapid_intensification` on every prediction row and
+always publish RI sample counts beside the subset metrics.
+
 !!! caution "Check the split policy"
     Modular data configs default to `include_test_in_train: false`. Some
     historical full-YAML presets set it to `true`. Inspect

@@ -780,16 +780,32 @@ def _markdown_table(
     rows: Sequence[Mapping[str, Any]],
     *,
     split: str,
+    rapid_intensification_rows: Sequence[Mapping[str, Any]] | None = None,
     bootstrap_repetitions: int = 2000,
     bootstrap_seed: int = 42,
 ) -> str:
     if not rows:
         raise ValueError("cannot render an empty comparison table")
+    result_sections: list[str] = []
+    if rapid_intensification_rows:
+        result_sections.extend(
+            [
+                "## Rapid-intensification phases",
+                "",
+                "The same scalar metrics are recomputed only where IBTrACS maximum "
+                "wind increased by at least 30 kt in the preceding 24 hours. Field "
+                "metrics are omitted because the RI subset is defined per sample.",
+                "",
+                *_markdown_result_table(rapid_intensification_rows),
+                "",
+            ]
+        )
     lines = [
         f"# Intensity model comparison ({split})",
         "",
         *_markdown_result_table(rows),
         "",
+        *result_sections,
         *_methodology_markdown(
             split=split,
             samples=int(rows[0]["samples"]),
@@ -888,6 +904,14 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         seed=args.bootstrap_seed,
     )
     table_rows = _table_rows(summaries, field_metrics, bootstrap)
+    target_reference = reference_evaluation.get(target_source, {})
+    ri_summaries = target_reference.get("rapid_intensification")
+    ri_bootstrap = target_reference.get("rapid_intensification_storm_bootstrap")
+    ri_table_rows = (
+        _table_rows(ri_summaries, {}, ri_bootstrap)
+        if ri_summaries and ri_bootstrap
+        else []
+    )
     cache_manifest = pd.read_csv(
         args.cache_root / args.split / "manifest.csv", keep_default_na=False
     )
@@ -942,6 +966,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
             "prediction_rows": {name: rows for name, rows in rows_by_model.items()},
             "paired_storm_bootstrap": bootstrap,
             "table": table_rows,
+            "rapid_intensification_table": ri_table_rows,
         }
     )
 
@@ -953,11 +978,16 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         encoding="utf-8",
     )
     os.replace(temporary, output)
-    pd.DataFrame(table_rows).to_csv(output.with_suffix(".csv"), index=False)
+    csv_rows = [
+        *({"subset": "all", **row} for row in table_rows),
+        *({"subset": "rapid_intensification", **row} for row in ri_table_rows),
+    ]
+    pd.DataFrame(csv_rows).to_csv(output.with_suffix(".csv"), index=False)
     output.with_suffix(".md").write_text(
         _markdown_table(
             table_rows,
             split=args.split,
+            rapid_intensification_rows=ri_table_rows,
             bootstrap_repetitions=args.bootstrap_repetitions,
             bootstrap_seed=args.bootstrap_seed,
         ),
@@ -967,6 +997,7 @@ def evaluate_models(args: argparse.Namespace) -> dict[str, Any]:
         _markdown_table(
             table_rows,
             split=args.split,
+            rapid_intensification_rows=ri_table_rows,
             bootstrap_repetitions=args.bootstrap_repetitions,
             bootstrap_seed=args.bootstrap_seed,
         )

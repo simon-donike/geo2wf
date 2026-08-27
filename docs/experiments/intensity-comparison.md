@@ -23,6 +23,18 @@ crop settings, and evaluation code. The no-ERA5 runs still require ERA5
 availability while selecting the cohort, but do not pass ERA5 values to the
 model. This isolates conditioning rather than changing data availability.
 
+## Three-storm maximum-wind nowcasts
+
+After checkpoint selection, every model is also run independently over all GEO
+observations for the protected validation storms Humberto 2025 (`AL082025`),
+Kiko 2025 (`EP112025`), and Otis 2023 (`EP182023`). These are longitudinal
+case studies, not held-out test estimates. The paper exporter verifies the
+ERA5/no-ERA5 cohorts, saves every native prediction, computes per-storm and
+combined errors, and draws all series in one three-panel figure.
+
+The optional maximum-wind-only and radii-supervised joint checkpoints add the
+two structure-ablation arms to the same figure.
+
 ## Joint U-Net/latent-MLP structure experiment
 
 The separate structure study uses the joint U-Net + latent MLP so every model

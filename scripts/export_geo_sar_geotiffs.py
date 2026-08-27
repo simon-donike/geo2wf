@@ -13,7 +13,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from local_env import load_local_env
+try:
+    from scripts.local_env import load_local_env
+except ModuleNotFoundError:  # Direct ``python scripts/...`` execution.
+    from local_env import load_local_env
 
 load_local_env()
 

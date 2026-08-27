@@ -268,6 +268,11 @@ def test_combined_report_requires_and_documents_the_same_cohort() -> None:
     assert "2,000 paired cluster-bootstrap repetitions" in report
     assert report.count("## Metric definitions") == 1
 
+    with_ri = {**payload, "rapid_intensification_table": rows}
+    ri_report = combined_markdown_report(with_ri, with_ri)
+    assert "With ERA5: rapid-intensification phases" in ri_report
+    assert "Without ERA5: rapid-intensification phases" in ri_report
+
     different = {**payload, "cohort": {**payload["cohort"], "sha256": "other"}}
     with pytest.raises(ValueError, match="exact same cohort"):
         combined_markdown_report(payload, different)

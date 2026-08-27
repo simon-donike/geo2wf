@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the six-model intensity comparison over complete inference storms.
+"""Run the final intensity comparison over complete validation storms.
 
 One invocation evaluates one conditioning regime (with or without ERA5). It
 loads every GEO observation for the requested storms from the inference
@@ -36,6 +36,7 @@ from geo2wf.data.intensity import tropical_category_from_wind_ms  # noqa: E402
 from geo2wf.data.joint_intensity import (  # noqa: E402
     _interpolate_ibtracs_wind,
     _load_ibtracs_tracks,
+    _ri_diagnostics,
 )
 from geo2wf.models.bottleneck_unet_mlp import (  # noqa: E402
     BottleneckUNetMLPRegressor,
@@ -67,41 +68,21 @@ PAIRED_ROOT = ROOT / "data" / "geotiff" / "geo_sar_10bands_era5_v2_pmw"
 IBTRACS_FILE = ROOT / "data" / "IBTrACs" / "ibtracs.ALL.list.v04r01.csv"
 COMPARISON_ROOT = ROOT / "logs" / "intensity-comparisons"
 DEFAULT_OUTPUT_ROOT = COMPARISON_ROOT / "three-storm-inference"
-REGIMES = {
-    "with": {
-        "run_root": COMPARISON_ROOT / "20260820T144011Z-with-era5",
-        "unet": Path(
-            "unet-runs/20260820-164014_modular/checkpoints/" "epoch=061-step=13082.ckpt"
-        ),
-        "correction": Path(
-            "correction-runs/20260820-171845_modular/checkpoints/"
-            "epoch=027-step=1484.ckpt"
-        ),
-        "joint": Path(
-            "joint-runs/20260820-164014_modular/checkpoints/"
-            "epoch=139-step=29540.ckpt"
-        ),
-    },
-    "without": {
-        "run_root": COMPARISON_ROOT / "20260820T155344Z-without-era5",
-        "unet": Path(
-            "unet-runs/20260820-175347_modular/checkpoints/" "epoch=077-step=16458.ckpt"
-        ),
-        "correction": Path(
-            "correction-runs/20260820-183313_modular/checkpoints/"
-            "epoch=050-step=2703.ckpt"
-        ),
-        "joint": Path(
-            "joint-runs/20260820-175347_modular/checkpoints/"
-            "epoch=070-step=14981.ckpt"
-        ),
-    },
+REGIMES = ("with", "without")
+MODEL_COLUMNS = {
+    "unet_raw_max": "unet_raw_max_ms",
+    "unet_correction": "unet_correction_ms",
+    "joint_unet_mlp": "joint_unet_mlp_ms",
+}
+ABLATION_COLUMNS = {
+    "ablation_max_wind_only": "ablation_max_wind_only_ms",
+    "ablation_max_wind_radii": "ablation_max_wind_radii_ms",
 }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--era5", choices=tuple(REGIMES), required=True)
+    parser.add_argument("--era5", choices=REGIMES, required=True)
     parser.add_argument("--data-root", type=Path, default=DATA_ROOT)
     parser.add_argument(
         "--manifest",
@@ -111,12 +92,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stats", type=Path, default=PAIRED_ROOT / "stats.json")
     parser.add_argument("--ibtracs-file", type=Path, default=IBTRACS_FILE)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument(
+        "--comparison-run",
+        type=Path,
+        help=(
+            "Completed intensity-comparison workflow directory (or workflow.json). "
+            "Its checkpoint artifacts are used unless explicitly overridden."
+        ),
+    )
     parser.add_argument("--unet-checkpoint", type=Path, default=None)
     parser.add_argument("--correction-checkpoint", type=Path, default=None)
     parser.add_argument("--joint-checkpoint", type=Path, default=None)
     parser.add_argument("--intensity-cache-metadata", type=Path, default=None)
+    parser.add_argument(
+        "--ablation-max-wind-checkpoint",
+        type=Path,
+        help="Optional ERA5 joint-model checkpoint from the max-wind-only arm.",
+    )
+    parser.add_argument(
+        "--ablation-radii-checkpoint",
+        type=Path,
+        help="Optional ERA5 joint-model checkpoint from the radii-supervised arm.",
+    )
     parser.add_argument("--storms", nargs="+", default=list(STORMS))
     parser.add_argument("--max-ibtracs-bracket-hours", type=float, default=3.0)
+    parser.add_argument("--ri-threshold-kt", type=float, default=30.0)
+    parser.add_argument("--ri-window-hours", type=float, default=24.0)
     parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -138,26 +139,63 @@ def parse_args() -> argparse.Namespace:
         parser.error("--limit must be positive")
     if args.max_ibtracs_bracket_hours <= 0:
         parser.error("--max-ibtracs-bracket-hours must be positive")
+    if args.ri_threshold_kt <= 0 or args.ri_window_hours <= 0:
+        parser.error("RI threshold and window must be positive")
     if (args.shard_index is None) != (args.num_shards is None):
         parser.error("--shard-index and --num-shards must be provided together")
     if args.num_shards is not None and args.num_shards <= 0:
         parser.error("--num-shards must be positive")
     if args.shard_index is not None and not 0 <= args.shard_index < args.num_shards:
         parser.error("--shard-index must satisfy 0 <= index < --num-shards")
+    if args.era5 == "without" and (
+        args.ablation_max_wind_checkpoint is not None
+        or args.ablation_radii_checkpoint is not None
+    ):
+        parser.error("radii-ablation checkpoints are ERA5-conditioned")
     return args
 
 
 def _regime_paths(args: argparse.Namespace) -> dict[str, Path]:
-    configured = REGIMES[args.era5]
-    run_root = Path(configured["run_root"])
+    artifacts: Mapping[str, Any] = {}
+    if args.comparison_run is not None:
+        workflow_path = Path(args.comparison_run).expanduser().resolve()
+        if workflow_path.is_dir():
+            workflow_path = workflow_path / "workflow.json"
+        if not workflow_path.is_file():
+            raise FileNotFoundError(workflow_path)
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        if workflow.get("status") != "completed":
+            raise ValueError(f"comparison workflow is not completed: {workflow_path}")
+        if workflow.get("era5") != args.era5:
+            raise ValueError(
+                "comparison workflow conditioning does not match --era5: "
+                f"{workflow.get('era5')!r} != {args.era5!r}"
+            )
+        artifacts = workflow.get("artifacts", {})
+
+    cache_root = artifacts.get("cache_root")
     paths = {
-        "unet": args.unet_checkpoint or run_root / configured["unet"],
-        "correction": args.correction_checkpoint or run_root / configured["correction"],
-        "joint": args.joint_checkpoint or run_root / configured["joint"],
+        "unet": args.unet_checkpoint or artifacts.get("unet_checkpoint"),
+        "correction": args.correction_checkpoint
+        or artifacts.get("correction_checkpoint"),
+        "joint": args.joint_checkpoint or artifacts.get("joint_checkpoint"),
         "cache_metadata": args.intensity_cache_metadata
-        or run_root / "unet-intensity-cache" / "cache-metadata.json",
+        or (Path(cache_root) / "cache-metadata.json" if cache_root else None),
     }
-    return {name: Path(path).expanduser().resolve() for name, path in paths.items()}
+    missing = [name for name, path in paths.items() if path is None]
+    if missing:
+        raise ValueError(
+            "provide --comparison-run or explicit paths for: " + ", ".join(missing)
+        )
+    if args.ablation_max_wind_checkpoint is not None:
+        paths["ablation_max_wind_only"] = args.ablation_max_wind_checkpoint
+    if args.ablation_radii_checkpoint is not None:
+        paths["ablation_max_wind_radii"] = args.ablation_radii_checkpoint
+    return {
+        name: Path(path).expanduser().resolve()
+        for name, path in paths.items()
+        if path is not None
+    }
 
 
 def _atomic_csv(frame: pd.DataFrame, path: Path) -> None:
@@ -186,7 +224,14 @@ def _atomic_json(payload: Mapping[str, Any], path: Path) -> None:
 
 
 def _cohort_fingerprint(frame: pd.DataFrame) -> str:
-    columns = ["observation_id", "storm_id", "observation_timestamp", "target_ms"]
+    columns = [
+        "observation_id",
+        "storm_id",
+        "observation_timestamp",
+        "target_ms",
+        "ri_24h_change_ms",
+        "is_rapid_intensification",
+    ]
     data = (
         frame.loc[:, columns]
         .sort_values("observation_id")
@@ -206,9 +251,12 @@ def _metrics(prediction: np.ndarray, target: np.ndarray) -> dict[str, float]:
 
 def _summarize(frame: pd.DataFrame) -> dict[str, Any]:
     model_columns = {
-        "unet_raw_max": "unet_raw_max_ms",
-        "unet_correction": "unet_correction_ms",
-        "joint_unet_mlp": "joint_unet_mlp_ms",
+        **MODEL_COLUMNS,
+        **{
+            name: column
+            for name, column in ABLATION_COLUMNS.items()
+            if column in frame.columns
+        },
     }
     result: dict[str, Any] = {
         "samples": len(frame),
@@ -310,10 +358,21 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
     joint = BottleneckUNetMLPRegressor.load_from_checkpoint(
         paths["joint"], map_location="cpu"
     ).eval()
+    ablation_models = {
+        name: BottleneckUNetMLPRegressor.load_from_checkpoint(
+            paths[name], map_location="cpu"
+        ).eval()
+        for name in ABLATION_COLUMNS
+        if name in paths
+    }
     expected_channels = 23 if use_era5 else 14
     if (
         unet.condition_channels != expected_channels
         or joint.condition_channels != expected_channels
+        or any(
+            model.condition_channels != expected_channels
+            for model in ablation_models.values()
+        )
     ):
         raise ValueError(
             "checkpoint condition-channel contract does not match inference regime: "
@@ -323,6 +382,8 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
     unet.to(args.device)
     correction.to(args.device)
     joint.to(args.device)
+    for model in ablation_models.values():
+        model.to(args.device)
 
     rows: list[dict[str, Any]] = []
     selected_count = 0
@@ -350,6 +411,14 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                     raise ValueError(
                         f"IBTrACS cannot bracket {storm} at {geo.timestamp}"
                     )
+                ri_change_ms, is_ri = _ri_diagnostics(
+                    tracks[storm],
+                    label["observation_timestamp"],
+                    current_wind_ms=float(label["target_wind_ms"]),
+                    max_bracket_hours=args.max_ibtracs_bracket_hours,
+                    threshold_kt=args.ri_threshold_kt,
+                    window_hours=args.ri_window_hours,
+                )
                 batch, _ = _prepare_sample(
                     geo,
                     era5_by_storm.get(storm),
@@ -373,10 +442,17 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                     "target_category": tropical_category_from_wind_ms(
                         float(label["target_wind_ms"])
                     ),
+                    "ri_24h_change_ms": ri_change_ms,
+                    "is_rapid_intensification": is_ri,
                     "ibtracs_lower_fix_timestamp": label["lower_fix_timestamp"],
                     "ibtracs_upper_fix_timestamp": label["upper_fix_timestamp"],
                 }
                 if not bool(device_batch["condition_mask"].any().item()):
+                    invalid_predictions: dict[str, Any] = {}
+                    for name, column in ABLATION_COLUMNS.items():
+                        if name in ablation_models:
+                            invalid_predictions[column] = np.nan
+                            invalid_predictions[f"{name}_category"] = None
                     rows.append(
                         {
                             **base_row,
@@ -389,6 +465,7 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                             "unet_correction_category": None,
                             "joint_unet_mlp_ms": np.nan,
                             "joint_unet_mlp_category": None,
+                            **invalid_predictions,
                         }
                     )
                     continue
@@ -401,9 +478,23 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                     intensity_context[storm],
                 )
                 joint_output = joint.predict_normalized(device_batch)
+                ablation_predictions = {
+                    name: float(
+                        model.predict_normalized(
+                            device_batch
+                        ).ibtracs_max_wind_ms.item()
+                    )
+                    for name, model in ablation_models.items()
+                }
                 raw_ms = _valid_maximum(raw_field, device_batch["condition_mask"])
                 corrected_ms = float(corrected.output_msw_ms.item())
                 joint_ms = float(joint_output.ibtracs_max_wind_ms.item())
+                extra_predictions: dict[str, Any] = {}
+                for name, prediction_ms in ablation_predictions.items():
+                    extra_predictions[ABLATION_COLUMNS[name]] = prediction_ms
+                    extra_predictions[f"{name}_category"] = (
+                        tropical_category_from_wind_ms(prediction_ms)
+                    )
                 rows.append(
                     {
                         **base_row,
@@ -422,6 +513,7 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                         "joint_unet_mlp_category": tropical_category_from_wind_ms(
                             joint_ms
                         ),
+                        **extra_predictions,
                     }
                 )
 
@@ -455,6 +547,19 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
             "units": "m s-1",
             "interpolation": "linear at GEO observation time",
             "maximum_bracket_hours": args.max_ibtracs_bracket_hours,
+            "rapid_intensification": {
+                "threshold_kt": args.ri_threshold_kt,
+                "window_hours": args.ri_window_hours,
+                "comparison": "greater_than_or_equal",
+            },
+        },
+        "model_columns": {
+            **MODEL_COLUMNS,
+            **{
+                name: column
+                for name, column in ABLATION_COLUMNS.items()
+                if name in ablation_models
+            },
         },
         "checkpoints": {
             name: {"path": str(path), "sha256": _sha256(path)}
