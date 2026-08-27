@@ -94,6 +94,7 @@ class EncoderMLPOutput:
 
     intensity_prediction_ms: torch.Tensor
     bottleneck: torch.Tensor
+    structure_prediction_km: torch.Tensor | None = None
 
 
 class BottleneckEncoderMLP(nn.Module):
@@ -202,8 +203,8 @@ class BottleneckEncoderMLP(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> EncoderMLPOutput:
         bottleneck, _ = self.encode(inputs)
-        _, intensity, _ = self.intensity_features(bottleneck)
-        return EncoderMLPOutput(intensity, bottleneck)
+        _, intensity, structure = self.intensity_features(bottleneck)
+        return EncoderMLPOutput(intensity, bottleneck, structure)
 
 
 @dataclass(frozen=True, kw_only=True)

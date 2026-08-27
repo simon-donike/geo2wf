@@ -6,8 +6,11 @@ from .module import (
     JointPredictionBatch,
     JointUNetOutput,
 )
+from .encoder_only import BottleneckEncoderMLPRegressor
+
 __all__ = [
     "BottleneckEncoderMLP",
+    "BottleneckEncoderMLPRegressor",
     "BottleneckUNetMLP",
     "BottleneckUNetMLPRegressor",
     "EncoderMLPOutput",

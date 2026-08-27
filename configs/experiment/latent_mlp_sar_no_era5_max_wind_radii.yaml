@@ -1,0 +1,38 @@
+# @package _global_
+defaults:
+  - override /data: joint_geo_sar_ibtracs
+  - override /model: bottleneck_unet_mlp
+
+data:
+  use_era5: false
+
+model:
+  condition_channels: 14
+  structure_head_enabled: true
+  structure_loss_weight: 0.25
+
+trainer:
+  max_epochs: 1000
+  accelerator: gpu
+  devices: 1
+  deterministic: false
+  default_root_dir: logs/latent-matrix/sar/no-era5/max-wind-radii
+  checkpoint:
+    monitor: val/loss
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/loss
+    mode: min
+    patience: 50
+
+logging:
+  wandb:
+    name: latent-mlp-sar-no-era5-max-wind-radii
+    group: latent-mlp-matrix
+    project: geo2wf
+    tags: [sar, no-era5, max-wind-radii]
+    enabled: false
+    log_model: false

@@ -1,0 +1,35 @@
+# @package _global_
+defaults:
+  - override /data: unet_intensity_structure
+  - override /model: intensity_correction
+
+# Intensity correction is trained normally. Radius skill is evaluated directly
+# from the frozen U-Net image rather than from a learned scalar head.
+model:
+  structure_head_enabled: false
+  structure_loss_weight: 0.0
+
+trainer:
+  max_epochs: 200
+  accelerator: gpu
+  devices: 1
+  default_root_dir: logs/intensity-structure/unet-image-radii
+  checkpoint:
+    monitor: val/storm_macro_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/storm_macro_mae_ms
+    mode: min
+    patience: 50
+
+logging:
+  wandb:
+    name: unet-correction-image-radii
+    group: intensity-structure
+    project: geo2wf
+    tags: [unet-correction, image-radii]
+    enabled: false
+    log_model: false

@@ -1,0 +1,32 @@
+_target_: geo2wf.data.encoder_intensity.EncoderIBTrACSDataModule
+root: ${oc.env:GEO2WF_JOINT_PAIRED_ROOT,data/geotiff/geo_sar_10bands_era5_v2_pmw}
+ibtracs_file: ${oc.env:GEO2WF_IBTRACS_FILE,data/IBTrACs/ibtracs.ALL.list.v04r01.csv}
+eligibility_cache_dir: ${oc.env:GEO2WF_INTENSITY_COHORT_CACHE,${.root}/.geo2wf/encoder-ibtracs-cohorts}
+max_ibtracs_bracket_hours: 3.0
+intensity_target_source: ibtracs
+require_sar_valid_center: true
+sar_robust_peak_fraction: 0.005
+ri_threshold_kt: 30.0
+ri_window_hours: 24.0
+stats_file: ${.root}/stats.json
+train_split: train
+val_split: val
+test_split: test
+target_size: [256, 256]
+center_crop_size: [192, 192]
+random_flips: true
+include_test_in_train: false
+require_era5: true
+use_era5: true
+include_pmw: false
+pmw_as_condition: false
+include_ibtracs: false
+normalization: robust-zscore
+target_normalization: min-max
+robust_clip: 4.0
+max_era5_time_gap_hours: 3.1
+intensity_balanced_sampling: false
+batch_size: 4
+num_workers: 2
+pin_memory: false
+persistent_workers: false

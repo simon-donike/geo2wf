@@ -33,6 +33,7 @@ from geo2wf.data.intensity import (  # noqa: E402
     IBTRACS_STRUCTURE_MANIFEST_COLUMNS,
     INTENSITY_CACHE_SCHEMA_VERSION,
     KNOT_TO_MS,
+    UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS,
     tropical_category_from_wind_ms,
 )
 from geo2wf.data.joint_intensity import (  # noqa: E402
@@ -40,6 +41,10 @@ from geo2wf.data.joint_intensity import (  # noqa: E402
 )
 from geo2wf.models.deterministic_residual import (  # noqa: E402
     ERA5ResidualRegressor,
+)
+from geo2wf.metrics.wind import (  # noqa: E402
+    IBTRACS_RADIUS_NAMES,
+    ibtracs_radius_metric_statistics,
 )
 
 
@@ -341,6 +346,25 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                     distance = torch.nan_to_num(
                         distance, nan=0.0, posinf=1.0, neginf=0.0
                     ).clamp(0.0, 1.0)
+                    radius_statistics = ibtracs_radius_metric_statistics(
+                        field[None, None],
+                        valid[None, None],
+                        center[None],
+                        batch["target_bounds"][index][None],
+                        torch.zeros((1, len(IBTRACS_RADIUS_NAMES))),
+                        torch.ones((1, len(IBTRACS_RADIUS_NAMES)), dtype=torch.bool),
+                    )
+                    radius_fields: dict[str, Any] = {}
+                    for radius_index, column in enumerate(
+                        UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS
+                    ):
+                        is_valid = bool(radius_statistics[radius_index, 4] > 0)
+                        radius_fields[column] = (
+                            float(radius_statistics[radius_index, 0])
+                            if is_valid
+                            else math.nan
+                        )
+                        radius_fields[f"{column}_valid"] = is_valid
 
                     metadata = batch["meta"][index]
                     storm_id = str(metadata["storm_id"]).strip().upper()
@@ -438,6 +462,7 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
                                 dataset.filtered_unusable_sar_count
                             ),
                             **structure_fields,
+                            **radius_fields,
                         }
                     )
             if not split_rows:
@@ -499,6 +524,13 @@ def export_joint_intensity_cache(args: argparse.Namespace) -> dict[str, Any]:
             "wind_radius_reduction": "equivalent_area_from_four_quadrants",
             "units": "km",
             "training_optional": True,
+        },
+        "unet_image_structure": {
+            "targets": list(UNET_IMAGE_STRUCTURE_MANIFEST_COLUMNS),
+            "wind_radius_reduction": "equivalent_area_from_thresholded_pixels",
+            "rmw_reduction": "peak_10km_annular_mean",
+            "center": "ibtracs",
+            "units": "km",
         },
         "unet_checkpoint": {
             "path": str(args.checkpoint.expanduser().resolve()),

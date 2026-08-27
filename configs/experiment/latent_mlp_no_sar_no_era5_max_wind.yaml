@@ -1,0 +1,38 @@
+# @package _global_
+defaults:
+  - override /data: encoder_geo_ibtracs
+  - override /model: bottleneck_encoder_mlp
+
+data:
+  use_era5: false
+
+model:
+  condition_channels: 14
+  structure_head_enabled: false
+  structure_loss_weight: 0.0
+
+trainer:
+  max_epochs: 1000
+  accelerator: gpu
+  devices: 1
+  deterministic: false
+  default_root_dir: logs/latent-matrix/no-sar/no-era5/max-wind
+  checkpoint:
+    monitor: val/intensity_mae_ms
+    mode: min
+    save_top_k: 2
+    save_last: true
+  early_stopping:
+    enabled: true
+    monitor: val/intensity_mae_ms
+    mode: min
+    patience: 50
+
+logging:
+  wandb:
+    name: latent-mlp-no-sar-no-era5-max-wind
+    group: latent-mlp-matrix
+    project: geo2wf
+    tags: [no-sar, no-era5, max-wind-only]
+    enabled: false
+    log_model: false
