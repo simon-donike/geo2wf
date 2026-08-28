@@ -819,8 +819,61 @@ input {
 
 .mermaid {
   padding: 1rem;
-  background: var(--secondary);
+  color: var(--tint-10);
+  background: var(--tint-90);
+  border: 1px solid var(--divider);
   border-radius: 1rem;
+}
+
+/* Mermaid's default theme assumes a light page. The documentation deliberately
+   uses Material's `default` scheme with a dark custom palette, so set the SVG
+   primitives explicitly instead of relying on Mermaid's scheme-name detection. */
+.mermaid svg {
+  color: var(--tint-10);
+}
+
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse,
+.mermaid .node polygon,
+.mermaid .node path {
+  fill: var(--tint-80) !important;
+  stroke: var(--highlight) !important;
+}
+
+.mermaid .label,
+.mermaid .nodeLabel,
+.mermaid .edgeLabel,
+.mermaid .cluster-label,
+.mermaid text,
+.mermaid span,
+.mermaid p {
+  color: var(--secondary) !important;
+  fill: var(--secondary) !important;
+}
+
+.mermaid .edgeLabel,
+.mermaid .edgeLabel rect,
+.mermaid .labelBkg {
+  background-color: var(--tint-90) !important;
+  fill: var(--tint-90) !important;
+  opacity: 1 !important;
+}
+
+.mermaid .flowchart-link,
+.mermaid .edgePath path {
+  stroke: var(--tint-30) !important;
+}
+
+.mermaid marker path,
+.mermaid .arrowheadPath {
+  fill: var(--tint-30) !important;
+  stroke: var(--tint-30) !important;
+}
+
+.mermaid .cluster rect {
+  fill: var(--main) !important;
+  stroke: var(--tint-50) !important;
 }
 
 .md-footer,

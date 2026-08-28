@@ -65,20 +65,23 @@ The red cross marks the interpolated IBTrACS storm centre.
 The compact table reports all-validation MAE in km. The downloadable
 canonical table additionally contains RMSE, bias, RI-only values, and
 explicit not-applicable reasons for every experiment/metric combination.
+ERA5 identifies whether ERA5 fields were supplied as conditioning inputs;
+rows with the same experiment label but different ERA5 values are separate
+input-ablation runs, not repeated measurements.
 
-| Experiment | Radius source | RMW MAE | R34 MAE | R50 MAE | R64 MAE |
-|---|---|---:|---:|---:|---:|
-| U-Net + standard MLP · image radii | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
-| U-Net + standard MLP · MLP radii | Direct MLP head | 24.66 | 42.78 | 16.92 | 13.77 |
-| U-Net + standard MLP · MLP radii | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
-| Latent MLP · SAR · wind only | Diagnosed from 2D image | 32.12 | 55.67 | 41.41 | 34.72 |
-| Latent MLP · SAR · wind + radii | Direct MLP head | 19.51 | 44.47 | 20.19 | 13.18 |
-| Latent MLP · SAR · wind + radii | Diagnosed from 2D image | 28.65 | 38.99 | 28.02 | 27.07 |
-| Latent MLP · no SAR · wind + radii | Direct MLP head | 20.71 | 42.82 | 20.39 | 12.99 |
-| Latent MLP · SAR · wind only | Diagnosed from 2D image | 27.30 | 59.07 | 44.77 | 32.95 |
-| Latent MLP · SAR · wind + radii | Direct MLP head | 18.24 | 65.82 | 28.14 | 15.33 |
-| Latent MLP · SAR · wind + radii | Diagnosed from 2D image | 24.02 | 58.62 | 42.51 | 29.64 |
-| Latent MLP · no SAR · wind + radii | Direct MLP head | 19.44 | 56.73 | 25.89 | 13.47 |
+| Experiment | ERA5 | Radius source | RMW MAE | R34 MAE | R50 MAE | R64 MAE |
+|---|:---:|---|---:|---:|---:|---:|
+| U-Net + standard MLP · image radii | With | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
+| U-Net + standard MLP · MLP radii | With | Direct MLP head | 24.66 | 42.78 | 16.92 | 13.77 |
+| U-Net + standard MLP · MLP radii | With | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
+| Latent MLP · SAR · wind only | With | Diagnosed from 2D image | 32.12 | 55.67 | 41.41 | 34.72 |
+| Latent MLP · SAR · wind + radii | With | Direct MLP head | 19.51 | 44.47 | 20.19 | 13.18 |
+| Latent MLP · SAR · wind + radii | With | Diagnosed from 2D image | 28.65 | 38.99 | 28.02 | 27.07 |
+| Latent MLP · no SAR · wind + radii | With | Direct MLP head | 20.71 | 42.82 | 20.39 | 12.99 |
+| Latent MLP · SAR · wind only | Without | Diagnosed from 2D image | 27.30 | 59.07 | 44.77 | 32.95 |
+| Latent MLP · SAR · wind + radii | Without | Direct MLP head | 18.24 | 65.82 | 28.14 | 15.33 |
+| Latent MLP · SAR · wind + radii | Without | Diagnosed from 2D image | 24.02 | 58.62 | 42.51 | 29.64 |
+| Latent MLP · no SAR · wind + radii | Without | Direct MLP head | 19.44 | 56.73 | 25.89 | 13.47 |
 
 [Download CSV](assets/data/final-results/current-validation-radii.csv){ .md-button .result-download download }
 
