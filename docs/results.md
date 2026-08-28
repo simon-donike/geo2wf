@@ -50,6 +50,16 @@ Encoder-only no-SAR models have no image output and are therefore omitted.
 
 [Download CSV](assets/data/final-results/current-validation-image-reconstruction.csv){ .md-button .result-download download }
 
+#### Held-out reconstruction examples
+
+Four validation observations from the selected SAR + ERA5 latent-MLP model
+with wind-and-radii supervision are shown below. Predictions are complete 2D
+wind-speed fields; SAR targets are only observed inside the orange footprint,
+so the unobserved part of each prediction is a conditional reconstruction.
+The red cross marks the interpolated IBTrACS storm centre.
+
+[![Held-out 2D wind-field reconstructions](assets/images/final-results/current-validation-windfields-batch-01.jpg)](assets/images/final-results/current-validation-windfields-batch-01.jpg)
+
 ### Wind radii
 
 The compact table reports all-validation MAE in km. The downloadable

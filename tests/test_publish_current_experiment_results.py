@@ -139,6 +139,18 @@ def test_results_page_exposes_one_csv_download_per_table_and_figure() -> None:
     assert "](assets/data/final-results/current-validation-results.json" not in page
 
 
+def test_results_page_includes_held_out_windfield_reconstructions() -> None:
+    root = Path(__file__).resolve().parents[1]
+    page = (root / "docs/results.md").read_text(encoding="utf-8")
+    image = Path(
+        "assets/images/final-results/current-validation-windfields-batch-01.jpg"
+    )
+
+    assert "#### Held-out reconstruction examples" in page
+    assert f"]({image})" in page
+    assert (root / "docs" / image).is_file()
+
+
 def test_results_are_linked_from_the_persistent_site_header() -> None:
     root = Path(__file__).resolve().parents[1]
     header = (root / "docs/overrides/partials/header.html").read_text(encoding="utf-8")
