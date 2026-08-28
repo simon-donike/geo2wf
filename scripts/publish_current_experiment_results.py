@@ -712,8 +712,8 @@ def _validation_image_table(metrics: pd.DataFrame) -> str:
 
 def _validation_radius_table(metrics: pd.DataFrame) -> str:
     lines = [
-        "| Experiment | Radius source | RMW MAE | R34 MAE | R50 MAE | R64 MAE |",
-        "|---|---|---:|---:|---:|---:|",
+        "| Experiment | ERA5 | Radius source | RMW MAE | R34 MAE | R50 MAE | R64 MAE |",
+        "|---|:---:|---|---:|---:|---:|---:|",
     ]
     targets = {
         "scalar_radius_head": (
@@ -739,7 +739,8 @@ def _validation_radius_table(metrics: pd.DataFrame) -> str:
             if all(value is None for value in values):
                 continue
             lines.append(
-                f"| {metadata['label']} | {source_labels[output]} | "
+                f"| {metadata['label']} | {metadata['era5']} | "
+                f"{source_labels[output]} | "
                 + " | ".join(_number(value, 2) for value in values)
                 + " |"
             )
@@ -860,6 +861,9 @@ def write_docs(
             "The compact table reports all-validation MAE in km. The downloadable",
             "canonical table additionally contains RMSE, bias, RI-only values, and",
             "explicit not-applicable reasons for every experiment/metric combination.",
+            "ERA5 identifies whether ERA5 fields were supplied as conditioning inputs;",
+            "rows with the same experiment label but different ERA5 values are separate",
+            "input-ablation runs, not repeated measurements.",
             "",
             _validation_radius_table(validation_metrics),
             "",
