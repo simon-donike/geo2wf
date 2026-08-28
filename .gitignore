@@ -44,6 +44,8 @@ MANIFEST
 wandb
 *.gif
 playground
+tables
+docs/assets/images/final-results/category-4-5-triptychs
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

@@ -1,0 +1,292 @@
+{
+  "created_utc": "2026-08-28T16:40:55.997921+00:00",
+  "image_count": 25,
+  "filter": {
+    "source": "/work/code/geo2wf/data/unet_intensity_structure_v3/train/manifest.csv",
+    "split": "train",
+    "target": "interpolated IBTrACS USA_WIND",
+    "categories": [
+      4,
+      5
+    ],
+    "category_counts": {
+      "4": 18,
+      "5": 7
+    },
+    "storm_count": 25,
+    "ocean_only": true,
+    "land_criterion": "interpolated IBTrACS storm center classified by global_land_mask",
+    "land_occurrences_excluded": 0,
+    "eligible_occurrences": 58,
+    "selection": "strongest-per-storm",
+    "selection_limit": 25
+  },
+  "panels": [
+    "geostationary C13",
+    "SAR observed 10 m wind field",
+    "selected-model 10 m wind-field prediction"
+  ],
+  "wind_display_range_ms": [
+    0.0,
+    80.0
+  ],
+  "model": {
+    "name": "Latent MLP \u00b7 SAR \u00b7 ERA5 \u00b7 wind + radii",
+    "selection_basis": "lowest current all-validation wind-field L1",
+    "validation_l1_ms": 2.4017400469868218,
+    "config": "/work/code/geo2wf/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/resolved-config.yaml",
+    "checkpoint": "/work/code/geo2wf/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/checkpoints/epoch=104-step=14910.ckpt"
+  },
+  "images": [
+    {
+      "sequence": 1,
+      "file": "01-al022024-20240703t232451z-cat4.png",
+      "sample_id": "AL022024_sar_geo_20240703232451_9ee3302e",
+      "storm_id": "AL022024",
+      "observation_timestamp": "2024-07-03T23:24:51+00:00",
+      "ibtracs_target_wind_ms": 59.46243667602539,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 3.1967010498046875
+    },
+    {
+      "sequence": 2,
+      "file": "02-al052025-20250816t222940z-cat4.png",
+      "sample_id": "AL052025_sar_geo_20250816222940_9c64d085",
+      "storm_id": "AL052025",
+      "observation_timestamp": "2025-08-16T22:29:40+00:00",
+      "ibtracs_target_wind_ms": 66.37089538574219,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.411684036254883
+    },
+    {
+      "sequence": 3,
+      "file": "03-al072025-20250923t095319z-cat4.png",
+      "sample_id": "AL072025_sar_geo_20250923095319_ab4b9795",
+      "storm_id": "AL072025",
+      "observation_timestamp": "2025-09-23T09:53:19+00:00",
+      "ibtracs_target_wind_ms": 61.733280181884766,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.7682300806045532
+    },
+    {
+      "sequence": 4,
+      "file": "04-al082023-20230828t223959z-cat4.png",
+      "sample_id": "AL082023_sar_geo_20230828223959_8da19b8b",
+      "storm_id": "AL082023",
+      "observation_timestamp": "2023-08-28T22:39:59+00:00",
+      "ibtracs_target_wind_ms": 66.42034149169922,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.6916797161102295
+    },
+    {
+      "sequence": 5,
+      "file": "05-al132023-20230908t092552z-cat5.png",
+      "sample_id": "AL132023_sar_geo_20230908092552_a8df13bc",
+      "storm_id": "AL132023",
+      "observation_timestamp": "2023-09-08T09:25:52+00:00",
+      "ibtracs_target_wind_ms": 71.65251922607422,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 2.8001835346221924
+    },
+    {
+      "sequence": 6,
+      "file": "06-al132025-20251028t111057z-cat5.png",
+      "sample_id": "AL132025_sar_geo_20251028111057_ad4c0ae0",
+      "storm_id": "AL132025",
+      "observation_timestamp": "2025-10-28T11:10:57+00:00",
+      "ibtracs_target_wind_ms": 84.18232727050781,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 2.448429822921753
+    },
+    {
+      "sequence": 7,
+      "file": "07-al142024-20241007t235905z-cat5.png",
+      "sample_id": "AL142024_sar_geo_20241007235905_6123a25d",
+      "storm_id": "AL142024",
+      "observation_timestamp": "2024-10-07T23:59:05+00:00",
+      "ibtracs_target_wind_ms": 74.61534118652344,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 2.3138701915740967
+    },
+    {
+      "sequence": 8,
+      "file": "08-ep072023-20230814t135308z-cat4.png",
+      "sample_id": "EP072023_sar_geo_20230814135308_25a9b782",
+      "storm_id": "EP072023",
+      "observation_timestamp": "2023-08-14T13:53:08+00:00",
+      "ibtracs_target_wind_ms": 59.16106033325195,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.743025302886963
+    },
+    {
+      "sequence": 9,
+      "file": "09-ep092023-20230819t013357z-cat4.png",
+      "sample_id": "EP092023_sar_geo_20230819013357_dccbfc18",
+      "storm_id": "EP092023",
+      "observation_timestamp": "2023-08-19T01:33:57+00:00",
+      "ibtracs_target_wind_ms": 59.16106033325195,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 3.6062395572662354
+    },
+    {
+      "sequence": 10,
+      "file": "10-ep122024-20241024t140154z-cat5.png",
+      "sample_id": "EP122024_sar_geo_20241024140154_882a8581",
+      "storm_id": "EP122024",
+      "observation_timestamp": "2024-10-24T14:01:54+00:00",
+      "ibtracs_target_wind_ms": 70.4951171875,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 1.2305059432983398
+    },
+    {
+      "sequence": 11,
+      "file": "11-ep172023-20231019t130451z-cat4.png",
+      "sample_id": "EP172023_sar_geo_20231019130451_e9579a12",
+      "storm_id": "EP172023",
+      "observation_timestamp": "2023-10-19T13:04:51+00:00",
+      "ibtracs_target_wind_ms": 58.790374755859375,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.3857057094573975
+    },
+    {
+      "sequence": 12,
+      "file": "12-sh102025-20250120t110218z-cat4.png",
+      "sample_id": "SH102025_sar_geo_20250120110218_6474804c",
+      "storm_id": "SH102025",
+      "observation_timestamp": "2025-01-20T11:02:18+00:00",
+      "ibtracs_target_wind_ms": 58.66633605957031,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 3.386094808578491
+    },
+    {
+      "sequence": 13,
+      "file": "13-sh172023-20230331t112728z-cat4.png",
+      "sample_id": "SH172023_sar_geo_20230331112728_48a526c9",
+      "storm_id": "SH172023",
+      "observation_timestamp": "2023-03-31T11:27:28+00:00",
+      "ibtracs_target_wind_ms": 66.69175720214844,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.2324597835540771
+    },
+    {
+      "sequence": 14,
+      "file": "14-sh182024-20240321t223714z-cat4.png",
+      "sample_id": "SH182024_sar_geo_20240321223714_ca363996",
+      "storm_id": "SH182024",
+      "observation_timestamp": "2024-03-21T22:37:14+00:00",
+      "ibtracs_target_wind_ms": 58.68796157836914,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.901750087738037
+    },
+    {
+      "sequence": 15,
+      "file": "15-sh272025-20250329t123924z-cat4.png",
+      "sample_id": "SH272025_sar_geo_20250329123924_f3a3c121",
+      "storm_id": "SH272025",
+      "observation_timestamp": "2025-03-29T12:39:24+00:00",
+      "ibtracs_target_wind_ms": 65.62361907958984,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.13356351852417
+    },
+    {
+      "sequence": 16,
+      "file": "16-wp022023-20230525t204123z-cat5.png",
+      "sample_id": "WP022023_sar_geo_20230525204123_c9ec9966",
+      "storm_id": "WP022023",
+      "observation_timestamp": "2023-05-25T20:41:23+00:00",
+      "ibtracs_target_wind_ms": 82.04500579833984,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 1.8895665407180786
+    },
+    {
+      "sequence": 17,
+      "file": "17-wp062023-20230801t092240z-cat4.png",
+      "sample_id": "WP062023_sar_geo_20230801092240_26a05c0e",
+      "storm_id": "WP062023",
+      "observation_timestamp": "2023-08-01T09:22:40+00:00",
+      "ibtracs_target_wind_ms": 63.08226776123047,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.643604040145874
+    },
+    {
+      "sequence": 18,
+      "file": "18-wp092023-20230829t214707z-cat5.png",
+      "sample_id": "WP092023_sar_geo_20230829214707_349f04d2",
+      "storm_id": "WP092023",
+      "observation_timestamp": "2023-08-29T21:47:07+00:00",
+      "ibtracs_target_wind_ms": 70.58928680419922,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 2.538789987564087
+    },
+    {
+      "sequence": 19,
+      "file": "19-wp142023-20231002t093715z-cat4.png",
+      "sample_id": "WP142023_sar_geo_20231002093715_a2e739d6",
+      "storm_id": "WP142023",
+      "observation_timestamp": "2023-10-02T09:37:15+00:00",
+      "ibtracs_target_wind_ms": 59.69336700439453,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 3.90779185295105
+    },
+    {
+      "sequence": 20,
+      "file": "20-wp152023-20231011t203131z-cat5.png",
+      "sample_id": "WP152023_sar_geo_20231011203131_5ad0084c",
+      "storm_id": "WP152023",
+      "observation_timestamp": "2023-10-11T20:31:31+00:00",
+      "ibtracs_target_wind_ms": 82.71807098388672,
+      "ibtracs_category": 5,
+      "valid_sar_pixel_mae_ms": 2.837028741836548
+    },
+    {
+      "sequence": 21,
+      "file": "21-wp202024-20240930t220155z-cat4.png",
+      "sample_id": "WP202024_sar_geo_20240930220155_0e3bfff9",
+      "storm_id": "WP202024",
+      "observation_timestamp": "2024-09-30T22:01:55+00:00",
+      "ibtracs_target_wind_ms": 67.89017486572266,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.7633352279663086
+    },
+    {
+      "sequence": 22,
+      "file": "22-wp242024-20241107t095247z-cat4.png",
+      "sample_id": "WP242024_sar_geo_20241107095247_440f671f",
+      "storm_id": "WP242024",
+      "observation_timestamp": "2024-11-07T09:52:47+00:00",
+      "ibtracs_target_wind_ms": 63.55121994018555,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 3.9938056468963623
+    },
+    {
+      "sequence": 23,
+      "file": "23-wp252024-20241115t211634z-cat4.png",
+      "sample_id": "WP252024_sar_geo_20241115211634_ec7733ba",
+      "storm_id": "WP252024",
+      "observation_timestamp": "2024-11-15T21:16:34+00:00",
+      "ibtracs_target_wind_ms": 68.75248718261719,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 1.8786529302597046
+    },
+    {
+      "sequence": 24,
+      "file": "24-wp252025-20250921t080248z-cat4.png",
+      "sample_id": "WP252025_sar_geo_20250921080248_c42f023f",
+      "storm_id": "WP252025",
+      "observation_timestamp": "2025-09-21T08:02:48+00:00",
+      "ibtracs_target_wind_ms": 63.08912658691406,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.97590708732605
+    },
+    {
+      "sequence": 25,
+      "file": "25-wp272024-20241113t213144z-cat4.png",
+      "sample_id": "WP272024_sar_geo_20241113213144_5e0dfb11",
+      "storm_id": "WP272024",
+      "observation_timestamp": "2024-11-13T21:31:44+00:00",
+      "ibtracs_target_wind_ms": 65.57675170898438,
+      "ibtracs_category": 4,
+      "valid_sar_pixel_mae_ms": 2.285944938659668
+    }
+  ]
+}
