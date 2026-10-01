@@ -154,3 +154,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Local research artifacts are archived outside version control.
+/archived/local/
