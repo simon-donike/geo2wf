@@ -1,0 +1,43 @@
+{
+  "command": [
+    ".venv/bin/geo2wf-train",
+    "experiment=latent_mlp_sar_no_era5_max_wind"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 1,
+  "finished_at": "2026-08-27T17:08:27.272259+00:00",
+  "git_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+  "include_test_in_train": false,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": null
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/metric-history.jsonl",
+  "pid": 1374964,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+    "git_dirty": false,
+    "git_status": [],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "1dfcca486e785f326873cafe405053b84b3d689b4defdbefe2d4a9265ea6db58",
+    "tracked_diff_path": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/source-diff.patch",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tracked_diff_size_bytes": 0,
+    "untracked_snapshots": []
+  },
+  "started_at": "2026-08-27T16:38:21.979839+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

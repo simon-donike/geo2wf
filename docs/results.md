@@ -1,10 +1,42 @@
-# Current results
+# Published results
 
-!!! success "Canonical experiment outputs"
-    These tables are generated directly from the completed experiment
-    matrix and its selected checkpoints. They are the paper-facing source
-    of truth for current validation, RI validation, and the three complete
-    validation-storm case studies.
+These are the exact two tables used in the conference paper. See the
+[reproduction guide](reproduction.md) for checkpoint IDs, original cohorts,
+and dataset limitations. The architecture table uses the original test set;
+the latent-supervision table uses each run’s validation cohort.
+
+## Architecture ablation
+
+Maximum-wind MAE in m s⁻¹.
+
+| Model | ERA5 | All | RI |
+|---|:---:|---:|---:|
+| Field diagnostic | Yes | 6.446 | 14.475 |
+| Post-hoc MLP | Yes | 5.529 | 10.512 |
+| Joint latent MLP | Yes | 7.302 | 7.716 |
+| Field diagnostic | No | 7.518 | 17.859 |
+| Post-hoc MLP | No | 6.715 | 12.507 |
+| Joint latent MLP | No | 5.885 | 8.934 |
+
+## Latent-supervision ablation
+
+Maximum-wind MAE in m s⁻¹; RMW MAE in km. Dashes indicate no scalar radius head.
+
+| ERA5 | SAR | Radius supervision | Wind All | Wind RI | RMW All | RMW RI |
+|:---:|:---:|:---:|---:|---:|---:|---:|
+| Yes | Yes | No | 5.795 | 8.128 | -- | -- |
+| Yes | Yes | Yes | 5.859 | 7.316 | 19.51 | 13.78 |
+| Yes | No | No | 5.446 | 6.555 | -- | -- |
+| Yes | No | Yes | 5.688 | 6.904 | 20.71 | 16.27 |
+| No | Yes | No | 6.694 | 6.867 | -- | -- |
+| No | Yes | Yes | 6.344 | 5.469 | 18.24 | 11.18 |
+| No | No | No | 6.828 | 6.645 | -- | -- |
+| No | No | Yes | 6.297 | 7.198 | 19.44 | 13.14 |
+
+## Additional validation diagnostics
+
+The original detailed validation diagnostics follow. They are distinct from
+the architecture test table above.
 
 ## Current validation matrix
 

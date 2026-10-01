@@ -20,13 +20,12 @@ uv run geo2wf-train experiment=bottleneck_unet_mlp
 uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
 
 # Joint U-Net/latent MLP structure pair
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
 
 # Scalar correction and retained forecast
 uv run geo2wf-train experiment=unet_intensity_correction
 uv run geo2wf-train experiment=intensity_forecast_pretrain
-uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 
 Use normal Hydra overrides for smoke tests, hardware, and loader settings:
@@ -66,9 +65,9 @@ uv run geo2wf-export intensity-forecast-cache --help
 ## Evaluation and inference
 
 ```bash
-uv run geo2wf-evaluate latent-structure --help
+uv run geo2wf-evaluate conference --help
 uv run geo2wf-evaluate intensity-comparison --help
-uv run geo2wf-evaluate three-storm-nowcasts --help
+uv run geo2wf-evaluate conference figures --help
 uv run geo2wf-evaluate intensity-correction --help
 uv run geo2wf-evaluate intensity-forecast --help
 
@@ -95,12 +94,12 @@ uv run geo2wf-infer intensity-comparison-storms \
   --era5 without \
   --comparison-run logs/intensity-comparisons/<without-era5-run>
 
-uv run geo2wf-evaluate three-storm-nowcasts
+uv run geo2wf-evaluate conference figures
 ```
 
-The last command writes long-form predictions, per-storm and combined metrics,
-PNG/PDF paper figures, provenance JSON, and the generated section on the final
-results page.
+The last command verifies the saved native-observation metrics and writes
+long-form predictions and PNG/PDF figures into `build/conference/results`.
+See [reproduction](../reproduction.md) for checkpoint-based reevaluation.
 
 ## Environment variables
 

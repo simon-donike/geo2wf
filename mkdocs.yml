@@ -3,7 +3,7 @@ site_description: Satellite-based tropical-cyclone wind-field reconstruction and
 site_url: https://tcd.hyperalis.com/
 repo_url: https://github.com/simon-donike/geo2wf
 repo_name: simon-donike/geo2wf
-edit_uri: edit/main/docs/
+edit_uri: edit/conference-release/docs/
 copyright: Copyright &copy; 2026 geo2wf contributors
 
 theme:
@@ -38,7 +38,8 @@ theme:
 
 nav:
   - Home: index.md
-  - Results: results.md
+  - Published results: results.md
+  - Reproduce the paper: reproduction.md
   - Start here:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md
@@ -78,11 +79,6 @@ nav:
       - Troubleshooting: reference/troubleshooting.md
       - Glossary: reference/glossary.md
   - StormSense: explorer.md
-  - Archived:
-      - Archive overview: archived/index.md
-      - Previous intensity benchmark: archived/results/intensity-comparison-results.md
-      - Direct PMW U-Net: archived/models/direct-unet.md
-      - PMW proxy pretraining: archived/data/export-geo-pmw.md
 
 plugins:
   - search:

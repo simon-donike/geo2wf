@@ -1,0 +1,32 @@
+{
+  "best_model_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/checkpoints/epoch=070-step=14981.ckpt",
+  "best_model_score": 28.864666645114934,
+  "epoch": 121,
+  "finished_at": "2026-08-20T16:37:28.102244+00:00",
+  "global_step": 25531,
+  "last_model_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/checkpoints/last.ckpt",
+  "metrics": {
+    "train/image_bias_ms": -0.23370404541492462,
+    "train/image_loss": 4.844299793243408,
+    "train/image_mae_ms": 3.276423215866089,
+    "train/image_rmse_ms": 4.325216293334961,
+    "train/intensity_bias_ms": -0.18643924593925476,
+    "train/intensity_loss": 4.114596843719482,
+    "train/intensity_mae_ms": 2.2227861881256104,
+    "train/intensity_rmse_ms": 2.684847116470337,
+    "train/loss": 8.958894729614258,
+    "train/loss_epoch": 8.958894729614258,
+    "train/loss_step": 3.0243124961853027,
+    "val/image_bias_ms": -0.37750652814099084,
+    "val/image_loss": 5.681234779497638,
+    "val/image_mae_ms": 3.7088339479288934,
+    "val/image_rmse_ms": 5.068863528765693,
+    "val/intensity_bias_ms": -0.09602616984268715,
+    "val/intensity_loss": 25.0125384803476,
+    "val/intensity_mae_ms": 7.090891114596663,
+    "val/intensity_rmse_ms": 9.275149350160948,
+    "val/loss": 30.693773259845237
+  },
+  "schema_version": 1,
+  "status": "completed"
+}

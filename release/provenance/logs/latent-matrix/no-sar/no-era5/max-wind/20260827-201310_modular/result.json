@@ -1,0 +1,30 @@
+{
+  "best_model_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/checkpoints/epoch=061-step=8804.ckpt",
+  "best_model_score": 6.827936172485352,
+  "epoch": 112,
+  "finished_at": "2026-08-27T18:24:51.523739+00:00",
+  "global_step": 15904,
+  "last_model_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/checkpoints/last.ckpt",
+  "metrics": {
+    "train/intensity_bias_ms": -0.21318867802619934,
+    "train/intensity_loss": 8.848176956176758,
+    "train/intensity_mae_ms": 3.45621919631958,
+    "train/intensity_rmse_ms": 4.222363471984863,
+    "train/loss": 8.848176956176758,
+    "train/loss_epoch": 8.848176956176758,
+    "train/loss_step": 2.87317156791687,
+    "val/category_accuracy": 0.4150943458080292,
+    "val/category_macro_f1": 0.28334590792655945,
+    "val/intensity_bias_ms": 1.9250123500823975,
+    "val/intensity_loss": 28.09514808654785,
+    "val/intensity_mae_ms": 7.747270584106445,
+    "val/intensity_rmse_ms": 9.414300918579102,
+    "val/loss": 28.09514808654785,
+    "val_ri/intensity_bias_ms": 0.3812197148799896,
+    "val_ri/intensity_mae_ms": 6.2457709312438965,
+    "val_ri/intensity_rmse_ms": 6.845584869384766,
+    "val_ri/samples": 24.0
+  },
+  "schema_version": 1,
+  "status": "completed"
+}

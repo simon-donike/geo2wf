@@ -1,0 +1,82 @@
+{
+  "command": [
+    "/work/code/geo2wf/src/geo2wf/training.py",
+    "experiment=intensity_comparison_unet_no_era5",
+    "trainer.accelerator=gpu",
+    "trainer.devices=[1]",
+    "trainer.default_root_dir=/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs",
+    "seed=42",
+    "data.root=/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw",
+    "data.stats_file=/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+    "data.ibtracs_file=/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+    "data.batch_size=4",
+    "data.num_workers=2",
+    "logging.wandb.name=intensity-comparison-without-era5-unet-20260820T155344Z"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 2,
+  "finished_at": "2026-08-20T16:32:40.887054+00:00",
+  "git_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+  "include_test_in_train": false,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": null
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/metric-history.jsonl",
+  "pid": 98249,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+    "git_dirty": true,
+    "git_status": [
+      " M configs/experiment/bottleneck_unet_mlp.yaml",
+      " M configs/experiment/bottleneck_unet_mlp_no_era5.yaml",
+      " M configs/experiment/intensity_comparison_unet.yaml",
+      " M configs/experiment/unet_intensity_correction.yaml",
+      " M docs/experiments/intensity-comparison.md",
+      " M scripts/evaluate_intensity_models.py",
+      " M scripts/export_joint_intensity_cache.py",
+      " M scripts/run_intensity_model_comparison.py",
+      " M src/geo2wf/data/datasets/paired_geotiff.py",
+      " M src/geo2wf/training.py",
+      " M tests/test_bottleneck_unet_mlp.py",
+      " M tests/test_dataset_era5.py",
+      " M tests/test_intensity_model_comparison.py",
+      "?? configs/experiment/intensity_comparison_unet_no_era5.yaml",
+      "?? scripts/run_intensity_comparison_both.sh"
+    ],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "223241785b35b9fc75d8d9475955d45a15d6a02b52c3db45e7ccbcb70adad5d5",
+    "tracked_diff_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/source-diff.patch",
+    "tracked_diff_sha256": "f1eed50a02585f3d9119e5d6c7ac1635fbe2c6cca5b994b7d2ce23bca6c91f93",
+    "tracked_diff_size_bytes": 36600,
+    "untracked_snapshots": [
+      {
+        "repository_path": "configs/experiment/intensity_comparison_unet_no_era5.yaml",
+        "sha256": "bb5dcd80c61a9a357140fd6b09262da6f4bf1fd7e6b4882a4deac24be444247d",
+        "size_bytes": 687,
+        "snapshot_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/source-snapshot/untracked/configs/experiment/intensity_comparison_unet_no_era5.yaml"
+      },
+      {
+        "repository_path": "scripts/run_intensity_comparison_both.sh",
+        "sha256": "8bb4f7ef398ca6743b241af590bb42980c76337c62effd0d5c98e2596134538b",
+        "size_bytes": 379,
+        "snapshot_path": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/source-snapshot/untracked/scripts/run_intensity_comparison_both.sh"
+      }
+    ]
+  },
+  "started_at": "2026-08-20T15:53:47.184878+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

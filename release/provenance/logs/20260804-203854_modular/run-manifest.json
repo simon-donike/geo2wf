@@ -1,0 +1,58 @@
+{
+  "command": [
+    ".venv/bin/geo2wf-train",
+    "experiment=unet_intensity_correction",
+    "data.root=/work/code/geo2wf/data/unet_intensity_geostat_nopmw_v2",
+    "trainer.accelerator=gpu",
+    "trainer.devices=2",
+    "+trainer.strategy=ddp_find_unused_parameters_false",
+    "logging.wandb.name=unet-intensity-correction-geostat-nopmw-v2-20260804T183843Z"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/20260804-203854_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 2,
+  "finished_at": "2026-08-04T18:43:22.809929+00:00",
+  "git_commit": "851f5eed225c456f2aa29ea44e6deadb352dc647",
+  "include_test_in_train": false,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": null
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/20260804-203854_modular/metric-history.jsonl",
+  "pid": 2781358,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/20260804-203854_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/20260804-203854_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/20260804-203854_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "851f5eed225c456f2aa29ea44e6deadb352dc647",
+    "git_dirty": true,
+    "git_status": [
+      " M src/geo2wf/models/intensity_correction/module.py",
+      "?? scripts/export_geotiff_intensity_cache.py"
+    ],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "0cd19d3bd46ad18bc2310ba8fbc4f3e565abbcdb73119242bce8e0071a8155f2",
+    "tracked_diff_path": "/work/code/geo2wf/logs/20260804-203854_modular/source-diff.patch",
+    "tracked_diff_sha256": "b63619a1c63dc1acb9689d766fb6758b830609175ebef693075ede1055c02bcd",
+    "tracked_diff_size_bytes": 971,
+    "untracked_snapshots": [
+      {
+        "repository_path": "scripts/export_geotiff_intensity_cache.py",
+        "sha256": "d6a1432e2db6e79c074839ec842b83a7723671a889592570775259bc219be7e4",
+        "size_bytes": 17545,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-203854_modular/source-snapshot/untracked/scripts/export_geotiff_intensity_cache.py"
+      }
+    ]
+  },
+  "started_at": "2026-08-04T18:38:54.101358+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

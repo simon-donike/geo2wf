@@ -348,15 +348,6 @@ wheels = [
 ]
 
 [[package]]
-name = "einops"
-version = "0.8.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/77/850bef8d72ffb9219f0b1aac23fbc1bf7d038ee6ea666f331fa273031aa2/einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827", size = 56261, upload-time = "2026-01-26T04:13:17.638Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193", size = 65638, upload-time = "2026-01-26T04:13:18.546Z" },
-]
-
-[[package]]
 name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -462,7 +453,6 @@ name = "geo2wf"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "einops" },
     { name = "global-land-mask" },
     { name = "h5netcdf" },
     { name = "h5py" },
@@ -479,7 +469,6 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "setuptools" },
     { name = "torch" },
-    { name = "torchvision" },
     { name = "tqdm" },
     { name = "typing-extensions" },
     { name = "wandb" },
@@ -500,7 +489,6 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "einops", specifier = ">=0.6,<0.9" },
     { name = "global-land-mask", specifier = ">=1.0.0" },
     { name = "h5netcdf", specifier = ">=1.3,<2.0" },
     { name = "h5py", specifier = ">=3.8,<4.0" },
@@ -516,7 +504,6 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10,<2.0" },
     { name = "setuptools", specifier = ">=65.0,<81.0" },
     { name = "torch", specifier = ">=1.13,<2.2" },
-    { name = "torchvision", specifier = ">=0.14,<0.17" },
     { name = "tqdm", specifier = ">=4.64,<5.0" },
     { name = "typing-extensions", specifier = ">=4.0,<5.0" },
     { name = "wandb", specifier = ">=0.24.0" },
@@ -1821,29 +1808,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/81/34/39b8b749333db56c0585d7a11fa62a283c087bb1dfc897d69fb8cedbefb1/torchmetrics-1.9.0.tar.gz", hash = "sha256:a488609948600df52d3db4fcdab02e62aab2a85ef34da67037dc3e65b8512faa", size = 581765, upload-time = "2026-03-09T17:41:22.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c3/a2/c7f6ebf546f8f644edf0f999aa98ece106986a77a7b922316bf6414ff825/torchmetrics-1.9.0-py3-none-any.whl", hash = "sha256:bfdcbff3dd1d96b3374bb2496eb39f23c4b28b8a845b6a18c313688e0d2d9ca1", size = 983384, upload-time = "2026-03-09T17:41:19.756Z" },
-]
-
-[[package]]
-name = "torchvision"
-version = "0.16.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "requests" },
-    { name = "torch" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/3c/687b31e39de3a220d4ba4db403819d9d2dfbecf5e77f6509ff377ccf7de2/torchvision-0.16.2-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:bc86f2800cb2c0c1a09c581409cdd6bff66e62f103dc83fc63f73346264c3756", size = 1588780, upload-time = "2023-12-14T21:50:12.421Z" },
-    { url = "https://files.pythonhosted.org/packages/16/25/186bc3ab670eec24d7fe799f5e5b096bc1a456bc88fa85decae78dc2f20c/torchvision-0.16.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b024bd412df6d3a007dcebf311a894eb3c5c21e1af80d12be382bbcb097a7c3a", size = 1500185, upload-time = "2023-12-14T21:50:09.437Z" },
-    { url = "https://files.pythonhosted.org/packages/da/ae/76bd3682465730dea7be21f36a8160a911a470de6f26228904f222e7fefe/torchvision-0.16.2-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:e89f10f3c8351972b6e3fda95bc3e479ea8dbfc9dfcfd2c32902dbad4ba5cfc5", size = 6796195, upload-time = "2023-12-14T21:49:59.255Z" },
-    { url = "https://files.pythonhosted.org/packages/54/78/7350fe2e9e4979d754f0a87191bd0cdc120c2fcfb163a036ca2c70276c54/torchvision-0.16.2-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:96c7583700112a410bdc4e1e4f118c429dab49c29c9a31a2cc3579bc9b08b19d", size = 13959335, upload-time = "2023-12-14T21:49:42.066Z" },
-    { url = "https://files.pythonhosted.org/packages/f7/27/c0faba9135bf3f110810e7e7896233c92edb92827ef824649f08d24adebd/torchvision-0.16.2-cp310-cp310-win_amd64.whl", hash = "sha256:9f4032ebb3277fb07ff6a9b818d50a547fb8fcd89d958cfd9e773322454bb688", size = 1137934, upload-time = "2023-12-14T21:50:10.924Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/0a/59f82c490e82c3f3671deb374b1d53e3285ff91b76cae46f99b5b3c3e2d7/torchvision-0.16.2-cp311-cp311-macosx_10_13_x86_64.whl", hash = "sha256:67b1aaf8b8cb02ce75dd445f291a27c8036a502f8c0aa76e28c37a0faac2e153", size = 1588786, upload-time = "2023-12-14T21:50:07.811Z" },
-    { url = "https://files.pythonhosted.org/packages/ef/a2/f16cac894c4c71585b3411707502ed8d607945fb4a695857621565bd728d/torchvision-0.16.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:bef30d03e1d1c629761f4dca51d3b7d8a0dc0acce6f4068ab2a1634e8e7b64e0", size = 1500181, upload-time = "2023-12-14T21:50:05.916Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/c8/cf445dcf86daf1aed298061ad14b8d335fa594596aeaa6b951231328ffd1/torchvision-0.16.2-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:e59cc7b2bd1ab5c0ce4ae382e4e37be8f1c174e8b5de2f6a23c170de9ae28495", size = 6795927, upload-time = "2023-12-14T21:50:01.511Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/2b/3177a4e6f0f190a036ec1c64866cf92442919fdfe4a4ee0cccc137e50dfd/torchvision-0.16.2-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:e130b08cc9b3cc73a6c59d6edf032394a322f9579bfd21d14bc2e1d0999aa758", size = 13959338, upload-time = "2023-12-14T21:49:54.95Z" },
-    { url = "https://files.pythonhosted.org/packages/f9/e6/3c821e7417acd82df89e39f09156ce80d58817b5b4b1ac5453b522bc5dd4/torchvision-0.16.2-cp311-cp311-win_amd64.whl", hash = "sha256:8692ab1e48807e9604046a6f4beeb67b523294cee1b00828654bb0df2cfce2b2", size = 1137940, upload-time = "2023-12-14T21:50:04.039Z" },
 ]
 
 [[package]]

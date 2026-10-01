@@ -1,0 +1,138 @@
+{
+  "command": [
+    ".venv/bin/geo2wf-train",
+    "--weights-only-path",
+    "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/checkpoints/epoch=020-step=5103.ckpt",
+    "data=geo_sar_common10_era5",
+    "model=deterministic_residual",
+    "experiment=ablations/stage1_peak_aware",
+    "data.root=data/geotiff/geo_sar_10bands_era5_v2_pmw",
+    "data.stats_file=data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+    "data.train_split=train_geostat_nopmw",
+    "data.include_pmw=false",
+    "data.include_test_in_train=true",
+    "trainer.accelerator=gpu",
+    "trainer.devices=2",
+    "+trainer.strategy=ddp_find_unused_parameters_false",
+    "logging.wandb.project=geo2wf",
+    "logging.wandb.name=geostat-nopmw-v2-weights-only-20260804T153445Z"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/20260804-173456_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 2,
+  "finished_at": null,
+  "git_commit": "16f584db8a51ea2dbe966c3d783017d41cf11794",
+  "include_test_in_train": true,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": {
+      "exists": true,
+      "path": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/checkpoints/epoch=020-step=5103.ckpt",
+      "sha256": "79a823ce5e09e4e3bcbbfd2043d238305650d507041883d5bc38f8128e71bd5a",
+      "size_bytes": 83626942
+    }
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/20260804-173456_modular/metric-history.jsonl",
+  "pid": 2567811,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/20260804-173456_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/20260804-173456_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/20260804-173456_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "16f584db8a51ea2dbe966c3d783017d41cf11794",
+    "git_dirty": true,
+    "git_status": [
+      " M src/geo2wf/cli/evaluate.py",
+      " M src/geo2wf/cli/export.py",
+      " M src/geo2wf/cli/infer.py",
+      " M src/geo2wf/data/__init__.py",
+      "?? configs/data/unet_intensity_single.yaml",
+      "?? configs/experiment/unet_intensity_correction.yaml",
+      "?? configs/model/intensity_correction.yaml",
+      "?? scripts/evaluate_intensity_correction.py",
+      "?? scripts/export_unet_intensity_cache.py",
+      "?? scripts/run_intensity_correction_inference.py",
+      "?? src/geo2wf/data/intensity.py",
+      "?? src/geo2wf/models/intensity_correction/__init__.py",
+      "?? src/geo2wf/models/intensity_correction/module.py",
+      "?? tests/test_intensity_correction.py"
+    ],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "4df0e5cb1b013d4b4e503082400030c3628cae697b841d36cbc3186802ffaa5e",
+    "tracked_diff_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-diff.patch",
+    "tracked_diff_sha256": "c7372c25adec9583c75c1bdf84f863015d58729e739e8b59bfb0f7ba996575a4",
+    "tracked_diff_size_bytes": 3101,
+    "untracked_snapshots": [
+      {
+        "repository_path": "configs/data/unet_intensity_single.yaml",
+        "sha256": "3bf13976dbe3cdaaab2173f09161b59300f28732c3993f2c6a6918b693ef9cad",
+        "size_bytes": 295,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/configs/data/unet_intensity_single.yaml"
+      },
+      {
+        "repository_path": "configs/experiment/unet_intensity_correction.yaml",
+        "sha256": "53bf9c4e889a6791a13531ef4980a3afa1723466c4884ff556755dc432642a62",
+        "size_bytes": 311,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/configs/experiment/unet_intensity_correction.yaml"
+      },
+      {
+        "repository_path": "configs/model/intensity_correction.yaml",
+        "sha256": "ebfface8e109aacd234aee3955155bdf3137dea83dd051bcf8ca77a274eb1719",
+        "size_bytes": 412,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/configs/model/intensity_correction.yaml"
+      },
+      {
+        "repository_path": "scripts/evaluate_intensity_correction.py",
+        "sha256": "4511f5e467db25b73a0c9922e0e99ab2a81877616796ffc2558e28125dba77ac",
+        "size_bytes": 6134,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/scripts/evaluate_intensity_correction.py"
+      },
+      {
+        "repository_path": "scripts/export_unet_intensity_cache.py",
+        "sha256": "6c42b5679121477e44f6c1c3211ce8f93c7f1b94e7f749cffe8fb1e610f316bd",
+        "size_bytes": 17739,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/scripts/export_unet_intensity_cache.py"
+      },
+      {
+        "repository_path": "scripts/run_intensity_correction_inference.py",
+        "sha256": "56e1647d5d31f05cf04658954bc8f838601bcaadf2143ae4e8599b62414b1c99",
+        "size_bytes": 4112,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/scripts/run_intensity_correction_inference.py"
+      },
+      {
+        "repository_path": "src/geo2wf/data/intensity.py",
+        "sha256": "c6506f6786754b1de26cebdb6c1ed72965dec23f01e1512b2cebd54edf038f70",
+        "size_bytes": 16502,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/src/geo2wf/data/intensity.py"
+      },
+      {
+        "repository_path": "src/geo2wf/models/intensity_correction/__init__.py",
+        "sha256": "e04751dcb1afdade4f7a9a447af21be2cffe25af302264cf092a87065084e046",
+        "size_bytes": 269,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/src/geo2wf/models/intensity_correction/__init__.py"
+      },
+      {
+        "repository_path": "src/geo2wf/models/intensity_correction/module.py",
+        "sha256": "cb7b841bce34be62ddff1dd5c9b94cd283a04fd827bb73ae877d79da7560c67d",
+        "size_bytes": 20849,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/src/geo2wf/models/intensity_correction/module.py"
+      },
+      {
+        "repository_path": "tests/test_intensity_correction.py",
+        "sha256": "7035431c8726fe1c92dc7889508a6543ba2381748e0c2e9b75e2ad8ea082d14f",
+        "size_bytes": 10427,
+        "snapshot_path": "/work/code/geo2wf/logs/20260804-173456_modular/source-snapshot/untracked/tests/test_intensity_correction.py"
+      }
+    ]
+  },
+  "started_at": "2026-08-04T15:34:56.571843+00:00",
+  "status": "running",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

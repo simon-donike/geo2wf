@@ -1,0 +1,16 @@
+{
+  "correction_checkpoint": {
+    "path": "/work/code/geo2wf/logs/20260804-203854_modular/checkpoints/epoch=032-step=297.ckpt",
+    "sha256": "69c9c7c682c682fa445f1e32f1b1855ee02cd0ca87d178bb69bd42db81429841"
+  },
+  "intensity_cache_metadata": "/work/code/geo2wf/data/unet_intensity_geostat_nopmw_v2/cache-metadata.json",
+  "model": "UNet+MLP",
+  "samples": 81,
+  "scientific_evaluation": "development_only_upstream_test_was_trained",
+  "single_timestep": true,
+  "storm_id": "EP182023",
+  "unet_checkpoint": {
+    "path": "/work/code/geo2wf/logs/20260804-173456_modular/checkpoints/last.ckpt",
+    "sha256": "1bd532d9c84e6d9f6878d2f18927a658507de1fb9c6708b07d7bdfb5edcd3ef0"
+  }
+}

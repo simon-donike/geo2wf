@@ -1,0 +1,25 @@
+name: Conference release checks
+on:
+  pull_request:
+  push:
+    branches: [conference-release]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          python-version: '3.11'
+          enable-cache: true
+      - run: uv sync --frozen --group dev --group docs
+      - run: uv run python -m pytest -q
+        env:
+          OMP_NUM_THREADS: '2'
+      - run: uv run geo2wf-evaluate conference tables
+      - run: uv run mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: '1'
+      - run: uv run python scripts/check_site_links.py

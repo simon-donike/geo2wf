@@ -1,6 +1,8 @@
-"""Evaluate a checkpoint with the shared evaluation workflow."""
+"""Evaluate retained models or reproduce the fixed conference release."""
 
 from __future__ import annotations
+
+import argparse
 import sys
 from pathlib import Path
 
@@ -10,40 +12,24 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == "three-storm-nowcasts":
-        sys.argv.pop(1)
-        from scripts.build_three_storm_nowcast_results import (
-            main as nowcast_results_main,
-        )
-
-        nowcast_results_main()
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "latent-structure":
-        sys.argv.pop(1)
-        from scripts.evaluate_latent_structure_experiment import (
-            main as latent_structure_main,
-        )
-
-        latent_structure_main()
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "intensity-forecast":
-        sys.argv.pop(1)
-        from scripts.evaluate_intensity_forecast import main as forecast_main
-
-        forecast_main()
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "intensity-correction":
-        sys.argv.pop(1)
-        from scripts.evaluate_intensity_correction import main as intensity_main
-
-        intensity_main()
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "intensity-comparison":
-        sys.argv.pop(1)
-        from scripts.evaluate_intensity_models import main as comparison_main
-
-        comparison_main()
-        return
-    from scripts.evaluate_checkpoint import main as evaluate_main
-
-    evaluate_main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "workflow",
+        choices=(
+            "conference",
+            "intensity-comparison",
+            "intensity-correction",
+            "intensity-forecast",
+        ),
+    )
+    args, remaining = parser.parse_known_args()
+    sys.argv = [sys.argv[0], *remaining]
+    if args.workflow == "conference":
+        from scripts.conference_release import main as evaluate
+    elif args.workflow == "intensity-comparison":
+        from scripts.evaluate_intensity_models import main as evaluate
+    elif args.workflow == "intensity-correction":
+        from scripts.evaluate_intensity_correction import main as evaluate
+    else:
+        from scripts.evaluate_intensity_forecast import main as evaluate
+    evaluate()

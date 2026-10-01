@@ -1,0 +1,63 @@
+{
+  "command": [
+    ".venv/bin/geo2wf-train",
+    "experiment=intensity_forecast_pretrain",
+    "data.root=data/intensity_forecast",
+    "trainer.accelerator=gpu",
+    "trainer.devices=1"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/20260805-180538_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 1,
+  "finished_at": "2026-08-05T17:17:32.030678+00:00",
+  "git_commit": "ffe59adeea88a20e8406e8d9bd683d498212fe8c",
+  "include_test_in_train": false,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": null
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/20260805-180538_modular/metric-history.jsonl",
+  "pid": 3293348,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/20260805-180538_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/20260805-180538_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/20260805-180538_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "ffe59adeea88a20e8406e8d9bd683d498212fe8c",
+    "git_dirty": true,
+    "git_status": [
+      " M configs/experiment/intensity_forecast_finetune.yaml",
+      " M configs/experiment/intensity_forecast_pretrain.yaml",
+      " M configs/model/intensity_forecast.yaml",
+      " M docs/models/intensity-forecast.md",
+      " M scripts/export_intensity_forecast_cache.py",
+      " M src/geo2wf/models/intensity_forecast/module.py",
+      " M src/geo2wf/tracking/forecast_media.py",
+      " M tests/test_intensity_forecast.py",
+      "?? src/geo2wf/tracking/forecast_full_storm_media.py"
+    ],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "625c2e110ad4209f61c1068be7746feefaa8dce2a887928a822d64a4c51527bc",
+    "tracked_diff_path": "/work/code/geo2wf/logs/20260805-180538_modular/source-diff.patch",
+    "tracked_diff_sha256": "6559cb775146f15a1dd3303de5cd184bc5989a9f57d43c7924e750f9f1860433",
+    "tracked_diff_size_bytes": 13224,
+    "untracked_snapshots": [
+      {
+        "repository_path": "src/geo2wf/tracking/forecast_full_storm_media.py",
+        "sha256": "23677649e637ca900eaac23010d6c6ceba693e7960e53b1fc291eecdf781cb7b",
+        "size_bytes": 4590,
+        "snapshot_path": "/work/code/geo2wf/logs/20260805-180538_modular/source-snapshot/untracked/src/geo2wf/tracking/forecast_full_storm_media.py"
+      }
+    ]
+  },
+  "started_at": "2026-08-05T16:05:38.299651+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

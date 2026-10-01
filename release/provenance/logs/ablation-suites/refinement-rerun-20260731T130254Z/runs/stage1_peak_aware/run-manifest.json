@@ -1,0 +1,51 @@
+{
+  "command": [
+    "train.py",
+    "--config",
+    "configs/ablations/config_stage1_peak_aware.yaml",
+    "--weights-only-path",
+    "/work/code/geo2wf/logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt"
+  ],
+  "config_path": "/work/code/geo2wf/configs/ablations/config_stage1_peak_aware.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 1,
+  "finished_at": "2026-07-31T15:27:03.677948+00:00",
+  "git_commit": "e86a4a7d8c3a13df4c49c2fd006b2dd9c597b7fd",
+  "include_test_in_train": true,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": {
+      "exists": true,
+      "path": "/work/code/geo2wf/logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt",
+      "sha256": "41761eb9ca26485f2f914404beb0f22f92698287bd3c0bb6d2b6702544867b52",
+      "size_bytes": 83626046
+    }
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/metric-history.jsonl",
+  "pid": 1116509,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/result.json",
+  "run_dir": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "e86a4a7d8c3a13df4c49c2fd006b2dd9c597b7fd",
+    "git_dirty": false,
+    "git_status": [],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "e6b3aa4d72f4cdc1de2e11f9984f763aadc297615887886745b85b1c8016067e",
+    "tracked_diff_path": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/source-diff.patch",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tracked_diff_size_bytes": 0,
+    "untracked_snapshots": []
+  },
+  "started_at": "2026-07-31T15:06:15.854015+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf-refinement-ablations",
+  "wandb_run_group": "stage1"
+}

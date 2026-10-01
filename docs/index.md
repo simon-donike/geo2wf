@@ -73,3 +73,9 @@ The repository does not implement joint track and wind-field forecasting or
 arbitrary observation-set models.
 
 Start with [the field model](models/era5-residual.md), then follow the [data inputs](data/index.md) into [training](experiments/training.md) and [evaluation](experiments/evaluation.md).
+
+## Conference release
+
+Use the [published tables](results.md) and [reproduction guide](reproduction.md)
+for exact checkpoint selection and cohort provenance. The complete
+[StormSense stormtracker](explorer.md) remains part of this release.

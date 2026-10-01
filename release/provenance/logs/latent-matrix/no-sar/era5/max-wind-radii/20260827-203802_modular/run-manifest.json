@@ -1,0 +1,47 @@
+{
+  "command": [
+    ".venv/bin/geo2wf-train",
+    "experiment=latent_mlp_no_sar_era5_max_wind_radii"
+  ],
+  "config_path": "/work/code/geo2wf/configs/modular.yaml",
+  "csv_metrics_dir": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/metrics",
+  "cuda_available": true,
+  "cuda_device_count": 1,
+  "finished_at": "2026-08-27T19:04:30.436859+00:00",
+  "git_commit": "dc5217cf107deea17812c3bb9251d61c151f5c91",
+  "include_test_in_train": false,
+  "input_checkpoints": {
+    "deterministic_baseline": null,
+    "resume": null,
+    "weights_only": null
+  },
+  "metric_history_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/metric-history.jsonl",
+  "pid": 1525846,
+  "python": "3.10.20",
+  "resolved_config_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/resolved-config.yaml",
+  "result_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/result.json",
+  "run_dir": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular",
+  "schema_version": 2,
+  "source_provenance": {
+    "available": true,
+    "git_commit": "dc5217cf107deea17812c3bb9251d61c151f5c91",
+    "git_dirty": true,
+    "git_status": [
+      " M docs/explorer/app.js",
+      " M docs/explorer/dashboard.html",
+      " M docs/explorer/styles.css"
+    ],
+    "repository_root": "/work/code/geo2wf",
+    "source_state_sha256": "506691fae9ceaa129724db5dbab1528be18170f6ff33fcd10087c51cd20d78ba",
+    "tracked_diff_path": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/source-diff.patch",
+    "tracked_diff_sha256": "2ca82567f4b381c9fa9c6d733ba0beac119dba71a00857bc7bf38856cecfebbe",
+    "tracked_diff_size_bytes": 3244,
+    "untracked_snapshots": []
+  },
+  "started_at": "2026-08-27T18:38:02.239555+00:00",
+  "status": "completed",
+  "torch": "2.1.2+cu121",
+  "wandb_mode": "online",
+  "wandb_project": "geo2wf",
+  "wandb_run_group": null
+}

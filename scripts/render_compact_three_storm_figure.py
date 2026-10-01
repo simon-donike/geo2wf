@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
         "--input",
         type=Path,
         default=ROOT
-        / "docs/assets/data/final-results/current-three-storm-predictions.csv",
+        / "docs/assets/data/final-results/current-three-storm-predictions.csv.gz",
     )
     parser.add_argument("--smoothing-hours", type=int, default=5)
     parser.add_argument(

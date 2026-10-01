@@ -1,6 +1,7 @@
 """Export browser-ready metrics and SAR overlays from inference bundles."""
 
 import csv
+import argparse
 import json
 import math
 import re
@@ -917,6 +918,25 @@ def export_storm(storm_id):
 
 
 def main():
+    global VIT_ROOT, UNET_ROOT, UNET_MLP_ROOT, NWP_ROOT, FORECAST_ROOT
+    global RAW_INPUT_ROOT, RAW_MANIFEST, OUTPUT_PATH, CSV_OUTPUT_PATH
+    global SAR_IMAGE_DIR, PMW_IMAGE_DIR, GEO_IMAGE_DIR, FORECAST_OUTPUT_DIR
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--inference-root", type=Path, default=ROOT / "inference")
+    parser.add_argument("--output-root", type=Path, default=ROOT / "docs/explorer")
+    args = parser.parse_args()
+    inference = args.inference_root.resolve()
+    output = args.output_root.resolve()
+    VIT_ROOT, UNET_ROOT, UNET_MLP_ROOT = (
+        inference / name for name in ("inf_vit", "inf_unet", "inf_unet_mlp")
+    )
+    NWP_ROOT, FORECAST_ROOT = inference / "NWP", inference / "forecasts"
+    RAW_INPUT_ROOT = inference / "inf_data"
+    RAW_MANIFEST = RAW_INPUT_ROOT / "index-files/observation_manifest_v6.csv"
+    OUTPUT_PATH, CSV_OUTPUT_PATH = output / "storm-data.json", output / "storm-data.csv"
+    SAR_IMAGE_DIR, PMW_IMAGE_DIR, GEO_IMAGE_DIR, FORECAST_OUTPUT_DIR = (
+        output / name for name in ("sar", "pmw", "geo", "forecasts")
+    )
     SAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     PMW_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     GEO_IMAGE_DIR.mkdir(parents=True, exist_ok=True)

@@ -73,8 +73,7 @@ serialization independent of the model architecture.
 
 Installed inference subcommands call the maintained workflow scripts. Modular
 models expose `predict_batch()` for physical predictions. Retired full-YAML
-presets and model families are stored outside the active package under
-`archived/`.
+presets and model families remain in pre-release Git history.
 
 ## Tracking and visualization boundary
 

@@ -1,0 +1,60 @@
+{
+  "created_utc": "2026-08-04T18:35:35.706020+00:00",
+  "ibtracs": {
+    "path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+    "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+  },
+  "normalization_stats": {
+    "path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+    "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+  },
+  "samples": 424,
+  "schema_version": 1,
+  "scientific_evaluation": "development_only_upstream_test_was_trained",
+  "single_timestep": true,
+  "source_kind": "paired_geotiff_geo_era5_only",
+  "source_manifests": {
+    "test": {
+      "path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv",
+      "sha256": "4fc554d1a363cbc388ad6f9071d334876bf1a87c4288d64120cf77fd8c1a4e36"
+    },
+    "train": {
+      "path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv",
+      "sha256": "17cbad43a6a39c204027d61b6e5f5e6d1df10710079c9cece3c24ac936bb3b9f"
+    },
+    "val": {
+      "path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv",
+      "sha256": "ec4cbd3862b63667f08bebda412486c0c9aa84d81e6fc004cdf123c5d1e1909b"
+    }
+  },
+  "splits": {
+    "test": 65,
+    "train": 261,
+    "val": 98
+  },
+  "storms": 114,
+  "target": {
+    "closest_fix_hours": 0.5,
+    "eligible_usa_sshs": [
+      -1,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "knot_to_ms": 0.514444,
+    "source": "IBTrACS USA_WIND",
+    "units": "m s-1"
+  },
+  "unet_checkpoint": {
+    "path": "/work/code/geo2wf/logs/20260804-173456_modular/checkpoints/last.ckpt",
+    "sha256": "1bd532d9c84e6d9f6878d2f18927a658507de1fb9c6708b07d7bdfb5edcd3ef0"
+  },
+  "unet_config": {
+    "include_test_in_train": true,
+    "path": "/work/code/geo2wf/logs/20260804-173456_modular/resolved-config.yaml",
+    "sha256": "78c198f23142a7573d7e6301dee68b0bcd74a86da0d465e53357854f4db7dd65"
+  }
+}

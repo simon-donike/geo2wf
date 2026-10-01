@@ -662,7 +662,7 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert config["trainer"]["checkpoint"]["monitor"] == "val/loss"
     assert isinstance(instantiate_model(config), BottleneckUNetMLPRegressor)
 
-    max_wind_config = compose_config(["experiment=bottleneck_unet_mlp_max_wind"])
+    max_wind_config = compose_config(["experiment=latent_mlp_sar_era5_max_wind"])
     assert max_wind_config["data"]["use_era5"] is True
     assert max_wind_config["model"]["structure_head_enabled"] is False
     assert max_wind_config["model"]["structure_loss_weight"] == 0.0
@@ -670,10 +670,10 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert max_wind_config["trainer"]["early_stopping"]["enabled"] is True
     assert max_wind_config["logging"]["wandb"]["enabled"] is False
     assert max_wind_config["trainer"]["default_root_dir"] == (
-        "logs/latent-structure/max-wind"
+        "logs/latent-matrix/sar/era5/max-wind"
     )
 
-    radii_config = compose_config(["experiment=bottleneck_unet_mlp_max_wind_radii"])
+    radii_config = compose_config(["experiment=latent_mlp_sar_era5_max_wind_radii"])
     assert radii_config["data"] == max_wind_config["data"]
     assert radii_config["model"]["structure_head_enabled"] is True
     assert radii_config["model"]["structure_loss_weight"] == 0.25
@@ -682,7 +682,7 @@ def test_lightning_fit_checkpoint_and_hydra_composition(tmp_path: Path) -> None:
     assert radii_config["trainer"]["early_stopping"]["enabled"] is True
     assert radii_config["logging"]["wandb"]["enabled"] is False
     assert radii_config["trainer"]["default_root_dir"] == (
-        "logs/latent-structure/max-wind-radii"
+        "logs/latent-matrix/sar/era5/max-wind-radii"
     )
     assert isinstance(instantiate_model(radii_config), BottleneckUNetMLPRegressor)
 

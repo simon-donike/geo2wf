@@ -91,9 +91,7 @@ CSV metrics and run manifests are always configured independently of W&B.
 
 ## Archived configuration
 
-Retired full-YAML, diffusion, PMW-proxy, and ablation presets are stored under
-`archived/configs/`. They are preserved for provenance and excluded from Hydra's
-active config search path.
+Retired full-YAML, diffusion, PMW-proxy, and ablation presets remain in pre-release Git history. The conference branch keeps only the retained experiment presets.
 
 ## Export configuration
 

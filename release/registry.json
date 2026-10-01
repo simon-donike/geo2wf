@@ -1,0 +1,1154 @@
+{
+  "architecture": {
+    "with-era5": {
+      "cache_metadata": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/cache-metadata.json",
+      "models": {
+        "correction": "architecture-with-era5-correction",
+        "joint": "architecture-with-era5-joint",
+        "unet": "architecture-with-era5-unet"
+      },
+      "report": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/test-comparison.json",
+      "workflow": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/workflow.json"
+    },
+    "without-era5": {
+      "cache_metadata": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/cache-metadata.json",
+      "models": {
+        "correction": "architecture-without-era5-correction",
+        "joint": "architecture-without-era5-joint",
+        "unet": "architecture-without-era5-unet"
+      },
+      "report": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/test-comparison.json",
+      "workflow": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/workflow.json"
+    }
+  },
+  "case_studies": {
+    "with-era5": "release/provenance/logs/current-experiment-evaluation/three-storm/with-era5.json",
+    "without-era5": "release/provenance/logs/current-experiment-evaluation/three-storm/without-era5.json"
+  },
+  "dashboard": {
+    "cache_metadata": "release/provenance/data/unet_intensity_geostat_nopmw_v2/cache-metadata.json",
+    "correction": "dashboard-correction",
+    "field": "structure-cache-field",
+    "forecast": "dashboard-mlp"
+  },
+  "external_dependencies": [
+    {
+      "checkpoint": "/gws/ssde/j25a/ai4er/users/ediazsa/outputs/processor/20260804-104122-1102/checkpoints/processor-040.ckpt",
+      "config": "/gws/ssde/j25a/ai4er/users/ediazsa/outputs/processor/20260804-104122-1102/config.json",
+      "id": "dashboard-convlstm",
+      "sha256": "d9c890ae00f82de1b46b9b470de07cdad5961b9b58b92944929014832f5e3410",
+      "status": "external HPC checkpoint unavailable locally; exported forecasts retained"
+    },
+    {
+      "id": "dashboard-vit",
+      "status": "Precomputed ViT fields and summaries supplied externally; no checkpoint identity recorded in local bundles. Browser exports retained."
+    }
+  ],
+  "files": {
+    "release/paper/latent_supervision_ablation.tex": {
+      "sha256": "0cf3f92147c7229c0a882dded9ca04d72798b9e0ff48a43826d99622ab5b1f08",
+      "size_bytes": 1189
+    },
+    "release/paper/vmax_architecture_ablation.tex": {
+      "sha256": "97a79d530566d8761d01b7338974fc1ea605a2c22ffa709f6b82443c39c962f1",
+      "size_bytes": 788
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5/stats.json": {
+      "sha256": "78c17bb1b340f8920b7ca224d11661f2640785483a8723f587314ecf6049fe87",
+      "size_bytes": 9013
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5/test/manifest.csv.gz": {
+      "sha256": "8d297f59d5c471e1ec492d9c2f5c0c5ddf1a9737b6caad1c97c4b7a741d6b383",
+      "size_bytes": 94550,
+      "uncompressed_sha256": "39c5df3e829de52e8e2c609676e5ee67d09f53dca80f44c6efa851c689665e86"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5/train/manifest.csv.gz": {
+      "sha256": "2f01ff3049e03529235a56e26c6e59514a89d0e019aae602751ae75003ebb901",
+      "size_bytes": 378028,
+      "uncompressed_sha256": "cf18d0f8638bc551738b7394a2ea644f90997c938469b704ff09cae916956ed2"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5/val/manifest.csv.gz": {
+      "sha256": "6885382861af20b565bab06120f8e342511ebf98de2faafbe44147537d099ea6",
+      "size_bytes": 102621,
+      "uncompressed_sha256": "7cbe757f45ddbccf61d52a22f540d22e252dac4bc421a8956a0f6b55f7960683"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json": {
+      "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded",
+      "size_bytes": 18824
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz": {
+      "sha256": "812f47226ce08b38727db159a40df601f70a76a3fecd9aefb4afc687196e6d92",
+      "size_bytes": 49775,
+      "uncompressed_sha256": "4fc554d1a363cbc388ad6f9071d334876bf1a87c4288d64120cf77fd8c1a4e36"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz": {
+      "sha256": "f75fde80b37727f2561ca0e8bdbde3d060e4289ba7d96e21d5156390833b862b",
+      "size_bytes": 196892,
+      "uncompressed_sha256": "17cbad43a6a39c204027d61b6e5f5e6d1df10710079c9cece3c24ac936bb3b9f"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz": {
+      "sha256": "75947076184eaa5abe926bd72c3534014869c8d5482271ab2b7e97d202c2e8b3",
+      "size_bytes": 196718,
+      "uncompressed_sha256": "257f368e3c3e116f038bc0c0aabef6b5a6eb6ddc7a2266b548892ad611d1968b"
+    },
+    "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz": {
+      "sha256": "83c85350513f2ba4876ffe5358fc264a39c085f878ae11798d3552d2983b22ef",
+      "size_bytes": 53814,
+      "uncompressed_sha256": "ec4cbd3862b63667f08bebda412486c0c9aa84d81e6fc004cdf123c5d1e1909b"
+    },
+    "release/provenance/data/intensity_forecast/cache-metadata.json": {
+      "sha256": "9402f9df99eb117fb2ee71319153a50a5e4df8bc4e9381650f8be379b578fc26",
+      "size_bytes": 3467
+    },
+    "release/provenance/data/intensity_forecast/pretrain_train/manifest.csv.gz": {
+      "sha256": "73f8f066f44d1492018e4b326001218ec16392249e1880a4b0109c311a88b359",
+      "size_bytes": 1008147,
+      "uncompressed_sha256": "790c56fba62340bb6f2e17b01713773ba727358019f60c576c55b9f7585ad159"
+    },
+    "release/provenance/data/intensity_forecast/pretrain_val/manifest.csv.gz": {
+      "sha256": "3e2bed6a0fda7fc46e56d0b0092190c8c8a0af7ce17d1f4102cc509350c0e299",
+      "size_bytes": 212457,
+      "uncompressed_sha256": "048b9a55a7a9c3955f55040228ccbf67d9611f134688303a60425f957ca04ea8"
+    },
+    "release/provenance/data/intensity_forecast/test/manifest.csv.gz": {
+      "sha256": "020e5030fb278c1eda37c1741b0a5f662d721623a6207e69440f650b32878c19",
+      "size_bytes": 2827,
+      "uncompressed_sha256": "651430ab80eadc68a8bc66c1457088772abe4725cff14bd77606efad870866f7"
+    },
+    "release/provenance/data/intensity_forecast/train/manifest.csv.gz": {
+      "sha256": "8926439902694795a9f419c74725932341cb15a48089d551aacbb056be3a3154",
+      "size_bytes": 11085,
+      "uncompressed_sha256": "4c4fdc7e331fe955b73a1d92f24743bb325ce23914c2a1170e9961918ae3c428"
+    },
+    "release/provenance/data/intensity_forecast/val/manifest.csv.gz": {
+      "sha256": "aaa4d447a0b4b22f2c6e79b7750eb49920d35e94a8ece96c9e8388810e328079",
+      "size_bytes": 4277,
+      "uncompressed_sha256": "a8e313a5cec1d873a9894fa398c997cbcf15c6479d5f22f76b773a6cd6ca8a94"
+    },
+    "release/provenance/data/unet_intensity_geostat_nopmw_v2/cache-metadata.json": {
+      "sha256": "07076b83b8ae04cecbdf56e7f622d9c31b0e54302d5bf6fafbdd280b958b9389",
+      "size_bytes": 1970
+    },
+    "release/provenance/data/unet_intensity_geostat_nopmw_v2/test/manifest.csv.gz": {
+      "sha256": "d3f5c8163db876bdd7cb49323e5ad44db936a75ca886dabf45add96e74112a6d",
+      "size_bytes": 6130,
+      "uncompressed_sha256": "2296285397ee7e5f80624c9b40f74d41ed5a456972801a592357a69d0e227f54"
+    },
+    "release/provenance/data/unet_intensity_geostat_nopmw_v2/train/manifest.csv.gz": {
+      "sha256": "ef1319601ff2803677461a8e94a5dbc2a8646cad7a885b39a9ceeaf187cb50bb",
+      "size_bytes": 22550,
+      "uncompressed_sha256": "ce74f3a81fedecf7e0c837c4e93177997104dc24a35b65d67b05a123bf174779"
+    },
+    "release/provenance/data/unet_intensity_geostat_nopmw_v2/val/manifest.csv.gz": {
+      "sha256": "81fcd877215dc6b9c3d4bbe062b24b4bf7c70fdd6e817aa8b6783fda74804fa8",
+      "size_bytes": 8833,
+      "uncompressed_sha256": "edec9d0ad807fa7fd91f31a0ac43dc41fd83b2b2e969be24a8a8daee2aec059d"
+    },
+    "release/provenance/data/unet_intensity_structure_v3/cache-metadata.json": {
+      "sha256": "332d1be58d63532cf48e6e65fa462a10d69e9b44cf4f1ad605e69df5ccb9ce0e",
+      "size_bytes": 3880
+    },
+    "release/provenance/data/unet_intensity_structure_v3/test/manifest.csv.gz": {
+      "sha256": "0f6deb500540c7f4f0c6e2c6bf80d80dd0b9a318123bb41b3d071b9154b50ad5",
+      "size_bytes": 24456,
+      "uncompressed_sha256": "8827c983556c7ed37e8a429b286fa109e4fa7fbab7669eb6f062318181cc3b4d"
+    },
+    "release/provenance/data/unet_intensity_structure_v3/train/manifest.csv.gz": {
+      "sha256": "3da87641771ae0dd853a085e505d8906c2ec110582950d3589a1349e147caf0d",
+      "size_bytes": 94669,
+      "uncompressed_sha256": "b510c2aa58b450cde7a465176cc137f2dbf7d82c1f5dd8660947337e59bb05de"
+    },
+    "release/provenance/data/unet_intensity_structure_v3/val/manifest.csv.gz": {
+      "sha256": "4b8aced071e02a06d7a731614e1e71be1e748ad2718a62928f3d04124814d71d",
+      "size_bytes": 27892,
+      "uncompressed_sha256": "21e462da673bf513411ef51a338658603ba2841ce7aae8c43ce2759c9b2739a7"
+    },
+    "release/provenance/inference/forecasts/AL082025/summary.json": {
+      "sha256": "3febd342a2ce73ac93fb0732e16151b75c324728a461241da408fda36d028ca0",
+      "size_bytes": 648
+    },
+    "release/provenance/inference/forecasts/EP112025/summary.json": {
+      "sha256": "6aae1a429a700ccd984be2228646203ca47446747c531b57a01d396c7c9f9cc3",
+      "size_bytes": 650
+    },
+    "release/provenance/inference/forecasts/EP182023/summary.json": {
+      "sha256": "5bc43adcbf7f62e8b637b2dff315cb0c3843d67c8c1289839b3ad828448c646f",
+      "size_bytes": 647
+    },
+    "release/provenance/inference/forecasts/mlp/AL082025/summary.json": {
+      "sha256": "5caac0b4521b747cdeb13d52c14b2753beb5d5934aad95ea35c131707a3f62bf",
+      "size_bytes": 433
+    },
+    "release/provenance/inference/forecasts/mlp/EP112025/summary.json": {
+      "sha256": "6a7d50147851e33bd5cd62645aa7ad37e5616d3f1146ca4851218f92027e2da7",
+      "size_bytes": 433
+    },
+    "release/provenance/inference/forecasts/mlp/EP182023/summary.json": {
+      "sha256": "f70e267e5a6dfbec9195c5bb41fadfdcea2323ff5cdf44b59cc6a7779dce70af",
+      "size_bytes": 433
+    },
+    "release/provenance/inference/inf_unet/AL082025/inference-summary.csv.gz": {
+      "sha256": "78a8109c3ea77534ce0f19362443f89de71295ddc0f49cfd8a036b1b3d0672ac",
+      "size_bytes": 53294,
+      "uncompressed_sha256": "b41ff3c29499e854527d5994c453f80d32746c5dfe5b15f67b47082240ec726a"
+    },
+    "release/provenance/inference/inf_unet/EP112025/inference-summary.csv.gz": {
+      "sha256": "cb901cb8a3300b4934c990c29ec44857421d178dd4ef936b85e4793d7d846730",
+      "size_bytes": 56032,
+      "uncompressed_sha256": "b012630a74cd317128ce74639b4835b0ed9c25c72887f7342ec755f2220ee00f"
+    },
+    "release/provenance/inference/inf_unet/EP182023/inference-summary.csv.gz": {
+      "sha256": "c6d6aa0acb358b4bdf6ea994cc54278ed642c662c2a874e4395dfc4f6bdc14a8",
+      "size_bytes": 10258,
+      "uncompressed_sha256": "1aae8805e20586a4c14e4517e769d249ab45eaf27882994f14b7503063a42ea4"
+    },
+    "release/provenance/inference/inf_unet_mlp/AL082025/correction-provenance.json": {
+      "sha256": "ea3c1b54650f0e34f5fb800b2303b80e699f194cfca8b462b23f7b63f16f4de1",
+      "size_bytes": 684
+    },
+    "release/provenance/inference/inf_unet_mlp/AL082025/inference-summary.csv.gz": {
+      "sha256": "0ea027451003245723ea4c98518419dfe8c0d53c4f06a21db8116d3b5c94e0f9",
+      "size_bytes": 38386,
+      "uncompressed_sha256": "050a40c637e41280af0d1e0fe77a55be23301fa88bd3d94038b9e703bd537ecb"
+    },
+    "release/provenance/inference/inf_unet_mlp/EP112025/correction-provenance.json": {
+      "sha256": "89066c27b84ccccb2972cf8cfd517b7a6e0dbef9cfd74521eb102195ab2d9e90",
+      "size_bytes": 684
+    },
+    "release/provenance/inference/inf_unet_mlp/EP112025/inference-summary.csv.gz": {
+      "sha256": "a85d6437717819727bee6d872210f308e1740e9a42114ae9fc3e9d6aed8d5e12",
+      "size_bytes": 42450,
+      "uncompressed_sha256": "69e99a994f948055d3a504fda20d8a437c132defc3acc12b6e1f831c072f0104"
+    },
+    "release/provenance/inference/inf_unet_mlp/EP182023/correction-provenance.json": {
+      "sha256": "2d36b12302293c986113ab5893a7b195fb322a06eb4e99f9da3dc19837958064",
+      "size_bytes": 683
+    },
+    "release/provenance/inference/inf_unet_mlp/EP182023/inference-summary.csv.gz": {
+      "sha256": "bedee2fdf30dafb945db93f9a4642735e6b3936de9b9a7beeea11c21468fc90d",
+      "size_bytes": 8172,
+      "uncompressed_sha256": "931ffeefa3def46f19a9ab966f2f284db829a73153ac85e022e17970f520fc49"
+    },
+    "release/provenance/inference/inf_vit/AL082025/inference-summary.csv.gz": {
+      "sha256": "ba7db1e7d63397c70e4f1d4c9c65595d43880025629d23065d193e5b484fbf8b",
+      "size_bytes": 33848,
+      "uncompressed_sha256": "28652d5274b84ff1503bffa369b8db025d781a452fd7f3d73ea1204533fb9546"
+    },
+    "release/provenance/inference/inf_vit/EP112025/inference-summary.csv.gz": {
+      "sha256": "d646e4ed805406f248f8128b6606f33de21ba98e4c672c132ab60a41803acc5b",
+      "size_bytes": 35454,
+      "uncompressed_sha256": "75933004968390ab3a5f03816dc318677507594fddf61e79170695172cb16477"
+    },
+    "release/provenance/inference/inf_vit/EP182023/inference-summary.csv.gz": {
+      "sha256": "89169b3d988f0a80f561d3cc6834eaae5cc89f186fba752a9f4c8e718ccd3c57",
+      "size_bytes": 6966,
+      "uncompressed_sha256": "f5879c344b99a83463bea8a82f1b6f99cc9995a32cae7ed902ec3221e4de085e"
+    },
+    "release/provenance/logs/20260804-173456_modular/resolved-config.yaml": {
+      "sha256": "78c198f23142a7573d7e6301dee68b0bcd74a86da0d465e53357854f4db7dd65",
+      "size_bytes": 2428
+    },
+    "release/provenance/logs/20260804-173456_modular/run-manifest.json": {
+      "sha256": "5c189b82e68750d12188fbe5fb5da891219a8a8c8b4d780db9e29ccfc14854e9",
+      "size_bytes": 6795
+    },
+    "release/provenance/logs/20260804-203854_modular/resolved-config.yaml": {
+      "sha256": "dd3905a9e8dde619402ea57d70f390ed3312f4112d3fb73c8d604cf6bb688d53",
+      "size_bytes": 1527
+    },
+    "release/provenance/logs/20260804-203854_modular/result.json": {
+      "sha256": "171d3ab46cb3cf3ede35de6daddd10f54116e14aac1e90c392fb5765a376694d",
+      "size_bytes": 2287
+    },
+    "release/provenance/logs/20260804-203854_modular/run-manifest.json": {
+      "sha256": "0ce9ffe6ba743436b32ffd2c4dbc3e6a658fd607230bd66532de441ed5e6621d",
+      "size_bytes": 2422
+    },
+    "release/provenance/logs/20260805-180538_modular/resolved-config.yaml": {
+      "sha256": "7c4204cb51c7ae0b3417667b93a4deac573b82a61766fb0714bc343bd63496d1",
+      "size_bytes": 1215
+    },
+    "release/provenance/logs/20260805-180538_modular/result.json": {
+      "sha256": "073bc2290c248bddd64cec61de0364f3588443a5798e41264fc9d13038073078",
+      "size_bytes": 1071
+    },
+    "release/provenance/logs/20260805-180538_modular/run-manifest.json": {
+      "sha256": "e1d547279233e5e8ec363c1c6e81213bb697b32e6a202965f9b4f7341c651ae2",
+      "size_bytes": 2643
+    },
+    "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/resolved-config.yaml": {
+      "sha256": "d5e2ada6cf04bf0809a7d7be4c1bd12e9334e718dcfda1a2ef1b18d3c6de00ff",
+      "size_bytes": 3050
+    },
+    "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/result.json": {
+      "sha256": "19a5b874a7830d4274d1a41eff6d30371f257dda75dc69b57ee453ce58d13627",
+      "size_bytes": 2619
+    },
+    "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/run-manifest.json": {
+      "sha256": "652467d5a8d5a871c9dc40c5f777eff74ad15c0351cb5d45ca1006f2a7d6eac7",
+      "size_bytes": 2453
+    },
+    "release/provenance/logs/current-experiment-evaluation/three-storm/with-era5.json": {
+      "sha256": "f6282cf9bf5a5374b2fbd789db4c1a9ecd012dfb5cb6b7cf23a01110b3636ad8",
+      "size_bytes": 24986
+    },
+    "release/provenance/logs/current-experiment-evaluation/three-storm/without-era5.json": {
+      "sha256": "9c3cdaeab1e6da74766cfa2f7f1586ba2ecc2982b8b716e003331f538ac542d6",
+      "size_bytes": 17596
+    },
+    "release/provenance/logs/current-experiment-evaluation/validation-metrics.csv.gz": {
+      "sha256": "5a9e761bb0f61a143e3c9eb91f4d2048e5f22492cb34bf0a843287e30a6e8310",
+      "size_bytes": 6357,
+      "uncompressed_sha256": "c93c25eb718804e9e9eb96ce30a0a85d6374ace5e21d6f843b6f3773a760673f"
+    },
+    "release/provenance/logs/current-experiment-evaluation/validation-results.json": {
+      "sha256": "5f9f52593ccf125aca000d79175a43a49864ae3712571dda6bfc81b4cd752468",
+      "size_bytes": 310053
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/resolved-config.yaml": {
+      "sha256": "2a743880a598983516a36ad657f099b37aae012dce6d640febcbca2a179469c6",
+      "size_bytes": 1710
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/result.json": {
+      "sha256": "1153228a84cfc364fe086b726b90f1b2b2f818c4043e6acc49c9fe01cf20bbd0",
+      "size_bytes": 2432
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/run-manifest.json": {
+      "sha256": "8941744e373cf8ab8543e5ad1666a1396aa7b4b03d4b902ff2a214b862618a16",
+      "size_bytes": 4188
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/resolved-config.yaml": {
+      "sha256": "48e600cb70676fcafe96b093f631dce0b8af324598e98da1aead86a242394a4e",
+      "size_bytes": 2152
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/result.json": {
+      "sha256": "1e445cae848ca3459abfc6a0df406db9a4506f1110add91c396b22d89b897faf",
+      "size_bytes": 1437
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/run-manifest.json": {
+      "sha256": "5f859a8289cf0015d3d18dd625e72dba80f9db0e5d39c3482dd68a674649dd25",
+      "size_bytes": 4274
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/test-comparison.csv.gz": {
+      "sha256": "2a968c767715f39a03702227251a59536c03052145f96ec56b96ce4a9490dd89",
+      "size_bytes": 1162,
+      "uncompressed_sha256": "bad65162dc339803191f0bdf0774c39ab7768c57d06fbed67339564ef51c49eb"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/test-comparison.json": {
+      "sha256": "45cecf81778c31ebe1d62f4f4ec96e43ffd59798fba5621faababd3b8fbf4dde",
+      "size_bytes": 629660
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/test-comparison.md": {
+      "sha256": "ac92ba4b4be7b48707c01fdd5d21dd83426c7ae70b66131248b816396ccd1fb8",
+      "size_bytes": 7069
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/cache-metadata.json": {
+      "sha256": "46db12570786d0c20119c9520e82ba98f7b16f0db483d110a3bc553cad4a5af4",
+      "size_bytes": 2322
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/test/manifest.csv.gz": {
+      "sha256": "dd200f8c0d985ef4bde511b88a72490cdc0f820d1d10a5dff44b35762ddfaab4",
+      "size_bytes": 18181,
+      "uncompressed_sha256": "d8c9b7e699d1335e312157196540cb23e57177ff7123da2d136efbc3a3eb4be3"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/train/manifest.csv.gz": {
+      "sha256": "b77dc3303987e312eb8f295de5c3ed31cde8a9605bdbb90e53c258487f5979d7",
+      "size_bytes": 68426,
+      "uncompressed_sha256": "1d185c2c2e71a2f1c33533d1bb13480d9cbc8d1853af3f8e1ced582f7ef751ed"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/val/manifest.csv.gz": {
+      "sha256": "6104fa6ceb2cce556531caec2a38abd5a4b08ad21ed71f8c8a327395a64673f2",
+      "size_bytes": 19441,
+      "uncompressed_sha256": "c528be0fb2b5e7b4e649c32127f9a9c1699dbdb44579cc2cd67b0e0e9c9914d6"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/resolved-config.yaml": {
+      "sha256": "9d104adced3f92545fe2c503c4129725533b20ed43b7b7b7fe24dc815d9cc554",
+      "size_bytes": 2759
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/result.json": {
+      "sha256": "ebf16d0f634e55f158ee67d813450dc4d42ade8397b9c738b2080dc628741da1",
+      "size_bytes": 2639
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/run-manifest.json": {
+      "sha256": "c8c48612d85cc541853c1c4d1662aa91437c108160c4897df513d18dfe40befc",
+      "size_bytes": 4270
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/workflow.json": {
+      "sha256": "389e5b51cf95d043779bd97f1ee955aa9c916e454c90775630bf601400b9c01d",
+      "size_bytes": 6884
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/resolved-config.yaml": {
+      "sha256": "36654c3e792a71c8f4636cad181edb4ab084158b3038ffb29246e22c0a2cecbc",
+      "size_bytes": 1719
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/result.json": {
+      "sha256": "7e81ed08a6cac73fb314ed9fb500d76d06f7b81dbeb3a05f716bb4bca1644492",
+      "size_bytes": 2485
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/run-manifest.json": {
+      "sha256": "ff37e6d3c6a31fe4cbc67fd93e0aaef4475fc6187c63fcd15717dcc4d630c779",
+      "size_bytes": 4222
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/resolved-config.yaml": {
+      "sha256": "287426e123ca13307401b5df686a7e71a2c81c9efbc4f25ae936f1d7bdc3b34b",
+      "size_bytes": 2159
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/result.json": {
+      "sha256": "9570adc0d8880e144718c70a296ec81c856918891c24ff2c8925eee0e5c7130a",
+      "size_bytes": 1441
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/run-manifest.json": {
+      "sha256": "0f47a33351b33304df8bea71a9fd0f20ea22cc70115d691ac6e720e7f6f6ed35",
+      "size_bytes": 4312
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/test-comparison.csv.gz": {
+      "sha256": "3b73ed3af39e9806710574568229a8e9f048a86ef58480d0b6e7216c4a49a158",
+      "size_bytes": 1156,
+      "uncompressed_sha256": "97000e866add4e71de8fcae477c550d971a494925e08db025c7cb9231de9ce2d"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/test-comparison.json": {
+      "sha256": "0376d8cc4719c8481d4778ba0f8eb9749671637bca1feafef0487e60ceebdf70",
+      "size_bytes": 630173
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/test-comparison.md": {
+      "sha256": "0fddcdea3f4adab337c2e14561b3b27617d219cb29b6d4aa98b8b412eba54f17",
+      "size_bytes": 7077
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/cache-metadata.json": {
+      "sha256": "79bfe65dc152889284b500f32f984f9fd3f11c71a31b9bd16a4e6e08b70fd3f7",
+      "size_bytes": 2328
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/test/manifest.csv.gz": {
+      "sha256": "93a4613629936c8d7f886f68a152e52c89b6289c533328bf88ca12c754cc86ae",
+      "size_bytes": 17508,
+      "uncompressed_sha256": "39a48dc6076184cb863b4ec7d6d196cb6af81ff345dd0b31cdbb2a3d74955346"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/train/manifest.csv.gz": {
+      "sha256": "fc3e31eb2890f3ef8f05f7b88759396b813faf67146a95fbd979be66330cfc21",
+      "size_bytes": 66310,
+      "uncompressed_sha256": "7ea8a66c59746e5258cfb6ff57d2bc59bfeb3e160097b8e1e8a7984f5e255842"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/val/manifest.csv.gz": {
+      "sha256": "74003086ab8ca9b26d4b70e0cd901d50a21e33c322e1ac14360cea70f163b8ca",
+      "size_bytes": 18912,
+      "uncompressed_sha256": "7b2caf956da0545c9f481537fd072103b4b1a97f2478912b263befeb9c9dd500"
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/resolved-config.yaml": {
+      "sha256": "737f1a58c065e0ba1a131482920fdf1a557a9a8f8c7f9424335d50c440dbdff3",
+      "size_bytes": 2766
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/result.json": {
+      "sha256": "a6393fa643ab0521974458e8a98935ce739e3e743c72a96f443683c04004fee9",
+      "size_bytes": 2162
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/run-manifest.json": {
+      "sha256": "bea61377f405e5f692c77575b6cc128c1aca406e1a0b3f160eeac9a4b16cf4c7",
+      "size_bytes": 4308
+    },
+    "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/workflow.json": {
+      "sha256": "af3595d5e05fbcba23980cb622b65679045a5db96c3e31e14676da6d943cf0b9",
+      "size_bytes": 6975
+    },
+    "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/resolved-config.yaml": {
+      "sha256": "b063d8601d0717c7deac8dd279de595c7366d7b84137e3aaef5e24aba547b90a",
+      "size_bytes": 1783
+    },
+    "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/result.json": {
+      "sha256": "27bb9fae8aa9ca2b963c8bb0c40cb3b598105ff1a71197d9d3af1309576cd4c5",
+      "size_bytes": 6342
+    },
+    "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/run-manifest.json": {
+      "sha256": "c076d60a9337c6412b7b60659d0c7dd7a2d6df38bbc7b1b40ee1f709816813a2",
+      "size_bytes": 4836
+    },
+    "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/resolved-config.yaml": {
+      "sha256": "70f2c746b009da80ee3768a9082f86a0a11d15aad148eaa128b7d9b99ceb2f2e",
+      "size_bytes": 1822
+    },
+    "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/result.json": {
+      "sha256": "75587b78ed725bcf2a6ac42e535ff9700d9542d89cd339353b9d10d1ea87ac99",
+      "size_bytes": 5270
+    },
+    "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/run-manifest.json": {
+      "sha256": "87c492452e86504eea375b6a6f0c89bcef0cf114957c0bbedf97217062e4a166",
+      "size_bytes": 4915
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/resolved-config.yaml": {
+      "sha256": "ef952a56efe08bd96601be5af00a834ae41f5203e9397a53fdf8312338ed9e7a",
+      "size_bytes": 2336
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/result.json": {
+      "sha256": "6f1d0f1813ad8bfc1b2a90f2218efeea29d2f4022f74d2e598514bc191fdbc7c",
+      "size_bytes": 3653
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/run-manifest.json": {
+      "sha256": "8774a6bc391ccb7b7c172186d7311a64aab3338a634daf99a5c7ec80c7999068",
+      "size_bytes": 2055
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/resolved-config.yaml": {
+      "sha256": "651acf914731b8178e909aa66f629f75e3c36c4ab57655c65f89e4a5e5e85625",
+      "size_bytes": 2347
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/result.json": {
+      "sha256": "b7ca907bd755474911c6aa95f3eff0dc7d97084446cc81dd304c27458bd2eb57",
+      "size_bytes": 1308
+    },
+    "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/run-manifest.json": {
+      "sha256": "8ee655c09339f0aee90f66eada914f12bc7f7aaeefb73de4ecdfc25e79a8b508",
+      "size_bytes": 3753
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/resolved-config.yaml": {
+      "sha256": "58445ea3af9ce81d5c574aadc22c54afb31f98e4cc7f36765fb246426f23af3c",
+      "size_bytes": 2346
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/result.json": {
+      "sha256": "49240ab4b623923c5d39b37904dd1ed9b5dfe66d34f94fbf5cfe5d61d1ac846f",
+      "size_bytes": 3652
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/run-manifest.json": {
+      "sha256": "56dfd4f109495d720bed6100a57f9d908f365442c5bc97f22900d73d6b9df86d",
+      "size_bytes": 3843
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/resolved-config.yaml": {
+      "sha256": "ae284d1e24e6cc617122c78b2c75bb196a1dce99e1e9c5604f3a7d27c9389423",
+      "size_bytes": 2357
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/result.json": {
+      "sha256": "e9cddc89dedb652d23425018c26a120e3ed385fb1663cf43048586e157d11e2b",
+      "size_bytes": 1305
+    },
+    "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/run-manifest.json": {
+      "sha256": "505fd5c290e2168bce1e92bc7a08f507f0ae7670a3ceefe23da2c3bb622ce2a0",
+      "size_bytes": 3783
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/resolved-config.yaml": {
+      "sha256": "05fd873ea5ea63e629fb9f6333fc809bbd6343020b221bc9f3d514da91159d48",
+      "size_bytes": 2419
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/result.json": {
+      "sha256": "e815134529132989ca1fb716d0e99ba4b9ac5429ed9f8767592f73c0132356ce",
+      "size_bytes": 7778
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/run-manifest.json": {
+      "sha256": "0f87aa72e5b5f864e41eb8ef2195968c1fdce6dbbd63a5e1eb644dd61f9dc768",
+      "size_bytes": 3738
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/resolved-config.yaml": {
+      "sha256": "b934ffb0fff668821f70353e5602d973807db1758cbb891a6a11388420a283b3",
+      "size_bytes": 2406
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/result.json": {
+      "sha256": "3bb539896f63ad417c54810ca71b4029b0be8b94a7989de019f6ea05584e9030",
+      "size_bytes": 4554
+    },
+    "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/run-manifest.json": {
+      "sha256": "afb66ead4300b4d17975a2906fbf8acf18306fb4c93cd3bb310686b2b2d4ef8b",
+      "size_bytes": 1875
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/resolved-config.yaml": {
+      "sha256": "b48c9866bcd0a714bf515f7bb518c431d8036c3993e017bb1e6481d8b0415daf",
+      "size_bytes": 2429
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/result.json": {
+      "sha256": "9ee2db15e488815ee570aa69bc1a915d45190be87b1164764e94a80214c73ec4",
+      "size_bytes": 7819
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/run-manifest.json": {
+      "sha256": "6b5b7ec9617f62f053b820138693bf334943a31abb9dfe1cba31dd35a14a58b1",
+      "size_bytes": 3768
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/resolved-config.yaml": {
+      "sha256": "b304cc12b06d5831b494ac038d47f2068895baa17d0b9d72cfd5a7a958373fe3",
+      "size_bytes": 2416
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/result.json": {
+      "sha256": "5cb66757fcf55d11c7a214970bf0088664c8dee42adef7d7a1eb0ecd598905f7",
+      "size_bytes": 4510
+    },
+    "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/run-manifest.json": {
+      "sha256": "a3c6c3b780c0a532be790d39f4877cc1254c1f0cbff5afcdbfe4f6e2ca1162d9",
+      "size_bytes": 1896
+    },
+    "release/provenance/logs/latent-structure/max-wind/20260827-115409_modular/resolved-config.yaml": {
+      "sha256": "82fab596618dceaa94f9fd501af35aeb4dee7d300f240e096cc0a3a59ab34e1e",
+      "size_bytes": 2409
+    }
+  },
+  "models": {
+    "architecture-with-era5-correction": {
+      "checkpoint": "checkpoints/architecture-with-era5-correction.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/test/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/train/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/val/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-intensity-cache/cache-metadata.json"
+      ],
+      "dependencies": [],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_correction.UNetIntensityCorrection",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/checkpoints/epoch=027-step=1484.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/correction-runs/20260820-171845_modular/run-manifest.json",
+      "sha256": "f7216569860e185b77c83ba2988641b46c0c44f51ff4c2fd252d6b60156b943a",
+      "size_bytes": 11306172,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true
+    },
+    "architecture-with-era5-joint": {
+      "checkpoint": "checkpoints/architecture-with-era5-joint.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/checkpoints/epoch=139-step=29540.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/joint-runs/20260820-164014_modular/run-manifest.json",
+      "sha256": "56baff0039a458cbdb6d02adfc9062131c2f1154d390789a548f223200fcfab1",
+      "size_bytes": 84520380,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "architecture-with-era5-unet": {
+      "checkpoint": "checkpoints/architecture-with-era5-unet.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.deterministic_residual.ERA5ResidualRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/checkpoints/epoch=061-step=13082.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T144011Z-with-era5/unet-runs/20260820-164014_modular/run-manifest.json",
+      "sha256": "84dfb8cdcf14eee3894a7e8ef9d4379fbabc19dd1f11621bc5dc8d92ca16bbde",
+      "size_bytes": 83627516,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "architecture-without-era5-correction": {
+      "checkpoint": "checkpoints/architecture-without-era5-correction.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/test/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/train/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/val/manifest.csv.gz",
+        "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-intensity-cache/cache-metadata.json"
+      ],
+      "dependencies": [],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_correction.UNetIntensityCorrection",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/checkpoints/epoch=050-step=2703.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/correction-runs/20260820-183313_modular/run-manifest.json",
+      "sha256": "925e20289440691f54abd066c846ad768e4584b36cd2d44b5254060b40834c00",
+      "size_bytes": 11306236,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true
+    },
+    "architecture-without-era5-joint": {
+      "checkpoint": "checkpoints/architecture-without-era5-joint.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/checkpoints/epoch=070-step=14981.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/joint-runs/20260820-175347_modular/run-manifest.json",
+      "sha256": "b97059b114a4e9b9b00db83fe05f73ff1141bbfe1fd78786bbe0d4485c19784b",
+      "size_bytes": 84489276,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "architecture-without-era5-unet": {
+      "checkpoint": "checkpoints/architecture-without-era5-unet.ckpt",
+      "config": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.deterministic_residual.ERA5ResidualRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/checkpoints/epoch=077-step=16458.ckpt",
+      "result": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/result.json",
+      "role": "paper architecture table and storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-comparisons/20260820T155344Z-without-era5/unet-runs/20260820-175347_modular/run-manifest.json",
+      "sha256": "767df895503c8ff2b3c17f13557e0d0dc233c60928c56916f811e6f199f92a26",
+      "size_bytes": 83589500,
+      "source_commit": "3745fcdf10882b997a5e68cc0282913d98f17a93",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "correction_image_radii": {
+      "checkpoint": "checkpoints/correction_image_radii.ckpt",
+      "config": "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/unet_intensity_structure_v3/test/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/train/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/val/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/cache-metadata.json"
+      ],
+      "dependencies": [
+        "structure-cache-field"
+      ],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_correction.UNetIntensityCorrection",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-structure/unet-image-radii/20260827-182853_modular/checkpoints/epoch=000-step=36.ckpt",
+      "result": "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/result.json",
+      "role": "storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-structure/unet-image-radii/20260827-182853_modular/run-manifest.json",
+      "sha256": "b36b9f7009bde54c10c0d83edcb8b6f7ed3b8cc45272aaa97b0448ea88b12241",
+      "size_bytes": 11305980,
+      "source_commit": "8a29ef3706ee037197ce0458062fd73dad3c2d03",
+      "source_dirty": true
+    },
+    "correction_mlp_radii": {
+      "checkpoint": "checkpoints/correction_mlp_radii.ckpt",
+      "config": "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/unet_intensity_structure_v3/test/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/train/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/val/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_structure_v3/cache-metadata.json"
+      ],
+      "dependencies": [
+        "structure-cache-field"
+      ],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_correction.UNetIntensityCorrection",
+      "original_checkpoint": "/work/code/geo2wf/logs/intensity-structure/mlp-radii/20260827-182847_modular/checkpoints/epoch=073-step=2664.ckpt",
+      "result": "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/result.json",
+      "role": "storm case studies",
+      "run_manifest": "release/provenance/logs/intensity-structure/mlp-radii/20260827-182847_modular/run-manifest.json",
+      "sha256": "aec74d84353c6961da1ee4b9d543ac6d1c092682b1b1e177b5039d0afd822f17",
+      "size_bytes": 11312300,
+      "source_commit": "8a29ef3706ee037197ce0458062fd73dad3c2d03",
+      "source_dirty": true
+    },
+    "dashboard-correction": {
+      "checkpoint": "checkpoints/dashboard-correction.ckpt",
+      "config": "release/provenance/logs/20260804-203854_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/unet_intensity_geostat_nopmw_v2/test/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_geostat_nopmw_v2/train/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_geostat_nopmw_v2/val/manifest.csv.gz",
+        "release/provenance/data/unet_intensity_geostat_nopmw_v2/cache-metadata.json"
+      ],
+      "dependencies": [
+        "structure-cache-field"
+      ],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_correction.UNetIntensityCorrection",
+      "original_checkpoint": "/work/code/geo2wf/logs/20260804-203854_modular/checkpoints/epoch=032-step=297.ckpt",
+      "result": "release/provenance/logs/20260804-203854_modular/result.json",
+      "role": "stormtracker UNet+MLP nowcasts",
+      "run_manifest": "release/provenance/logs/20260804-203854_modular/run-manifest.json",
+      "sha256": "69c9c7c682c682fa445f1e32f1b1855ee02cd0ca87d178bb69bd42db81429841",
+      "size_bytes": 11305406,
+      "source_commit": "851f5eed225c456f2aa29ea44e6deadb352dc647",
+      "source_dirty": true
+    },
+    "dashboard-mlp": {
+      "checkpoint": "checkpoints/dashboard-mlp.ckpt",
+      "config": "release/provenance/logs/20260805-180538_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/intensity_forecast/pretrain_train/manifest.csv.gz",
+        "release/provenance/data/intensity_forecast/pretrain_val/manifest.csv.gz",
+        "release/provenance/data/intensity_forecast/test/manifest.csv.gz",
+        "release/provenance/data/intensity_forecast/train/manifest.csv.gz",
+        "release/provenance/data/intensity_forecast/val/manifest.csv.gz",
+        "release/provenance/data/intensity_forecast/cache-metadata.json"
+      ],
+      "dependencies": [],
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.intensity_forecast.IntensityForecastMLP",
+      "original_checkpoint": "/work/code/geo2wf/logs/20260805-180538_modular/checkpoints/epoch=051-step=14976.ckpt",
+      "result": "release/provenance/logs/20260805-180538_modular/result.json",
+      "role": "stormtracker retrospective 12-hour forecast",
+      "run_manifest": "release/provenance/logs/20260805-180538_modular/run-manifest.json",
+      "sha256": "2aee3963b7714575f9ed7a0bb04cbba014edb2645ad0c1c6dd172a004e5c0129",
+      "size_bytes": 26706,
+      "source_commit": "ffe59adeea88a20e8406e8d9bd683d498212fe8c",
+      "source_dirty": true
+    },
+    "latent_no_sar_era5_max_wind": {
+      "checkpoint": "checkpoints/latent_no_sar_era5_max_wind.ckpt",
+      "config": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckEncoderMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/checkpoints/epoch=092-step=13206.ckpt",
+      "result": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind/20260827-201311_modular/run-manifest.json",
+      "sha256": "706907169b1976bd5ed3fd4a65322925846618dad71703e4671e05afdbbb47ca",
+      "size_bytes": 71763564,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_no_sar_era5_max_wind_radii": {
+      "checkpoint": "checkpoints/latent_no_sar_era5_max_wind_radii.ckpt",
+      "config": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckEncoderMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/checkpoints/epoch=122-step=17466.ckpt",
+      "result": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/no-sar/era5/max-wind-radii/20260827-203802_modular/run-manifest.json",
+      "sha256": "5ad510a1f19c22af9c9de2127557243e99b3e8038b30c06904536e90d3b29d93",
+      "size_bytes": 71769884,
+      "source_commit": "dc5217cf107deea17812c3bb9251d61c151f5c91",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_no_sar_no_era5_max_wind": {
+      "checkpoint": "checkpoints/latent_no_sar_no_era5_max_wind.ckpt",
+      "config": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckEncoderMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/checkpoints/epoch=061-step=8804.ckpt",
+      "result": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind/20260827-201310_modular/run-manifest.json",
+      "sha256": "6e06fb6ef5887fbb6ac3f70c464fb5bbc84f68511f6e675022b33971a5f313c8",
+      "size_bytes": 71732460,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_no_sar_no_era5_max_wind_radii": {
+      "checkpoint": "checkpoints/latent_no_sar_no_era5_max_wind_radii.ckpt",
+      "config": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckEncoderMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/checkpoints/epoch=113-step=16188.ckpt",
+      "result": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/no-sar/no-era5/max-wind-radii/20260827-202455_modular/run-manifest.json",
+      "sha256": "bcba6be687fbf2490ba67be8be3094e12a12de249dd84306c7eb7cad9c16fb66",
+      "size_bytes": 71738780,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_sar_era5_max_wind": {
+      "checkpoint": "checkpoints/latent_sar_era5_max_wind.ckpt",
+      "config": "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/checkpoints/epoch=099-step=14200.ckpt",
+      "result": "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/sar/era5/max-wind/20260827-183815_modular/run-manifest.json",
+      "sha256": "68edf6b5a926f59d9a6fa10c22014b5626f7d807e7c517468ba48ba8952b95c3",
+      "size_bytes": 84520508,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": false,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_sar_era5_max_wind_radii": {
+      "checkpoint": "checkpoints/latent_sar_era5_max_wind_radii.ckpt",
+      "config": "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/checkpoints/epoch=104-step=14910.ckpt",
+      "result": "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/sar/era5/max-wind-radii/20260827-190834_modular/run-manifest.json",
+      "sha256": "55c6c4f7074a48da1139d79a1bfb57a95317a624419a1249a336501d8c2ec75e",
+      "size_bytes": 84526700,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_sar_no_era5_max_wind": {
+      "checkpoint": "checkpoints/latent_sar_no_era5_max_wind.ckpt",
+      "config": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/checkpoints/epoch=122-step=17466.ckpt",
+      "result": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind/20260827-183821_modular/run-manifest.json",
+      "sha256": "05a3e58078b477360e5200936c6f749186ec0a13d32fa73f39d1f2d80bac6fb0",
+      "size_bytes": 84489404,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": false,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "latent_sar_no_era5_max_wind_radii": {
+      "checkpoint": "checkpoints/latent_sar_no_era5_max_wind_radii.ckpt",
+      "config": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [],
+      "ibtracs_file": {
+        "original_path": "/work/code/geo2wf/data/IBTrACs/ibtracs.ALL.list.v04r01.csv",
+        "sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef"
+      },
+      "include_test_in_train": false,
+      "model_target": "geo2wf.models.bottleneck_unet_mlp.BottleneckUNetMLPRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/checkpoints/epoch=107-step=15336.ckpt",
+      "result": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/result.json",
+      "role": "paper latent ablation",
+      "run_manifest": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/run-manifest.json",
+      "sha256": "5c6ff493e54ea4ab4ff3c5e7055998e6a29124f104842b168415144cb3ab358a",
+      "size_bytes": 84495596,
+      "source_commit": "7d098347c2d112a6445be0d518486c781f5c5bcb",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "structure-cache-field": {
+      "checkpoint": "checkpoints/structure-cache-field.ckpt",
+      "config": "release/provenance/logs/20260804-173456_modular/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train_geostat_nopmw/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json"
+      ],
+      "dependencies": [
+        "training-input-79a823ce5e09"
+      ],
+      "include_test_in_train": true,
+      "model_target": "geo2wf.models.deterministic_residual.ERA5ResidualRegressor",
+      "original_checkpoint": "/work/code/geo2wf/logs/20260804-173456_modular/checkpoints/last.ckpt",
+      "role": "frozen field used to train radii correction heads",
+      "run_manifest": "release/provenance/logs/20260804-173456_modular/run-manifest.json",
+      "sha256": "1bd532d9c84e6d9f6878d2f18927a658507de1fb9c6708b07d7bdfb5edcd3ef0",
+      "size_bytes": 83626878,
+      "source_commit": "16f584db8a51ea2dbe966c3d783017d41cf11794",
+      "source_dirty": true,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+        "sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded"
+      }
+    },
+    "training-input-41761eb9ca26": {
+      "checkpoint": "checkpoints/training-input-41761eb9ca26.ckpt",
+      "config": null,
+      "data_metadata": [],
+      "dependencies": [],
+      "include_test_in_train": false,
+      "model_target": null,
+      "original_checkpoint": "/work/code/geo2wf/logs/20260730-132206_config_geo_sar_10bands_era5_residual/checkpoints/epoch=038-step=4758.ckpt",
+      "reproduction_gap": "Initialization weights retained; original training config unavailable locally.",
+      "role": "training initialization",
+      "sha256": "41761eb9ca26485f2f914404beb0f22f92698287bd3c0bb6d2b6702544867b52",
+      "size_bytes": 83626046
+    },
+    "training-input-79a823ce5e09": {
+      "checkpoint": "checkpoints/training-input-79a823ce5e09.ckpt",
+      "config": "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/resolved-config.yaml",
+      "data_metadata": [
+        "release/provenance/data/geotiff/geo_sar_10bands_era5/test/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5/train/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5/val/manifest.csv.gz",
+        "release/provenance/data/geotiff/geo_sar_10bands_era5/stats.json"
+      ],
+      "dependencies": [
+        "training-input-41761eb9ca26"
+      ],
+      "include_test_in_train": true,
+      "model_target": null,
+      "original_checkpoint": "/work/code/geo2wf/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/checkpoints/epoch=020-step=5103.ckpt",
+      "result": "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/result.json",
+      "role": "training initialization",
+      "run_manifest": "release/provenance/logs/ablation-suites/refinement-rerun-20260731T130254Z/runs/stage1_peak_aware/run-manifest.json",
+      "sha256": "79a823ce5e09e4e3bcbbfd2043d238305650d507041883d5bc38f8128e71bd5a",
+      "size_bytes": 83626942,
+      "source_commit": "e86a4a7d8c3a13df4c49c2fd006b2dd9c597b7fd",
+      "source_dirty": false,
+      "stats_file": {
+        "original_path": "/work/code/geo2wf/data/geotiff/geo_sar_10bands_era5/stats.json",
+        "sha256": "78c17bb1b340f8920b7ca224d11661f2640785483a8723f587314ecf6049fe87"
+      }
+    }
+  },
+  "provenance_notes": [
+    "Architecture table uses its original test cohort; latent table uses configured validation cohorts.",
+    "Source reports preserve historical hashes; files records hash the available captured metadata.",
+    "Structure-cache field was trained with include_test_in_train=true; its export config says false. Preserve both; it supports case-study correction heads, not the six paper architecture checkpoints."
+  ],
+  "schema_version": 1,
+  "source_commit": "8e26d543ccdfb84be2c9d401e23221412e9b1a82",
+  "source_root": "/work/code/geo2wf",
+  "structure_cache": {
+    "export_config": "release/provenance/logs/latent-structure/max-wind/20260827-115409_modular/resolved-config.yaml",
+    "field_model": "structure-cache-field",
+    "metadata": "release/provenance/data/unet_intensity_structure_v3/cache-metadata.json"
+  },
+  "validation_report": "release/provenance/logs/current-experiment-evaluation/validation-results.json"
+}

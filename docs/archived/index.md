@@ -1,20 +1,5 @@
-# Archived work
+# Historical research archive
 
-This section preserves completed results and documentation for model families
-that are no longer in the active experiment matrix. Archived pages are kept for
-provenance and should not be read as the current experiment plan.
+This conference branch retains the published models and StormSense. Earlier research remains in [the pre-release source](https://github.com/simon-donike/geo2wf/tree/8e26d54/archived).
 
-## Published results
-
-- [Previous intensity reconstruction benchmark](results/intensity-comparison-results.md)
-
-## Retired model and data tracks
-
-- [Direct PMW U-Net](models/direct-unet.md)
-- [PMW proxy pretraining and export](data/export-geo-pmw.md)
-- Decoder-free U-Net encoder/MLP intensity regression (code and presets under
-  `archived/code/` and `archived/configs/`)
-
-The matching code, configurations, launchers, and tests are preserved in the
-repository's top-level `archived/` directory. Large ignored local run folders
-are intentionally not relocated.
+See [conference results and reproduction](../reproduction.md) for the retained checkpoints and workflows.

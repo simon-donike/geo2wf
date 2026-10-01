@@ -27,30 +27,16 @@ splits it is the frozen correction-model prediction. The exporter selects one
 current field per storm/fix and records source hashes and three
 rapid-intensification validation cases in `cache-metadata.json`.
 
-## Train both stages
+## Train the retained dashboard model
 
 ```bash
-uv run geo2wf-train \
-  experiment=intensity_forecast_pretrain \
-  data.root=data/intensity_forecast
-
-uv run geo2wf-train \
-  --weights-only-path /path/to/pretrain.ckpt \
-  experiment=intensity_forecast_finetune \
-  data.root=data/intensity_forecast
+uv run geo2wf-train experiment=intensity_forecast_pretrain
 ```
 
-The five model inputs are the current anchor, the −6 h and −12 h winds, and
-the two consecutive six-hour changes. Validation reports MAE, RMSE, bias,
-storm-macro MAE, persistence, and recent-trend baselines.
-
-Each fine-tuning validation epoch also performs a recursive +6 h/+12 h rollout
-for `WP282025`, `WP112024`, and `AL092024`. For each storm, initialization is
-the latest usable matched sample at or before RI onset. If no pre-onset sample
-exists, selection falls back to the earliest usable sample after onset, so the
-two-step diagnostic can begin inside the RI period. W&B receives a three-panel
-RI plot and a six-row forecast table. The observed +6 h intensity is never fed
-into the second forecast step.
+The five inputs are the current anchor, the −6 h and −12 h winds, and the
+two consecutive six-hour changes. The release uses the original IBTrACS
+pretraining checkpoint for the dashboard. Historical matched-data fine-tuning
+presets are outside this release. See [reproduction](../reproduction.md).
 
 ## One-step training and +12 h dashboard rollout
 

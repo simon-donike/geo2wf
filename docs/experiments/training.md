@@ -13,8 +13,7 @@ Select one of the retained experiments through configuration:
 ```bash
 uv run geo2wf-train experiment=intensity_comparison_unet
 uv run geo2wf-train experiment=bottleneck_unet_mlp
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
-uv run geo2wf-train experiment=intensity_forecast_finetune
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
 ```
 
 ## Startup sequence

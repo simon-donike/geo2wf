@@ -23,8 +23,8 @@ wind field. Its completed held-out metrics and figures are collected on the
 [current results page](../results.md).
 
 ```bash
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
 ```
 
 ## Forecast retained
@@ -34,14 +34,12 @@ instantaneous ERA5 matrix:
 
 ```bash
 uv run geo2wf-train experiment=intensity_forecast_pretrain
-uv run geo2wf-train experiment=intensity_forecast_finetune
 ```
 
 ## Archived work
 
 Diffusion, direct-PMW proxy training, historical full-YAML presets, ablation
-suites, and previous results are preserved under the repository's `archived/`
-tree and the documentation [archive](../archived/index.md). They are not active
+suites, and previous results are preserved under the pre-release Git history and the documentation [archive](../archived/index.md). They are not active
 configuration choices.
 
 Continue to [configuration](configuration.md), [training](training.md), and

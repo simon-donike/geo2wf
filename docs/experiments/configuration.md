@@ -111,7 +111,7 @@ there, making the actual run input inspectable.
 
 ## Archived full YAML files
 
-Historical full-YAML presets are preserved under `archived/configs/` for
+Historical full-YAML presets are preserved in the pre-release Git history for
 provenance. Active training requires grouped configs with a model `_target_`;
 archived presets are not accepted as current launch choices. Use git history or
 an older checkout for exact historical reproduction.

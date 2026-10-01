@@ -84,8 +84,8 @@ radii can be evaluated from both the bottleneck MLP and its decoded wind field.
 Its paired presets are:
 
 ```bash
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind
-uv run geo2wf-train experiment=bottleneck_unet_mlp_max_wind_radii
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
+uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
 ```
 
 The first preset disables the structure head. The second enables its masked

@@ -25,7 +25,7 @@ geo2wf/
 │   └── training.py
 ├── scripts/                            maintained workflow implementations
 ├── tests/
-├── archived/                           retired configs, code, scripts, tests
+├── release/                            paper tables, checkpoint registry, provenance
 ├── train.py and legacy modules         limited forwarding adapters
 ├── mkdocs.yml
 └── pyproject.toml
@@ -51,8 +51,7 @@ geo2wf/
 | source pairing and export | reusable APIs under `preprocessing/`; maintained workflows under `scripts/` |
 
 Dashboard-only ViT and external ConvLSTM artifacts live below `inference/` and
-are not model packages. Retired diffusion and direct-PMW packages are under
-`archived/` and are not part of the maintained model inventory.
+are not model packages. Retired diffusion and direct-PMW packages remain in pre-release Git history and are not part of the maintained model inventory.
 
 Do not add new behavior to CamelCase `src/*.py` or the root `train.py`. They
 exist for compatible imports and checkpoints.

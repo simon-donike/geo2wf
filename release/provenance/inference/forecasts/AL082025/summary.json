@@ -1,0 +1,19 @@
+{
+  "storm_id": "AL082025",
+  "split": "val",
+  "candidate_processed_targets": 1039,
+  "excluded_insufficient_context": 86,
+  "eligible_samples": 953,
+  "evaluated_samples": 953,
+  "checkpoint": "/gws/ssde/j25a/ai4er/users/ediazsa/outputs/processor/20260804-104122-1102/checkpoints/processor-040.ckpt",
+  "checkpoint_sha256": "d9c890ae00f82de1b46b9b470de07cdad5961b9b58b92944929014832f5e3410",
+  "experiment_config": "/gws/ssde/j25a/ai4er/users/ediazsa/outputs/processor/20260804-104122-1102/config.json",
+  "window_hours": 12.0,
+  "window_length": 12,
+  "forecast_lead_hours": 12.0,
+  "target_source_types": [
+    "sar",
+    "pmw",
+    "geo"
+  ]
+}
