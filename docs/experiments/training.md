@@ -1,105 +1,91 @@
-# Training & checkpoints
+# Training and checkpoints
 
-## Launch a composed run
-
-```bash
-uv run geo2wf-train \
-  data=geo_sar_common10_era5 \
-  model=deterministic_residual
-```
-
-Select one of the retained experiments through configuration:
+Install the package and obtain a compatible [local dataset](../data/dataset-contract.md).
+Choose a retained [model preset](../models/index.md#training-presets), then
+pass local paths explicitly. For a joint field/intensity run:
 
 ```bash
-uv run geo2wf-train experiment=intensity_comparison_unet
-uv run geo2wf-train experiment=bottleneck_unet_mlp
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
+WANDB_DISABLED=true uv run geo2wf-train \
+  experiment=bottleneck_unet_mlp \
+  data.root=/path/to/paired \
+  data.ibtracs_file=/path/to/ibtracs.ALL.list.v04r01.csv
 ```
 
-## Startup sequence
-
-1. Load machine-local environment values and bound numerical-library threads.
-2. Compose the selected groups and resolve environment interpolation.
-3. Create one timestamped run directory, reused by DDP child processes.
-4. Save `resolved-config.yaml`, source provenance, and `run-manifest.json`.
-5. Seed Python, PyTorch, and DataLoader workers through Lightning.
-6. Instantiate the data module and model from their local `_target_` values.
-7. Build `DataSpec` and reject incompatible channel/companion contracts.
-8. Configure CSV logging, optional W&B, callbacks, scheduler, and checkpoints.
-9. Call `trainer.fit(model, datamodule=..., ckpt_path=...)`.
-
-## Resume a run
-
-`--ckpt-path` restores model weights and Lightning training state: optimizer,
-scheduler, callbacks, epoch, and global step.
+For a field-only run without scalar target filtering:
 
 ```bash
-uv run geo2wf-train \
-  model=deterministic_residual \
-  --ckpt-path /path/to/last.ckpt
+WANDB_DISABLED=true uv run geo2wf-train \
+  data=geo_sar_common10_era5 model=deterministic_residual \
+  data.root=/path/to/paired data.stats_file=/path/to/paired/stats.json
 ```
 
-The selected model and data configuration must still match the checkpoint.
+These start new training runs. Exact checkpoint reproduction also requires
+its original configuration, cohort membership, statistics, and producer files.
 
-## Initialize weights only
+## Configuration and hardware
 
-Use `--weights-only-path` for transfer learning. It strict-loads the
-state dictionary but starts optimizer, scheduler, epoch, and step state fresh.
-It is mutually exclusive with `--ckpt-path`.
+`configs/modular.yaml` composes `data`, `model`, `trainer`, `logging`, and an
+optional `experiment`. Choices are the YAML filenames under each group;
+dotted overrides change values for one invocation.
 
-```bash
-uv run geo2wf-train \
-  model=deterministic_residual \
-  --weights-only-path /path/to/source.ckpt
-```
+| Override | Purpose |
+|---|---|
+| `data.root`, `data.stats_file` | Local export/cache and its normalization statistics |
+| `data.require_era5`, `data.use_era5` | Availability filtering and input inclusion, respectively |
+| `trainer.max_epochs` | Training duration |
+| `trainer.limit_train_batches`, `trainer.limit_val_batches` | Integer batch limit or floating-point fraction |
+| `trainer.accelerator`, `trainer.devices`, `trainer.strategy` | Hardware and distributed execution |
+| `trainer.checkpoint.monitor` | Checkpoint metric; null uses the model default |
+| `trainer.default_root_dir` | Parent of timestamped run directories |
 
-Changed condition widths or architecture keys still fail strict loading. A
-partial-load policy must be an explicit model-specific migration, not an
-implicit training flag.
+The basic paired data config uses `data.loader.batch_size` and
+`data.loader.num_workers`. Joint, correction, and forecast configs expose
+`data.batch_size` and `data.num_workers` directly. Inspect the selected YAML
+before overriding these keys.
 
-## Checkpoint selection
-
-When `trainer.checkpoint.monitor` is null, the model supplies its standard
-monitor and mode. The callback writes under `<run>/checkpoints/` using the
-configured filename, top-k count, and `save_last` policy.
-
-A monitor must be emitted for the validation coverage in use. Very small
-validation limits can omit storm metrics when no sample satisfies their
-coverage gates; use `val/loss` temporarily or increase coverage for a smoke run.
-
-## Logging and run artifacts
-
-Every run creates:
+For two allocated GPUs, append:
 
 ```text
-<default_root_dir>/<timestamp>_modular/
+trainer.accelerator=gpu trainer.devices=2 trainer.strategy=ddp_find_unused_parameters_false
+```
+
+Batch size and workers are per process. Start with zero workers for data-loader
+debugging. `DataSpec` validates ordered channels, units, and required companions
+before the first batch.
+
+## Resume or initialize
+
+Append `--ckpt-path /path/to/last.ckpt` to restore weights, optimizer, scheduler,
+callbacks, epoch, and step. Append `--weights-only-path /path/to/model.ckpt`
+for strict weight loading with fresh training state. The flags are mutually
+exclusive; both require a matching model architecture and channel contract.
+
+Changing normalization or targets can change model meaning even when tensor
+shapes match. Use the checkpoint's resolved configuration when continuing an
+existing experiment.
+
+## Checkpoints and run records
+
+Each run writes a timestamped directory:
+
+```text
+logs/<timestamp>_modular/
 ├── checkpoints/
 ├── metrics/metrics.csv
 ├── resolved-config.yaml
 ├── run-manifest.json
 ├── source-diff.patch
-├── source-snapshot/
-└── wandb/                         # only used when W&B is active/offline
+└── source-snapshot/
 ```
 
-The run manifest records status, resolved config, checkpoint provenance, split
-policy, git/source state, runtime metadata, final metrics, and failures. CSV
-logging and manifests do not depend on W&B.
+The manifest records configuration, source/checkpoint provenance, split policy,
+status, and metrics. The default checkpoint callback retains the best two and
+last checkpoint. A monitor must be logged for the validation coverage used;
+a tiny smoke run may not produce every structural metric.
 
-## W&B modes
+`WANDB_DISABLED=true` keeps CSV/run records without W&B. `WANDB_MODE=offline`
+keeps local W&B artifacts. Early stopping and learning-rate scheduling have
+separate monitors and patience; the resolved config is authoritative.
 
-```bash
-export WANDB_DISABLED=true   # no W&B logger
-export WANDB_MODE=offline    # local W&B files, no online traffic
-```
-
-Models import neither W&B nor Matplotlib; reconstruction payloads are routed through
-the tracking layer, whose callback can also drain standardized events.
-
-## Resume safety
-
-- Resume only with the same architecture, channel order, schedule, and target definition.
-- Changed optimizer only: use weights-only initialization if intentional.
-- Changed target normalization: start a fresh run.
-- Changed bands, companions, or spatial contract: select compatible config and checkpoint.
-- Older compatible checkpoints remain strict-loadable; only new checkpoints receive `geo2wf` metadata.
+Continue with [evaluation metrics](evaluation.md) and the
+[command reference](../reference/commands.md).

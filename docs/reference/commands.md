@@ -1,92 +1,68 @@
-# Commands & environment
+# Commands
 
-## Environment and quality
+Run commands from the repository root after [installation](../getting-started/installation.md).
+CLI workflows use local data and checkpoint files; [Hugging Face access](../data/index.md)
+is a separate download step.
+
+## Train and export
 
 ```bash
-uv sync --frozen --group dev --group docs
-uv run python -m pytest
-uv run mkdocs build --strict
+uv run geo2wf-train --help
+uv run python scripts/export_geo_sar_geotiffs.py --help
+uv run python scripts/export_unet_intensity_cache.py --help
+uv run python scripts/export_joint_intensity_cache.py --help
+uv run python scripts/export_intensity_forecast_cache.py --help
 ```
 
-## Active training
+See [training](../experiments/training.md) for Hydra overrides and resume flags,
+[model presets](../models/index.md#training-presets) for experiment choices,
+and [GEO–SAR export](../data/export-geo-sar.md) for source requirements.
+
+## Evaluate local checkpoints
 
 ```bash
-# Raw field U-Net: matched with/without-ERA5 pair
-uv run geo2wf-train experiment=intensity_comparison_unet
-uv run geo2wf-train experiment=intensity_comparison_unet_no_era5
-
-# Joint U-Net + bottleneck MLP: matched pair
-uv run geo2wf-train experiment=bottleneck_unet_mlp
-uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
-
-# Joint U-Net/latent MLP structure pair
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
-
-# Scalar correction and retained forecast
-uv run geo2wf-train experiment=unet_intensity_correction
-uv run geo2wf-train experiment=intensity_forecast_pretrain
+uv run python scripts/evaluate_intensity_models.py --help
+uv run python scripts/evaluate_intensity_correction.py --help
+uv run python scripts/evaluate_intensity_forecast.py --help
 ```
 
-Use normal Hydra overrides for smoke tests, hardware, and loader settings:
+The script help lists workflow-specific arguments; the installed CLI wrappers
+provide the workflow selector. The comparison evaluator works with
+field, correction, and joint-model artifacts; it does not rerun the removed
+experiment orchestration scripts. Metric meanings are documented under
+[evaluation](../experiments/evaluation.md).
+
+## Infer over source observations
+
+The field workflow reads an observation manifest and source archive:
 
 ```bash
-WANDB_DISABLED=true uv run geo2wf-train \
-  experiment=intensity_comparison_unet \
-  trainer.max_epochs=1 \
-  trainer.limit_train_batches=1 \
-  trainer.limit_val_batches=1 \
-  trainer.enable_checkpointing=false
-
-uv run geo2wf-train \
-  experiment=bottleneck_unet_mlp \
-  trainer.devices=2 \
-  trainer.strategy=ddp_find_unused_parameters_false
-```
-
-Resume full state with `--ckpt-path`; initialize weights only with
-`--weights-only-path`.
-
-## Data and cache export
-
-```bash
-uv run geo2wf-export geo-sar \
-  --config configs/config.yaml \
-  --limit 2
-
-uv run geo2wf-export intensity-cache \
-  --config /path/to/unet-run/resolved-config.yaml \
-  --checkpoint /path/to/unet.ckpt \
-  --output-root data/unet_intensity
-
-uv run geo2wf-export intensity-forecast-cache --help
-```
-
-## Evaluation and inference
-
-```bash
-uv run geo2wf-evaluate intensity-comparison --help
-uv run geo2wf-evaluate intensity-correction --help
-uv run geo2wf-evaluate intensity-forecast --help
-
 uv run geo2wf-infer deterministic-residual \
-  --config /path/to/unet-run/resolved-config.yaml \
-  --checkpoint /path/to/unet.ckpt
-
-uv run geo2wf-infer intensity-correction --help
-uv run geo2wf-infer intensity-forecast --help
+  --config /path/to/resolved-config.yaml \
+  --checkpoint /path/to/model.ckpt \
+  --stats /path/to/paired/stats.json \
+  --data-root /path/to/source-archive \
+  --manifest /path/to/observation_manifest.csv \
+  --reference-root /path/to/reference-series \
+  --ibtracs-file /path/to/ibtracs.ALL.list.v04r01.csv \
+  --output-root inference/my-run
 ```
 
-## Environment variables
+The reference root must contain `<storm_id>/inference-summary.csv` files;
+their observation IDs define which source observations are processed.
+`--storms` and `--limit` restrict that selection. Scalar workflows consume
+their corresponding local caches. For all inference options:
 
-| Variable | Effect |
-|---|---|
-| `TCD_DATA_ROOT` | source observation archive used by exporters |
-| `GEO_SAR_OUTPUT_ROOT` | conventional GEO–SAR export destination override |
-| `GEO2WF_RUN_DIR` | inherited DDP run path; normally managed internally |
-| `WANDB_DISABLED` | disable W&B construction when true-like |
-| `WANDB_MODE` | `offline` retains local W&B artifacts |
-| `WANDB_PROJECT`, `WANDB_NAME` | override run tracking names |
+```bash
+uv run python scripts/run_storm_unet_inference.py --help
+uv run python scripts/run_intensity_correction_inference.py --help
+uv run python scripts/run_intensity_forecast_inference.py --help
+```
 
-Retired commands, full-YAML presets, and launchers are preserved in the
-[archive](../archived/index.md) and are not active CLI choices.
+## Check docs
+
+```bash
+uv sync --frozen --group docs
+uv run mkdocs build --strict
+uv run python scripts/check_site_links.py
+```

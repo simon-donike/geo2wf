@@ -1,95 +1,63 @@
-# Bottleneck U-Net + MLP
+# Joint field and latent MLP
 
-This model learns a SAR wind-field reconstruction and a continuous IBTrACS
-maximum-wind estimate in one end-to-end network.
+`BottleneckUNetMLPRegressor` shares an encoder between a wind-field decoder and an MLP
+that predicts continuous IBTrACS maximum wind. Spatial mean and max pooling
+connect the bottleneck feature map to the scalar head. This is the joint
+representation studied in the [paper](../concepts/problem.md).
 
-```mermaid
-flowchart LR
-  X[GEO + ERA5 condition] --> E[Shared U-Net encoder]
-  E --> B[Bottleneck feature map]
-  B --> D[Skip-connected decoder]
-  D --> I[SAR wind field]
-  B --> P[Spatial mean + max pooling]
-  P --> M[MLP]
-  M --> W[IBTrACS USA_WIND in m/s]
-```
+The input has 23 condition channels with ERA5 or 14 without it, plus a
+condition-validity mask. The decoder predicts a normalized field that is
+converted to physical wind using the target statistics. The explicit ERA5
+residual addition belongs to the field-only model. The scalar head predicts intensity
+directly rather than taking the maximum of the decoded field.
 
-The experiment's scalar target is the continuous IBTrACS `USA_WIND` value
-converted from knots to metres per second. Tropical-cyclone categories are not
-model targets and do not contribute to the loss.
+## Targets and loss
 
-The data module reuses `PairedImageDataset` for all raster loading,
-normalization, masking, and augmentation. It reads `USA_WIND` directly from
-IBTrACS and linearly interpolates it at each SAR target timestamp between the
-immediately preceding and following valid fixes. The two fixes may be at most
-three hours apart. Exact fix timestamps use the recorded value directly.
-Category fields, frozen-U-Net caches, and ERA5 are not involved in constructing
-the scalar target. Samples outside a valid three-hour bracket are excluded.
+The data module interpolates IBTrACS `USA_WIND` to each SAR timestamp only
+between valid fixes at most three hours apart; an exact fix uses its recorded
+value. Knots are converted to m/s. Categories are derived diagnostics, not
+training labels.
 
-Train with the default local data paths:
-
-```bash
-uv run geo2wf-train experiment=bottleneck_unet_mlp
-```
-
-Override the paired root and IBTrACS file through environment variables:
-
-```bash
-GEO2WF_JOINT_PAIRED_ROOT=/path/to/paired \
-GEO2WF_IBTRACS_FILE=/path/to/ibtracs.ALL.list.v04r01.csv \
-uv run geo2wf-train experiment=bottleneck_unet_mlp
-```
-
-For the GEO-only ablation, use the checked-in preset:
-
-```bash
-uv run geo2wf-train experiment=bottleneck_unet_mlp_no_era5
-```
-
-This sets `data.use_era5=false` and changes `model.condition_channels` from 23
-to 14: ten GEO bands, distance to the storm center, and three solar-time
-channels. The comparison preset still requires ERA5 availability to preserve
-the same cohort, but no ERA5 channel or companion tensor is passed to the
-model.
-
-With the optional structure head disabled, the objective is
+The default objective is
 
 \[
-L = w_{image} L_{Huber,image} + w_{intensity} L_{Huber,IBTrACS},
+L = L_{\mathrm{Huber,field}} + L_{\mathrm{Huber,intensity}},
 \]
 
-with both weights equal to one by default. Both terms update the shared
-encoder. The image term additionally updates the decoder, while the continuous
-IBTrACS term updates the bottleneck MLP. Checkpoints are selected by the
-combined `val/loss`; the two component losses and image/intensity MAE, RMSE,
-and bias are logged separately.
+with transitions of 2 and 5 m/s. Both terms update the encoder; the field term
+also updates the decoder. Checkpoints use combined `val/loss`.
 
-## Optional storm-structure head
+## Optional radii supervision
 
-The shared bottleneck can also predict five nonnegative IBTrACS structure
-values in kilometres: eye size, RMW, and equivalent-area R34, R50, and R64.
-Equivalent-area radii reduce the available quadrant radii to the radius of a
-circle with the same complete-quadrant area. Each value has its own validity
-mask because IBTrACS structure fields are frequently missing.
+The structure head predicts five nonnegative values in kilometres: eye size,
+RMW (called \(R_{\max}\) in the paper), and equivalent-area R34/R50/R64.
+Each target has an independent validity mask. A missing eye or radius label
+contributes no loss. Radius-enabled presets add masked Huber loss with a
+20 km transition and weight 0.25.
 
-This head uses a masked Huber term when
-`model.structure_head_enabled=true` and `model.structure_loss_weight>0`. The
-checked-in model config has the head disabled and weight zero, so it does not
-affect the default two-term objective or checkpoint results.
+Direct head predictions and radii diagnosed from the decoded image are
+reported separately; image-diagnosed radii do not contribute to this scalar
+loss. The published [supervision ablation](../results.md#latent-supervision-ablation)
+tests the contribution of SAR and radius targets.
 
-## Joint latent-structure experiment
-
-The active structure experiment retains the decoder and reconstruction head so
-radii can be evaluated from both the bottleneck MLP and its decoded wind field.
-Its paired presets are:
+## Train
 
 ```bash
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
+uv run geo2wf-train experiment=latent_mlp_sar_no_era5_max_wind_radii \
+  data.root=/path/to/paired \
+  data.ibtracs_file=/path/to/ibtracs.ALL.list.v04r01.csv
 ```
 
-The first preset disables the structure head. The second enables its masked
-Huber objective at weight `0.25`; missing radii do not contribute to the loss.
-Both use the same ERA5-conditioned, storm-disjoint cohort and seed. Held-out
-RMW, R34, R50, and R64 results are reported separately for the latent head and
-the diagnostic extraction from the 2D field.
+Use `bottleneck_unet_mlp` for the ERA5-conditioned field/intensity model
+without radius supervision. The [preset table](index.md#training-presets)
+lists the other retained combinations. `data.stats_file` follows `data.root`
+in these joint presets. Hardware and logging overrides are described in
+[training](../experiments/training.md).
+
+## Encoder-only control
+
+`BottleneckEncoderMLPRegressor` retains the encoder and scalar heads but removes the
+decoder and field loss. Select a `latent_mlp_no_sar_*` preset to compare scalar
+learning with and without SAR supervision. The matched data cohort can still
+require a SAR-valid center; “no SAR” describes the objective, not a claim that
+the training samples have no SAR record.

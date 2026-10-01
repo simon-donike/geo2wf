@@ -1,115 +1,56 @@
-# Single-field intensity correction
+# Post-hoc intensity correction
 
-The intensity-correction model turns one frozen deterministic U-Net wind field
-into one corrected maximum sustained wind estimate. It does not reconstruct an
-image and it never reads previous or future observations.
+This model takes one frozen U-Net wind field and current metadata, then adds
+a learned signed correction to the field's valid-pixel maximum. A compact
+CNN encodes wind, validity, and storm-center distance; an MLP combines those
+features with current location/time metadata. The result is clamped
+nonnegative. It estimates current intensity from one observation.
 
-```mermaid
-flowchart LR
-  U[Frozen U-Net wind field] --> C[Compact residual CNN]
-  M[Current coordinates and time metadata] --> E[Metadata MLP]
-  C --> F[Fusion MLP]
-  E --> F
-  R[Raw valid-pixel field maximum] --> A[Add learned correction]
-  F --> A
-  A --> W[Corrected USA_WIND in m/s]
-  W --> S[TD / TS / C1–C5 thresholds]
-```
+The zero-initialized final layer initially reproduces the raw field maximum.
+Training uses tropical IBTrACS `USA_WIND` in m/s, with `USA_SSHS` from −1 to 5.
+Storm-balanced, capped category-aware weights enter a 5 m/s Huber objective.
+Categories are derived from continuous predictions. The default checkpoint
+monitor is `val/storm_macro_mae_ms`.
 
-## Scientific target contract
+Optional radius presets either retain field-diagnosed radii or enable a
+separate masked scalar structure head. Keep the source of each reported radius
+explicit. The default `unet_intensity_correction` has no structure loss.
 
-Training targets come only from tropical IBTrACS `USA_WIND` fixes whose
-`USA_SSHS` value is between `-1` and `5`. `USA_WIND` is converted from knots
-with `1 kt = 0.514444 m/s`. The exporter intentionally does not use the
-repository's WMO-first convenience intensity because IBTrACS does not
-homogenize the agencies' wind-averaging periods, while `USA_SSHS` is defined
-from US one-minute winds. See the [official IBTrACS product
-documentation](https://www.ncei.noaa.gov/products/international-best-track-archive).
+## Prepare a local cache
 
-The model sees three image channels: physical U-Net wind, validity, and
-normalized distance to the current storm center. Its scalar metadata is limited
-to current latitude, cyclic longitude, basin, cyclic UTC/day-of-year/local-solar
-time, elapsed time from the first track record, and valid fraction. Storm IDs,
-absolute year, track history, intensity labels, pressure, and future-lifecycle
-fields are not model inputs.
-
-The learned scalar is a signed residual around the valid-pixel U-Net maximum.
-The final layer starts at zero, so a new model initially reproduces that
-baseline. The corrected value is nonnegative. TD, TS, and hurricane categories
-are derived from the corrected continuous wind without rounding.
-
-The active cache uses the raw field maximum as its anchor and continuous
-IBTrACS wind as its scalar target.
-
-An optional five-value structure head can predict IBTrACS eye size, RMW, and
-equivalent-area R34/R50/R64 radii. It uses per-value validity masks and a masked
-Huber loss. `structure_head_enabled` is false and its loss weight is zero in the
-checked-in default, so published default scalar results do not include this
-multi-task supervision.
-
-## Export the frozen fields
+The cache contains split manifests, frozen field arrays, and
+`cache-metadata.json`, which records the producer checkpoint and source hashes.
+Generate it from source observations using:
 
 ```bash
 uv run geo2wf-export intensity-cache \
   --data-root /path/to/archive \
-  --manifest /path/to/observation_manifest_v6.csv \
+  --manifest /path/to/observation_manifest.csv \
   --ibtracs-file /path/to/ibtracs.ALL.list.v04r01.csv \
-  --config /path/to/unet-run/resolved-config.yaml \
-  --checkpoint /path/to/frozen-unet.ckpt \
-  --stats data/geotiff/geo_sar_10bands_era5/stats.json \
+  --config /path/to/unet/resolved-config.yaml \
+  --checkpoint /path/to/unet.ckpt \
+  --stats /path/to/paired/stats.json \
   --output-root data/unet_intensity
 ```
 
-Each split contains `manifest.csv` and compressed field arrays. The root
-`cache-metadata.json` hashes the U-Net checkpoint, resolved source config,
-normalization statistics, source manifest, and IBTrACS file. Loading can require
-an expected checkpoint hash and fails on mismatches.
+The frozen producer must match the cache provenance. End-to-end evaluation
+also depends on the producer's training membership; a clean downstream split
+cannot undo upstream exposure to evaluation storms.
 
-The exporter rejects storms shared by multiple splits. If the upstream U-Net
-config declares `include_test_in_train: true`, provenance marks the result as
-development-only. A clean end-to-end generalization claim requires an upstream
-checkpoint that did not train on or select against the final evaluation storms.
-
-## Train
+## Train and evaluate
 
 ```bash
-uv run geo2wf-train \
-  experiment=unet_intensity_correction \
+uv run geo2wf-train experiment=unet_intensity_correction \
   data.root=data/unet_intensity
-```
 
-Training uses storm-balanced, capped category-aware Huber weights. Checkpoints
-are selected by `val/storm_macro_mae_ms`. Validation also logs global MAE,
-RMSE, bias, raw-U-Net MAE, category accuracy, macro F1, within-one-category
-accuracy, and per-category MAE.
-
-When W&B is enabled, every validation epoch also logs a three-panel storm plot
-comparing IBTrACS `USA_WIND`, the corrected prediction, and the raw U-Net
-maximum over observation time. These are independently inferred single-timestep
-fixes arranged chronologically for inspection; the model never receives the curve.
-The default selection is the three validation storms with the most cached fixes,
-with storm ID as a deterministic tie-breaker. Pin a particular trio with, for
-example, `model.validation_plot_storm_ids=[AL012020,EP022021,WP032022]`. W&B
-also receives the plotted fixes as a table, per-storm metrics for the full
-validation split, the category confusion matrix, correction statistics, and
-raw-U-Net baseline metrics.
-
-## Evaluate and infer
-
-```bash
 uv run geo2wf-evaluate intensity-correction \
   --cache-root data/unet_intensity \
-  --checkpoint /path/to/intensity.ckpt \
-  --split test \
+  --checkpoint /path/to/intensity.ckpt --split test \
   --output logs/intensity-evaluation.json
-
-uv run geo2wf-infer intensity-correction \
-  --cache-root data/unet_intensity \
-  --checkpoint /path/to/intensity.ckpt \
-  --split test \
-  --output inference/intensity-summary.csv
 ```
 
-Inference returns `raw_unet_max_wind_ms`, `correction_ms`, `output_msw_ms`, and
-`output_category` with observation identifiers and timestamps. StormSense
-displays this output as its U-Net+MLP maximum-wind series.
+`geo2wf-infer intensity-correction` accepts the same cache/checkpoint/split
+arguments and writes prediction CSV via `--output`. Its outputs include
+`raw_unet_max_wind_ms`, `correction_ms`, `output_msw_ms`, and `output_category`.
+[StormSense](../explorer.md) calls this post-hoc product **U-Net+MLP**; it is
+separate from the jointly trained latent model.

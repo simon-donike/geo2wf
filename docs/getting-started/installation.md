@@ -1,84 +1,47 @@
-# Installation
+# Get started
 
-The supported environment uses Python 3.10 or 3.11 and
-[uv](https://docs.astral.sh/uv/) for dependency locking and command execution.
-
-## Create the environment
+Use Python 3.10 or 3.11 and [uv](https://docs.astral.sh/uv/).
+From the repository root:
 
 ```bash
 uv sync --frozen
 ```
 
-For tests and documentation:
+This installs the locked dependencies and the `geo2wf-train`, `geo2wf-export`,
+`geo2wf-evaluate`, and `geo2wf-infer` commands.
+
+## Get data and model files
+
+- [Dataset on Hugging Face](https://huggingface.co/datasets/simon-donike/geo2wf-data): imagery, caches, labels, indexes, and reference results.
+- [Model repository on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models): the linked destination for model releases; see [availability and checkpoint requirements](../models/index.md#checkpoints).
+
+Read the [dataset guide](../data/index.md) before downloading large assets.
+Current training consumes a [local raster export or task cache](../data/dataset-contract.md).
+The Hub catalog and the original export layout are different; release-specific
+catalog tools are not included in this checkout.
+
+Once data are available locally, run the [first experiment](first-experiment.md)
+or select a [model preset](../models/index.md). Inference requires a compatible
+checkpoint, its resolved configuration, and the original normalization statistics.
+
+## Local paths and logging
+
+Pass data paths explicitly in commands. Optional machine defaults can be kept
+in `.local.env`, copied from `.local.example.env`. `TCD_DATA_ROOT` selects the
+source archive for export/inference; `WANDB_DISABLED=true` disables W&B while
+keeping local CSV metrics and run records. `WANDB_MODE=offline` records W&B
+artifacts locally.
+
+## Development and docs
 
 ```bash
 uv sync --frozen --group dev --group docs
-```
-
-`--frozen` uses the checked-in `uv.lock`. Omit it only when intentionally
-changing dependencies. Installation registers `geo2wf-train`,
-`geo2wf-evaluate`, `geo2wf-infer`, and `geo2wf-export`.
-
-## Verify the checkout
-
-```bash
 uv run python -m pytest
 uv run mkdocs build --strict
-uv run geo2wf-train --help
-```
-
-The test suite covers config composition, data/model contracts, checkpoint
-compatibility, data transforms, learning behavior,
-prediction shapes, metrics, and architecture boundaries. The strict docs build
-checks pages, internal links, Markdown extensions, and assets.
-
-## Configure machine-local values
-
-Copy the ignored template only when local overrides are needed:
-
-```bash
-cp .local.example.env .local.env
-```
-
-`geo2wf.config.local_environment.load_local_env()` is used by the canonical
-training runtime. Maintained compatibility scripts load the same file through
-their forwarding environment module.
-
-| Variable | Purpose |
-|---|---|
-| `TCD_DATA_ROOT` | source-observation archive for exporters |
-| `GEO_SAR_OUTPUT_ROOT` | conventional GEO–SAR export destination |
-| `WANDB_MODE=offline` | keep W&B activity local |
-| `WANDB_DISABLED=true` | disable W&B construction completely |
-| `WANDB_PROJECT`, `WANDB_NAME` | override tracking names |
-
-!!! danger "Keep secrets local"
-    `.local.env` is ignored by Git. Never commit credentials or private
-    cluster paths in YAML.
-
-## GPU notes
-
-The lock file pins Lightning `1.9.3` and the compatible PyTorch range. A
-generic sync may select a CPU build; managed GPU systems may require the
-site-specific CUDA wheel or module.
-
-Use trainer overrides instead of copying a config:
-
-```bash
-uv run geo2wf-train \
-  trainer.accelerator=gpu \
-  trainer.devices=2 \
-  trainer.strategy=ddp_find_unused_parameters_false
-```
-
-Only request devices that the machine or scheduler allocation provides. See
-[HPC & multi-GPU](../experiments/hpc.md).
-
-## Preview the documentation
-
-```bash
+uv run python scripts/check_site_links.py
 uv run mkdocs serve
 ```
 
-Open `http://127.0.0.1:8000`. The server live-reloads Markdown, YAML, CSS, and
-theme overrides.
+The preview opens at `http://127.0.0.1:8000`. GPU training requires a compatible
+PyTorch/CUDA installation and allocated devices; use the
+[trainer overrides](../experiments/training.md#configuration-and-hardware) for your machine.

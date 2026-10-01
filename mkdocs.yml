@@ -38,46 +38,37 @@ theme:
 
 nav:
   - Home: index.md
-  - Published results: results.md
-  - Start here:
-      - Overview: getting-started/index.md
-      - Installation: getting-started/installation.md
+  - Paper:
+      - Reasoning and methods: concepts/problem.md
+      - Results: results.md
+  - Get started:
+      - Installation and access: getting-started/installation.md
       - First experiment: getting-started/first-experiment.md
-  - Science and system:
-      - Scientific problem and observations: concepts/problem.md
-      - System architecture: concepts/architecture.md
-      - Modular package architecture: concepts/modular-architecture.md
   - Data:
-      - Inputs and targets: data/index.md
-      - Full training corpus: data/full-dataset.md
-      - StormSense case-study manifest: data/storm-manifest.md
-      - Dataset contract: data/dataset-contract.md
-      - Normalization & masks: data/normalization.md
+      - Dataset on Hugging Face: data/index.md
+      - Local layout and tensors: data/dataset-contract.md
+      - Paired export inventory: data/full-dataset.md
       - Export GEO–SAR: data/export-geo-sar.md
-      - Hosting dashboard data on R2: data/r2-hosting.md
   - Models:
-      - Model overview: models/index.md
-      - ERA5-residual U-Net: models/era5-residual.md
-      - Single-field intensity correction: models/intensity-correction.md
-      - Bottleneck U-Net + MLP: models/bottleneck-unet-mlp.md
-      - Six-hour scalar intensity forecast: models/intensity-forecast.md
-  - Experiments:
-      - Choose an experiment: experiments/index.md
-      - Configuration guide: experiments/configuration.md
-      - Training & checkpoints: experiments/training.md
-      - Evaluation & metrics: experiments/evaluation.md
-      - Model presets: experiments/intensity-comparison.md
-      - Latent-structure results: experiments/latent-structure-results.md
-      - Visual examples: experiments/visual-examples.md
-      - HPC & multi-GPU: experiments/hpc.md
-  - Reference:
-      - Project map: reference/index.md
-      - Adding models, datasets, and metrics: reference/adding-components.md
-      - Configuration reference: reference/configuration.md
-      - Commands & environment: reference/commands.md
+      - Models and checkpoints: models/index.md
+      - Field U-Net: models/era5-residual.md
+      - Joint field and latent MLP: models/bottleneck-unet-mlp.md
+      - Post-hoc correction: models/intensity-correction.md
+      - Six-hour forecast: models/intensity-forecast.md
+  - Usage:
+      - Training and checkpoints: experiments/training.md
+      - Evaluation: experiments/evaluation.md
+      - Commands: reference/commands.md
       - Troubleshooting: reference/troubleshooting.md
-      - Glossary: reference/glossary.md
-  - StormSense: explorer.md
+      - Code map: reference/index.md
+  - StormSense:
+      - Viewer guide: explorer.md
+      - Observation manifest: data/storm-manifest.md
+
+# Keep local, ignored research renders out of documentation builds.
+exclude_docs: |
+  assets/images/*.gif
+  assets/images/final-results/category-4-5-triptychs/
 
 plugins:
   - search:

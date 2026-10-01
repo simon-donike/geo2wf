@@ -6,7 +6,7 @@ and `EP182023`, plus IBTrACS intensity, sparse SAR matches, and paths to image
 overlays. Model predictions remain available in the dashboard and source JSON,
 but are intentionally excluded from the CSV.
 
-[Browse the full training corpus](full-dataset.md){ .md-button .md-button--primary }
+[Browse the scientific dataset](index.md){ .md-button .md-button--primary }
 
 [Download the case-study CSV](../explorer/storm-data.csv){ .md-button download }
 [View the source JSON](../explorer/storm-data.json){ .md-button }

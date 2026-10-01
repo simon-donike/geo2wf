@@ -1,117 +1,88 @@
-# Dataset contract
+# Local data layout and tensors
 
-Datasets return tensor-oriented samples described by `WindFieldBatch`. The
-canonical collator stacks tensors and identifiers but keeps
-metadata as one mapping per sample.
+The current loaders read local raster exports or task-specific caches. The
+[Hugging Face release](index.md) stores scientific assets in a catalog layout;
+its root is not interchangeable with the export root below. Use the original
+export manifests with their referenced files, or the release-specific tooling
+documented on the Hub to obtain a compatible view.
 
-## Required sample fields
-
-| Key | Sample shape | Batched shape | Meaning |
-|---|---|---|---|
-| `condition` | `[C,H,W]` | `[B,C,H,W]` | normalized GEO and optional normalized context/features |
-| `condition_mask` | `[1,H,W]` | `[B,1,H,W]` | valid condition/context pixels |
-| `target` | `[T,H,W]` | `[B,T,H,W]` | normalized target |
-| `target_physical` | `[T,H,W]` | `[B,T,H,W]` | target in source units |
-| `target_mask` | `[1,H,W]` | `[B,1,H,W]` | observed target pixels |
-| `target_norm_offset` | broadcastable | batched | affine inverse-normalization offset |
-| `target_norm_scale` | broadcastable | batched | affine inverse-normalization scale |
-| `condition_bounds` | `[4]` | `[B,4]` | left, right, bottom, top |
-| `target_bounds` | `[4]` | `[B,4]` | left, right, bottom, top |
-| `center` | `[2]` | `[B,2]` | IBTrACS latitude/longitude for diagnostics |
-| `sample_id` | string | `list[str]` | stable sample identifier |
-| `meta` | mapping | `list[SampleMetadata]` | source/sensor/time/channel provenance |
-
-`validate_batch()` checks required keys and tensor types at the shared model
-boundary. Dataset-specific tests remain responsible for shapes, dtypes, finite
-values, mask alignment, and normalization equivalence.
-
-## Optional companions
-
-| Companion | Fields |
-|---|---|
-| ERA5 baseline | `era5_wind_speed`, `era5_wind_speed_physical`, `era5_wind_speed_mask` |
-| PMW | `pmw`, `pmw_physical`, `pmw_mask`, `pmw_bounds` |
-| IBTrACS | per-sample `ibtracs` mappings |
-
-Rows are filtered as needed so all samples in a loader have a consistent set of
-tensor keys. PMW can remain separate or be appended as configured; the base
-GEO/ERA5 mask is not intersected with partial PMW coverage.
-
-## Canonical collation
-
-```python
-from torch.utils.data import DataLoader
-from geo2wf.data.collation import collate_wind_field_samples
-
-loader = DataLoader(dataset, collate_fn=collate_wind_field_samples)
-```
-
-Default PyTorch collation transposes nested metadata into a mapping of batched
-values. The canonical collator instead returns `batch["meta"]` and optional
-`batch["ibtracs"]` as sample-oriented lists, preserving mixed strings and
-numbers without changing tensor batching.
-
-## `DataSpec`
-
-Every data module exposes capabilities before training:
-
-```python
-DataSpec(
-    condition_channels=("CMI_C07", "..."),
-    target_channels=("wind_speed",),
-    spatial_shape=(192, 192),
-    target_units="m s-1",
-    companions=frozenset({"era5_wind_speed"}),
-)
-```
-
-Models validate this object before the first training or inference batch. The
-ordered names, rather than only the channel count, make resolved configs and mismatch
-errors interpretable. Models with extra requirements should override
-`validate_data_spec()`.
-
-## Runtime transform order
-
-```mermaid
-graph TD
-  A[Select manifest rows] --> B[Read rasters + masks]
-  B --> C[Derive ERA5 / geometry / solar features]
-  C --> D[Capture physical target and baselines]
-  D --> E[Normalize by train statistics]
-  E --> F[Replace non-finite values and apply masks]
-  F --> G[Crop / resize aligned tensors]
-  G --> H[Physics-aware paired augmentation]
-  H --> I[Return WindFieldBatch sample]
-  I --> J[Canonical collation]
-```
-
-Raw-data storm inference and exported-raster loading use the same normalization
-and feature functions wherever their inputs overlap.
-
-## Condition mask and channel arithmetic
-
-The mask is not included in `batch["condition"]`. Models append it internally
-when required. For the common10 + ERA5 dataset:
+## Paired raster export
 
 ```text
-10 GEO + 9 ERA5 + distance + 3 solar = 23 data condition channels
+paired/
+├── stats.json
+├── train/
+│   ├── manifest.csv
+│   └── ... GeoTIFFs referenced by the manifest
+├── val/
+│   ├── manifest.csv
+│   └── ...
+└── test/
+    ├── manifest.csv
+    └── ...
 ```
 
-The ERA5-residual model appends its condition mask, explicit ERA5 wind, and
-ERA5 mask, producing 26 U-Net input channels. See each model page instead of
-inferring one family's internal width from another.
+Manifests identify GEO conditions, SAR targets, optional ERA5/PMW companions,
+source times, and IBTrACS centers. The loader accepts generic
+`condition_path`/`target_path` and compatible `geo_path`/`sar_path` columns.
+GeoTIFFs preserve raw values, band descriptions, CRS, bounds, and validity.
+Set `data.root` and `data.stats_file` to the matching export and statistics.
+Joint scalar training additionally needs `data.ibtracs_file`.
 
-## Split behavior
+## Returned sample
 
-Modular data configs default to `include_test_in_train: false`. Some historical
-full-YAML research presets intentionally use `true`; those runs must not report
-their test metrics as held-out generalization. Validation ordering remains
-storm-stratified so bounded validation samples storms rather than a raw manifest
-prefix.
+| Key | Per-sample shape | Meaning |
+|---|---|---|
+| `condition` | `[C,H,W]` | Normalized GEO and configured context/features |
+| `condition_mask` | `[1,H,W]` | Valid condition/context pixels |
+| `target`, `target_physical` | `[T,H,W]` | Normalized target and original physical values |
+| `target_mask` | `[1,H,W]` | Observed target footprint |
+| `target_norm_offset`, `target_norm_scale` | Broadcastable | Inverse-normalization parameters |
+| `condition_bounds`, `target_bounds` | `[4]` | Left, right, bottom, top |
+| `center` | `[2]` | IBTrACS latitude/longitude |
+| `sample_id`, `meta` | String, mapping | Identity and source provenance |
 
-## Center metadata
+ERA5 adds normalized/physical `era5_wind_speed` tensors and an
+`era5_wind_speed_mask`. Optional PMW supplies `pmw`, `pmw_physical`, `pmw_mask`,
+and `pmw_bounds`. The canonical `collate_wind_field_samples` stacks tensors
+with a batch dimension while retaining metadata as one mapping per sample.
 
-`center` and `target_bounds` define the coordinate frame for storm diagnostics.
-The center comes from `ibtracs_center_lat`/`ibtracs_center_lon`, not the raster
-crop center. Neither scalar is directly concatenated as a model condition; the
-derived distance raster is the model input.
+`DataSpec` exposes ordered channels, units, spatial shape, and companions before
+training, so the model can reject incompatible inputs. For the default paired
+configuration:
+
+```text
+10 GEO + 9 ERA5 + distance + 3 solar = 23 condition channels
+ERA5-residual U-Net: 23 + condition mask + ERA5 wind + ERA5 mask = 26 inputs
+```
+
+The mask is appended inside the model, not counted in `condition_channels`.
+
+## Normalization and masks
+
+Statistics come from valid training pixels only. The default grouped presets
+use robust z-score normalization for conditions (median/IQR scale, clipped at
+4 and mapped to [0,1]) and min–max normalization for SAR targets. Preserve the
+statistics used by the checkpoint; do not recompute them on evaluation data.
+
+The loader retains physical targets and the affine inverse mapping
+\(x = z\,\mathrm{scale} + \mathrm{offset}\). Losses and wind metrics use physical
+units. Invalid values are zero-filled after normalization and masked, so
+missing pixels are not zero-wind labels. `target_mask` limits SAR supervision;
+`era5_wind_speed_mask` separately limits the ERA5 anchor and comparisons.
+
+Aligned rasters are cropped together. Flips also transform ERA5 vector
+components and vorticity according to their physical parity. The storm center
+comes from IBTrACS metadata, which can differ from the raster crop center.
+
+## Splits and scalar caches
+
+Current grouped configs use `include_test_in_train: false`. Keep storms
+disjoint and inspect a historical checkpoint's actual training membership.
+`require_era5` filters availability; `use_era5` controls model inputs. Joint
+scalar datasets additionally apply target/center eligibility rules.
+
+[Correction](../models/intensity-correction.md) and
+[forecast](../models/intensity-forecast.md) datasets use split manifests and
+cache metadata instead of the paired-raster contract. Preserve the frozen
+producer hashes, target definitions, and feature scaler with each cache.

@@ -1,175 +1,104 @@
-# Published results
+# Paper results
 
-These tables summarize the conference paper results.
-The architecture table uses the original test set;
-the latent-supervision table uses each run’s validation cohort.
+The accepted paper studies whether shared spatial and scalar supervision
+improves tropical-cyclone intensity estimates. These tables retain its reported
+values, with the cohort distinctions preserved below. RI means an IBTrACS
+wind increase of at least 30 kt over the preceding 24 hours; it is an evaluation
+subset, not a separate training set.
 
 ## Architecture ablation
 
-Maximum-wind MAE in m s⁻¹.
+Maximum-wind MAE in m/s on the original architecture test cohort (paper Table 1a).
 
 | Model | ERA5 | All | RI |
 |---|:---:|---:|---:|
-| Field diagnostic | Yes | 6.446 | 14.475 |
-| Post-hoc MLP | Yes | 5.529 | 10.512 |
-| Joint latent MLP | Yes | 7.302 | 7.716 |
-| Field diagnostic | No | 7.518 | 17.859 |
+| Field U-Net diagnostic | No | 7.518 | 17.859 |
 | Post-hoc MLP | No | 6.715 | 12.507 |
-| Joint latent MLP | No | 5.885 | 8.934 |
+| Joint latent MLP | No | **5.885** | **8.934** |
+| Field U-Net diagnostic | Yes | 6.446 | 14.475 |
+| Post-hoc MLP | Yes | **5.529** | 10.512 |
+| Joint latent MLP | Yes | 7.302 | **7.716** |
+
+Without ERA5, the joint model improves on both alternatives, especially during
+RI. ERA5 improves the field-only and post-hoc models and the joint model's RI
+error, but worsens the joint model's all-observation error. Its benefit depends
+on the architecture and regime.
 
 ## Latent-supervision ablation
 
-Maximum-wind MAE in m s⁻¹; RMW MAE in km. Dashes indicate no scalar radius head.
+Maximum-wind MAE in m/s and RMW MAE in km. RMW is the paper's radius of maximum
+wind, also called Rmax. Dashes mean no scalar radius head. The four no-ERA5
+rows correspond to paper Table 1b; the ERA5 rows retain the companion comparison.
 
-| ERA5 | SAR | Radius supervision | Wind All | Wind RI | RMW All | RMW RI |
+| ERA5 | SAR supervision | Radius supervision | Wind All | Wind RI | RMW All | RMW RI |
 |:---:|:---:|:---:|---:|---:|---:|---:|
-| Yes | Yes | No | 5.795 | 8.128 | -- | -- |
-| Yes | Yes | Yes | 5.859 | 7.316 | 19.51 | 13.78 |
-| Yes | No | No | 5.446 | 6.555 | -- | -- |
-| Yes | No | Yes | 5.688 | 6.904 | 20.71 | 16.27 |
-| No | Yes | No | 6.694 | 6.867 | -- | -- |
-| No | Yes | Yes | 6.344 | 5.469 | 18.24 | 11.18 |
-| No | No | No | 6.828 | 6.645 | -- | -- |
+| No | Yes | No | 6.694 | 6.867 | — | — |
 | No | No | Yes | 6.297 | 7.198 | 19.44 | 13.14 |
+| No | No | No | 6.828 | 6.645 | — | — |
+| No | Yes | Yes | 6.344 | **5.469** | 18.24 | **11.18** |
+| Yes | Yes | No | 5.795 | 8.128 | — | — |
+| Yes | Yes | Yes | 5.859 | 7.316 | 19.51 | 13.78 |
+| Yes | No | No | 5.446 | 6.555 | — | — |
+| Yes | No | Yes | 5.688 | 6.904 | 20.71 | 16.27 |
 
-## Additional validation diagnostics
+Adding SAR reconstruction to the GEO-only radius-supervised model reduces RI
+wind MAE from 7.198 to 5.469 m/s and RI RMW MAE from 13.14 to 11.18 km.
+SAR supervision alone does not improve RI intensity in the wind-only control.
+This supports the paper's argument that the spatial and scalar objectives
+are complementary.
 
-The original detailed validation diagnostics follow. They are distinct from
-the architecture test table above.
+!!! note "Cohort provenance"
+    The supplied paper captions Table 1b as a reduced test set with SAR-valid
+    centers. The retained reports and the [Hugging Face release](https://huggingface.co/datasets/simon-donike/geo2wf-data#scientific-scope-and-limitations)
+    identify these latent-ablation values as **validation** results. They are
+    kept distinct from the architecture test table. Use the release's
+    effective-cohort and training-membership records for reproduction; there
+    is no common split covering every published artifact.
 
-## Current validation matrix
+## Complete-storm case studies
 
-Maximum-wind targets are interpolated IBTrACS USA_WIND values. RI is
-defined as an increase of at least 30 kt during the preceding 24 hours.
-The configured validation cohorts are used exactly as trained; ERA5-required
-runs exclude observations without valid matched ERA5, so cross-regime rankings
-are descriptive rather than strictly paired.
+Humberto 2025, Kiko 2025, and Otis 2023 provide 3,266 valid observations,
+including 466 RI observations. Each prediction is an independent instantaneous
+nowcast. The joint model here uses SAR and radius supervision with no ERA5
+input. These dense storm diagnostics are separate from the paired test table.
 
-### Maximum wind
+| Model / reference | All MAE (m/s) | RI MAE (m/s) |
+|---|---:|---:|
+| GEO-only field U-Net | 9.197 | 12.203 |
+| GEO-only latent MLP, SAR + radii | **7.434** | **5.441** |
+| ERA5 10 m wind maximum | 22.119 | 40.550 |
 
-All wind errors are in m s⁻¹.
+![Complete-storm GEO-only nowcasts](assets/images/final-results/current-three-storm-compact-nowcasts.png)
 
-| Experiment | ERA5 | SAR | Radii supervision | All MAE | All RMSE | RI MAE | RI RMSE |
-|---|:---:|:---:|---|---:|---:|---:|---:|
-| U-Net + standard MLP · image radii | With | Yes | 2D image | 7.001 | 8.697 | 10.239 | 12.228 |
-| U-Net + standard MLP · MLP radii | With | Yes | MLP head | 7.264 | 9.026 | 11.044 | 12.957 |
-| Latent MLP · SAR · wind only | With | Yes | None | 5.795 | 7.723 | 8.128 | 9.958 |
-| Latent MLP · SAR · wind + radii | With | Yes | MLP head | 5.859 | 7.662 | 7.316 | 8.879 |
-| Latent MLP · no SAR · wind only | With | No | None | 5.446 | 6.889 | 6.555 | 7.210 |
-| Latent MLP · no SAR · wind + radii | With | No | MLP head | 5.688 | 6.845 | 6.904 | 7.454 |
-| Latent MLP · SAR · wind only | Without | Yes | None | 6.694 | 9.099 | 6.867 | 9.394 |
-| Latent MLP · SAR · wind + radii | Without | Yes | MLP head | 6.344 | 8.519 | 5.469 | 7.469 |
-| Latent MLP · no SAR · wind only | Without | No | None | 6.828 | 8.245 | 6.645 | 7.263 |
-| Latent MLP · no SAR · wind + radii | Without | No | MLP head | 6.297 | 7.779 | 7.198 | 7.634 |
+Curves use hourly means and a centered five-hour rolling mean; all metrics
+use unsmoothed native predictions. Shading marks RI. ERA5 is an external
+reference: maximum 10 m wind in the same 5.184° storm-centered crop at the
+nearest analysis time. Two invalid GEO observations are excluded consistently.
 
-[Download CSV](assets/data/final-results/current-validation-maximum-wind.csv){ .md-button .result-download download }
+[Download figure PDF](assets/images/final-results/current-three-storm-compact-nowcasts.pdf){ .md-button download }
+[Download full case-study metrics](assets/data/final-results/current-three-storm-metrics.csv){ .md-button download }
+[Open StormSense](explorer/dashboard.html){ .md-button }
 
-### Wind-field reconstruction
+## Wind-field reconstruction
 
-L1 is pooled valid-pixel MAE in m s⁻¹. PSNR uses the fixed 79.8 m s⁻¹
-physical range; SSIM is the scene mean over complete valid 7×7 windows.
-Encoder-only no-SAR models have no image output and are therefore omitted.
+![Validation wind-field reconstructions](assets/images/final-results/current-validation-windfields-batch-01.jpg)
 
-| Experiment | ERA5 | All L1 | All PSNR | All SSIM | RI L1 | RI PSNR | RI SSIM |
-|---|:---:|---:|---:|---:|---:|---:|---:|
-| U-Net + standard MLP · image radii | With | 2.410 | 26.975 | 0.833 | 2.448 | 26.820 | 0.819 |
-| U-Net + standard MLP · MLP radii | With | 2.410 | 26.975 | 0.833 | 2.448 | 26.820 | 0.819 |
-| Latent MLP · SAR · wind only | With | 2.565 | 26.604 | 0.840 | 2.675 | 26.395 | 0.818 |
-| Latent MLP · SAR · wind + radii | With | 2.402 | 27.139 | 0.840 | 2.494 | 26.630 | 0.816 |
-| Latent MLP · SAR · wind only | Without | 4.106 | 23.202 | 0.800 | 3.351 | 24.502 | 0.802 |
-| Latent MLP · SAR · wind + radii | Without | 3.864 | 23.831 | 0.811 | 3.506 | 24.643 | 0.806 |
+These validation examples use the SAR + ERA5 latent model with wind/radius
+supervision. The orange footprint marks observed SAR; the red cross is the
+IBTrACS center. Predictions extend beyond the swath, where they are conditional
+estimates rather than verified wind observations. The field is smoother than
+the SAR reference, so scalar skill should be read alongside spatial diagnostics.
 
-[Download CSV](assets/data/final-results/current-validation-image-reconstruction.csv){ .md-button .result-download download }
+## Detailed reports
 
-#### Held-out reconstruction examples
+The retained exports provide additional diagnostics without repeating every
+matrix here:
 
-Four validation observations from the selected SAR + ERA5 latent-MLP model
-with wind-and-radii supervision are shown below. Predictions are complete 2D
-wind-speed fields; SAR targets are only observed inside the orange footprint,
-so the unobserved part of each prediction is a conditional reconstruction.
-The red cross marks the interpolated IBTrACS storm centre.
+- [Validation maximum wind](assets/data/final-results/current-validation-maximum-wind.csv)
+- [Validation field reconstruction](assets/data/final-results/current-validation-image-reconstruction.csv)
+- [Validation radii, including direct-head and image-derived estimates](assets/data/final-results/current-validation-radii.csv)
+- [Full validation report](assets/data/final-results/current-validation-results.json)
+- [Native three-storm predictions](assets/data/final-results/current-three-storm-predictions.csv.gz)
 
-[![Held-out 2D wind-field reconstructions](assets/images/final-results/current-validation-windfields-batch-01.jpg)](assets/images/final-results/current-validation-windfields-batch-01.jpg)
-
-### Wind radii
-
-The compact table reports all-validation MAE in km. The downloadable
-canonical table additionally contains RMSE, bias, RI-only values, and
-explicit not-applicable reasons for every experiment/metric combination.
-ERA5 identifies whether ERA5 fields were supplied as conditioning inputs;
-rows with the same experiment label but different ERA5 values are separate
-input-ablation runs, not repeated measurements.
-
-| Experiment | ERA5 | Radius source | RMW MAE | R34 MAE | R50 MAE | R64 MAE |
-|---|:---:|---|---:|---:|---:|---:|
-| U-Net + standard MLP · image radii | With | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
-| U-Net + standard MLP · MLP radii | With | Direct MLP head | 24.66 | 42.78 | 16.92 | 13.77 |
-| U-Net + standard MLP · MLP radii | With | Diagnosed from 2D image | 20.62 | 78.25 | 33.91 | 20.44 |
-| Latent MLP · SAR · wind only | With | Diagnosed from 2D image | 32.12 | 55.67 | 41.41 | 34.72 |
-| Latent MLP · SAR · wind + radii | With | Direct MLP head | 19.51 | 44.47 | 20.19 | 13.18 |
-| Latent MLP · SAR · wind + radii | With | Diagnosed from 2D image | 28.65 | 38.99 | 28.02 | 27.07 |
-| Latent MLP · no SAR · wind + radii | With | Direct MLP head | 20.71 | 42.82 | 20.39 | 12.99 |
-| Latent MLP · SAR · wind only | Without | Diagnosed from 2D image | 27.30 | 59.07 | 44.77 | 32.95 |
-| Latent MLP · SAR · wind + radii | Without | Direct MLP head | 18.24 | 65.82 | 28.14 | 15.33 |
-| Latent MLP · SAR · wind + radii | Without | Diagnosed from 2D image | 24.02 | 58.62 | 42.51 | 29.64 |
-| Latent MLP · no SAR · wind + radii | Without | Direct MLP head | 19.44 | 56.73 | 25.89 | 13.47 |
-
-[Download CSV](assets/data/final-results/current-validation-radii.csv){ .md-button .result-download download }
-
-## Complete-storm nowcasts
-
-Humberto 2025, Kiko 2025, and Otis 2023 are dense validation-storm
-case studies. Each value is an independent instantaneous nowcast from one
-GEO observation. Figures show hourly means followed by a centred
-3-hour rolling mean; every metric below uses all valid,
-unsmoothed native observations. Shaded intervals are RI phases.
-
-The ERA5 line is the maximum native 10 m wind speed within the same
-5.184° storm-centred crop used by the models at the
-nearest ERA5 analysis time. It is an external reanalysis reference in the
-without-ERA5 panels, not an input to those models.
-
-### Core field and scalar architectures
-
-![Core field and scalar architectures](assets/images/final-results/current-three-storm-core-nowcasts.png)
-
-[Download CSV](assets/data/final-results/current-three-storm-core-nowcasts.csv){ .md-button .result-download download }
-
-### SAR/no-SAR and ERA5/no-ERA5 latent-MLP matrix
-
-![SAR/no-SAR and ERA5/no-ERA5 latent-MLP matrix](assets/images/final-results/current-three-storm-latent-nowcasts.png)
-
-[Download CSV](assets/data/final-results/current-three-storm-latent-nowcasts.csv){ .md-button .result-download download }
-
-### Radii-supervised correction and latent experiments
-
-![Radii-supervised correction and latent experiments](assets/images/final-results/current-three-storm-radii-nowcasts.png)
-
-[Download CSV](assets/data/final-results/current-three-storm-radii-nowcasts.csv){ .md-button .result-download download }
-
-### Dense three-storm metrics
-
-Wind errors are in m s⁻¹. The two invalid GEO observations are excluded
-consistently from every model series and the ERA5 reference.
-
-| Model | Conditioning | All n | MAE | RMSE | Bias | RI n | RI MAE | RI RMSE |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| Raw field U-Net | With ERA5 | 3266 | 9.066 | 12.026 | -6.560 | 466 | 15.542 | 18.403 |
-| U-Net + standard MLP | With ERA5 | 3266 | 7.609 | 10.453 | -4.561 | 466 | 13.401 | 16.614 |
-| Joint U-Net + latent MLP | With ERA5 | 3266 | 8.402 | 10.509 | -0.387 | 466 | 11.912 | 14.271 |
-| Standard MLP · image radii | With ERA5 | 3266 | 9.135 | 12.147 | -6.781 | 466 | 15.741 | 18.587 |
-| Standard MLP · MLP radii | With ERA5 | 3266 | 9.405 | 12.507 | -7.320 | 466 | 16.263 | 19.057 |
-| Latent MLP · SAR · wind only | With ERA5 | 3266 | 7.325 | 9.638 | -3.688 | 466 | 11.049 | 13.926 |
-| Latent MLP · SAR · wind + radii | With ERA5 | 3266 | 6.413 | 8.502 | -0.197 | 466 | 10.103 | 13.098 |
-| Latent MLP · no SAR · wind only | With ERA5 | 3266 | 7.421 | 10.001 | -2.269 | 466 | 9.361 | 12.700 |
-| Latent MLP · no SAR · wind + radii | With ERA5 | 3266 | 7.370 | 9.935 | -3.112 | 466 | 12.367 | 15.572 |
-| Raw field U-Net | Without ERA5 | 3266 | 9.197 | 11.444 | -4.961 | 466 | 12.203 | 14.333 |
-| U-Net + standard MLP | Without ERA5 | 3266 | 7.383 | 9.439 | -1.465 | 466 | 7.760 | 10.082 |
-| Joint U-Net + latent MLP | Without ERA5 | 3266 | 7.191 | 9.229 | -0.316 | 466 | 5.021 | 6.690 |
-| Latent MLP · SAR · wind only | Without ERA5 | 3266 | 7.909 | 10.237 | -2.140 | 466 | 6.982 | 9.606 |
-| Latent MLP · SAR · wind + radii | Without ERA5 | 3266 | 7.434 | 9.331 | 1.289 | 466 | 5.441 | 7.602 |
-| Latent MLP · no SAR · wind only | Without ERA5 | 3266 | 7.484 | 9.301 | 0.029 | 466 | 5.807 | 7.782 |
-| Latent MLP · no SAR · wind + radii | Without ERA5 | 3266 | 7.039 | 9.330 | 0.443 | 466 | 6.044 | 8.560 |
-| ERA5 10 m maximum | Reanalysis reference | 3266 | 22.119 | 27.208 | -22.117 | 466 | 40.550 | 41.657 |
-
-[Download CSV](assets/data/final-results/current-three-storm-metrics.csv){ .md-button .result-download download }
+See [evaluation](experiments/evaluation.md) for masks, units, and aggregation,
+and [paper reasoning](concepts/problem.md) for interpretation and limitations.

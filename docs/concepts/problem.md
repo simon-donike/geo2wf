@@ -1,124 +1,102 @@
-# Scientific problem and observations
+# Paper reasoning and methods
 
-geo2wf estimates tropical-cyclone surface wind fields from colocated
-geostationary imagery and environmental context, using sparse synthetic-aperture
-radar (SAR) wind retrievals as supervision. This is an **instantaneous
-reconstruction** problem: it estimates conditions near the observation time. It
-is not a track forecast. The separate scalar forecast model is described under
-[Six-hour intensity forecast](../models/intensity-forecast.md).
+The accepted paper, *Nowcasting of Tropical Cyclone Wind Fields and Intensity
+from Geostationary Imagery*, studies a practical question: can learning a
+spatial surface-wind field improve estimates of tropical-cyclone intensity and
+size, particularly during rapid intensification (RI)?
 
-## Why the inverse problem is difficult
+## Why predict the field as well as intensity?
 
-GEO and SAR do not observe the same physical quantity. GOES ABI and Himawari
-AHI measure radiation in infrared and water-vapor bands. Those measurements
-describe cloud-top temperature, moisture, and atmospheric structure; they do
-not measure surface wind directly. Different surface-wind fields can produce
-similar cloud patterns, and cloud structure also depends on shear, moisture,
-storm motion, and the stage of the cyclone lifecycle. The mapping from GEO to
-surface wind is therefore non-unique.
+Maximum sustained wind alone does not describe a storm's spatial extent or
+integrated wind hazard. SAR wind retrievals resolve fine surface structure but
+sample only occasional swaths. GOES and Himawari observe cloud structure
+frequently, yet their infrared brightness temperatures do not directly measure
+surface wind. Different surface winds can produce similar cloud patterns.
 
-SAR supplies a much closer view of the target quantity, but its wind product is
-also a retrieval rather than direct truth. Ocean-surface roughness changes the
-radar backscatter, and a geophysical model function converts that signal to wind
-speed. Retrieval quality depends on polarization, incidence angle, ancillary
-information, rain, sea state, and the high-wind response. SAR also samples only
-an occasional swath. The [NOAA tropical SAR technical
-description](https://www.star.nesdis.noaa.gov/socd/mecb/sar/tropical_gmf_tech_doc.php)
-explains this backscatter-to-wind inversion.
+The paper uses sparse SAR supervision to teach spatial structure to an encoder
+that also predicts best-track intensity and radii. At inference, the model
+needs GEO imagery, storm-center and time context, and optionally ERA5. It does
+not need a new SAR acquisition.
 
-ERA5 is a physically consistent reanalysis: it combines a forecast model and
-assimilated observations into a complete atmospheric estimate. It is useful as
-large-scale context and as a dense wind anchor, but it is neither an independent
-surface observation nor ground truth. See the [ECMWF ERA5 dataset
-description](https://www.ecmwf.int/en/forecasts/datasets/era5-hourly-data-single-levels-1940-present).
+## Observations and supervision
 
-IBTrACS provides retrospective best-track storm centers and scalar intensity.
-It merges agency records without converting every wind estimate to a single
-averaging period, so scalar models deliberately use the documented
-`USA_WIND`/`USA_SSHS` contract rather than mixing agencies. The [NOAA IBTrACS
-product page](https://www.ncei.noaa.gov/products/international-best-track-archive)
-describes that provenance.
+| Source | Role |
+|---|---|
+| GOES ABI / Himawari AHI | Ten GEO bands, harmonized by band number, provide cloud and moisture information. |
+| CyclObs SAR retrievals | Surface wind-speed fields supervise reconstruction inside the observed swath. |
+| IBTrACS | Best-track centers, US-agency maximum wind, RMW, and wind radii supply geometry and scalar references. |
+| ERA5 | Optional environmental context and a dense wind anchor for the residual model. |
 
-## Aligned learning problem
+Four deterministic channels encode distance to the storm center, local-solar-time
+sine and cosine, and solar zenith angle. This gives 14 condition channels
+without ERA5 and 23 with its nine source/derived fields, before model-specific
+masks and helpers. The current raster loader uses 256 × 256 exports and
+192 × 192 center crops. See the [dataset guide](../data/index.md) for the
+published release and its relationship to the paper cohorts.
 
-Each export is aligned to one 256 × 256 latitude–longitude grid in EPSG:4326;
-the principal grouped training configs take a 192 × 192 center crop:
+## Architecture comparisons
 
-- **GEO observation:** ten GOES ABI or Himawari AHI bands 7–16;
-- **ERA5 context:** seven exported atmospheric/surface fields plus derived
-  10 m wind speed and relative vorticity;
-- **derived context:** distance to the IBTrACS center and three solar-time
-  fields;
-- **SAR target:** one retrieved near-surface wind-speed channel in m/s; and
-- **validity masks:** explicit support for the condition, ERA5 anchor, and SAR
-  swath.
+1. **Field U-Net:** reconstruct a wind field, then diagnose maximum wind and
+   radii from that image. With ERA5, predict a physical residual around its
+   wind field; without ERA5, predict absolute wind.
+2. **Post-hoc MLP:** freeze the field model and learn an intensity correction
+   from its output field and current metadata.
+3. **Joint latent MLP:** share an encoder between the field decoder and an
+   MLP acting on pooled latent features. Both spatial and scalar objectives
+   update the representation.
+4. **Encoder-only control:** remove the field decoder and SAR loss to test
+   what spatial supervision contributes to scalar prediction.
 
-The 0.027° pixels are not equal-area. East–west distance changes with latitude,
-so storm metrics use raster bounds and a local physical coordinate conversion
-instead of treating degrees as kilometres. See [Model inputs and training
-targets](../data/index.md) for real examples and exact channel assembly.
+```mermaid
+flowchart LR
+  X[GEO + deterministic context + optional ERA5] --> E[Shared encoder]
+  E --> D[U-Net decoder]
+  D --> F[Surface wind field]
+  E --> P[Mean and max pooling]
+  P --> M[Latent MLP]
+  M --> S[Maximum wind and optional radii]
+```
 
-## ERA5-residual formulation
-
-The maintained field model estimates a deterministic physical reconstruction:
+The joint objective combines field and intensity Huber losses, plus an optional
+masked radius term:
 
 \[
-\hat v =
-v_{\mathrm{ERA5}} + f_\theta(x_{\mathrm{GEO}}, x_{\mathrm{ERA5}}, x_{\mathrm{derived}}, m)
+L = w_f L_{\mathrm{field}} + w_v L_{V_{\max}} + w_r L_{\mathrm{radii}}.
 \]
 
-This keeps the large-scale ERA5 structure explicit while allowing GEO and
-derived context to correct it toward the SAR-supervised field. The formulation
-does not remove the ambiguity of the inverse problem; the output is a single
-conditional estimate. [Read the field-model details.](../models/era5-residual.md)
+The retained joint presets use unit field/intensity weights and a radius
+weight of 0.25 when enabled. Huber transitions are 2 m/s for fields, 5 m/s
+for intensity, and 20 km for radii. Missing pixels and scalar labels are masked
+independently. The [field-only model](../models/era5-residual.md) additionally
+uses high-wind weighting and a peak term; the [joint model guide](../models/bottleneck-unet-mlp.md)
+describes its implemented objective.
 
-## Scientific constraints reflected in code
+## What the evidence supports
 
-Sparse and imperfect supervision
-: Losses and metrics use `target_mask`. A weak off-swath anchor can constrain
-  corrections where ERA5 is valid without relabeling those pixels as SAR. SAR
-  is treated as the supervised reference inside its footprint, not as an
-  uncertainty-free measurement.
+The [results](../results.md) show that the GEO-only latent model improves
+maximum-wind estimates over the field diagnostic and post-hoc correction in
+the architecture comparison. Joint SAR and radius supervision is especially
+useful during RI. ERA5 helps some configurations, but does not consistently
+improve the joint model. This motivates observation-driven inference without
+waiting for a reanalysis product.
 
-Physical scale
-: The dataset retains `target_physical` and reversible normalization
-  parameters. The field model predicts in m/s.
-
-Storm geometry
-: Manifests carry IBTrACS center coordinates and raster bounds. The dataset
-  derives a distance input, while evaluation converts the grid to local
-  physical distances for eye, inner-core, radial-profile, and
-  radius-of-maximum-wind metrics.
-
-Solar context
-: Pixelwise local-solar-time sine/cosine and solar zenith represent the
-  diurnal cycle and help disambiguate the daytime reflected component of Band
-  7. Most selected channels are thermal infrared, so these features should not
-  be interpreted as a generic daylight correction for every band. NOAA lists
-  the [ABI band wavelengths and purposes](https://www.goes.noaa.gov/abispectralattributes.php)
-  and notes Band 7's reflected daytime component in its [band quick
-  guide](https://goes-r.noaa.gov/mission/ABI-bands-quick-info.html).
-
-Vector-aware augmentation
-: Flips transform ERA5 wind components and vorticity according to their
-  physical parity instead of treating every channel as a generic scalar image.
+The paper favors compact, interpretable comparisons given limited, unevenly
+sampled training data. More extensive channel ablations, hyperparameter tuning,
+and prospective evaluation remain future work.
 
 ## Interpretation and limits
 
-- Report reconstruction skill only on the observed SAR footprint and against
-  the exact baseline used by the model.
-- Do not interpret a visually plausible unobserved region as independently
-  verified wind. The off-swath field is constrained by context and
-  regularization, not by SAR loss.
-- Validation and test splits are storm-disjoint in current modular configs,
-  but nearby samples within one storm are temporally correlated. Storm-level
-  aggregation is therefore important.
-- SAR-derived peak wind, IBTrACS best-track intensity, and the maximum of a
-  reconstructed grid are related but not interchangeable quantities.
-- The current reconstruction models consume a single colocated time, not a
-  temporal image window. The current system does not represent arbitrary
-  heterogeneous observation sets, learned availability policies, or complete
-  tracks as field-model inputs.
+SAR wind is a retrieval from radar backscatter, with rain, sea-state, and
+high-wind calibration limitations. ERA5 is a reanalysis, not an independent
+surface observation. IBTrACS is retrospective and mixes agency conventions;
+scalar workflows use the documented `USA_WIND` contract. See the
+[IBTrACS product description](https://www.ncei.noaa.gov/products/international-best-track-archive)
+and [SAR retrieval description](https://www.star.nesdis.noaa.gov/socd/mecb/sar/tropical_gmf_tech_doc.php).
 
-Source download is outside `prepare_data()`; export is an explicit preprocessing
-step.
+A plausible field outside the SAR footprint is a conditional reconstruction,
+not an independently verified measurement. Field maxima, SAR peaks, and
+best-track sustained winds are related but different quantities. Nearby
+observations within a storm are correlated, and each reported experiment must
+retain its actual cohort and split provenance. Near-real-time use also requires
+an available storm center and evaluation with real-time inputs in place of
+retrospective best-track information.

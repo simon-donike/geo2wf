@@ -6,70 +6,43 @@ hide:
 <div class="geo-intro" markdown>
 <span class="geo-eyebrow">Tropical-cyclone wind reconstruction</span>
 
-# Tropical-cyclone wind reconstruction
+# Wind fields and intensity from geostationary imagery
 
-geo2wf reconstructs surface wind fields from geostationary satellite imagery
-and optional ERA5 context. Its maintained field model predicts a deterministic
-physical correction around ERA5; separate models estimate current intensity
-and short-range scalar intensity change.
+geo2wf estimates tropical-cyclone surface wind fields, maximum sustained wind,
+and wind radii from geostationary satellite imagery. These are the companion
+docs for the accepted paper *Nowcasting of Tropical Cyclone Wind Fields and
+Intensity from Geostationary Imagery*.
+
+The paper asks whether learning spatial wind structure helps estimate storm
+intensity, especially during rapid intensification. A shared U-Net encoder
+supports both SAR-supervised field reconstruction and a latent MLP for scalar
+intensity and radii. SAR is needed for training supervision; inference uses
+GEO imagery and deterministic context, with ERA5 as an optional input.
 
 <div class="geo-actions" markdown>
-[Understand the field model](models/era5-residual.md){ .md-button .md-button--primary }
-[See current results](results.md){ .md-button }
-[Understand the scientific problem](concepts/problem.md){ .md-button }
-[Understand the data](data/index.md){ .md-button }
+[Paper reasoning](concepts/problem.md){ .md-button .md-button--primary }
+[Results](results.md){ .md-button }
+[Dataset on Hugging Face](https://huggingface.co/datasets/simon-donike/geo2wf-data){ .md-button }
+[Models on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models){ .md-button }
 [Open StormSense](explorer/dashboard.html){ .md-button }
 </div>
 </div>
 
-## Reconstruction workflow
+## Use the project
 
-<div class="stage-flow">
-  <div class="stage-card">
-    <span class="geo-kicker">Field reconstruction</span>
-    <strong>ERA5-residual U-Net</strong>
-    <p>GEO, ERA5, storm-relative geometry, solar context, and validity masks produce one dense wind field.</p>
-    <code>baseline = ERA5 + learned correction</code>
-  </div>
-</div>
+- [Get started](getting-started/installation.md): install the package and locate data and model files.
+- [Dataset](data/index.md): understand the published catalog, inputs, targets, and local loading format.
+- [Models](models/index.md): choose a field model, joint model, scalar correction, or forecast.
+- [Train and evaluate](experiments/training.md): use the retained presets and checkpoint workflows.
 
-The U-Net learns where GEO and environmental context support corrections to the
-dense ERA5 wind anchor. [See its equations, objective, and input assembly.](models/era5-residual.md)
+[![GEO, ERA5, SAR, and mask example](assets/images/data-example-target.webp)](data/index.md)
 
-## What the models receive
-
-The default field configuration uses a 23-channel data condition:
-
-- 10 GEO infrared and water-vapor bands;
-- 9 ERA5 fields: seven exported variables plus derived 10 m wind speed and relative vorticity;
-- 1 normalized distance-to-IBTrACS-center raster; and
-- 3 solar-time fields.
-
-Validity masks and an explicit ERA5 wind anchor are appended by the model. SAR
-wind is the supervised target during training; it is not an inference-time input.
-
-[![Real GEO, ERA5, SAR, and mask example](assets/images/data-example-target.webp)](data/index.md)
-
-<p class="geo-caption">Real exported sample <code>WP232024_sar_geo_20241030095303_bb2c52ca</code>, rendered from the repository GeoTIFFs with Matplotlib. The data page shows every input family.</p>
-
-## Read by task
-
-<div class="quick-links">
-  <a class="quick-link" href="models/era5-residual/"><strong>Understand the field model</strong><span>The maintained ERA5-residual U-Net.</span></a>
-  <a class="quick-link" href="data/"><strong>Understand the inputs</strong><span>Real examples, channel lists, masks, and tensor assembly.</span></a>
-  <a class="quick-link" href="getting-started/first-experiment/"><strong>Run an experiment</strong><span>Export a small batch and launch a smoke run.</span></a>
-  <a class="quick-link" href="experiments/"><strong>Choose a preset</strong><span>Compare the stacked workflow with standalone controls.</span></a>
-  <a class="quick-link" href="experiments/evaluation/"><strong>Evaluate structure</strong><span>Physical error, eye, inner core, radial profile, and RMW.</span></a>
-  <a class="quick-link" href="reference/"><strong>Find a file or command</strong><span>Project map, configuration keys, and troubleshooting.</span></a>
-</div>
+<p class="geo-caption">An exported training example: ERA5 context, a sparse SAR wind retrieval, and its validity mask. Supervised field errors are measured only where SAR is observed.</p>
 
 ## Scope
 
-The principal wind-field models operate on paired rasters on a common grid and
-use a 192 × 192 center crop. They reconstruct the observation time; they do not
-forecast a future wind field. Separate scalar models estimate current intensity
-and a six-hour intensity change, with an optional recursive +12 h diagnostic.
-The repository does not implement joint track and wind-field forecasting or
-arbitrary observation-set models.
-
-Start with [the field model](models/era5-residual.md), then follow the [data inputs](data/index.md) into [training](experiments/training.md) and [evaluation](experiments/evaluation.md).
+Field models reconstruct the observation time. The separate scalar forecast
+predicts six-hour intensity change. [StormSense](explorer.md) provides
+retrospective case studies of Humberto, Kiko, and Otis. The
+[paper discussion](concepts/problem.md) explains the observational limits and
+why this is a research workflow rather than a validated operational product.

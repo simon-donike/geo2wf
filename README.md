@@ -4,7 +4,8 @@ Reconstruct tropical-cyclone surface wind fields and estimate intensity from
 geostationary satellite imagery, with optional ERA5 inputs and SAR supervision.
 
 [Documentation](https://tcd.hyperalis.com/) ·
-[Data guide](docs/data/index.md) ·
+[Dataset on Hugging Face](https://huggingface.co/datasets/simon-donike/geo2wf-data) ·
+[Models on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models) ·
 [Model guide](docs/models/index.md) ·
 [StormSense](https://tcd.hyperalis.com/explorer/dashboard.html)
 
@@ -18,9 +19,10 @@ uv sync --frozen
 
 The repository includes data loaders, model implementations, and training
 presets. Observation rasters and checkpoint binaries are stored separately;
-point the commands below at your local data and model files.
+see the [model guide](docs/models/index.md#checkpoints) for release availability,
+then point the commands below at your local data and model files.
 See the [dataset layout](docs/data/dataset-contract.md) and
-[corpus manifest](docs/data/full-dataset.md) for the expected inputs.
+[dataset guide](docs/data/index.md) for the expected inputs.
 
 ## Use a trained model
 
@@ -32,7 +34,8 @@ uv run geo2wf-infer deterministic-residual \
   --checkpoint /path/to/model.ckpt
 ```
 
-Use `--help` for input/output options. Scalar intensity correction and forecasting
+See the [command reference](docs/reference/commands.md) for required data inputs
+and workflow-specific help. Scalar intensity correction and forecasting
 are available through `geo2wf-infer intensity-correction` and
 `geo2wf-infer intensity-forecast`.
 
@@ -47,7 +50,7 @@ WANDB_DISABLED=true uv run geo2wf-train \
 ```
 
 The [first experiment](docs/getting-started/first-experiment.md) walks through
-loading a batch and running a small training job. [Model presets](docs/experiments/intensity-comparison.md)
+loading a batch and running a small training job. [Model presets](docs/models/index.md#training-presets)
 cover field U-Nets, joint field/intensity models, and scalar heads.
 
 ## Repository
