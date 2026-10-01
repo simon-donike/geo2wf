@@ -1,93 +1,31 @@
-# Active experiment matrix
+# Model presets
 
-The completed experiment matrix uses one fixed, storm-disjoint cohort and keeps
-ERA5 conditioning as the only input-regime difference. Its held-out results are
-reported on the [final results page](../results.md).
+Choose a preset for the prediction you need. Each preset can be adapted with
+Hydra overrides for data paths, hardware, and training settings.
 
-Earlier exploratory benchmarks and their published artifacts remain
-[archived for provenance](../archived/results/intensity-comparison-results.md).
-
-## Three-model ERA5 comparison
-
-Each of the following models is trained and evaluated once with ERA5 inputs and
-once without them:
-
-| Model | Output used for intensity evaluation | With ERA5 | Without ERA5 |
-|---|---|---|---|
-| Raw field U-Net | maximum diagnosed from the predicted 2D wind field | `intensity_comparison_unet` | `intensity_comparison_unet_no_era5` |
-| U-Net + scalar correction | corrected maximum from a frozen U-Net field | ERA5 cache + `unet_intensity_correction` | no-ERA5 cache + `unet_intensity_correction` |
-| Joint U-Net + bottleneck MLP | 2D wind field plus MLP maximum wind | `bottleneck_unet_mlp` | `bottleneck_unet_mlp_no_era5` |
-
-The paired regimes must use identical sample IDs, storm splits, scalar targets,
-crop settings, and evaluation code. The no-ERA5 runs still require ERA5
-availability while selecting the cohort, but do not pass ERA5 values to the
-model. This isolates conditioning rather than changing data availability.
-
-## Three-storm maximum-wind nowcasts
-
-After checkpoint selection, every model is also run independently over all GEO
-observations for the protected validation storms Humberto 2025 (`AL082025`),
-Kiko 2025 (`EP112025`), and Otis 2023 (`EP182023`). These are longitudinal
-case studies, not held-out test estimates. The paper exporter verifies the
-ERA5/no-ERA5 cohorts, saves every native prediction, computes per-storm and
-combined errors, and draws all series in one three-panel figure.
-
-The optional maximum-wind-only and radii-supervised joint checkpoints add the
-two structure-ablation arms to the same figure.
-
-## Joint U-Net/latent-MLP structure experiment
-
-The separate structure study uses the joint U-Net + latent MLP so every model
-retains both the decoded 2D wind field and the bottleneck outputs. Two runs use
-the same strict ERA5-conditioned cohort, architecture, seed, and optimizer.
-This cohort requires a valid SAR pixel at the storm center and is smaller than
-the standard six-model cohort; comparisons are paired within the two structure
-arms, not across the two experiment families. Strict CUDA determinism is
-disabled in both because reflection-padding backward has no deterministic CUDA
-implementation:
+| Model | With ERA5 | Without ERA5 |
+|---|---|---|
+| Wind-field U-Net | `intensity_comparison_unet` | `intensity_comparison_unet_no_era5` |
+| Joint wind field and maximum wind | `bottleneck_unet_mlp` | `bottleneck_unet_mlp_no_era5` |
+| Joint wind field, maximum wind, and radii | `latent_mlp_sar_era5_max_wind_radii` | `latent_mlp_sar_no_era5_max_wind_radii` |
+| Scalar wind and radii without SAR supervision | `latent_mlp_no_sar_era5_max_wind_radii` | `latent_mlp_no_sar_no_era5_max_wind_radii` |
 
 ```bash
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind
-uv run geo2wf-train experiment=latent_mlp_sar_era5_max_wind_radii
+uv run geo2wf-train experiment=bottleneck_unet_mlp \
+  data.root=/path/to/geo_sar \
+  data.stats_file=/path/to/geo_sar/stats.json
 ```
 
-The maximum-wind baseline optimizes the field and scalar maximum-wind losses.
-The multi-task run additionally predicts RMW and equivalent-area R34, R50, and
-R64 with a masked latent-head loss weighted by `0.25`. Eye size is excluded
-from reporting because the frozen cohort contains no valid eye-size labels.
+The no-ERA5 presets retain the ERA5-available data filter used in the original
+experiments. Set `data.require_era5=false` to use observations without an ERA5
+companion when the model does not consume ERA5 inputs.
 
-Evaluation has three explicitly labeled output views:
+A post-hoc intensity head uses `experiment=unet_intensity_correction` and a
+cache of predictions from a frozen field model. See the
+[intensity correction guide](../models/intensity-correction.md).
+For six-hour scalar forecasts, use `experiment=intensity_forecast_pretrain`;
+see the [forecast guide](../models/intensity-forecast.md).
 
-1. maximum wind only;
-2. maximum wind plus radii predicted directly by the latent MLP head; and
-3. maximum wind plus radii diagnosed from the predicted 2D U-Net wind field.
-
-The radii comparison must report MLP-derived and image-derived values as
-different sources. It must not silently substitute one when the other is
-missing. Checkpoints are selected on validation data; the held-out test split
-is evaluated once after both runs finish.
-
-## Retained forecast
-
-The six-hour scalar intensity forecast remains active as a separate downstream
-experiment. It is not one of the three instantaneous reconstruction models and
-does not enter the ERA5/no-ERA5 matrix.
-
-```bash
-uv run geo2wf-train experiment=intensity_forecast_pretrain
-```
-
-## Comparison contract
-
-- Freeze one cohort before training any matrix cell.
-- Keep train, validation, and test storms disjoint.
-- Use the same scalar reference and field target in all six ERA5 matrix cells.
-- Select checkpoints from validation only; evaluate the held-out test split
-  after model and hyperparameter choices are frozen.
-- Record resolved configs, checkpoint hashes, cohort fingerprints, and random
-  seeds for every result.
-- Report physical field metrics for field-producing models and scalar metrics
-  for maximum wind; report radii metrics separately by extraction source.
-
-The existing comparison runner and evaluator remain in `scripts/` as the basis
-for the new run. They should not update archived result pages.
+See [configuration](configuration.md) for overrides,
+[training](training.md) for checkpoint loading, and
+[published results](../results.md) for model comparisons.

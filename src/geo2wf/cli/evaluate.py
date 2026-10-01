@@ -1,4 +1,4 @@
-"""Evaluate retained models or reproduce the fixed conference release."""
+"""Evaluate model predictions."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ def main() -> None:
     parser.add_argument(
         "workflow",
         choices=(
-            "conference",
             "intensity-comparison",
             "intensity-correction",
             "intensity-forecast",
@@ -24,9 +23,7 @@ def main() -> None:
     )
     args, remaining = parser.parse_known_args()
     sys.argv = [sys.argv[0], *remaining]
-    if args.workflow == "conference":
-        from scripts.conference_release import main as evaluate
-    elif args.workflow == "intensity-comparison":
+    if args.workflow == "intensity-comparison":
         from scripts.evaluate_intensity_models import main as evaluate
     elif args.workflow == "intensity-correction":
         from scripts.evaluate_intensity_correction import main as evaluate

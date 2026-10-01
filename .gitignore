@@ -159,11 +159,8 @@ dmypy.json
 *.ckpt
 /table_2/
 
-# Publication evidence is tracked despite historical run-directory exclusions.
-!release/provenance/logs/
-!release/provenance/logs/**
-!release/provenance/inference/
-!release/provenance/inference/**
+# Local publication material
+/release/
 
 # Local research artifacts are archived outside version control.
 /archived/

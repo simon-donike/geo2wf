@@ -1,64 +1,69 @@
-# geo2wf — conference release
+# geo2wf
 
-Reconstruct tropical-cyclone surface wind fields from geostationary satellite
-imagery, with optional ERA5 conditioning and sparse SAR supervision.
+Reconstruct tropical-cyclone surface wind fields and estimate intensity from
+geostationary satellite imagery, with optional ERA5 inputs and SAR supervision.
 
 [Documentation](https://tcd.hyperalis.com/) ·
-[Published results](docs/results.md) ·
-[Reproduction guide](docs/reproduction.md) ·
-[StormSense stormtracker](https://tcd.hyperalis.com/explorer/dashboard.html)
+[Data guide](docs/data/index.md) ·
+[Model guide](docs/models/index.md) ·
+[StormSense](https://tcd.hyperalis.com/explorer/dashboard.html)
 
-This branch contains the models and ablations behind the two conference paper
-tables, the Humberto/Kiko/Otis case studies, and the complete documentation
-website and stormtracker. Historical experiments remain in Git history.
+## Get started
 
-## Included models and evidence
-
-- Field U-Net, post-hoc intensity correction, and joint latent MLP, with and
-  without ERA5: six original architecture checkpoints.
-- Eight latent-MLP supervision ablations: ERA5/no ERA5, SAR/no SAR, and
-  wind-only/wind-plus-radii supervision.
-- Case-study correction heads, their frozen-field and initialization
-  dependencies, and the dashboard MLP forecast.
-- Exact paper tables, original full-precision reports, dataset fingerprints,
-  resolved configurations, and source provenance in `release/`.
-
-The architecture table uses its original test cohort; the latent table uses
-configured validation cohorts. Their joint models are different checkpoints.
-The [reproduction guide](docs/reproduction.md) documents dataset differences
-and the historical case-study field's training/export configuration discrepancy.
-
-## Install and reproduce
+Use Python 3.10 or 3.11:
 
 ```bash
-uv sync --frozen --group dev --group docs
-uv run geo2wf-evaluate conference tables
-uv run geo2wf-evaluate conference figures
-uv run geo2wf-evaluate conference verify --artifact-root /path/to/conference-artifacts
-uv run geo2wf-evaluate conference smoke --artifact-root /path/to/conference-artifacts
-uv run python -m pytest
-uv run mkdocs build --strict
+uv sync --frozen
 ```
 
-The separate checksummed artifact bundle contains 21 local checkpoints and their
-saved training provenance. Checkpoint binaries and raw observations are outside
-Git. Follow the [reproduction guide](docs/reproduction.md) for exact registry IDs,
-portable data paths, checkpoint reevaluation, and training commands.
+The repository includes data loaders, model implementations, and training
+presets. Observation rasters and checkpoint binaries are stored separately;
+point the commands below at your local data and model files.
+See the [dataset layout](docs/data/dataset-contract.md) and
+[corpus manifest](docs/data/full-dataset.md) for the expected inputs.
 
-ConvLSTM forecast exports are retained for the stormtracker; regenerating them
-requires the external HPC project and checkpoint identified in the registry.
+## Use a trained model
+
+Run wind-field inference with a checkpoint and its matching configuration:
+
+```bash
+uv run geo2wf-infer deterministic-residual \
+  --config /path/to/resolved-config.yaml \
+  --checkpoint /path/to/model.ckpt
+```
+
+Use `--help` for input/output options. Scalar intensity correction and forecasting
+are available through `geo2wf-infer intensity-correction` and
+`geo2wf-infer intensity-forecast`.
+
+## Train on your data
+
+```bash
+WANDB_DISABLED=true uv run geo2wf-train \
+  data=geo_sar_common10_era5 \
+  model=deterministic_residual \
+  data.root=/path/to/geo_sar \
+  data.stats_file=/path/to/geo_sar/stats.json
+```
+
+The [first experiment](docs/getting-started/first-experiment.md) walks through
+loading a batch and running a small training job. [Model presets](docs/experiments/intensity-comparison.md)
+cover field U-Nets, joint field/intensity models, and scalar heads.
 
 ## Repository
 
 ```text
-src/geo2wf/   shared model, data, training, evaluation, and tracking code
-configs/      retained model, dataset, training, and experiment presets
-scripts/      preprocessing, reproduction, inference, figures, and R2 publishing
-release/      publication tables, checkpoint registry, original provenance
-docs/         scientific documentation and StormSense UI
-tests/        model, data, release, and stormtracker checks
+src/geo2wf/   data loaders, models, training, inference, and metrics
+configs/      data and model presets
+scripts/      data preparation, inference, evaluation, and website utilities
+docs/         usage guides, model descriptions, results, and StormSense
+tests/        data, model, and integration checks
 ```
 
-SAR masks define observed targets; off-swath reconstructions are conditional
-predictions. These are instantaneous wind reconstructions. The dashboard's
-retrospective forecasts are a separate model capability.
+For development:
+
+```bash
+uv sync --frozen --group dev --group docs
+uv run python -m pytest
+uv run mkdocs build --strict
+```

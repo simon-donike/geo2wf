@@ -34,9 +34,7 @@ uv run geo2wf-train experiment=intensity_forecast_pretrain
 ```
 
 The five inputs are the current anchor, the −6 h and −12 h winds, and the
-two consecutive six-hour changes. The release uses the original IBTrACS
-pretraining checkpoint for the dashboard. Historical matched-data fine-tuning
-presets are outside this release. See [reproduction](../reproduction.md).
+two consecutive six-hour changes. The dashboard uses an IBTrACS-pretrained checkpoint.
 
 ## One-step training and +12 h dashboard rollout
 

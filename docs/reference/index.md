@@ -25,7 +25,6 @@ geo2wf/
 │   └── training.py
 ├── scripts/                            maintained workflow implementations
 ├── tests/
-├── release/                            paper tables, checkpoint registry, provenance
 ├── train.py and legacy modules         limited forwarding adapters
 ├── mkdocs.yml
 └── pyproject.toml

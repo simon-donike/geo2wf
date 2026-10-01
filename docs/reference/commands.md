@@ -65,9 +65,7 @@ uv run geo2wf-export intensity-forecast-cache --help
 ## Evaluation and inference
 
 ```bash
-uv run geo2wf-evaluate conference --help
 uv run geo2wf-evaluate intensity-comparison --help
-uv run geo2wf-evaluate conference figures --help
 uv run geo2wf-evaluate intensity-correction --help
 uv run geo2wf-evaluate intensity-forecast --help
 
@@ -76,30 +74,8 @@ uv run geo2wf-infer deterministic-residual \
   --checkpoint /path/to/unet.ckpt
 
 uv run geo2wf-infer intensity-correction --help
-uv run geo2wf-infer intensity-comparison-storms --help
 uv run geo2wf-infer intensity-forecast --help
 ```
-
-Generate the dense validation-storm nowcasts after both comparison workflows
-finish. The optional ablation checkpoints are ERA5-conditioned:
-
-```bash
-uv run geo2wf-infer intensity-comparison-storms \
-  --era5 with \
-  --comparison-run logs/intensity-comparisons/<with-era5-run> \
-  --ablation-max-wind-checkpoint /path/to/max-wind-only.ckpt \
-  --ablation-radii-checkpoint /path/to/max-wind-plus-radii.ckpt
-
-uv run geo2wf-infer intensity-comparison-storms \
-  --era5 without \
-  --comparison-run logs/intensity-comparisons/<without-era5-run>
-
-uv run geo2wf-evaluate conference figures
-```
-
-The last command verifies the saved native-observation metrics and writes
-long-form predictions and PNG/PDF figures into `build/conference/results`.
-See [reproduction](../reproduction.md) for checkpoint-based reevaluation.
 
 ## Environment variables
 

@@ -1,11 +1,6 @@
 # Full training corpus
 
-!!! note "Publication cohorts"
-    This page describes the later corpus inventory. The original paper tables
-    use their recorded training/evaluation configurations, including the
-    212-observation architecture test cohort and separate latent validation
-    cohorts. See [exact reproduction and limitations](../reproduction.md).
-
+This inventory describes the available corpus; paper results may use different subsets.
 
 This is the complete paired GEO–ERA5–SAR corpus manifest used by the maintained
 wind-field training workflow. It contains **1,205 samples from 176 storms** and

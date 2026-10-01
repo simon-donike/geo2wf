@@ -1,8 +1,7 @@
 # Published results
 
-These are the exact two tables used in the conference paper. See the
-[reproduction guide](reproduction.md) for checkpoint IDs, original cohorts,
-and dataset limitations. The architecture table uses the original test set;
+These tables summarize the conference paper results.
+The architecture table uses the original test set;
 the latent-supervision table uses each run’s validation cohort.
 
 ## Architecture ablation

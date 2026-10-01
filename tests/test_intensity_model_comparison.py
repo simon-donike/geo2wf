@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 from geo2wf.data.datasets.paired_geotiff import PairedImageDataset
-from scripts.combine_intensity_comparison_reports import combined_markdown_report
 from scripts.evaluate_intensity_models import (
     _assert_common_cohort,
     _cluster_bootstrap,
@@ -23,8 +22,6 @@ from scripts.export_joint_intensity_cache import (
     _cohort_fingerprint as export_fingerprint,
     _target_fingerprint as export_target_fingerprint,
 )
-from scripts.run_intensity_model_comparison import _source_storm_counts
-from scripts.run_intensity_model_comparison import _training_result
 
 
 def _rows() -> list[dict[str, object]]:
@@ -228,97 +225,6 @@ def test_table_marks_scalar_only_correction_field_metrics_as_missing() -> None:
     assert "—" in markdown
     assert "## Metric definitions" in markdown
     assert "Field bias" in markdown
-
-
-def test_combined_report_requires_and_documents_the_same_cohort() -> None:
-    rows = [
-        {
-            "model": "Example",
-            "model_key": "example",
-            "samples": 2,
-            "storms": 2,
-            "intensity_mae_ms": 1.0,
-            "intensity_mae_95ci_low_ms": 0.5,
-            "intensity_mae_95ci_high_ms": 1.5,
-            "intensity_mae_delta_vs_unet_raw_max_ms": -0.25,
-            "intensity_mae_delta_95ci_low_ms": -0.5,
-            "intensity_mae_delta_95ci_high_ms": -0.1,
-            "intensity_rmse_ms": 1.2,
-            "intensity_bias_ms": -0.2,
-            "storm_macro_mae_ms": 0.9,
-            "category_accuracy": 0.5,
-            "category_macro_f1": 0.4,
-            "within_one_category_accuracy": 1.0,
-            "field_mae_ms": 2.0,
-            "field_rmse_ms": 2.5,
-            "field_bias_ms": -0.1,
-        }
-    ]
-    payload = {
-        "split": "val",
-        "cohort": {"sha256": "same", "samples": 2, "storms": 2},
-        "paired_storm_bootstrap": {"repetitions": 2000, "seed": 42},
-        "table": rows,
-    }
-
-    report = combined_markdown_report(payload, payload)
-
-    assert "## With ERA5" in report
-    assert "## Without ERA5" in report
-    assert "2,000 paired cluster-bootstrap repetitions" in report
-    assert report.count("## Metric definitions") == 1
-
-    with_ri = {**payload, "rapid_intensification_table": rows}
-    ri_report = combined_markdown_report(with_ri, with_ri)
-    assert "With ERA5: rapid-intensification phases" in ri_report
-    assert "Without ERA5: rapid-intensification phases" in ri_report
-
-    different = {**payload, "cohort": {**payload["cohort"], "sha256": "other"}}
-    with pytest.raises(ValueError, match="exact same cohort"):
-        combined_markdown_report(payload, different)
-
-
-def test_training_result_uses_recorded_best_checkpoint(tmp_path: Path) -> None:
-    run = tmp_path / "20260820-120000_modular"
-    checkpoint = run / "checkpoints" / "best.ckpt"
-    checkpoint.parent.mkdir(parents=True)
-    checkpoint.touch()
-    (run / "resolved-config.yaml").write_text("seed: 42\n", encoding="utf-8")
-    (run / "result.json").write_text(
-        json.dumps(
-            {
-                "status": "completed",
-                "best_model_path": str(checkpoint),
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    selected, config = _training_result(tmp_path)
-
-    assert selected == checkpoint.resolve()
-    assert config == (run / "resolved-config.yaml").resolve()
-
-
-def test_source_storm_counts_reports_absent_and_held_out_storms(
-    tmp_path: Path,
-) -> None:
-    for split, storms in {
-        "train": ["AL012020"],
-        "val": ["EP182023", "EP182023"],
-        "test": ["AL092019"],
-    }.items():
-        directory = tmp_path / split
-        directory.mkdir()
-        pd.DataFrame({"storm_id": storms}).to_csv(
-            directory / "manifest.csv", index=False
-        )
-
-    counts = _source_storm_counts(tmp_path, ["AL092019", "EP132019", "EP182023"])
-
-    assert counts["AL092019"] == {"train": 0, "val": 0, "test": 1}
-    assert counts["EP132019"] == {"train": 0, "val": 0, "test": 0}
-    assert counts["EP182023"] == {"train": 0, "val": 2, "test": 0}
 
 
 def test_no_era5_regime_filters_to_the_era5_available_cohort(tmp_path: Path) -> None:
