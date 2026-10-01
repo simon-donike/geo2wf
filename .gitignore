@@ -45,7 +45,8 @@ wandb
 *.gif
 playground
 tables
-docs/assets/images/final-results/category-4-5-triptychs
+docs/assets/images/final-results/category-4-5*
+table_2
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

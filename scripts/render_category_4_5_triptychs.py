@@ -115,6 +115,32 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Maximum images after category, ocean, and selection filtering.",
     )
+    parser.add_argument(
+        "--sample-id",
+        help="Render only this sample from the otherwise complete selection.",
+    )
+    parser.add_argument(
+        "--no-super-header",
+        action="store_true",
+        help="Omit the storm/time/category figure-level heading.",
+    )
+    parser.add_argument(
+        "--wind-range",
+        choices=("fixed", "actual"),
+        default="fixed",
+        help="Use fixed 0--80 m/s or each image pair's combined actual range.",
+    )
+    parser.add_argument(
+        "--font-scale",
+        type=float,
+        default=1.0,
+        help="Scale all figure typography for the intended display size.",
+    )
+    parser.add_argument(
+        "--compact-headers",
+        action="store_true",
+        help="Use shorter panel headings suited to large type at small page size.",
+    )
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument(
         "--device", default="cuda:0" if torch.cuda.is_available() else "cpu"
@@ -282,6 +308,27 @@ def _display_limits(values: np.ndarray, valid: np.ndarray) -> tuple[float, float
     return float(low), float(high)
 
 
+def actual_wind_display_range(
+    target: Any,
+    target_mask: Any,
+    prediction: Any,
+) -> tuple[float, float]:
+    """Return the shared finite min/max across observed SAR and prediction."""
+
+    target_array = _as_numpy(target).squeeze()
+    prediction_array = _as_numpy(prediction).squeeze()
+    target_valid = _as_numpy(target_mask).astype(bool).squeeze()
+    target_values = target_array[target_valid & np.isfinite(target_array)]
+    prediction_values = prediction_array[np.isfinite(prediction_array)]
+    if not target_values.size or not prediction_values.size:
+        raise ValueError("SAR target and prediction must both contain finite values")
+    low = float(min(target_values.min(), prediction_values.min()))
+    high = float(max(target_values.max(), prediction_values.max()))
+    if math.isclose(low, high):
+        high = low + 1.0
+    return low, high
+
+
 def _plot_center(axis: Any, center: Any) -> None:
     values = _as_numpy(center).reshape(-1)
     if values.size == 2 and np.isfinite(values).all():
@@ -315,6 +362,10 @@ def render_triptych(
     center: Any,
     category_row: Mapping[str, Any],
     geo_channel: str,
+    wind_display_range_ms: tuple[float, float] = WIND_DISPLAY_RANGE_MS,
+    show_super_header: bool = True,
+    font_scale: float = 1.0,
+    compact_headers: bool = False,
 ):
     """Build one horizontal GEO, SAR, and selected-model prediction figure."""
 
@@ -329,6 +380,13 @@ def render_triptych(
         raise ValueError("target and prediction must each resolve to one 2D field")
     if target_array.shape != prediction_array.shape:
         raise ValueError("target and prediction shapes differ")
+    if font_scale <= 0.0:
+        raise ValueError("font_scale must be positive")
+    wind_low, wind_high = (float(value) for value in wind_display_range_ms)
+    if not math.isfinite(wind_low) or not math.isfinite(wind_high):
+        raise ValueError("wind display limits must be finite")
+    if wind_low >= wind_high:
+        raise ValueError("wind display minimum must be less than maximum")
 
     channel_index = geostationary_channel_index(condition_channels, geo_channel)
     geo = condition_array[channel_index]
@@ -341,11 +399,11 @@ def render_triptych(
 
     with plt.rc_context(
         {
-            "font.size": 9.0,
-            "axes.titlesize": 10.2,
-            "axes.labelsize": 8.5,
-            "xtick.labelsize": 7.7,
-            "ytick.labelsize": 7.7,
+            "font.size": 9.0 * font_scale,
+            "axes.titlesize": 10.2 * font_scale,
+            "axes.labelsize": 8.5 * font_scale,
+            "xtick.labelsize": 7.7 * font_scale,
+            "ytick.labelsize": 7.7 * font_scale,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
         }
@@ -379,8 +437,8 @@ def render_triptych(
             extent=extent,
             origin="upper",
             cmap=wind_colormap,
-            vmin=WIND_DISPLAY_RANGE_MS[0],
-            vmax=WIND_DISPLAY_RANGE_MS[1],
+            vmin=wind_low,
+            vmax=wind_high,
             interpolation="nearest",
         )
         axes[2].imshow(
@@ -388,16 +446,21 @@ def render_triptych(
             extent=extent,
             origin="upper",
             cmap=wind_colormap,
-            vmin=WIND_DISPLAY_RANGE_MS[0],
-            vmax=WIND_DISPLAY_RANGE_MS[1],
+            vmin=wind_low,
+            vmax=wind_high,
             interpolation="nearest",
         )
 
         sensor = str(category_row.get("geo_sensor", "")).strip()
         sensor_prefix = f"{sensor} " if sensor else ""
-        axes[0].set_title(f"(a) Geostationary {sensor_prefix}{geo_channel.upper()}")
-        axes[1].set_title("(b) SAR observed wind field")
-        axes[2].set_title("(c) Best-model prediction")
+        if compact_headers:
+            axes[0].set_title(f"(a) GEO {sensor_prefix}{geo_channel.upper()}")
+            axes[1].set_title("(b) SAR wind field")
+            axes[2].set_title("(c) Model prediction")
+        else:
+            axes[0].set_title(f"(a) Geostationary {sensor_prefix}{geo_channel.upper()}")
+            axes[1].set_title("(b) SAR observed wind field")
+            axes[2].set_title("(c) Best-model prediction")
         for index, axis in enumerate(axes):
             _plot_center(axis, center)
             axis.set_xlabel("Longitude (°)")
@@ -414,12 +477,13 @@ def render_triptych(
             pad=0.025,
             label=r"10 m wind speed (m s$^{-1}$)",
         )
-        figure.suptitle(
-            f"{_format_storm_id(storm_id)} · "
-            f"{timestamp.strftime('%Y-%m-%d %H:%M UTC')} · "
-            f"IBTrACS Category {category} ({target_wind:.1f} m s$^{{-1}}$)",
-            fontsize=11.2,
-        )
+        if show_super_header:
+            figure.suptitle(
+                f"{_format_storm_id(storm_id)} · "
+                f"{timestamp.strftime('%Y-%m-%d %H:%M UTC')} · "
+                f"IBTrACS Category {category} ({target_wind:.1f} m s$^{{-1}}$)",
+                fontsize=11.2 * font_scale,
+            )
     return figure
 
 
@@ -459,6 +523,8 @@ def main() -> None:
     args = parse_args()
     if args.expected_count < 1 or args.batch_size < 1 or args.dpi < 1:
         raise ValueError("expected-count, batch-size, and dpi must be positive")
+    if args.font_scale <= 0.0:
+        raise ValueError("font-scale must be positive")
     for path in (args.config, args.result, args.category_manifest):
         if not path.is_file():
             raise FileNotFoundError(path)
@@ -489,6 +555,20 @@ def main() -> None:
         limit=args.limit,
         expected_count=args.expected_count,
     )
+    sequence_by_id = {
+        str(sample_id): index
+        for index, sample_id in enumerate(
+            category_rows["sample_id"].astype(str), start=1
+        )
+    }
+    if args.sample_id:
+        category_rows = category_rows.loc[
+            category_rows["sample_id"].astype(str) == str(args.sample_id)
+        ].reset_index(drop=True)
+        if len(category_rows) != 1:
+            raise ValueError(
+                f"sample-id {args.sample_id!r} is absent from the render selection"
+            )
     config = load_config_file(args.config)
     checkpoint = _resolve_checkpoint(args.checkpoint, args.result)
     datamodule = instantiate_datamodule(config)
@@ -522,9 +602,6 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     row_by_id = {str(row["sample_id"]): row for _, row in category_rows.iterrows()}
     image_records: list[dict[str, Any]] = []
-    sequence_by_id = {
-        sample_id: index for index, sample_id in enumerate(requested_ids, start=1)
-    }
     with torch.inference_mode():
         for cpu_batch in loader:
             batch = move_to_device(cpu_batch, device)
@@ -537,6 +614,15 @@ def main() -> None:
                 row["geo_sensor"] = str(meta.get("condition_sensor", ""))
                 output = args.output_dir / _output_filename(
                     sequence_by_id[sample_id], row
+                )
+                wind_display_range = (
+                    actual_wind_display_range(
+                        cpu_batch["target_physical"][batch_index],
+                        cpu_batch["target_mask"][batch_index],
+                        prediction[batch_index],
+                    )
+                    if args.wind_range == "actual"
+                    else WIND_DISPLAY_RANGE_MS
                 )
                 figure = render_triptych(
                     condition=cpu_batch["condition"][batch_index],
@@ -551,6 +637,10 @@ def main() -> None:
                     center=cpu_batch["center"][batch_index],
                     category_row=row,
                     geo_channel=args.geo_channel,
+                    wind_display_range_ms=wind_display_range,
+                    show_super_header=not args.no_super_header,
+                    font_scale=args.font_scale,
+                    compact_headers=args.compact_headers,
                 )
                 figure.savefig(output, dpi=args.dpi, bbox_inches="tight")
                 plt.close(figure)
@@ -565,6 +655,7 @@ def main() -> None:
                         ).isoformat(),
                         "ibtracs_target_wind_ms": float(row["target_wind_ms"]),
                         "ibtracs_category": int(row["target_category"]),
+                        "wind_display_range_ms": list(wind_display_range),
                         "valid_sar_pixel_mae_ms": _sample_mae(
                             cpu_batch["target_physical"][batch_index],
                             cpu_batch["target_mask"][batch_index],
@@ -574,9 +665,9 @@ def main() -> None:
                 )
 
     image_records.sort(key=lambda record: int(record["sequence"]))
-    if len(image_records) != args.expected_count:
+    if len(image_records) != len(category_rows):
         raise RuntimeError(
-            f"rendered {len(image_records)} images, expected {args.expected_count}"
+            f"rendered {len(image_records)} images, expected {len(category_rows)}"
         )
     manifest = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -608,7 +699,15 @@ def main() -> None:
             "SAR observed 10 m wind field",
             "selected-model 10 m wind-field prediction",
         ],
-        "wind_display_range_ms": list(WIND_DISPLAY_RANGE_MS),
+        "rendering": {
+            "wind_range_mode": args.wind_range,
+            "fixed_wind_display_range_ms": (
+                list(WIND_DISPLAY_RANGE_MS) if args.wind_range == "fixed" else None
+            ),
+            "show_super_header": not args.no_super_header,
+            "font_scale": args.font_scale,
+            "compact_headers": args.compact_headers,
+        },
         "model": {
             "name": "Latent MLP · SAR · ERA5 · wind + radii",
             "selection_basis": "lowest current all-validation wind-field L1",
@@ -618,7 +717,11 @@ def main() -> None:
         },
         "images": image_records,
     }
-    manifest_path = args.output_dir / "manifest.json"
+    manifest_path = (
+        args.output_dir / f"{Path(image_records[0]['file']).stem}-manifest.json"
+        if args.sample_id
+        else args.output_dir / "manifest.json"
+    )
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {len(image_records)} triptychs and {manifest_path}")
 

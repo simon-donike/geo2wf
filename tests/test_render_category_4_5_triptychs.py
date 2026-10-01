@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from scripts.render_category_4_5_triptychs import (
+    actual_wind_display_range,
     choose_render_rows,
     geostationary_channel_index,
     render_triptych,
@@ -98,6 +99,14 @@ def test_geostationary_channel_index_accepts_common_aliases() -> None:
     assert geostationary_channel_index(channels, "ABI_C13") == 1
 
 
+def test_actual_wind_display_range_combines_valid_sar_and_prediction() -> None:
+    target = np.array([[[2.0, 80.0], [4.0, 6.0]]])
+    mask = np.array([[[True, False], [True, True]]])
+    prediction = np.array([[[1.0, 12.0], [5.0, 40.0]]])
+
+    assert actual_wind_display_range(target, mask, prediction) == (1.0, 40.0)
+
+
 def test_render_triptych_is_horizontal_and_has_three_data_panels() -> None:
     condition = np.stack([np.linspace(0.0, 1.0, 16).reshape(4, 4), np.ones((4, 4))])
     target = np.arange(16, dtype=float).reshape(1, 4, 4)
@@ -120,6 +129,8 @@ def test_render_triptych_is_horizontal_and_has_three_data_panels() -> None:
             "geo_sensor": "ABI",
         },
         geo_channel="C13",
+        show_super_header=False,
+        font_scale=1.5,
     )
     try:
         width, height = figure.get_size_inches()
@@ -128,6 +139,39 @@ def test_render_triptych_is_horizontal_and_has_three_data_panels() -> None:
             "(a) Geostationary ABI C13",
             "(b) SAR observed wind field",
             "(c) Best-model prediction",
+        ]
+        assert figure._suptitle is None
+    finally:
+        plt.close(figure)
+
+
+def test_render_triptych_supports_compact_headers() -> None:
+    field = np.ones((1, 4, 4))
+    figure = render_triptych(
+        condition=field,
+        condition_mask=np.ones_like(field, dtype=bool),
+        condition_channels=["CMI_C13"],
+        target=field,
+        target_mask=np.ones_like(field, dtype=bool),
+        prediction=field + 1.0,
+        bounds=np.array([-2.0, 2.0, -2.0, 2.0]),
+        center=np.array([0.0, 0.0]),
+        category_row={
+            "storm_id": "AL012025",
+            "observation_timestamp": "2025-08-02T00:00:00Z",
+            "target_wind_ms": 60.0,
+            "target_category": 4,
+            "geo_sensor": "ABI",
+        },
+        geo_channel="C13",
+        show_super_header=False,
+        compact_headers=True,
+    )
+    try:
+        assert [axis.get_title() for axis in figure.axes[:3]] == [
+            "(a) GEO ABI C13",
+            "(b) SAR wind field",
+            "(c) Model prediction",
         ]
     finally:
         plt.close(figure)
