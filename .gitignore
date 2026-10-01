@@ -164,3 +164,6 @@ dmypy.json
 !release/provenance/logs/**
 !release/provenance/inference/
 !release/provenance/inference/**
+
+# Local research artifacts are archived outside version control.
+/archived/
