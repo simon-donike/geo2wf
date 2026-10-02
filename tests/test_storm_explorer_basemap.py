@@ -18,5 +18,5 @@ def test_dashboard_uses_only_the_keyless_openstreetmap_basemap() -> None:
 def test_dashboard_cache_busts_the_keyless_basemap_release() -> None:
     dashboard = (ROOT / "docs/explorer/dashboard.html").read_text(encoding="utf-8")
 
-    assert 'href="styles.css?v=20260827-2"' in dashboard
-    assert 'src="app.js?v=20260827-2"' in dashboard
+    assert 'href="styles.css?v=20261002-1"' in dashboard
+    assert 'src="app.js?v=20261002-1"' in dashboard

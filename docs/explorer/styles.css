@@ -1111,12 +1111,8 @@ dialog #confirmDialog:hover {
 
 .leaflet-container {
   color: var(--main);
-  background: #090e14;
+  background: #f2efe9;
   font-family: var(--font-main);
-}
-
-.dark-basemap-tiles {
-  filter: grayscale(1) invert(0.92) brightness(0.42) contrast(1.35);
 }
 
 .leaflet-bar a {

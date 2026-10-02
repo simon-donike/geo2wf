@@ -69,7 +69,7 @@ function initMap(){
   map.createPane("sarPane");map.getPane("sarPane").style.zIndex=340;
   map.createPane("pmwPane");map.getPane("pmwPane").style.zIndex=345;
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,className:"dark-basemap-tiles",attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   }).addTo(map);
   map.getContainer().insertAdjacentHTML("beforeend",`<span class="map-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></span>`);
   const intensityKey=L.control({position:"bottomright"});
