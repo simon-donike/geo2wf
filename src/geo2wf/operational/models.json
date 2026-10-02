@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "repository": "simon-donike/geo2wf-models",
+  "revision": "b4399d426b80698d4cf73a77c9541071a8ab3d42",
+  "models": {
+    "nowcast": {
+      "id": "latent_sar_no_era5_max_wind_radii",
+      "checkpoint": "checkpoints/latent_sar_no_era5_max_wind_radii.ckpt",
+      "sha256": "5c6ff493e54ea4ab4ff3c5e7055998e6a29124f104842b168415144cb3ab358a",
+      "config": "release/provenance/logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/resolved-config.yaml",
+      "local_checkpoint": "logs/latent-matrix/sar/no-era5/max-wind-radii/20260827-190830_modular/checkpoints/epoch=107-step=15336.ckpt",
+      "stats": "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+      "stats_sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded",
+      "training_manifest": "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+      "config_sha256": "b48c9866bcd0a714bf515f7bb518c431d8036c3993e017bb1e6481d8b0415daf",
+      "training_manifest_sha256": "f75fde80b37727f2561ca0e8bdbde3d060e4289ba7d96e21d5156390833b862b"
+    },
+    "forecast": {
+      "id": "dashboard-mlp",
+      "checkpoint": "checkpoints/dashboard-mlp.ckpt",
+      "sha256": "2aee3963b7714575f9ed7a0bb04cbba014edb2645ad0c1c6dd172a004e5c0129",
+      "config": "release/provenance/logs/20260805-180538_modular/resolved-config.yaml",
+      "local_checkpoint": "logs/20260805-180538_modular/checkpoints/epoch=051-step=14976.ckpt",
+      "config_sha256": "7c4204cb51c7ae0b3417667b93a4deac573b82a61766fb0714bc343bd63496d1"
+    }
+  }
+}

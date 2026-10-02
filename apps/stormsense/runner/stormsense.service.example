@@ -1,0 +1,16 @@
+[Unit]
+Description=StormSense finite advisory and prediction update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=stormsense
+WorkingDirectory=/srv/geo2wf
+Environment=STORMSENSE_ROOT=/srv/geo2wf
+Environment=STORMSENSE_DEVICE=cpu
+Environment=STORMSENSE_PUBLISH=0
+ExecStart=/srv/geo2wf/apps/stormsense/runner/cycle.sh
+TimeoutStartSec=15min
+Nice=5
+# Install only after choosing a runner. No service is enabled by this repository.

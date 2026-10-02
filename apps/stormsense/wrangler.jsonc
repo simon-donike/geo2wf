@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stormsense",
+  "account_id": "9d9a9d8281d0329e2a5a36456ee7a9ff",
+  "workers_dev": true,
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/data/*"],
+  },
+  "r2_buckets": [{ "binding": "STORMSENSE_DATA", "bucket_name": "tcd" }],
+  "observability": { "enabled": true },
+  "vars": { "DATA_PREFIX": "explorer/stormsense/" },
+}

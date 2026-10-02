@@ -30,6 +30,7 @@ geo2wf-train = "geo2wf.cli.train:main"
 geo2wf-evaluate = "geo2wf.cli.evaluate:main"
 geo2wf-infer = "geo2wf.cli.infer:main"
 geo2wf-export = "geo2wf.cli.export:main"
+geo2wf-operational = "geo2wf.operational.cli:main"
 
 [build-system]
 requires = ["setuptools>=65"]
@@ -39,7 +40,14 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 include = ["geo2wf*"]
 
+[tool.setuptools.package-data]
+"geo2wf.operational" = ["models.json"]
+
 [dependency-groups]
+operational = [
+    "fsspec[http]>=2024.6,<2026",
+    "pyproj>=3.6,<3.8",
+]
 dev = [
     "black>=24,<26",
     "pytest>=8.0,<9.0",

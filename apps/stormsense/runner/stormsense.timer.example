@@ -1,0 +1,10 @@
+[Unit]
+Description=StormSense intended 15-minute polling cadence — inactive example
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00 UTC
+Persistent=true
+Unit=stormsense.service
+
+[Install]
+WantedBy=timers.target

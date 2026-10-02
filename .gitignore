@@ -164,3 +164,16 @@ dmypy.json
 
 # Local research artifacts are archived outside version control.
 /archived/
+
+# Independent StormSense application and operational runtime
+apps/stormsense/node_modules/
+apps/stormsense/dist/
+apps/stormsense/.wrangler/
+apps/stormsense/worker-configuration.d.ts
+apps/stormsense/*.tsbuildinfo
+apps/stormsense/public/data/
+apps/stormsense/public/data.publish.lock
+apps/stormsense/test-results/
+apps/stormsense/playwright-report/
+apps/stormsense/.dev.vars
+/var/stormsense/

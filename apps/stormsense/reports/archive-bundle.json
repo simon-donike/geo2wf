@@ -1,0 +1,9 @@
+{
+  "path": "var/stormsense/stormsense-2025-10-02_2026-10-02.tar.gz",
+  "release": "20261002T143251092386Z",
+  "bytes": 1524220,
+  "sha256": "6fa9f1bc34656839060e975a99115f788bdfa2c4cf67bccd468cdb47dbfd8751",
+  "json_files": 42,
+  "imagery_included": false,
+  "checkpoints_included": false
+}

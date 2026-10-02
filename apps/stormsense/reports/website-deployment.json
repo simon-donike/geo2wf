@@ -1,0 +1,44 @@
+{
+  "url": "https://stormsense.hyperalislabs.workers.dev",
+  "provider": "Cloudflare Workers Static Assets",
+  "account": "Hyperalis Labs",
+  "worker": "stormsense",
+  "version_id": "31524b8a-9f33-462a-a9dc-f93b49307825",
+  "data_bucket": "tcd",
+  "data_prefix": "explorer/stormsense/",
+  "verification": {
+    "url": "https://stormsense.hyperalislabs.workers.dev",
+    "checked_at": "2026-10-02T15:01:48.360Z",
+    "client": "Desktop Chrome HTTP profile",
+    "/": 200,
+    "/archive": 200,
+    "/about": 200,
+    "/storms/EP152026": 200,
+    "release": "20261002T143251092386Z",
+    "storms": 38,
+    "coverage": {
+      "expected": 7070,
+      "gaps": 17,
+      "pending": 0,
+      "predictions": 7053
+    },
+    "series_loaded": 38,
+    "conditional_get": 304,
+    "head": 200,
+    "write_rejected": 405,
+    "invalid_path": 404
+  },
+  "browser_tests": {
+    "passed": 14,
+    "targets": [
+      "desktop",
+      "mobile"
+    ],
+    "scope": "deployed HTTPS website"
+  },
+  "web_unit_tests": {
+    "passed": 10
+  },
+  "continuous_inference_scheduling_active": false,
+  "verification_note": "A default Python urllib request was rejected by Cloudflare with error 1010; the browser suite and API checks using the Desktop Chrome HTTP profile passed."
+}

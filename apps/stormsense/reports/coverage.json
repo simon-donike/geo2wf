@@ -1,0 +1,339 @@
+{
+  "complete": true,
+  "discovery": {
+    "end": "2026-10-02T14:00:00Z",
+    "failures": [],
+    "retrieved_at": "2026-10-02T14:28:14Z",
+    "start": "2025-10-02T02:00:00Z"
+  },
+  "end": "2026-10-02T14:00:00Z",
+  "generated_at": "2026-10-02T14:32:51Z",
+  "schema_version": 1,
+  "start": "2025-10-02T14:00:00Z",
+  "storms": [
+    {
+      "expected": 73,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 73,
+      "reasons": {},
+      "storm_id": "AL012026"
+    },
+    {
+      "expected": 157,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 157,
+      "reasons": {},
+      "storm_id": "AL022026"
+    },
+    {
+      "expected": 67,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 67,
+      "reasons": {},
+      "storm_id": "AL032026"
+    },
+    {
+      "expected": 181,
+      "gaps": 1,
+      "pending": 0,
+      "predictions": 180,
+      "reasons": {
+        "poor_coverage": 1
+      },
+      "storm_id": "AL042026"
+    },
+    {
+      "expected": 133,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 133,
+      "reasons": {},
+      "storm_id": "AL052026"
+    },
+    {
+      "expected": 295,
+      "gaps": 5,
+      "pending": 0,
+      "predictions": 290,
+      "reasons": {
+        "missing_scan": 4,
+        "poor_coverage": 1
+      },
+      "storm_id": "AL062026"
+    },
+    {
+      "expected": 97,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 97,
+      "reasons": {},
+      "storm_id": "AL072026"
+    },
+    {
+      "expected": 91,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 91,
+      "reasons": {},
+      "storm_id": "AL082026"
+    },
+    {
+      "expected": 83,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 83,
+      "reasons": {},
+      "storm_id": "AL092025"
+    },
+    {
+      "expected": 103,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 103,
+      "reasons": {},
+      "storm_id": "AL102025"
+    },
+    {
+      "expected": 85,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 85,
+      "reasons": {},
+      "storm_id": "AL112025"
+    },
+    {
+      "expected": 55,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 55,
+      "reasons": {},
+      "storm_id": "AL122025"
+    },
+    {
+      "expected": 265,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 265,
+      "reasons": {},
+      "storm_id": "AL132025"
+    },
+    {
+      "expected": 439,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 439,
+      "reasons": {},
+      "storm_id": "CP012026"
+    },
+    {
+      "expected": 163,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 163,
+      "reasons": {},
+      "storm_id": "CP022026"
+    },
+    {
+      "expected": 181,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 181,
+      "reasons": {},
+      "storm_id": "EP012026"
+    },
+    {
+      "expected": 91,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 91,
+      "reasons": {},
+      "storm_id": "EP022026"
+    },
+    {
+      "expected": 103,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 103,
+      "reasons": {},
+      "storm_id": "EP032026"
+    },
+    {
+      "expected": 109,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 109,
+      "reasons": {},
+      "storm_id": "EP042026"
+    },
+    {
+      "expected": 193,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 193,
+      "reasons": {},
+      "storm_id": "EP052026"
+    },
+    {
+      "expected": 307,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 307,
+      "reasons": {},
+      "storm_id": "EP062026"
+    },
+    {
+      "expected": 307,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 307,
+      "reasons": {},
+      "storm_id": "EP072026"
+    },
+    {
+      "expected": 121,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 121,
+      "reasons": {},
+      "storm_id": "EP082026"
+    },
+    {
+      "expected": 133,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 133,
+      "reasons": {},
+      "storm_id": "EP092026"
+    },
+    {
+      "expected": 139,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 139,
+      "reasons": {},
+      "storm_id": "EP102026"
+    },
+    {
+      "expected": 313,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 313,
+      "reasons": {},
+      "storm_id": "EP112026"
+    },
+    {
+      "expected": 391,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 391,
+      "reasons": {},
+      "storm_id": "EP122026"
+    },
+    {
+      "expected": 235,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 235,
+      "reasons": {},
+      "storm_id": "EP132026"
+    },
+    {
+      "expected": 187,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 187,
+      "reasons": {},
+      "storm_id": "EP142026"
+    },
+    {
+      "expected": 173,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 173,
+      "reasons": {},
+      "storm_id": "EP152025"
+    },
+    {
+      "expected": 531,
+      "gaps": 4,
+      "pending": 0,
+      "predictions": 527,
+      "reasons": {
+        "missing_scan": 3,
+        "stale_or_missing_center": 1
+      },
+      "storm_id": "EP152026"
+    },
+    {
+      "expected": 181,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 181,
+      "reasons": {},
+      "storm_id": "EP162025"
+    },
+    {
+      "expected": 265,
+      "gaps": 3,
+      "pending": 0,
+      "predictions": 262,
+      "reasons": {
+        "missing_scan": 3
+      },
+      "storm_id": "EP162026"
+    },
+    {
+      "expected": 79,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 79,
+      "reasons": {},
+      "storm_id": "EP172025"
+    },
+    {
+      "expected": 301,
+      "gaps": 3,
+      "pending": 0,
+      "predictions": 298,
+      "reasons": {
+        "missing_scan": 3
+      },
+      "storm_id": "EP172026"
+    },
+    {
+      "expected": 133,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 133,
+      "reasons": {},
+      "storm_id": "EP182025"
+    },
+    {
+      "expected": 183,
+      "gaps": 1,
+      "pending": 0,
+      "predictions": 182,
+      "reasons": {
+        "stale_or_missing_center": 1
+      },
+      "storm_id": "EP182026"
+    },
+    {
+      "expected": 127,
+      "gaps": 0,
+      "pending": 0,
+      "predictions": 127,
+      "reasons": {},
+      "storm_id": "EP192026"
+    }
+  ],
+  "totals": {
+    "expected": 7070,
+    "gaps": 17,
+    "pending": 0,
+    "predictions": 7053
+  }
+}

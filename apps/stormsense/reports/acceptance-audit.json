@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-10-02T14:32:59.513010+00:00",
+  "release": "20261002T143251092386Z",
+  "database_records": {
+    "live/ready": 8,
+    "hindcast/ready": 7075,
+    "hindcast/gap": 19
+  },
+  "forecast_issues": {
+    "hindcast": 6615,
+    "live": 4
+  },
+  "public_storms": 38,
+  "coverage": {
+    "expected": 7070,
+    "gaps": 17,
+    "pending": 0,
+    "predictions": 7053
+  },
+  "complete": true,
+  "referenced_series_bytes": 14009179,
+  "provenance_limits": {
+    "imagery_retrieval_timestamp_not_recorded": 881
+  },
+  "checks": [
+    "finite nonnegative numerical values",
+    "scan end within preceding 30 minutes",
+    "channel/unit metadata where recorded agrees with the pinned model contract",
+    "at least 90% valid crop coverage",
+    "NHC/CPHC source snapshot retrieval times available",
+    "live fixes no older than six hours and not future dated",
+    "exact forecast input and valid times",
+    "no future-generated live forecast inputs",
+    "gaps have reasons and no substitute metrics",
+    "content-addressed object hashes",
+    "zero pending hours and no historical discovery failures"
+  ]
+}

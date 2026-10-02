@@ -1,0 +1,352 @@
+{
+  "checkpoint_hashes": {
+    "forecast": "2aee3963b7714575f9ed7a0bb04cbba014edb2645ad0c1c6dd172a004e5c0129",
+    "nowcast": "5c6ff493e54ea4ab4ff3c5e7055998e6a29124f104842b168415144cb3ab358a"
+  },
+  "device": "cpu",
+  "generated_at": "2026-10-02T12:23:18Z",
+  "imagery_retained": false,
+  "note": "Observed byte counts and runtimes for these probes; throughput varies with network and shared compute.",
+  "samples": [
+    {
+      "center": {
+        "age_hours": 0.0,
+        "fix_time": "2026-10-02T06:00:00Z",
+        "lat": 23.2,
+        "lon": -166.4,
+        "method": "historical_fix"
+      },
+      "channel_kelvin": {
+        "CMI_C07": {
+          "max": 298.03271484375,
+          "median": 278.12652587890625,
+          "min": 221.8915252685547
+        },
+        "CMI_C08": {
+          "max": 250.18112182617188,
+          "median": 234.21067810058594,
+          "min": 210.2127685546875
+        },
+        "CMI_C09": {
+          "max": 258.0277404785156,
+          "median": 242.53163146972656,
+          "min": 210.396240234375
+        },
+        "CMI_C10": {
+          "max": 263.5564880371094,
+          "median": 250.13629150390625,
+          "min": 211.1728515625
+        },
+        "CMI_C11": {
+          "max": 293.62469482421875,
+          "median": 267.54254150390625,
+          "min": 211.41372680664062
+        },
+        "CMI_C12": {
+          "max": 270.50408935546875,
+          "median": 252.44680786132812,
+          "min": 218.93214416503906
+        },
+        "CMI_C13": {
+          "max": 297.02496337890625,
+          "median": 268.81787109375,
+          "min": 211.0517578125
+        },
+        "CMI_C14": {
+          "max": 296.9294128417969,
+          "median": 267.48284912109375,
+          "min": 210.6246337890625
+        },
+        "CMI_C15": {
+          "max": 293.9306945800781,
+          "median": 265.5797424316406,
+          "min": 210.18820190429688
+        },
+        "CMI_C16": {
+          "max": 276.39691162109375,
+          "median": 257.55902099609375,
+          "min": 211.1252899169922
+        }
+      },
+      "imagery": {
+        "bands": [
+          "CMI_C07",
+          "CMI_C08",
+          "CMI_C09",
+          "CMI_C10",
+          "CMI_C11",
+          "CMI_C12",
+          "CMI_C13",
+          "CMI_C14",
+          "CMI_C15",
+          "CMI_C16"
+        ],
+        "end": "2026-10-02T05:59:52Z",
+        "etag": "\"30f013504323a25901a50ab54f34a542\"",
+        "grid": {
+          "crop": [
+            32,
+            224
+          ],
+          "height": 256,
+          "resolution_degrees": 0.027,
+          "width": 256
+        },
+        "published_at": "2026-10-02T06:00:49Z",
+        "range_bytes": 20316160,
+        "retrieved_at": "2026-10-02T12:22:58Z",
+        "satellite": 18,
+        "size_bytes": 262338047,
+        "start": "2026-10-02T05:50:20Z",
+        "units": "K",
+        "url": "https://noaa-goes18.s3.amazonaws.com/ABI-L2-MCMIPF/2026/275/05/OR_ABI-L2-MCMIPF-M6_G18_s20262750550208_e20262750559522_c20262750600010.nc",
+        "valid_fraction": 1.0
+      },
+      "inference_seconds": 0.18340021604672074,
+      "metrics": {
+        "r34_km": 180.16111755371094,
+        "r50_km": 85.08385467529297,
+        "r64_km": 63.462615966796875,
+        "rmw_km": 58.11845397949219,
+        "vmax_ms": 34.380149841308594
+      },
+      "preprocessing_max_abs_error": {
+        "condition": 2.5033950805664062e-06,
+        "condition_mask": 0.0,
+        "target_norm_offset": 0.0,
+        "target_norm_scale": 0.0
+      },
+      "regime": "Central Pacific",
+      "storm_id": "EP152026",
+      "time": "2026-10-02T06:00:00Z",
+      "total_seconds": 9.880172741948627
+    },
+    {
+      "center": {
+        "age_hours": 0.0,
+        "fix_time": "2025-11-01T06:00:00Z",
+        "lat": 46.6,
+        "lon": -51.3,
+        "method": "historical_fix"
+      },
+      "channel_kelvin": {
+        "CMI_C07": {
+          "max": 289.8999938964844,
+          "median": 272.6654052734375,
+          "min": 209.30609130859375
+        },
+        "CMI_C08": {
+          "max": 257.32135009765625,
+          "median": 245.87164306640625,
+          "min": 209.3255157470703
+        },
+        "CMI_C09": {
+          "max": 268.7818603515625,
+          "median": 252.56600952148438,
+          "min": 208.99905395507812
+        },
+        "CMI_C10": {
+          "max": 272.7860107421875,
+          "median": 256.3724365234375,
+          "min": 209.67617797851562
+        },
+        "CMI_C11": {
+          "max": 287.990966796875,
+          "median": 270.3072509765625,
+          "min": 209.64015197753906
+        },
+        "CMI_C12": {
+          "max": 260.530029296875,
+          "median": 247.19979858398438,
+          "min": 213.59060668945312
+        },
+        "CMI_C13": {
+          "max": 289.52764892578125,
+          "median": 271.89056396484375,
+          "min": 211.0517578125
+        },
+        "CMI_C14": {
+          "max": 289.2685241699219,
+          "median": 271.73223876953125,
+          "min": 210.38522338867188
+        },
+        "CMI_C15": {
+          "max": 287.67681884765625,
+          "median": 270.76153564453125,
+          "min": 209.890380859375
+        },
+        "CMI_C16": {
+          "max": 269.40155029296875,
+          "median": 259.26654052734375,
+          "min": 210.0787353515625
+        }
+      },
+      "imagery": {
+        "bands": [
+          "CMI_C07",
+          "CMI_C08",
+          "CMI_C09",
+          "CMI_C10",
+          "CMI_C11",
+          "CMI_C12",
+          "CMI_C13",
+          "CMI_C14",
+          "CMI_C15",
+          "CMI_C16"
+        ],
+        "end": "2025-11-01T05:59:52Z",
+        "etag": "\"d7c4317b6bc0fed098505b3c0d5b96cc\"",
+        "grid": {
+          "crop": [
+            32,
+            224
+          ],
+          "height": 256,
+          "resolution_degrees": 0.027,
+          "width": 256
+        },
+        "published_at": "2025-11-01T06:00:37Z",
+        "range_bytes": 10878976,
+        "retrieved_at": "2026-10-02T12:23:09Z",
+        "satellite": 19,
+        "size_bytes": 237592257,
+        "start": "2025-11-01T05:50:20Z",
+        "units": "K",
+        "url": "https://noaa-goes19.s3.amazonaws.com/ABI-L2-MCMIPF/2025/305/05/OR_ABI-L2-MCMIPF-M6_G19_s20253050550209_e20253050559522_c20253050559594.nc",
+        "valid_fraction": 1.0
+      },
+      "inference_seconds": 0.1526670689927414,
+      "metrics": {
+        "r34_km": 163.52635192871094,
+        "r50_km": 76.84232330322266,
+        "r64_km": 65.4466552734375,
+        "rmw_km": 72.33075714111328,
+        "vmax_ms": 24.021257400512695
+      },
+      "preprocessing_max_abs_error": {
+        "condition": 8.344650268554688e-07,
+        "condition_mask": 0.0,
+        "target_norm_offset": 0.0,
+        "target_norm_scale": 0.0
+      },
+      "regime": "GOES-East",
+      "storm_id": "AL132025",
+      "time": "2025-11-01T06:00:00Z",
+      "total_seconds": 10.785083287046291
+    },
+    {
+      "center": {
+        "age_hours": 0.0,
+        "fix_time": "2026-10-02T06:00:00Z",
+        "lat": 14.8,
+        "lon": -120.5,
+        "method": "historical_fix"
+      },
+      "channel_kelvin": {
+        "CMI_C07": {
+          "max": 298.6875305175781,
+          "median": 277.2752685546875,
+          "min": 197.30999755859375
+        },
+        "CMI_C08": {
+          "max": 239.91441345214844,
+          "median": 230.11244201660156,
+          "min": 190.86233520507812
+        },
+        "CMI_C09": {
+          "max": 253.7938232421875,
+          "median": 237.91665649414062,
+          "min": 189.65008544921875
+        },
+        "CMI_C10": {
+          "max": 266.64959716796875,
+          "median": 246.09527587890625,
+          "min": 190.86795043945312
+        },
+        "CMI_C11": {
+          "max": 293.31170654296875,
+          "median": 263.57806396484375,
+          "min": 190.182861328125
+        },
+        "CMI_C12": {
+          "max": 273.4348449707031,
+          "median": 251.92684936523438,
+          "min": 209.47808837890625
+        },
+        "CMI_C13": {
+          "max": 295.7958984375,
+          "median": 263.53289794921875,
+          "min": 188.31402587890625
+        },
+        "CMI_C14": {
+          "max": 295.25360107421875,
+          "median": 260.7197265625,
+          "min": 187.22299194335938
+        },
+        "CMI_C15": {
+          "max": 292.3821105957031,
+          "median": 257.83685302734375,
+          "min": 186.89990234375
+        },
+        "CMI_C16": {
+          "max": 277.7188720703125,
+          "median": 249.957763671875,
+          "min": 188.48678588867188
+        }
+      },
+      "imagery": {
+        "bands": [
+          "CMI_C07",
+          "CMI_C08",
+          "CMI_C09",
+          "CMI_C10",
+          "CMI_C11",
+          "CMI_C12",
+          "CMI_C13",
+          "CMI_C14",
+          "CMI_C15",
+          "CMI_C16"
+        ],
+        "end": "2026-10-02T05:59:52Z",
+        "etag": "\"30f013504323a25901a50ab54f34a542\"",
+        "grid": {
+          "crop": [
+            32,
+            224
+          ],
+          "height": 256,
+          "resolution_degrees": 0.027,
+          "width": 256
+        },
+        "published_at": "2026-10-02T06:00:49Z",
+        "range_bytes": 23855104,
+        "retrieved_at": "2026-10-02T12:23:17Z",
+        "satellite": 18,
+        "size_bytes": 262338047,
+        "start": "2026-10-02T05:50:20Z",
+        "units": "K",
+        "url": "https://noaa-goes18.s3.amazonaws.com/ABI-L2-MCMIPF/2026/275/05/OR_ABI-L2-MCMIPF-M6_G18_s20262750550208_e20262750559522_c20262750600010.nc",
+        "valid_fraction": 1.0
+      },
+      "inference_seconds": 0.14737645408604294,
+      "metrics": {
+        "r34_km": 166.72352600097656,
+        "r50_km": 78.55168914794922,
+        "r64_km": 63.260128021240234,
+        "rmw_km": 65.06927490234375,
+        "vmax_ms": 28.21335220336914
+      },
+      "preprocessing_max_abs_error": {
+        "condition": 1.1920928955078125e-07,
+        "condition_mask": 0.0,
+        "target_norm_offset": 0.0,
+        "target_norm_scale": 0.0
+      },
+      "regime": "GOES-West",
+      "storm_id": "EP192026",
+      "time": "2026-10-02T06:00:00Z",
+      "total_seconds": 8.826260145986453
+    }
+  ],
+  "schema_version": 1
+}

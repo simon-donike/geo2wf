@@ -1,0 +1,64 @@
+{
+  "python": {
+    "passed": 222,
+    "command": ".venv/bin/pytest -q"
+  },
+  "web_unit": {
+    "passed": 10,
+    "command": "npm test"
+  },
+  "browser": {
+    "passed": 14,
+    "command": "npm run test:e2e",
+    "devices": [
+      "desktop",
+      "mobile"
+    ]
+  },
+  "real_export_refresh": {
+    "passed": true,
+    "command": "npm run test:export-refresh"
+  },
+  "worker_types": {
+    "passed": true,
+    "command": "npm run check:worker"
+  },
+  "production_build_and_deployment_dry_run": {
+    "passed": true,
+    "command": "npm run deploy:check"
+  },
+  "existing_docs": {
+    "passed": true,
+    "commands": [
+      "mkdocs build --strict",
+      "python scripts/check_site_links.py"
+    ],
+    "pages": 23,
+    "missing_links": 0
+  },
+  "portable_wheel": {
+    "passed": true,
+    "note": "Both pinned models loaded from bootstrapped assets with the wheel extracted outside the research checkout."
+  },
+  "finite_live_cycle": {
+    "passed": true,
+    "slot": "2026-10-02T14:00:00Z",
+    "ready": 2,
+    "repeat_new_estimates": 0
+  },
+  "docker_build": {
+    "tested": false,
+    "reason": "No Docker engine is installed on this workstation."
+  },
+  "continuous_scheduling_active": false,
+  "website_deployed": true,
+  "website_url": "https://stormsense.hyperalislabs.workers.dev",
+  "hosted_browser": {
+    "passed": 14,
+    "targets": [
+      "desktop",
+      "mobile"
+    ],
+    "scope": "deployed HTTPS website"
+  }
+}
