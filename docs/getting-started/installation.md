@@ -13,12 +13,28 @@ This installs the locked dependencies and the `geo2wf-train`, `geo2wf-export`,
 ## Get data and model files
 
 - [Dataset on Hugging Face](https://huggingface.co/datasets/simon-donike/geo2wf-data): imagery, caches, labels, indexes, and reference results.
-- [Model repository on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models): the linked destination for model releases; see [availability and checkpoint requirements](../models/index.md#checkpoints).
+- [Models on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models): 21 checkpoints, original configurations, provenance, and matching source code.
 
-Read the [dataset guide](../data/index.md) before downloading large assets.
-Current training consumes a [local raster export or task cache](../data/dataset-contract.md).
-The Hub catalog and the original export layout are different; release-specific
-catalog tools are not included in this checkout.
+Download without logging in, starting with the small metadata files:
+
+```bash
+uv tool install huggingface_hub
+python3 scripts/download_artifacts.py
+python3 scripts/download_artifacts.py all --dry-run
+python3 scripts/download_artifacts.py all
+```
+
+The script saves pinned releases under `downloads/data/` and `downloads/models/`.
+Use `data` or `models` instead of `all` to fetch one release, and
+`--output-dir /path/to/storage` to choose another destination. The full download
+includes about 32.9 GB of scientific assets and 1.27 GB of checkpoint weights,
+plus metadata and source files.
+
+Read the [dataset guide](../data/index.md#use-the-downloads) for selective
+downloads and using the matching source archive for reproduction. Current
+training in this checkout consumes a
+[local raster export or task cache](../data/dataset-contract.md); the Hub
+catalog uses the loaders in the released source archive.
 
 Once data are available locally, run the [first experiment](first-experiment.md)
 or select a [model preset](../models/index.md). Inference requires a compatible

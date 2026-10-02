@@ -20,11 +20,35 @@ paper's instantaneous reconstruction comparisons.
 
 ## Checkpoints
 
-At the **1 October 2026** documentation check, the linked Hugging Face model
-repository existed but contained only `.gitattributes`; checkpoint files and
-a model card were not yet available. Check its
-[Files tab](https://huggingface.co/simon-donike/geo2wf-models/tree/main)
-for availability. Checkpoint binaries are not bundled in this Git repository.
+The **2 October 2026** release contains **21 PyTorch Lightning checkpoints**
+(1.27 GB of checkpoint files), original configurations, provenance, and a
+matching source archive. Checkpoint binaries are not bundled in Git.
+
+From the repository root:
+
+```bash
+uv tool install huggingface_hub
+python3 scripts/download_artifacts.py models --dry-run
+python3 scripts/download_artifacts.py models
+```
+
+Files are saved to `downloads/models/`. The script pins a published model
+commit and the dataset commit referenced by its `dataset-links.json`.
+Use `all` instead of `models` to fetch both releases. See the
+[download guide](../data/index.md#browse-and-download) for storage, selective
+data downloads, and [using the matching source](../data/index.md#use-the-downloads).
+
+| Release path | Contents |
+|---|---|
+| `checkpoints/` | Released model weights and pretrained initializers |
+| `release/registry.json` | Checkpoint paths, hashes, original configurations, and experiment relationships |
+| `dataset-links.json` | Matching data revision, cohorts, normalization, and split hashes |
+| `run-provenance/` | Original training and source evidence |
+| `code/conference-source.tar.gz` | Matching implementation, catalog loaders, reproduction scripts, and dependency lock |
+
+The [model card](https://huggingface.co/simon-donike/geo2wf-models) lists the
+checkpoint groups and validation limits. External dashboard ViT and ConvLSTM
+weights are not included; their available exported results are in the dataset.
 
 Use each checkpoint with its matching resolved configuration, channel order,
 normalization statistics, and data cohort. Current presets are starting points

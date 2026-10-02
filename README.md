@@ -17,12 +17,35 @@ Use Python 3.10 or 3.11:
 uv sync --frozen
 ```
 
-The repository includes data loaders, model implementations, and training
-presets. Observation rasters and checkpoint binaries are stored separately;
-see the [model guide](docs/models/index.md#checkpoints) for release availability,
-then point the commands below at your local data and model files.
-See the [dataset layout](docs/data/dataset-contract.md) and
-[dataset guide](docs/data/index.md) for the expected inputs.
+## Download data and models
+
+Both releases are public on Hugging Face; no login is required. The
+[dataset](https://huggingface.co/datasets/simon-donike/geo2wf-data) contains
+about **32.9 GB of scientific assets**, plus catalogs and reference results.
+The [model release](https://huggingface.co/simon-donike/geo2wf-models) includes
+**21 checkpoints (1.27 GB)**, configurations, provenance, and matching source code.
+These binaries are stored separately from Git.
+
+From this repository's root, install the download CLI and start with metadata:
+
+```bash
+uv tool install huggingface_hub
+python3 scripts/download_artifacts.py                 # Small metadata download
+python3 scripts/download_artifacts.py all --dry-run   # Preview full download sizes
+python3 scripts/download_artifacts.py all             # Download data and models
+```
+
+Use `data` or `models` instead of `all` to download only one release. Files go
+to `downloads/data/` and `downloads/models/`; change the parent with
+`--output-dir /path/to/storage`. Rerun the same command after an interruption;
+the Hub client reuses completed downloads. The script pins matching immutable
+data/model commits.
+
+For paper reproduction, use `downloads/models/code/conference-source.tar.gz`:
+it includes the catalog loaders and selective download tools. Follow the
+[download and reproduction guide](docs/data/index.md#use-the-downloads).
+The commands below use the current checkout and expect a
+[local raster export](docs/data/dataset-contract.md), not the Hub catalog root.
 
 ## Use a trained model
 

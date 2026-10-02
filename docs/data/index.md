@@ -35,23 +35,104 @@ are recorded in the dataset's `ATTRIBUTION.md`.
 
 ## Browse and download
 
-With the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli)
-installed, download just the metadata first:
+Both repositories are public and can be downloaded without an account or token.
+From the root of the Git checkout, use Python 3.10 or 3.11 and install the
+[Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli):
 
 ```bash
-hf download simon-donike/geo2wf-data README.md schema.json release.json SHA256SUMS \
-  --repo-type dataset \
-  --local-dir data/geo2wf-hub
+uv tool install huggingface_hub
+python3 scripts/download_artifacts.py
 ```
 
-Download catalog tables separately with `--include 'index/*'` in place of the
-four filenames. Use `--revision <full-commit-hash>` to pin a release. Scientific rasters are
-separate assets; downloading the indexes alone does not provide training data.
-The [dataset card](https://huggingface.co/datasets/simon-donike/geo2wf-data#download-and-reproduce)
-describes release-specific download profiles and source requirements.
-Those release tools are separate from this slim checkout. Its current loaders
-expect the [local export layout](dataset-contract.md), not a Hub catalog root
-passed directly to `data.root`.
+The default downloads only release guides, inventories, attribution, and checksum
+lists from both repositories. It does **not** download catalog tables, imagery,
+or model weights. Choose a larger download explicitly:
+
+| Command | Contents | Destination |
+|---|---|---|
+| `python3 scripts/download_artifacts.py metadata` | Small metadata files from both releases | Both folders below |
+| `python3 scripts/download_artifacts.py data` | Complete dataset, including all scientific assets | `downloads/data/` |
+| `python3 scripts/download_artifacts.py models` | All checkpoints, configs, provenance, and source archive | `downloads/models/` |
+| `python3 scripts/download_artifacts.py all` | Complete data and model releases | Both folders |
+
+Add `--dry-run` to inspect file sizes and cached status without downloading
+payloads, or `--output-dir /path/to/storage` to change the destination parent.
+Allow space for at least 32.9 GB of scientific assets and 1.27 GB of checkpoints,
+plus catalogs, provenance, source extraction, and working files. The dry run
+reports the complete release sizes. If interrupted, rerun the same command;
+the Hub client reuses completed files and its download cache.
+
+The script pins this matching pair from the 2 October 2026 release:
+
+| Repository | Immutable commit |
+|---|---|
+| `simon-donike/geo2wf-models` | `b4399d426b80698d4cf73a77c9541071a8ab3d42` |
+| `simon-donike/geo2wf-data` | `043c7f23e5f0a1fbda7034c342113664fb6aa81e` |
+
+The data commit comes from the model release's `dataset-links.json`. To select
+another release manually, use `hf download` with `--revision <full-commit-hash>`
+and obtain its matching data revision from that file. For example, to fetch
+only catalog tables for this release:
+
+```bash
+hf download simon-donike/geo2wf-data --repo-type dataset \
+  --revision 043c7f23e5f0a1fbda7034c342113664fb6aa81e \
+  --include 'index/*' --local-dir downloads/data
+```
+
+After a **complete** download, verify each release against its checksum list
+(Linux; on macOS use `shasum -a 256 -c SHA256SUMS`):
+
+```bash
+(cd downloads/data && sha256sum -c SHA256SUMS)
+(cd downloads/models && sha256sum -c SHA256SUMS)
+```
+
+Partial downloads will report missing files with this full-release check.
+Selective dataset downloads through the release tools below verify the assets
+they fetch.
+
+## Use the downloads
+
+The Hub dataset is a catalog with referenced assets. This checkout's loaders
+expect the [local export layout](dataset-contract.md), so passing
+`downloads/data` directly as `data.root` will not work. For released models and
+paper reproduction, use the matching source archive supplied with the models.
+
+After downloading `models` (or `all`), run these commands from the Git checkout
+root. Extract into a new directory:
+
+```bash
+download_root="$(pwd)/downloads"
+mkdir -p "$download_root/source"
+tar -xzf "$download_root/models/code/conference-source.tar.gz" \
+  -C "$download_root/source"
+cd "$download_root/source/geo2wf"
+uv sync --frozen --group dev --group docs
+```
+
+If you changed `--output-dir`, set `download_root` to that absolute path.
+The archive includes `scripts/release_hub.py`, `scripts/conference_release.py`,
+and catalog loaders that are separate from this Git checkout. From the
+extracted source, download just the paper evaluation data and run an evaluation:
+
+```bash
+uv run python scripts/release_hub.py download \
+  --repo-id simon-donike/geo2wf-data \
+  --revision 043c7f23e5f0a1fbda7034c342113664fb6aa81e \
+  --root "$download_root/data" --profile paper-eval
+uv run python scripts/conference_release.py evaluate-architecture \
+  --artifact-root "$download_root/models" --catalog-root "$download_root/data" \
+  --era5 with-era5 --output build/paper-results
+```
+
+The release downloader supports `index-only`, `paper-eval`, `train`, `storms`,
+and `all` profiles, with `--cohort`, `--split`, and `--storm` filters. These
+are different from the four simple download choices in this checkout's script.
+See the downloaded `models/README.md`, `models/release/hosting/README.md`, and
+the extracted `docs/reproduction.md` for training, offline use, and storm runs.
+For new work with this checkout, follow the [local data contract](dataset-contract.md)
+and [first experiment](../getting-started/first-experiment.md).
 
 ## Inputs and targets
 

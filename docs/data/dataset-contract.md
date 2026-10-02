@@ -3,8 +3,8 @@
 The current loaders read local raster exports or task-specific caches. The
 [Hugging Face release](index.md) stores scientific assets in a catalog layout;
 its root is not interchangeable with the export root below. Use the original
-export manifests with their referenced files, or the release-specific tooling
-documented on the Hub to obtain a compatible view.
+export manifests with their referenced files, or follow the
+[released source workflow](index.md#use-the-downloads) for catalog loading.
 
 ## Paired raster export
 
