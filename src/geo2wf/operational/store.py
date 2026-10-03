@@ -30,6 +30,9 @@ class Store:
           CREATE TABLE IF NOT EXISTS forecasts(storm_id TEXT NOT NULL, time TEXT NOT NULL,
             kind TEXT NOT NULL, model TEXT NOT NULL, body TEXT NOT NULL,
             PRIMARY KEY(storm_id,time,kind,model));
+          CREATE TABLE IF NOT EXISTS visuals(storm_id TEXT NOT NULL, time TEXT NOT NULL,
+            version TEXT NOT NULL, status TEXT NOT NULL, body TEXT NOT NULL,
+            PRIMARY KEY(storm_id,time,version));
         """
         )
 
@@ -145,11 +148,33 @@ class Store:
             )
         ]
 
+    def visuals(self, sid, version):
+        return [
+            json.loads(row[0])
+            for row in self.db.execute(
+                "SELECT body FROM visuals WHERE storm_id=? AND version=? ORDER BY time",
+                (sid, version),
+            )
+        ]
+
+    def put_visual(self, body):
+        with self.db:
+            self.db.execute(
+                "INSERT OR REPLACE INTO visuals VALUES (?,?,?,?,?)",
+                (
+                    body["storm_id"],
+                    body["time"],
+                    body["version"],
+                    body["status"],
+                    encoded(body).decode(),
+                ),
+            )
+
     def retain(self, cutoff):
         """Keep forecast context separately from the public retention window."""
         with self.db:
             counts = {}
-            for table in ("samples", "forecasts"):
+            for table in ("samples", "forecasts", "visuals"):
                 counts[table] = self.db.execute(
                     f"DELETE FROM {table} WHERE time < ?", (iso(cutoff),)
                 ).rowcount

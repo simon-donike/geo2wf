@@ -7,6 +7,7 @@ from datetime import timedelta
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 
 from . import SCHEMA_VERSION
@@ -22,8 +23,23 @@ from .common import (
     year_before,
 )
 from .models import MANIFEST, version
+from .geocolor import VERSION as IMAGE_VERSION, asset_root, frame_files
 
 REMOTE = "r2:tcd/explorer/stormsense"
+IMAGE_PATH = r"imagery/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?)"
+
+
+def image_references(catalog, read):
+    """A release pins its complete asset set without bloating the browser catalog."""
+    manifest = catalog.get("imagery", {}).get("manifest")
+    if not manifest:
+        return set()
+    if not re.fullmatch(r"objects/[a-f0-9]{64}\.json", manifest):
+        raise ValueError("invalid imagery manifest")
+    paths = read(manifest)["files"]
+    if any(not re.fullmatch(IMAGE_PATH, path) for path in paths):
+        raise ValueError("invalid imagery asset path")
+    return {manifest, *paths}
 
 
 def coverage(store, start, end):
@@ -103,6 +119,8 @@ def _export_release(store, output, start=None, end=None, release=None):
     report = coverage(store, start, end)
     accounted = {row["storm_id"]: row for row in report["storms"]}
     summaries = []
+    image_files = set()
+    image_counts = Counter()
     for storm in store.storms():
         records = [
             s
@@ -117,6 +135,26 @@ def _export_release(store, output, start=None, end=None, release=None):
             for f in store.forecasts(storm["id"])
             if start <= utc(f["anchor_time"]) <= end
         ]
+        visuals = [
+            v
+            for v in store.visuals(storm["id"], IMAGE_VERSION)
+            if start <= utc(v["time"]) <= end
+        ]
+        visual_counts = {
+            "ready": sum(v["status"] == "ready" for v in visuals),
+            "gaps": sum(v["status"] == "gap" for v in visuals),
+        }
+        for visual in visuals:
+            for key in frame_files(visual):
+                if not re.fullmatch(IMAGE_PATH, key):
+                    raise ValueError("invalid imagery asset path")
+                source, target = asset_root(store) / key, output / key
+                if not source.is_file():
+                    raise FileNotFoundError(source)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if not target.exists():
+                    shutil.copy2(source, target)
+                image_files.add(key)
         provenance = {
             key: store.source(storm.get(key + "_snapshot"))
             for key in ("track", "advisory")
@@ -140,6 +178,10 @@ def _export_release(store, output, start=None, end=None, release=None):
             "forecasts": forecasts,
             "provenance": provenance,
         }
+        if visuals:
+            series["imagery"] = [
+                {k: v for k, v in frame.items() if k != "files"} for frame in visuals
+            ]
         object_path = f"objects/{digest(series)}.json"
         if not (output / object_path).exists():
             write_json(output / object_path, series)
@@ -168,6 +210,9 @@ def _export_release(store, output, start=None, end=None, release=None):
             ):
                 unique[row["time"]] = row
         counts = accounted.get(storm["id"], {})
+        visual_counts["expected"] = counts.get("expected", 0)
+        visual_counts["pending"] = max(0, visual_counts["expected"] - len(visuals))
+        image_counts.update(visual_counts)
         advisory = storm.get("advisory")
         references = ([advisory] if advisory else []) + track[-1:]
         latest_fix = (
@@ -205,9 +250,18 @@ def _export_release(store, output, start=None, end=None, release=None):
                 "expected_count": counts.get("expected", 0),
                 "pending_count": counts.get("pending", 0),
                 "series": object_path,
+                "imagery_coverage": visual_counts,
             }
         )
     evaluation = store.get_status("evaluation")
+    image_manifest = {
+        "schema_version": 1,
+        "version": IMAGE_VERSION,
+        "files": sorted(image_files),
+    }
+    image_manifest_path = f"objects/{digest(image_manifest)}.json"
+    if not (output / image_manifest_path).exists():
+        write_json(output / image_manifest_path, image_manifest)
     catalog = {
         "schema_version": SCHEMA_VERSION,
         "release": release,
@@ -223,6 +277,13 @@ def _export_release(store, output, start=None, end=None, release=None):
             for key in ("discovery", "update", "backfill", "history")
         },
         "coverage": report["totals"],
+        "imagery": {
+            "version": IMAGE_VERSION,
+            "manifest": image_manifest_path,
+            "coverage": dict(image_counts),
+            "source": "NASA GIBS GOES GeoColor",
+            "status": store.get_status("geocolor"),
+        },
         "reports": {
             "coverage": f"releases/{release}/coverage.json",
             "evaluation": f"releases/{release}/evaluation.json" if evaluation else None,
@@ -256,6 +317,39 @@ def publish(output, remote=REMOTE, run=subprocess.run):
     for storm in catalog["storms"]:
         if not (output / storm["series"]).is_file():
             raise FileNotFoundError(storm["series"])
+    assets = image_references(
+        catalog, lambda key: json.loads((output / key).read_text())
+    )
+    for key in assets:
+        if not (output / key).is_file():
+            raise FileNotFoundError(key)
+    if any(key.startswith("imagery/") for key in assets):
+        # Every display image and georeferencing sidecar precedes the release
+        # catalog and pointer. Never publish a partially available image archive.
+        run(
+            [
+                "rclone",
+                "copy",
+                str(output / "imagery"),
+                remote + "/imagery",
+                "--immutable",
+                "--checksum",
+                "--s3-no-head",
+                "--transfers",
+                "16",
+                "--checkers",
+                "16",
+                "--include",
+                "*.webp",
+                "--include",
+                "*.webp.aux.xml",
+                "--include",
+                "*.json",
+            ],
+            check=True,
+        )
+    # Restored exports can have different mtimes but identical bytes. Compare
+    # hashes so repeated publication neither rejects nor rewrites R2 metadata.
     run(
         [
             "rclone",
@@ -263,6 +357,8 @@ def publish(output, remote=REMOTE, run=subprocess.run):
             str(output / "objects"),
             remote + "/objects",
             "--immutable",
+            "--checksum",
+            "--s3-no-head",
             "--include",
             "*.json",
         ],
@@ -275,13 +371,42 @@ def publish(output, remote=REMOTE, run=subprocess.run):
             str(output / "releases" / release),
             remote + "/releases/" + release,
             "--immutable",
+            "--checksum",
+            "--s3-no-head",
             "--include",
             "*.json",
         ],
         check=True,
     )
+    # This endpoint returns a version ID but rejects version-specific HEADs.
+    # Avoid rclone's post-PUT HEAD, then independently compare normal object
+    # checksums before making the release visible. Upload success alone is not
+    # sufficient to advance the pointer.
+    directories = ["objects", "releases/" + release]
+    if any(key.startswith("imagery/") for key in assets):
+        directories.insert(0, "imagery")
+    for directory in directories:
+        run(
+            [
+                "rclone",
+                "check",
+                str(output / directory),
+                remote + "/" + directory,
+                "--one-way",
+                "--checkers",
+                "16",
+            ],
+            check=True,
+        )
     run(
-        ["rclone", "copyto", str(output / "latest.json"), remote + "/latest.json"],
+        [
+            "rclone",
+            "copyto",
+            "--checksum",
+            "--s3-no-head",
+            str(output / "latest.json"),
+            remote + "/latest.json",
+        ],
         check=True,
     )
 
@@ -295,8 +420,12 @@ def prune_local(output, keep=7, apply=False):
     references = set()
     for path in releases:
         if path.parent.name in retained:
+            catalog = json.loads(path.read_text())
+            references.update(s["series"] for s in catalog["storms"])
             references.update(
-                s["series"] for s in json.loads(path.read_text())["storms"]
+                image_references(
+                    catalog, lambda key: json.loads((output / key).read_text())
+                )
             )
     obsolete = [
         p
@@ -308,6 +437,12 @@ def prune_local(output, keep=7, apply=False):
         for path in releases
         if path.parent.name not in retained
         for p in path.parent.glob("*.json")
+    ]
+    obsolete += [
+        p
+        for p in (output / "imagery").glob("*")
+        if re.fullmatch(IMAGE_PATH, str(p.relative_to(output)))
+        and str(p.relative_to(output)) not in references
     ]
     if apply:
         for path in obsolete:
@@ -324,6 +459,11 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
     A 24-hour grace period protects newly uploaded, not-yet-referenced objects.
     Serialize publication and GC on the runner; do not run a second publisher.
     """
+
+    def modified(row):
+        # Rclone emits nanosecond RFC3339 times; Python 3.10 accepts at most
+        # microseconds. Sub-microsecond precision is irrelevant to a day of grace.
+        return utc(re.sub(r"(\.\d{6})\d+", r"\1", row["ModTime"]))
 
     def read(key):
         return json.loads(
@@ -344,8 +484,10 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
                 REMOTE,
                 "--recursive",
                 "--files-only",
-                "--include",
-                "*.json",
+                # Retention grace starts at upload time. Also avoids a HEAD
+                # request per image just to retrieve its original file mtime.
+                "--use-server-modtime",
+                "--no-mimetype",
             ],
             check=True,
             capture_output=True,
@@ -368,11 +510,15 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
     retained = (
         set(catalogs[: max(1, keep)])
         | {latest}
-        | {key for key in catalogs if utc(files[key]["ModTime"]) >= cutoff}
+        | {key for key in catalogs if modified(files[key]) >= cutoff}
     )
     references = set()
     for key in retained:
         catalog = read(key)
+        image_refs = image_references(catalog, read)
+        if not image_refs.issubset(files):
+            raise ValueError("Remote imagery assets are missing; refusing retention")
+        references.update(image_refs)
         for storm in catalog["storms"]:
             path = storm["series"]
             if (
@@ -395,10 +541,13 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
             and key.split("/")[1] in obsolete_versions
         )
         unused_object = (
-            bool(re.fullmatch(r"objects/[a-f0-9]{64}\.json", key))
+            bool(
+                re.fullmatch(r"objects/[a-f0-9]{64}\.json", key)
+                or re.fullmatch(IMAGE_PATH, key)
+            )
             and key not in references
         )
-        if (old_release or unused_object) and utc(row["ModTime"]) < cutoff:
+        if (old_release or unused_object) and modified(row) < cutoff:
             obsolete.append(key)
     if apply:
         # Recheck catalogs as well as the pointer before deleting any objects.
@@ -410,6 +559,8 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
                     REMOTE + "/releases",
                     "--recursive",
                     "--files-only",
+                    "--use-server-modtime",
+                    "--no-mimetype",
                     "--include",
                     "catalog.json",
                 ],

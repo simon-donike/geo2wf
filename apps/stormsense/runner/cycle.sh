@@ -10,6 +10,10 @@ runner_models="${STORMSENSE_MODELS:-downloads/models}"
 command_args=(-m geo2wf.operational.cli --db "$runner_db" --model-root "$runner_models" --device "$runner_device")
 update_status=0
 "$runner_python" "${command_args[@]}" update || update_status=$?
+# Optional imagery never blocks numerical publication. Revisit recent gaps as
+# GIBS finishes producing its delayed display product. This installs no timer.
+imagery_status=0
+"$runner_python" "${command_args[@]}" imagery --recent-hours 48 --active-only --workers 2 || imagery_status=$?
 # Export the recorded discovery failure as well as successes, preserving the
 # previous numerical data and the last successful source retrieval time.
 "$runner_python" "${command_args[@]}" evaluate
@@ -17,4 +21,5 @@ update_status=0
 if [[ "${STORMSENSE_PUBLISH:-0}" == "1" ]]; then
   "$runner_python" "${command_args[@]}" publish --output "$runner_export"
 fi
-exit "$update_status"
+if [[ "$update_status" != "0" ]]; then exit "$update_status"; fi
+exit "$imagery_status"

@@ -2,7 +2,7 @@
 
 Independent React/TypeScript/Vite application and NHC/CPHC prediction pipeline. The existing documentation and explorer retain their own build and R2 pointer.
 
-**Hosted website:** https://stormsense.hyperalislabs.workers.dev/ — deployed to the Hyperalis Labs Cloudflare account and reading the existing R2 archive. Automatic prediction scheduling remains inactive until its runner host is selected.
+**Hosted website:** https://stormsense.hyperalislabs.com/ — deployed to the Hyperalis Labs Cloudflare account and reading the existing R2 archive. Automatic prediction scheduling remains inactive until its runner host is selected.
 
 The completed 12-month archive, measured data-path checks, forecast evaluation and delivery limitations are recorded in the [implementation report](reports/README.md).
 
@@ -25,12 +25,40 @@ The preview is at http://127.0.0.1:5173. `bootstrap` uses the Hugging Face CLI (
 
 The local database is `var/stormsense/state.sqlite`. Generated data and logs under `var/stormsense` are excluded from Git; delivery reports under `apps/stormsense/reports` are reviewable repository artifacts. The app has its own routes `/`, `/storms/:id`, `/archive`, `/about`. Append `?time=<UTC ISO timestamp>&issue=<forecast anchor>` for a shareable selection. Auto-refresh preserves an explicitly selected time. Wind units default to knots; the toggle persists locally. JSON retains canonical m/s and km. All dates are UTC.
 
+The active map includes track history and true-scale R34/R50/R64/RMW rings at the latest estimate. Storm cards show official and model-equivalent wind categories and elapsed days/hours since the first recorded fix. Detail maps update the rings at the selected hour. Intensity charts mark NHC category thresholds in either wind unit. Estimate charts default to a light trailing three-hour filter (60/30/10% weighting), with an off switch; gaps reset the filter, and original downloads, metric tiles, map radii and issued forecasts remain unchanged. Timeline dragging updates locally and commits its shareable URL on release, keeping track paths and the slider position stable.
+
+Active-storm maps also show approximately **1,800 km GeoColor crops** from [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/access-basics/), choosing GOES-East or GOES-West by viewing geometry. “Focus … image” fits the crop to the map; the checkbox and opacity slider control visibility. Daytime imagery uses a natural-colour composite; nighttime uses an infrared blend. The UI labels the actual reported image time and age separately from prediction times. It checks for new frames every five minutes while visible, tries up to three advertised times if a crop is empty, and retains labeled previous imagery if metadata refresh fails. The active overview fetches these latest images directly into the browser. Storm detail pages instead use the saved hourly image archive described below. WMS crops and Leaflet use the same Web Mercator projection, including split crops across the dateline.
+
 After publication, restore the numerical archive into a fresh checkout without rerunning satellite inference:
 
 ```bash
 rclone copy r2:tcd/explorer/stormsense/objects apps/stormsense/public/data/objects --include '*.json'
 rclone copy r2:tcd/explorer/stormsense/releases apps/stormsense/public/data/releases --include '*.json'
 rclone copyto r2:tcd/explorer/stormsense/latest.json apps/stormsense/public/data/latest.json
+```
+
+## Hourly imagery and playback
+
+Storm detail pages keep the original single timeline slider, with play/pause and 2/4/8 hours-per-second playback. Opening a storm preloads its full image history, using eight concurrent downloads and prioritizing the selected hour and nearby previews. Compressed WebP bytes stay in memory for the open storm; distant slider jumps can decode locally without another network request. A separate 48 MiB decoded-image buffer keeps nearby 256 px previews and 768 px full frames ready. Preload progress appears in the existing imagery controls. Changing storms releases the old images; hiding imagery pauses background loading. Playback waits for its current image; scrubbing remains immediate. Unavailable hours hide imagery rather than keeping the previous picture under a new timestamp. A stopped playback commits a shareable time link.
+
+Generate the optional image archive separately from inference:
+
+```bash
+uv run --group operational geo2wf-operational imagery --start 2025-10-02T16:01:46Z --end 2026-10-02T16:01:46Z --workers 4
+# Future finite runner cycles revisit recent active hours as delayed imagery arrives:
+uv run --group operational geo2wf-operational imagery --recent-hours 48 --active-only --workers 2
+```
+
+The job uses saved hourly centers or track interpolation. It only calls NASA GIBS; unavailable data is left out with a reason, without a raw-data fallback or model rerun. Use `--limit`, `--storms` or `--retry-gaps` for a bounded retry. Completed frames resume safely. To stop gracefully, create `<db>.stop-imagery`, wait for exit, then remove it before resuming. An update request also drains and stops imagery work so inference can take priority. No new service or scheduler is activated.
+
+**Keep the WebP, `.webp.aux.xml` sidecar and STAC JSON together.** They contain EPSG:3857/WKT, exact pixel transforms, full/preview grids, WGS84 footprints, antimeridian parts, image checksums, product/retrieval/generation times and source URLs. This supports later GIS or map-engine migration independently of Leaflet. See [the imagery contract](CONTRACT.md#optional-hourly-display-imagery-gibs-geocolor-webp-v1).
+
+Processing assets are under `var/stormsense/geocolor/imagery`. Export copies referenced assets into its `imagery/` directory; publication uploads them before the release pointer. Restore a new runner's processing assets with:
+
+```bash
+rclone copy r2:tcd/explorer/stormsense/imagery var/stormsense/geocolor/imagery
+# Restore imagery for the local website preview as well:
+rclone copy r2:tcd/explorer/stormsense/imagery apps/stormsense/public/data/imagery
 ```
 
 ## Finite pipeline commands
@@ -71,7 +99,7 @@ Only one update/backfill runs for a database. An `update` requests priority: bac
 
 The evaluation command defaults to the rolling year of forecast anchors. Use `evaluate --start <UTC> --end <UTC>` to reproduce a particular archive report; preceding forecast context remains available as input but is excluded from the scored issue window.
 
-The read-only Worker serves schema-versioned JSON from R2. See [the data contract](CONTRACT.md). Raw imagery is never published.
+The read-only Worker serves schema-versioned JSON from R2. See [the data contract](CONTRACT.md). Raw numerical model inputs are never published; compact, separately sourced GeoColor display images and georeferencing metadata are published when available.
 
 ## Website hosting and deployment
 
@@ -90,13 +118,19 @@ npm run deploy
 STORMSENSE_BASE_URL=https://<deployed-hostname> npm run test:e2e
 ```
 
-Use Node 22 (`.nvmrc`); with an older system Node, prefix the commands with `npm exec --yes --package=node@22 --`. The existing rclone credentials authorize R2 data uploads, not Worker deployments. Wrangler therefore needs its own Cloudflare login. The first deployment can use the account's `workers.dev` address; a custom domain can be attached afterward. If the account has several Workers already, confirm that the new `stormsense` name is unused before the first deploy.
+Use Node 22 (`.nvmrc`); with an older system Node, prefix the commands with `npm exec --yes --package=node@22 --`. The existing rclone credentials authorize R2 data uploads, not Worker deployments. Wrangler therefore needs its own Cloudflare login. The custom domain `stormsense.hyperalislabs.com` is declared in `wrangler.jsonc`; Wrangler provisions its DNS record and HTTPS certificate in the account’s `hyperalislabs.com` zone. The `stormsense.hyperalislabs.workers.dev` address also remains available. If the account has several Workers already, confirm that the new `stormsense` name is unused before the first deploy.
 
 Hosting the website and running inference are separate deployments. The website reads R2 through its binding and stays available while the runner is stopped. For automatic updates, place the existing CPU runner on an always-on Linux host with persistent storage for SQLite and the pinned models. Install the 15-minute timer only on that selected host, enable `STORMSENSE_PUBLISH=1`, and configure state backups, retention and failure monitoring. No GPU is required by the verified CPU path. A website deployment alone does not activate prediction updates.
+
+The [hosted-runner handoff](runner/README.md) includes exact activation steps. `python3 apps/stormsense/runner/package.py` creates a portable source/model bundle and a consistent SQLite snapshot without credentials or imagery; the prepared bundle's [checksum and verification](reports/runner-bundle.json) are recorded. Server access or a selected cloud account/budget is still required to install and enable it.
 
 Local preview data in `public/data` must be excluded from production static assets: the production Vite build uses `STORMSENSE_PRODUCTION=1` through the deploy scripts. Data is served by the R2 Worker route instead.
 
 Publication uses the authenticated **rclone** remote `r2:tcd/explorer/stormsense`. It uploads content-addressed storm objects and an immutable UTC release before `rclone copyto` advances this application's `latest.json`. It never touches the existing explorer's pointer. Unchanged storm objects are reused. Local retention keeps a rolling calendar year plus 12 hours of forecast context; release cleanup preserves objects referenced by retained catalogs. Do not use an R2 lifecycle rule that deletes shared objects purely by age.
+
+Publication compares hashes with `--checksum`, including for immutable assets. This permits republishing or restoring equal bytes with different local modification times without attempting unsupported R2 metadata rewrites. Changed immutable content still fails, and a failed upload never advances the pointer. See [rclone's checksum behavior](https://rclone.org/docs/#checksum).
+
+Uploads use `--s3-no-head` because this endpoint returns a version ID but rejects the version-specific HEAD request made by the installed rclone. Publication runs a separate `rclone check --one-way` over imagery, objects and release metadata before advancing the pointer; checksum verification remains required.
 
 [`runner/cycle.sh`](runner/cycle.sh), [`runner/Dockerfile`](runner/Dockerfile) and the example systemd units provide portable, finite entry points. Nothing has installed or activated them. Once hosting is selected, schedule `cycle.sh` every 15 minutes: discovery happens each invocation, and hourly slots are idempotent. Start with `STORMSENSE_PUBLISH=0`; enable publication only for the selected runner with the existing authenticated rclone configuration. Backfill is a separate finite job and yields to recent updates.
 

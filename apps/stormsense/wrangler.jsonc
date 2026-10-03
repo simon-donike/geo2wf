@@ -3,6 +3,9 @@
   "name": "stormsense",
   "account_id": "9d9a9d8281d0329e2a5a36456ee7a9ff",
   "workers_dev": true,
+  "routes": [
+    { "pattern": "stormsense.hyperalislabs.com", "custom_domain": true },
+  ],
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-02",
   "compatibility_flags": ["nodejs_compat"],

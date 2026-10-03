@@ -73,4 +73,24 @@ describe("read-only data Worker", () => {
     expect((await read("/data/latest.json", env(true))).status).toBe(503);
     vi.restoreAllMocks();
   });
+  it("serves immutable images and GIS metadata with correct MIME types", async () => {
+    const hash = "a".repeat(64);
+    for (const [suffix, type] of [
+      ["webp", "image/webp"],
+      ["webp.aux.xml", "application/xml"],
+      ["json", "application/json"],
+    ]) {
+      const e = env();
+      const response = await read(`/data/imagery/${hash}.${suffix}`, e);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe(type);
+      expect(response.headers.get("Cache-Control")).toContain("immutable");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(
+        (await read(`/data/imagery/${hash}.${suffix}`, e, { method: "PUT" }))
+          .status,
+      ).toBe(405);
+    }
+    expect((await read(`/data/imagery/${hash}.html`, env())).status).toBe(404);
+  });
 });

@@ -1,6 +1,6 @@
 # Public data contract v1
 
-Every document has `schema_version: 1`. JSON numbers are finite; missing scalar output is `null`, never zero or an official wind value. Canonical wind units are m/s, radii km, coordinates WGS84 degrees, and timestamps UTC ISO 8601 ending in `Z`. Identity is the ATCF ID (e.g. `EP152026`), independent of current basin.
+StormSense numerical and index documents have `schema_version: 1`. Standard STAC image metadata instead uses `stac_version: 1.0.0`. JSON numbers are finite; missing scalar output is `null`, never zero or an official wind value. Canonical wind units are m/s, radii km, coordinates WGS84 degrees, and timestamps UTC ISO 8601 ending in `Z`. Identity is the ATCF ID (e.g. `EP152026`), independent of current basin.
 
 ## Release layout
 
@@ -73,3 +73,41 @@ Each prediction has `lead_hours` (6 or 12), `valid_time`, and `vmax_ms`. The 12-
 Keep the rolling 12-calendar-month public window and at least 12 preceding hours locally. Read a consistent SQLite snapshot while exporting. Published releases and storm objects are immutable; consumers should cache them. Revalidate `latest.json`, then resolve its catalog and series relative to the same data root. Do not treat the catalog's export time as the source observation time.
 
 Read-only Worker methods are GET/HEAD. It returns 404 for absent/disallowed objects, 405 for writes, 503 for source errors, and ETag-based 304 responses. Only the new StormSense prefix is accessible.
+
+## Optional hourly display imagery (gibs-geocolor-webp-v1)
+
+`series.imagery[]` is independent of `records[].imagery` (the numerical model's original input provenance). Display images never enter inference. The catalog's `imagery` contains a version, source status, coverage counts (`expected`, `ready`, `gaps`, `pending`) and an immutable `objects/<digest>.json` manifest of every referenced display asset. Storm summaries include `imagery_coverage`. Old releases without these fields remain readable.
+
+Each display record includes `storm_id`, hourly `time`, `status`, `reason`, `checked_at`, `version`, `center`, `center_kind`, and `parts`. Ready records additionally include `acquired_at`, `satellite` (East/West), `generated_at` and `metadata` (the STAC Item path). Here **`acquired_at` is the provider-reported GeoColor product timestamp**, not a reconstructed ABI scan start/end. It must fall within `[time - 30 minutes, time]`. Source retrieval and generation times are recorded independently. Center provenance identifies a saved live/hindcast position or retrospective track interpolation; these display assets do not become as-issued predictions.
+
+Only GIBS availability metadata and WMS crops are requested. Older hours get one attempt at the latest reported eligible frame. Recent hours may try up to three frames because newly listed regional imagery can still be empty. Missing centers, no reported frames, empty images, invalid dimensions and source failures remain distinct gap reasons. Raw ABI reconstruction is not a fallback. A gap is explicitly attempted work; a missing row remains pending. Interrupted jobs commit completed hours independently and resume without fetching existing ready assets.
+
+### Georeferencing and migration
+
+Every raster is north-up **EPSG:3857**, with metre coordinates and **PixelIsArea** semantics. All bounds describe **outer pixel edges**. Source WMS BBOX values are rounded to two decimals before both acquisition and transform calculation, so metadata describes the actual requested grid. Full images are 768 pixels high; previews are 256 pixels high. A dateline crop is split into two independently georeferenced parts, with widths proportional to their footprint.
+
+Each part contains:
+
+- `image`, `preview`: immutable relative WebP paths under `imagery/`.
+- `sidecar`, `preview_sidecar`: matching `.webp.aux.xml` GDAL PAM metadata. Download each WebP **together with its same-named sidecar** for automatic CRS/transform recognition in GDAL/QGIS.
+- `bbox`: `[west, south, east, north]`, canonical WGS84 longitude/latitude degrees within ±180.
+- `display_bbox`: the same footprint unwrapped around the storm for continuous antimeridian display. This is a convenience, not the raster's CRS. A future MapLibre image source can use corners `[[west,north],[east,north],[east,south],[west,south]]` from it.
+- `sha256`, `bytes`, `preview_bytes`, `source_url`, `retrieved_at`, `valid_fraction`.
+
+The STAC 1.0 Item uses the [Projection Extension v1.1](https://github.com/stac-extensions/projection/tree/v1.1.0). Its geometry is a WGS84 MultiPolygon with separate dateline pieces. Each image and preview asset has `proj:epsg`, `proj:wkt2`, `proj:bbox`, `proj:shape` (`[height,width]`) and `proj:transform` (a row-major affine matrix):
+
+```text
+[x_pixel_size, 0, xmin,
+ 0, -y_pixel_size, ymax,
+ 0, 0, 1]
+```
+
+This maps pixel **corners** to projected coordinates. Pixel `(column,row)` centers use `(column+0.5,row+0.5)`. The PAM sidecar stores equivalent GDAL order `[xmin,x_pixel_size,0,ymax,0,-y_pixel_size]`; no half-pixel offset is added to either transform. Preview transforms preserve exactly the full image's extent at the smaller shape.
+
+STAC `datetime` is the product timestamp; `stormsense:slot_time` is the hourly selection. Metadata includes the full CRS definition, source requests, retrieval timestamps, provider-availability response hashes, image checksums, centre provenance and rendering version. Asset addresses include both pixel checksum and grid, preventing identical pixels at different locations from sharing contradictory sidecars. Georeferencing is not embedded in the WebP bitstream: keep the sidecars and STAC metadata during migration. These are lossy display composites, not calibrated quantitative satellite bands.
+
+### Publication and retention
+
+Publish `imagery/*.webp`, `*.webp.aux.xml` and STAC `*.json` before the immutable numerical/index objects and release metadata. Advance `latest.json` last using `rclone copyto`. The read-only Worker serves correct image/XML/JSON MIME types and public CORS for GIS clients. Source processing state lives beside SQLite in `var/stormsense/geocolor/imagery`; no original PNG responses are retained.
+
+Release retention follows the imagery manifest as well as storm-series references. An image and all its sidecars survive while referenced by any retained release; remote deletion also observes the existing 24-hour grace period. Local processing asset cleanup follows retained SQLite visual rows. Never apply a blanket age-based R2 lifecycle to content-addressed images.

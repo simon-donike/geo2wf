@@ -1,0 +1,71 @@
+{
+  "checked_at": "2026-10-02T20:44:54.135572+00:00",
+  "url": "https://stormsense.hyperalislabs.com",
+  "worker_version": "c406c0a3-f3a5-4bb6-af7d-c5304640995b",
+  "timeline_sliders": 1,
+  "original_timeline_position_preserved": true,
+  "wind_category_labels": "left side of chart, including mobile",
+  "image_preloading": {
+    "scope": "all available full images and previews for the open storm",
+    "priority": "selected hour and nearby frames first",
+    "concurrent_downloads": 8,
+    "retention": "compressed bytes kept for open storm; freed on storm change or page exit",
+    "decoded_image_budget_bytes": 50331648,
+    "visible_progress": true,
+    "reuse_across_catalog_refresh": true,
+    "pauses_when_imagery_hidden": true
+  },
+  "scrubbing_without_network": {
+    "desktop": {
+      "storm_id": "EP152026",
+      "images": 531,
+      "project": "desktop",
+      "offline": true,
+      "p95_ms": 75.5,
+      "samples": [
+        61,
+        50.60000002384186,
+        44.699999928474426,
+        52.5,
+        52.700000047683716,
+        50.799999952316284,
+        32.10000002384186,
+        75.5,
+        50.10000002384186,
+        38.10000002384186,
+        44.09999990463257,
+        50.10000002384186
+      ]
+    },
+    "mobile": {
+      "storm_id": "EP152026",
+      "images": 531,
+      "project": "mobile",
+      "offline": true,
+      "p95_ms": 58.10000002384186,
+      "samples": [
+        28.600000023841858,
+        32.10000002384186,
+        34.700000047683716,
+        32.299999952316284,
+        33.39999997615814,
+        37.10000002384186,
+        58.10000002384186,
+        39.39999997615814,
+        36.60000002384186,
+        48.299999952316284,
+        50.89999997615814,
+        50.60000002384186
+      ]
+    }
+  },
+  "measurement_note": "Real archive on hosted website, after all 531 images loaded; Chrome desktop and mobile emulation on this workstation, not a physical phone or slow-network benchmark.",
+  "regression_fix": "Remove old Leaflet image layers before clearing their event handlers, preserving internal map-listener cleanup during provider fallback.",
+  "checks": {
+    "web_unit": 26,
+    "browser_local": 36,
+    "browser_hosted": 36,
+    "production_build_and_deploy": true
+  },
+  "data_release_unchanged": "20261002T174218736546Z"
+}

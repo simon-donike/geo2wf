@@ -81,6 +81,29 @@ export interface Series {
   track: Fix[];
   records: RecordHour[];
   forecasts: Forecast[];
+  imagery?: ImageHour[];
+}
+export interface ImageHour {
+  storm_id: string;
+  time: string;
+  status: "ready" | "gap";
+  reason: string | null;
+  version: string;
+  acquired_at?: string;
+  checked_at: string;
+  satellite?: "East" | "West";
+  metadata?: string;
+  parts: {
+    image: string;
+    preview: string;
+    sidecar: string;
+    preview_sidecar: string;
+    bbox: [number, number, number, number];
+    display_bbox: [number, number, number, number];
+    sha256: string;
+    bytes: number;
+    preview_bytes: number;
+  }[];
 }
 export interface Catalog {
   schema_version: 1;

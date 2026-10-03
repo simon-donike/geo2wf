@@ -326,11 +326,60 @@ def test_release_objects_reused_and_failed_upload_never_advances_pointer(
         and calls[-1][-1] == "r2:tcd/explorer/stormsense/latest.json"
     )
     assert not any("rcat" in c for c in calls)
+    calls.clear()
+
+    def bad_checksum(command, **kwargs):
+        calls.append(command)
+        if command[1] == "check":
+            raise CalledProcessError(1, command)
+
+    with pytest.raises(CalledProcessError):
+        publish(output, run=bad_checksum)
+    assert not any(c[1] == "copyto" for c in calls)
     obsolete = prune_local(output, keep=1, apply=True)
     assert "releases/first/catalog.json" in obsolete
     assert (output / b["storms"][0]["series"]).exists()
     with pytest.raises(FileExistsError):
         export_release(store, output, release="second")
+
+
+def test_publication_reuses_equal_bytes_with_different_mtimes_and_rejects_corruption(
+    store, tmp_path
+):
+    import os
+    import shutil
+    import subprocess
+    from geo2wf.operational.export import REMOTE
+
+    if not shutil.which("rclone"):
+        pytest.skip("rclone is required for the publication integration check")
+    store.put_storm(storm())
+    store.put_sample(sample(0))
+    output, remote = tmp_path / "export", tmp_path / "remote"
+    first = export_release(store, output, "2026-09-01", "2026-09-02", release="first")
+
+    def local_remote(command, **kwargs):
+        mapped = [
+            str(remote) + item[len(REMOTE) :] if item.startswith(REMOTE) else item
+            for item in command
+        ]
+        return subprocess.run(mapped, capture_output=True, **kwargs)
+
+    publish(output, run=local_remote)
+    object_path = remote / first["storms"][0]["series"]
+    changed_mtime = object_path.stat().st_mtime - 3600
+    os.utime(object_path, (changed_mtime, changed_mtime))
+    export_release(store, output, "2026-09-01", "2026-09-02", release="second")
+    publish(output, run=local_remote)
+    assert object_path.stat().st_mtime == changed_mtime
+    assert json.loads((remote / "latest.json").read_text())["version"] == "second"
+    # Same-sized corruption must still fail, leaving the previous pointer intact.
+    content = object_path.read_bytes()
+    object_path.write_bytes(b"!" + content[1:])
+    export_release(store, output, "2026-09-01", "2026-09-02", release="third")
+    with pytest.raises(CalledProcessError):
+        publish(output, run=local_remote)
+    assert json.loads((remote / "latest.json").read_text())["version"] == "second"
 
 
 def test_remote_retention_preserves_shared_and_recent_references():
@@ -577,7 +626,7 @@ def test_runner_exports_failure_status_and_preserves_failed_exit_code(tmp_path):
     stub.write_text(
         "#!/usr/bin/env python3\n"
         "import os,sys\n"
-        "command=next(c for c in sys.argv if c in ('update','evaluate','export','publish'))\n"
+        "command=next(c for c in sys.argv if c in ('update','imagery','evaluate','export','publish'))\n"
         "with open(os.environ['STORMSENSE_TEST_CALLS'],'a') as f: f.write(command+'\\n')\n"
         "sys.exit(7 if command=='update' else 0)\n"
     )
@@ -593,7 +642,7 @@ def test_runner_exports_failure_status_and_preserves_failed_exit_code(tmp_path):
         check=False,
     )
     assert result.returncode == 7
-    assert calls.read_text().splitlines() == ["update", "evaluate", "export"]
+    assert calls.read_text().splitlines() == ["update", "imagery", "evaluate", "export"]
 
 
 def test_discovery_never_claims_to_cover_future_storms(store, monkeypatch):

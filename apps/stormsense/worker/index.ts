@@ -9,7 +9,7 @@ export default {
       });
     const key = url.pathname.slice("/data/".length);
     if (
-      !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json)$/.test(
+      !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json|imagery\/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?))$/.test(
         key,
       )
     ) {
@@ -23,8 +23,13 @@ export default {
           { status: 404 },
         );
       const headers = new Headers({
-        "Content-Type": "application/json",
+        "Content-Type": key.endsWith(".webp")
+          ? "image/webp"
+          : key.endsWith(".xml")
+            ? "application/xml"
+            : "application/json",
         "X-Content-Type-Options": "nosniff",
+        "Access-Control-Allow-Origin": "*",
         ETag: object.httpEtag,
         "Cache-Control":
           key === "latest.json"
@@ -39,8 +44,7 @@ export default {
           const tag = value.trim();
           return tag === "*" || tag.replace(/^W\//, "") === object.httpEtag;
         });
-      if (notModified)
-        return new Response(null, { status: 304, headers });
+      if (notModified) return new Response(null, { status: 304, headers });
       return new Response(request.method === "HEAD" ? null : object.body, {
         headers,
       });

@@ -60,6 +60,18 @@ def parser():
     cmd.add_argument(
         "--output", type=Path, default=Path("var/stormsense/evaluation.json")
     )
+    cmd = sub.add_parser(
+        "imagery",
+        help="Archive easy-to-obtain hourly GeoColor WebP crops; no raw-data fallback",
+    )
+    cmd.add_argument("--start")
+    cmd.add_argument("--end")
+    cmd.add_argument("--recent-hours", type=int)
+    cmd.add_argument("--workers", type=int, default=4)
+    cmd.add_argument("--limit", type=int)
+    cmd.add_argument("--storms", nargs="+")
+    cmd.add_argument("--active-only", action="store_true")
+    cmd.add_argument("--retry-gaps", action="store_true")
     cmd = sub.add_parser("export")
     cmd.add_argument("--output", type=Path, default=Path("var/stormsense/export"))
     cmd.add_argument("--start")
@@ -132,6 +144,30 @@ def main(argv=None):
         elif args.command == "coverage":
             result = coverage(store, start, end)
             write_json(args.db.parent / "coverage.json", result)
+        elif args.command == "imagery":
+            from .geocolor import backfill_images
+
+            if not 1 <= args.workers <= 8 or (
+                args.limit is not None and args.limit < 1
+            ):
+                raise ValueError(
+                    "imagery workers must be 1–8 and limit must be positive"
+                )
+            if args.recent_hours is not None:
+                if args.recent_hours < 1:
+                    raise ValueError("recent-hours must be positive")
+                start = hour(end) - timedelta(hours=args.recent_hours)
+            with lock(str(args.db) + ".lock"):
+                result = backfill_images(
+                    store,
+                    start,
+                    end,
+                    args.workers,
+                    args.limit,
+                    args.retry_gaps,
+                    args.storms,
+                    args.active_only,
+                )
         elif args.command == "evaluate":
             result = evaluate(store, args.model_root, start, end)
             write_json(args.output, result)
@@ -154,8 +190,12 @@ def main(argv=None):
         elif args.command == "retain":
             cutoff = hour(year_before()) - timedelta(hours=12)
             result = {"cutoff": iso(cutoff), "apply": args.apply}
-            if args.apply:
-                result["database"] = store.retain(cutoff)
+            from .geocolor import retain_assets
+
+            with lock(str(args.db) + ".lock"):
+                if args.apply:
+                    result["database"] = store.retain(cutoff)
+                result["obsolete_imagery"] = retain_assets(store, apply=args.apply)
             with lock(str(args.output) + ".publish.lock"):
                 result["obsolete_files"] = prune_local(args.output, apply=args.apply)
                 if args.remote:

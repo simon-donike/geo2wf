@@ -1,14 +1,14 @@
 {
   "python": {
-    "passed": 222,
+    "passed": 232,
     "command": ".venv/bin/pytest -q"
   },
   "web_unit": {
-    "passed": 10,
+    "passed": 26,
     "command": "npm test"
   },
   "browser": {
-    "passed": 14,
+    "passed": 36,
     "command": "npm run test:e2e",
     "devices": [
       "desktop",
@@ -42,9 +42,10 @@
   },
   "finite_live_cycle": {
     "passed": true,
-    "slot": "2026-10-02T14:00:00Z",
+    "slot": "2026-10-02T16:00:00Z",
     "ready": 2,
-    "repeat_new_estimates": 0
+    "repeat_new_estimates": 0,
+    "release": "20261002T160146269421Z"
   },
   "docker_build": {
     "tested": false,
@@ -52,13 +53,39 @@
   },
   "continuous_scheduling_active": false,
   "website_deployed": true,
-  "website_url": "https://stormsense.hyperalislabs.workers.dev",
+  "website_url": "https://stormsense.hyperalislabs.com",
   "hosted_browser": {
-    "passed": 14,
+    "passed": 36,
     "targets": [
       "desktop",
       "mobile"
     ],
-    "scope": "deployed HTTPS website"
+    "scope": "deployed custom-domain HTTPS website"
+  },
+  "publication_repeated": {
+    "passed": true,
+    "checksum_comparison": true
+  },
+  "runner_bundle": {
+    "prepared": true,
+    "report": "runner-bundle.json",
+    "installed": false
+  },
+  "geocolor": {
+    "report": "geocolor.json",
+    "actual_goes_east_west_images": true,
+    "images_archived": true,
+    "hourly_archive_report": "hourly-imagery.json"
+  },
+  "hourly_imagery": {
+    "report": "hourly-imagery.json",
+    "all_expected_hours_accounted": true,
+    "all_gdal_grids_and_checksums_verified": true,
+    "hosted_api_checks_passed": true
+  },
+  "whole_storm_image_preloading": {
+    "report": "image-preloading.json",
+    "verified_offline_scrubbing": true,
+    "original_single_timeline": true
   }
 }

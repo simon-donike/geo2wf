@@ -1,0 +1,11 @@
+{
+  "path": "var/stormsense/runner.tar.gz",
+  "bytes": 82860794,
+  "sha256": "fbfc8cf1d892d9127da09eafccbb0092233c2f358b9def973bf03ff843e4b20a",
+  "files": 101,
+  "sqlite_integrity": "ok",
+  "pinned_models_verified": true,
+  "credentials_included": false,
+  "imagery_included": false,
+  "scheduler_activated": false
+}

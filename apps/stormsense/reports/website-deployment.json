@@ -1,44 +1,96 @@
 {
-  "url": "https://stormsense.hyperalislabs.workers.dev",
+  "url": "https://stormsense.hyperalislabs.com",
   "provider": "Cloudflare Workers Static Assets",
   "account": "Hyperalis Labs",
   "worker": "stormsense",
-  "version_id": "31524b8a-9f33-462a-a9dc-f93b49307825",
+  "version_id": "c406c0a3-f3a5-4bb6-af7d-c5304640995b",
   "data_bucket": "tcd",
   "data_prefix": "explorer/stormsense/",
   "verification": {
-    "url": "https://stormsense.hyperalislabs.workers.dev",
-    "checked_at": "2026-10-02T15:01:48.360Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "checked_at": "2026-10-02T17:47:09.730Z",
     "client": "Desktop Chrome HTTP profile",
     "/": 200,
     "/archive": 200,
     "/about": 200,
     "/storms/EP152026": 200,
-    "release": "20261002T143251092386Z",
+    "release": "20261002T174218736546Z",
     "storms": 38,
     "coverage": {
-      "expected": 7070,
+      "expected": 7068,
       "gaps": 17,
       "pending": 0,
-      "predictions": 7053
+      "predictions": 7051
     },
+    "window": {
+      "end": "2026-10-02T16:01:46Z",
+      "start": "2025-10-02T16:01:46Z"
+    },
+    "active": [
+      {
+        "id": "EP152026",
+        "estimate": "2026-10-02T16:00:00Z",
+        "advisory": "2026-10-02T15:00:00Z"
+      },
+      {
+        "id": "EP182026",
+        "estimate": "2026-10-02T16:00:00Z",
+        "advisory": "2026-10-02T15:00:00Z"
+      }
+    ],
     "series_loaded": 38,
     "conditional_get": 304,
     "head": 200,
     "write_rejected": 405,
-    "invalid_path": 404
+    "invalid_path": 404,
+    "imagery_coverage": {
+      "expected": 7068,
+      "gaps": 1733,
+      "pending": 0,
+      "ready": 5335
+    }
   },
   "browser_tests": {
-    "passed": 14,
+    "passed": 36,
     "targets": [
       "desktop",
       "mobile"
     ],
-    "scope": "deployed HTTPS website"
+    "scope": "deployed custom-domain HTTPS website",
+    "checked_at": "2026-10-02T20:44:54.135572+00:00"
   },
   "web_unit_tests": {
-    "passed": 10
+    "passed": 26
   },
   "continuous_inference_scheduling_active": false,
-  "verification_note": "A default Python urllib request was rejected by Cloudflare with error 1010; the browser suite and API checks using the Desktop Chrome HTTP profile passed."
+  "verification_note": "A default Python urllib request was rejected by Cloudflare with error 1010; the browser suite and API checks using the Desktop Chrome HTTP profile passed.",
+  "workers_dev_url": "https://stormsense.hyperalislabs.workers.dev",
+  "custom_domain_verification": {
+    "checked_at": "2026-10-02T17:47:09.730Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "https_certificate_verified": true,
+    "pages": {
+      "/": 200,
+      "/archive": 200,
+      "/about": 200,
+      "/storms/EP152026": 200
+    },
+    "release": "20261002T174218736546Z",
+    "coverage": {
+      "expected": 7068,
+      "gaps": 17,
+      "pending": 0,
+      "predictions": 7051
+    },
+    "storms": 38,
+    "imagery_coverage": {
+      "expected": 7068,
+      "gaps": 1733,
+      "pending": 0,
+      "ready": 5335
+    }
+  },
+  "satellite_imagery_report": "geocolor.json",
+  "hourly_imagery_report": "hourly-imagery.json",
+  "image_preloading_report": "image-preloading.json"
 }

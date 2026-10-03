@@ -39,7 +39,7 @@ export const className = (value?: string) =>
   })[value || ""] ||
   value ||
   "System";
-const root = (import.meta.env.VITE_DATA_BASE || "/data/").replace(/\/?$/, "/");
+const root = (import.meta.env?.VITE_DATA_BASE || "/data/").replace(/\/?$/, "/");
 export const dataUrl = (path: string) => root + path;
 async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(dataUrl(path), {

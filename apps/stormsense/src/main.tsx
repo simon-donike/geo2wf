@@ -17,12 +17,11 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { MapView } from "./MapView";
+import { MapView, RadiusLegend } from "./MapView";
 import { Chart, type Line } from "./Chart";
 import {
   age,
   BASINS,
-  className,
   csv,
   dataUrl,
   download,
@@ -34,7 +33,16 @@ import {
   stamp,
   wind,
 } from "./data";
-import type { Basin, Catalog, Series, Storm } from "./types";
+import type { Basin, Catalog, Fix, Series, Storm } from "./types";
+import {
+  nearestIndex,
+  officialCategory,
+  RADII,
+  smoothPoints,
+  stormAge,
+  windCategory,
+  WIND_BANDS,
+} from "./presentation";
 import "./styles.css";
 
 const UnitContext = createContext<{ unit: "kt" | "m/s"; toggle: () => void }>({
@@ -125,6 +133,21 @@ function Empty({
     </div>
   );
 }
+function StormAge({ start }: { start: string }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span
+      className="storm-age"
+      title={`Since first NHC/CPHC track fix: ${stamp(start)}`}
+    >
+      <Icon name="clock" /> Age · {stormAge(start, now)}
+    </span>
+  );
+}
 function StormCard({ storm }: { storm: Storm }) {
   const { unit } = useUnit();
   return (
@@ -134,20 +157,26 @@ function StormCard({ storm }: { storm: Storm }) {
         <Icon name="arrow" />
       </div>
       <div className="storm-name">
-        <Icon name="storm" />
+        <img className="storm-logo" src="/brand/mark.svg" alt="" />
         <h3>{storm.name}</h3>
         <span
           className={`classification ${storm.latest_fix?.classification === "HU" ? "hurricane" : ""}`}
         >
-          {className(storm.latest_fix?.classification)}
+          {officialCategory(storm.latest_fix)}
         </span>
       </div>
+      <StormAge start={storm.start} />
       <div className="card-metrics">
         <div>
           <small>StormSense intensity</small>
           <strong>
             {wind(storm.metrics?.vmax_ms, unit)} <em>{unit}</em>
           </strong>
+          <span className="wind-category">
+            {storm.metrics
+              ? `${windCategory(storm.metrics.vmax_ms)} equivalent`
+              : "Category unavailable"}
+          </span>
         </div>
         <div>
           <small
@@ -184,8 +213,50 @@ function StormCard({ storm }: { storm: Storm }) {
 function Overview({ catalog }: { catalog: Catalog }) {
   const navigate = useNavigate();
   const [basin, setBasin] = useState("all");
-  const active = catalog.storms.filter((s) => s.active);
-  const storms = active.filter((s) => basin === "all" || s.basin === basin);
+  const active = useMemo(
+    () => catalog.storms.filter((s) => s.active),
+    [catalog.storms],
+  );
+  const storms = useMemo(
+    () => active.filter((s) => basin === "all" || s.basin === basin),
+    [active, basin],
+  );
+  const [tracks, setTracks] = useState<Record<string, Fix[]>>({});
+  const [trackError, setTrackError] = useState(false);
+  const [trackRetry, setTrackRetry] = useState(0);
+  const trackKey = active
+    .map((s) => `${s.id}:${s.series}:${s.advisory?.time}`)
+    .join("|");
+  useEffect(() => {
+    const controller = new AbortController();
+    setTrackError(false);
+    void Promise.allSettled(
+      active.map(async (storm) => {
+        const series = await getSeries(storm.series, controller.signal);
+        const fixes = series.track;
+        const advisory = storm.advisory;
+        return [
+          storm.id,
+          advisory && advisory.time > (fixes.at(-1)?.time ?? "")
+            ? [...fixes, advisory]
+            : fixes,
+        ] as const;
+      }),
+    ).then((results) => {
+      if (controller.signal.aborted) return;
+      setTracks(
+        Object.fromEntries(
+          results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
+        ),
+      );
+      setTrackError(results.some((r) => r.status === "rejected"));
+    });
+    return () => controller.abort();
+  }, [trackKey, catalog.release, trackRetry]);
+  const openStorm = useCallback(
+    (id: string) => navigate(`/storms/${id}`),
+    [navigate],
+  );
   const unconfirmed =
     !catalog.source_status.discovery?.last_success ||
     Boolean(catalog.source_status.discovery?.error);
@@ -258,17 +329,23 @@ function Overview({ catalog }: { catalog: Catalog }) {
               </span>
               <span>NHC / CPHC</span>
             </div>
-            <MapView
-              storms={storms}
-              onSelect={(id) => navigate(`/storms/${id}`)}
-            />
+            <MapView storms={storms} tracks={tracks} onSelect={openStorm} />
+            <RadiusLegend />
+            {trackError && (
+              <p className="map-note" role="status">
+                Some tracks could not be loaded.{" "}
+                <button onClick={() => setTrackRetry((n) => n + 1)}>
+                  Retry tracks
+                </button>
+              </p>
+            )}
             <div className="map-bottom">
               <span>
                 <i className="dot warm" />
                 Hurricane <i className="dot teal" />
                 Other active system
               </span>
-              <span>Position times follow advisories</span>
+              <span>Rings follow latest estimates</span>
             </div>
           </div>
           <div className="storm-list">
@@ -489,46 +566,212 @@ function Detail({ catalog }: { catalog: Catalog }) {
     [series],
   );
   const requested = params.get("time");
-  const index = requested
-    ? records.reduce(
-        (best, row, i) =>
-          Math.abs(Date.parse(row.time) - Date.parse(requested)) <
-          Math.abs(Date.parse(records[best].time) - Date.parse(requested))
-            ? i
-            : best,
-        0,
-      )
-    : Math.max(0, records.length - 1);
-  const selected =
-    (params.get("issue_kind") &&
-      series?.records.find(
-        (row) =>
-          row.time === records[index]?.time &&
-          row.kind === params.get("issue_kind") &&
-          row.status === "ready",
-      )) ||
-    records[index];
-  const selectTime = useCallback(
+  const issue = params.get("issue"),
+    issueKind = params.get("issue_kind");
+  const [selection, setSelection] = useState<{
+    time: string | null;
+    issue?: string | null;
+    kind?: string | null;
+  }>(() => ({ time: requested, issue, kind: issueKind }));
+  useEffect(() => {
+    setSelection({ time: requested, issue, kind: issueKind });
+  }, [requested, issue, issueKind]);
+  const [hover, setHover] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(4);
+  const [imageReady, setImageReady] = useState(true);
+  useEffect(() => {
+    setPlaying(false);
+  }, [id]);
+  const [smoothing, setSmoothing] = useState(
+    () => localStorage.getItem("stormsense-smoothing") !== "off",
+  );
+  const times = useMemo(
+    () => records.map((r) => Date.parse(r.time)),
+    [records],
+  );
+  const index = nearestIndex(times, selection.time);
+  const recordLookup = useMemo(
+    () => new Map(series?.records.map((r) => [`${r.kind}|${r.time}`, r])),
+    [series],
+  );
+  const alternate = selection.kind
+    ? recordLookup.get(`${selection.kind}|${records[index]?.time}`)
+    : undefined;
+  const selected = alternate?.status === "ready" ? alternate : records[index];
+  const forecastLookup = useMemo(
+    () =>
+      new Map(series?.forecasts.map((f) => [`${f.kind}|${f.anchor_time}`, f])),
+    [series],
+  );
+  const selectedForecast = forecastLookup.get(
+    `${selection.kind || selected?.kind}|${selection.issue || selected?.time}`,
+  );
+  const commitTime = useCallback(
     (time: string) => {
+      if (
+        params.get("time") === time &&
+        !params.has("issue") &&
+        !params.has("issue_kind")
+      )
+        return;
       setParams(
         (prior) => {
-          prior.set("time", time);
-          prior.delete("issue");
-          prior.delete("issue_kind");
-          setHover(null);
-          return prior;
+          const next = new URLSearchParams(prior);
+          next.set("time", time);
+          next.delete("issue");
+          next.delete("issue_kind");
+          return next;
         },
-        { replace: true },
+        { replace: true, preventScrollReset: true },
       );
     },
-    [setParams],
+    [params, setParams],
   );
-  const [hover, setHover] = useState<string | null>(null);
-  const selectedForecast = series?.forecasts.find(
-    (f) =>
-      f.anchor_time === (params.get("issue") || selected?.time) &&
-      f.kind === (params.get("issue_kind") || selected?.kind),
+  const selectTime = useCallback(
+    (time: string) => {
+      setPlaying(false);
+      const selectedTime = records[nearestIndex(times, time)]?.time;
+      if (!selectedTime) return;
+      setSelection({ time: selectedTime });
+      setHover(null);
+      commitTime(selectedTime);
+    },
+    [records, times, commitTime],
   );
+  const scrub = (value: string) => {
+    setPlaying(false);
+    const time = records[Number(value)]?.time;
+    if (time) {
+      setSelection({ time });
+      setHover(null);
+    }
+  };
+  const finishScrub = (value: string) => {
+    const time = records[Number(value)]?.time;
+    if (time) commitTime(time);
+  };
+  const togglePlayback = () => {
+    if (playing) {
+      setPlaying(false);
+      if (selected) commitTime(selected.time);
+    } else {
+      if (index >= records.length - 1) setSelection({ time: records[0].time });
+      setPlaying(true);
+    }
+  };
+  useEffect(() => {
+    if (!playing || !imageReady || !records.length) return;
+    const timer = setTimeout(() => {
+      if (index >= records.length - 1) {
+        setPlaying(false);
+        commitTime(records[index].time);
+      } else {
+        setSelection({ time: records[index + 1].time });
+        setHover(null);
+      }
+    }, 1000 / playbackRate);
+    return () => clearTimeout(timer);
+  }, [playing, imageReady, index, records, playbackRate, commitTime]);
+  useEffect(() => {
+    const pauseWhenHidden = () => {
+      if (document.hidden) {
+        setPlaying(false);
+        if (selected) commitTime(selected.time);
+      }
+    };
+    document.addEventListener("visibilitychange", pauseWhenHidden);
+    return () =>
+      document.removeEventListener("visibilitychange", pauseWhenHidden);
+  }, [selected, commitTime]);
+  const factor = unit === "kt" ? 1 / KNOT : 1;
+  const intensity = useMemo(() => {
+    const points = records.map((r) => ({
+      time: r.time,
+      value: r.metrics ? r.metrics.vmax_ms * factor : null,
+    }));
+    const lines: Line[] = [
+      {
+        label: smoothing
+          ? "StormSense · lightly smoothed"
+          : "StormSense estimate",
+        color: "#40c7bd",
+        points: smoothing ? smoothPoints(points) : points,
+      },
+      {
+        label: "NHC/CPHC reference",
+        color: "#e8e2d7",
+        dashed: true,
+        gapHours: 6,
+        points: references.map((f) => ({
+          time: f.time,
+          value: f.wind_ms == null ? null : f.wind_ms * factor,
+        })),
+      },
+    ];
+    if (selectedForecast)
+      lines.push({
+        label: "Experimental forecast",
+        color: "#e9ac7a",
+        dashed: true,
+        gapHours: 6,
+        points: [
+          {
+            time: selectedForecast.anchor_time,
+            value: selectedForecast.input_vmax_ms[0] * factor,
+          },
+          ...selectedForecast.predictions.map((p) => ({
+            time: p.valid_time,
+            value: p.vmax_ms * factor,
+          })),
+        ],
+      });
+    return lines;
+  }, [records, references, factor, smoothing, selectedForecast]);
+  const structure = useMemo(
+    () =>
+      RADII.map(({ key, label, color }) => {
+        const points = records.map((r) => ({
+          time: r.time,
+          value: r.metrics?.[key] ?? null,
+        }));
+        return {
+          label,
+          color,
+          points: smoothing ? smoothPoints(points) : points,
+        };
+      }),
+    [records, smoothing],
+  );
+  const thresholds = useMemo(
+    () =>
+      WIND_BANDS.map((b) => ({
+        value: b.knots * KNOT * factor,
+        color: b.color,
+        label: `${b.short} · ${unit === "kt" ? b.knots : (b.knots * KNOT).toFixed(1)} ${unit}`,
+      })),
+    [factor, unit],
+  );
+  const forecastOptions = useMemo(
+    () =>
+      series?.forecasts
+        .slice()
+        .reverse()
+        .map((f) => (
+          <option
+            key={f.anchor_time + f.kind}
+            value={`${f.kind}|${f.anchor_time}`}
+          >
+            {stamp(f.anchor_time)} ·{" "}
+            {f.kind === "live" ? "Live" : "Retrospective"}
+          </option>
+        )),
+    [series],
+  );
+  const official = references
+    .filter((f) => f.time <= (selected?.time || storm?.end || ""))
+    .at(-1);
+  const metrics = selected?.metrics;
   if (!storm)
     return (
       <Empty title="Storm not found">
@@ -536,48 +779,6 @@ function Detail({ catalog }: { catalog: Catalog }) {
         <Link to="/archive">Browse available storms.</Link>
       </Empty>
     );
-  const factor = unit === "kt" ? 1 / KNOT : 1;
-  const intensity: Line[] = [
-    {
-      label: "StormSense estimate",
-      color: "#40c7bd",
-      points: records.map((r) => ({
-        time: r.time,
-        value: r.metrics ? r.metrics.vmax_ms * factor : null,
-      })),
-    },
-    {
-      label: "NHC/CPHC reference",
-      color: "#e8e2d7",
-      dashed: true,
-      gapHours: 6,
-      points: references.map((f) => ({
-        time: f.time,
-        value: f.wind_ms == null ? null : f.wind_ms * factor,
-      })),
-    },
-  ];
-  if (selectedForecast)
-    intensity.push({
-      label: "Experimental forecast",
-      color: "#e9ac7a",
-      dashed: true,
-      gapHours: 6,
-      points: [
-        {
-          time: selectedForecast.anchor_time,
-          value: selectedForecast.input_vmax_ms[0] * factor,
-        },
-        ...selectedForecast.predictions.map((p) => ({
-          time: p.valid_time,
-          value: p.vmax_ms * factor,
-        })),
-      ],
-    });
-  const official = references
-    .filter((f) => f.time <= (selected?.time || storm.end))
-    .at(-1);
-  const metrics = selected?.metrics;
   return (
     <>
       <Link to={storm.active ? "/" : "/archive"} className="back-link">
@@ -594,7 +795,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
           <h1>
             {storm.name}
             <span className="classification">
-              {className(storm.latest_fix?.classification)}
+              {officialCategory(official || storm.latest_fix)}
             </span>
           </h1>
           <p>
@@ -640,6 +841,11 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <strong>
                 {wind(metrics?.vmax_ms, unit)} <small>{unit}</small>
               </strong>
+              <span className="wind-category">
+                {metrics
+                  ? `${windCategory(metrics.vmax_ms)} equivalent`
+                  : "Category unavailable"}
+              </span>
               <em>
                 {selected?.kind === "live"
                   ? "Issued live estimate"
@@ -651,6 +857,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <strong>
                 {wind(official?.wind_ms, unit)} <small>{unit}</small>
               </strong>
+              <span className="wind-category">
+                {official ? officialCategory(official) : "Category unavailable"}
+              </span>
               <em>
                 {official ? stamp(official.time) : "No reference available"}
               </em>
@@ -684,9 +893,16 @@ function Detail({ catalog }: { catalog: Catalog }) {
               </div>
               <MapView
                 detail
-                track={series.track}
+                track={references}
                 selected={selected ? selected.center : storm.latest_fix}
+                radii={metrics}
+                liveStorm={storm.active ? storm : undefined}
+                latestImagery={selected?.time === storm.latest_prediction?.time}
+                imagery={series.imagery}
+                imageryTime={selected?.time}
+                onImageryReady={setImageReady}
               />
+              <RadiusLegend />
               <div className="track-context">
                 <span>Selected position</span>
                 <strong>
@@ -717,10 +933,28 @@ function Detail({ catalog }: { catalog: Catalog }) {
                 title="Maximum sustained wind"
                 unit={unit}
                 lines={intensity}
+                thresholds={thresholds}
                 selected={hover || selected?.time}
                 onTime={setHover}
                 onSelect={selectTime}
               />
+              <label
+                className="smoothing-control"
+                title="A trailing three-hour display filter. Original estimates remain in downloads and forecast inputs."
+              >
+                <input
+                  type="checkbox"
+                  checked={smoothing}
+                  onChange={(e) => {
+                    setSmoothing(e.target.checked);
+                    localStorage.setItem(
+                      "stormsense-smoothing",
+                      e.target.checked ? "on" : "off",
+                    );
+                  }}
+                />{" "}
+                Light smoothing · 3 hours
+              </label>
               <div className="forecast-controls">
                 <label>
                   Forecast issue
@@ -731,78 +965,75 @@ function Detail({ catalog }: { catalog: Catalog }) {
                         ? `${selectedForecast.kind}|${selectedForecast.anchor_time}`
                         : ""
                     }
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const [kind, time] = e.target.value.split("|");
+                      setSelection({
+                        time: time || selected?.time || null,
+                        issue: time,
+                        kind,
+                      });
+                      setHover(null);
                       setParams(
                         (prior) => {
-                          const [kind, time] = e.target.value.split("|");
+                          const next = new URLSearchParams(prior);
                           if (time) {
-                            prior.set("time", time);
-                            prior.set("issue", time);
-                            prior.set("issue_kind", kind);
+                            next.set("time", time);
+                            next.set("issue", time);
+                            next.set("issue_kind", kind);
                           } else {
-                            prior.delete("issue");
-                            prior.delete("issue_kind");
+                            next.delete("issue");
+                            next.delete("issue_kind");
                           }
-                          setHover(null);
-                          return prior;
+                          return next;
                         },
-                        { replace: true },
-                      )
-                    }
+                        { replace: true, preventScrollReset: true },
+                      );
+                    }}
                   >
                     <option value="">Select an available issue</option>
-                    {series.forecasts
-                      .slice()
-                      .reverse()
-                      .map((f) => (
-                        <option
-                          key={f.anchor_time + f.kind}
-                          value={`${f.kind}|${f.anchor_time}`}
-                        >
-                          {stamp(f.anchor_time)} ·{" "}
-                          {f.kind === "live" ? "Live" : "Retrospective"}
-                        </option>
-                      ))}
+                    {forecastOptions}
                   </select>
                 </label>
                 <span className="experimental">Experimental</span>
               </div>
-              {selectedForecast ? (
-                <div>
-                  <p className="forecast-explanation">
-                    {selectedForecast.kind === "live"
-                      ? "Live issue"
-                      : "Retrospective issue"}{" "}
-                    · {stamp(selectedForecast.anchor_time)}
-                    <br />
-                    Generated {stamp(selectedForecast.generated_at)}
-                    {selectedForecast.kind === "live" &&
-                      selectedForecast.input_kinds?.includes("hindcast") && (
-                        <>
-                          <br />
-                          Includes retrospective estimates already available at
-                          issue time.
-                        </>
-                      )}
-                  </p>
-                  <div className="forecast-values">
-                    {selectedForecast.predictions.map((p) => (
-                      <div key={p.lead_hours}>
-                        <span>+{p.lead_hours} hours</span>
-                        <strong>
-                          {wind(p.vmax_ms, unit)} <small>{unit}</small>
-                        </strong>
-                        <small>Valid {stamp(p.valid_time)}</small>
-                      </div>
-                    ))}
+              <div className="forecast-slot">
+                {selectedForecast ? (
+                  <div>
+                    <p className="forecast-explanation">
+                      {selectedForecast.kind === "live"
+                        ? "Live issue"
+                        : "Retrospective issue"}{" "}
+                      · {stamp(selectedForecast.anchor_time)}
+                      <br />
+                      Generated {stamp(selectedForecast.generated_at)}
+                      {selectedForecast.kind === "live" &&
+                        selectedForecast.input_kinds?.includes("hindcast") && (
+                          <>
+                            <br />
+                            Includes retrospective estimates already available
+                            at issue time.
+                          </>
+                        )}
+                    </p>
+                    <div className="forecast-values">
+                      {selectedForecast.predictions.map((p) => (
+                        <div key={p.lead_hours}>
+                          <span>+{p.lead_hours} hours</span>
+                          <strong>
+                            {wind(p.vmax_ms, unit)} <small>{unit}</small>
+                          </strong>
+                          <small>Valid {stamp(p.valid_time)}</small>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <p className="forecast-explanation">
-                  Forecasts need available StormSense estimates at the issue
-                  time, six hours earlier, and twelve hours earlier.
-                </p>
-              )}
+                ) : (
+                  <p className="forecast-explanation">
+                    Forecasts need available StormSense estimates at the issue
+                    time, six hours earlier, and twelve hours earlier.
+                  </p>
+                )}
+              </div>
             </section>
           </div>
           <section className="timeline-panel">
@@ -817,6 +1048,34 @@ function Detail({ catalog }: { catalog: Catalog }) {
                 </span>
               )}
             </div>
+            <div className="playback-controls">
+              <button
+                disabled={records.length < 2}
+                aria-label={playing ? "Pause timeline" : "Play timeline"}
+                onClick={togglePlayback}
+              >
+                {playing ? "Ⅱ Pause" : "▶ Play"}
+              </button>
+              <label>
+                Speed{" "}
+                <select
+                  aria-label="Timeline playback speed"
+                  value={playbackRate}
+                  onChange={(e) => setPlaybackRate(Number(e.target.value))}
+                >
+                  <option value="2">2 hours / sec</option>
+                  <option value="4">4 hours / sec</option>
+                  <option value="8">8 hours / sec</option>
+                </select>
+              </label>
+              <span role="status">
+                {playing
+                  ? imageReady
+                    ? "Playing"
+                    : "Buffering image…"
+                  : "Drag to explore"}
+              </span>
+            </div>
             <input
               aria-label="Storm timeline"
               type="range"
@@ -824,24 +1083,25 @@ function Detail({ catalog }: { catalog: Catalog }) {
               max={Math.max(0, records.length - 1)}
               value={index}
               disabled={!records.length}
-              onChange={(e) => {
-                setHover(null);
-                setParams(
-                  (prior) => {
-                    prior.set("time", records[Number(e.target.value)].time);
-                    prior.delete("issue");
-                    prior.delete("issue_kind");
-                    return prior;
-                  },
-                  { replace: true },
-                );
-              }}
+              aria-valuetext={
+                selected ? stamp(selected.time) : "No processed hours"
+              }
+              onChange={(e) => scrub(e.target.value)}
+              onPointerUp={(e) => finishScrub(e.currentTarget.value)}
+              onPointerDown={(e) =>
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }
+              onPointerCancel={(e) => finishScrub(e.currentTarget.value)}
+              onKeyUp={(e) => finishScrub(e.currentTarget.value)}
+              onBlur={(e) => finishScrub(e.currentTarget.value)}
             />
             <footer>
               <span>{stamp(storm.start, true)}</span>
               <button
                 onClick={() => {
-                  setParams({}, { replace: true });
+                  setPlaying(false);
+                  setSelection({ time: null });
+                  setParams({}, { replace: true, preventScrollReset: true });
                   setHover(null);
                 }}
               >
@@ -855,27 +1115,17 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <div className="eyebrow">Storm structure</div>
               <h2>How far the winds reach</h2>
               <p>
-                Model estimates of equivalent-area wind radii. Missing hours
-                remain gaps.
+                Model estimates of equivalent-area wind radii
+                {smoothing ? ", lightly smoothed" : ""}. Missing hours remain
+                gaps.
               </p>
             </div>
             <Chart
               title="Wind radii"
               unit="km"
               selected={selected?.time}
-              lines={[
-                ["rmw_km", "Radius of max. wind", "#e8e2d7"],
-                ["r34_km", "R34 · gale force", "#40c7bd"],
-                ["r50_km", "R50 · storm force", "#97adae"],
-                ["r64_km", "R64 · hurricane force", "#e9ac7a"],
-              ].map(([key, label, color]) => ({
-                label,
-                color,
-                points: records.map((r) => ({
-                  time: r.time,
-                  value: r.metrics?.[key as "r34_km"] ?? null,
-                })),
-              }))}
+              lines={structure}
+              onSelect={selectTime}
             />
           </section>
           <details className="provenance">
@@ -980,6 +1230,34 @@ function About({ catalog }: { catalog: Catalog }) {
           warning boundaries.
         </p>
         <p>
+          Map rings show these model radii at their actual geographic scale.
+          Category lines use NHC wind thresholds; a StormSense category is a
+          wind-speed equivalent, separate from the official classification.
+          Storm age starts at the first recorded NHC/CPHC track fix.
+        </p>
+        <p>
+          Light smoothing is enabled for estimate charts: a trailing three-hour
+          average weighted 60% to the current hour, 30% to the previous hour,
+          and 10% to two hours earlier. Missing hours reset the filter. Turn it
+          off above the intensity chart to see the original estimates. Metric
+          tiles, map rings, downloads, official observations, and issued
+          forecasts use the original values.
+        </p>
+        <p>
+          Storm pages show saved hourly GeoColor images from GOES-East or
+          GOES-West through NASA GIBS, covering roughly 1,800 km around each
+          recorded position. Play or drag either timeline to explore them.
+          Nearby images are buffered, and small previews sharpen as full images
+          arrive. Missing imagery remains an explicit gap; predictions are
+          independent. The view uses colour by day and an infrared blend at
+          night. Its displayed provider product time is separate from the scan
+          used for inference and can precede the selected hour by up to 30
+          minutes. Compact WebP images retain geospatial sidecars and source
+          metadata. Only this easy-to-obtain display product is archived; raw
+          satellite data is discarded. The active overview separately checks for
+          the latest available image every five minutes while visible.
+        </p>
+        <p>
           Continuous scheduling has not been activated. The interface reports
           the actual age of each completed run and source observation. Hourly
           updates are the intended operating cadence once a runner is hosted.
@@ -1077,9 +1355,7 @@ function App() {
       </a>
       <header className="topbar">
         <Link className="brand" to="/">
-          <span className="brand-icon">
-            <Icon name="storm" />
-          </span>
+          <img className="brand-icon" src="/brand/mark.svg" alt="" />
           <strong>
             StormSense<span>EARTH SYSTEMS LAB</span>
           </strong>

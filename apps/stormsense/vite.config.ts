@@ -22,7 +22,7 @@ export default defineConfig({
           }
           const key = (request.url || "").split("?")[0].replace(/^\//, "");
           if (
-            !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json)$/.test(
+            !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json|imagery\/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?))$/.test(
               key,
             )
           ) {
@@ -32,6 +32,14 @@ export default defineConfig({
           }
           try {
             const data = await readFile(resolve(dataRoot, key));
+            response.setHeader(
+              "Content-Type",
+              key.endsWith(".webp")
+                ? "image/webp"
+                : key.endsWith(".xml")
+                  ? "application/xml"
+                  : "application/json",
+            );
             response.setHeader(
               "Cache-Control",
               key === "latest.json"

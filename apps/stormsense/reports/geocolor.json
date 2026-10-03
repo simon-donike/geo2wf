@@ -1,0 +1,97 @@
+{
+  "url": "https://stormsense.hyperalislabs.com",
+  "provider": "NASA GIBS / NOAA / CIRA GOES-East and GOES-West ABI GeoColor",
+  "documentation": "https://nasa-gibs.github.io/gibs-api-docs/access-basics/",
+  "day_night": "Natural-colour daytime composite and infrared blend at night",
+  "crop_width_km_at_center": 1800,
+  "image_pixels": 1024,
+  "projection": "EPSG:3857",
+  "dateline_split": true,
+  "scope": "Latest position of active storms; hidden at earlier detail-page selections and for archived storms",
+  "poll_seconds": 300,
+  "maximum_frame_attempts": 3,
+  "freshness": "Product times come from reported GIBS availability. Empty crops fall back to earlier advertised times. Image time and age are displayed separately from estimate and advisory times.",
+  "storage": "Fetched directly by browsers; no imagery written to R2, SQLite or the prediction archive",
+  "controls": [
+    "visibility (persisted locally)",
+    "opacity",
+    "focus crop"
+  ],
+  "coverage_tests": [
+    "GOES-East real Atlantic crop",
+    "GOES-West real Nolo and Rachel crops",
+    "georeferencing",
+    "dateline split",
+    "provider outage",
+    "transparent newly advertised frames",
+    "bounded fallback",
+    "historical hiding",
+    "desktop/mobile input responsiveness"
+  ],
+  "hosted_verification": {
+    "checked_at": "2026-10-02T16:40:54.497Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "https_certificate_verified": true,
+    "pages": {
+      "/": 200,
+      "/archive": 200,
+      "/about": 200,
+      "/storms/EP152026": 200
+    },
+    "release": "20261002T160146269421Z",
+    "coverage": {
+      "expected": 7068,
+      "gaps": 17,
+      "pending": 0,
+      "predictions": 7051
+    },
+    "storms": 38,
+    "landing_images": "Nolo \u00b7 GOES-West \u00b7 02 Oct 2026, 15:50 UTC \u00b7 50m ago\nRachel \u00b7 GOES-West \u00b7 02 Oct 2026, 15:50 UTC \u00b7 50m ago",
+    "rachel_image": {
+      "time": "2026-10-02T15:50:00Z",
+      "url": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=GOES-West_ABI_GeoColor&STYLES=&SRS=EPSG%3A3857&BBOX=-13299480.93%2C1235717.28%2C-11392400.98%2C3142797.23&WIDTH=1024&HEIGHT=1024&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TIME=2026-10-02T15%3A50%3A00Z"
+    },
+    "east_probe": {
+      "location": {
+        "lat": 25,
+        "lon": -65
+      },
+      "time": "2026-10-02T16:00:00Z",
+      "width": 1024,
+      "height": 1024,
+      "opaque": 1024,
+      "colors": 223
+    }
+  },
+  "checks": {
+    "web_unit": 19,
+    "desktop_mobile_local": 26,
+    "desktop_mobile_hosted": 26,
+    "worker_types": true
+  },
+  "continuous_prediction_scheduling_active": false,
+  "timeline_measurements": [
+    {
+      "project": "desktop",
+      "records": 533,
+      "p95_ms": 25.5,
+      "max_ms": 41.700000047683716,
+      "positionShift": 0,
+      "sameTrack": true,
+      "synchronized": true
+    },
+    {
+      "project": "mobile",
+      "records": 533,
+      "p95_ms": 20.800000071525574,
+      "max_ms": 21.399999976158142,
+      "positionShift": 0,
+      "sameTrack": true,
+      "synchronized": true
+    }
+  ],
+  "measurement_note": "Browser emulation on this workstation, not a physical-phone performance guarantee. An initial parallel timing failure prompted removing map drop shadows; subsequent isolated repeats and the complete local/hosted suites passed.",
+  "worker_version_id": "5fd36bde-2868-4685-b144-d77793365379",
+  "browser_verified_at": "2026-10-02T16:44:53.602363+00:00",
+  "browser_log": "var/stormsense/geocolor-hosted-final.log"
+}

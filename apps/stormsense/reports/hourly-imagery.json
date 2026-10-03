@@ -1,0 +1,511 @@
+{
+  "checked_at": "2026-10-02T17:44:20Z",
+  "version": "gibs-geocolor-webp-v1",
+  "window": {
+    "start": "2025-10-02T16:01:46Z",
+    "end": "2026-10-02T16:01:46Z"
+  },
+  "coverage": {
+    "expected": 7068,
+    "ready": 5335,
+    "gaps": 1733,
+    "pending": 0
+  },
+  "gap_reasons": {
+    "no_reported_frame": 58,
+    "no_center": 2,
+    "empty_provider_image": 1672,
+    "source_unavailable": 1
+  },
+  "ready_by_satellite": {
+    "West": 3859,
+    "East": 1476
+  },
+  "unique_assets": 27431,
+  "bytes_by_type": {
+    "webp": 470336048,
+    "sidecars": 17178774,
+    "stac": 37316982
+  },
+  "total_bytes": 524831804,
+  "full_image_bytes": {
+    "median": 60636.0,
+    "mean": 73321.2472845764,
+    "max": 188324
+  },
+  "georeferencing": {
+    "crs": "EPSG:3857",
+    "pixel_interpretation": "Area",
+    "format": "WebP + GDAL PAM .aux.xml + STAC 1.0 / Projection 1.1",
+    "all_image_checksums_verified": true,
+    "all_gdal_grids_verified": true,
+    "maximum_bounds_roundtrip_error_metres": 3.4378899727016687e-10,
+    "all_product_times_within_preceding_30_minutes": true
+  },
+  "storms": [
+    {
+      "storm_id": "AL092025",
+      "expected": 80,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 80
+      }
+    },
+    {
+      "storm_id": "AL102025",
+      "expected": 103,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 103
+      }
+    },
+    {
+      "storm_id": "AL112025",
+      "expected": 85,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 85
+      }
+    },
+    {
+      "storm_id": "AL122025",
+      "expected": 55,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 55
+      }
+    },
+    {
+      "storm_id": "AL132025",
+      "expected": 265,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 254,
+        "no_reported_frame": 11
+      }
+    },
+    {
+      "storm_id": "EP152025",
+      "expected": 170,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 165,
+        "no_reported_frame": 4,
+        "source_unavailable": 1
+      }
+    },
+    {
+      "storm_id": "EP162025",
+      "expected": 181,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 177,
+        "no_reported_frame": 4
+      }
+    },
+    {
+      "storm_id": "EP172025",
+      "expected": 79,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 79
+      }
+    },
+    {
+      "storm_id": "EP182025",
+      "expected": 133,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 122,
+        "no_reported_frame": 11
+      }
+    },
+    {
+      "storm_id": "AL012026",
+      "expected": 73,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 73
+      }
+    },
+    {
+      "storm_id": "AL022026",
+      "expected": 157,
+      "ready": 157,
+      "gaps": {}
+    },
+    {
+      "storm_id": "AL032026",
+      "expected": 67,
+      "ready": 67,
+      "gaps": {}
+    },
+    {
+      "storm_id": "AL042026",
+      "expected": 181,
+      "ready": 181,
+      "gaps": {}
+    },
+    {
+      "storm_id": "AL052026",
+      "expected": 133,
+      "ready": 133,
+      "gaps": {}
+    },
+    {
+      "storm_id": "AL062026",
+      "expected": 295,
+      "ready": 293,
+      "gaps": {
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "AL072026",
+      "expected": 97,
+      "ready": 97,
+      "gaps": {}
+    },
+    {
+      "storm_id": "AL082026",
+      "expected": 91,
+      "ready": 91,
+      "gaps": {}
+    },
+    {
+      "storm_id": "CP012026",
+      "expected": 439,
+      "ready": 436,
+      "gaps": {
+        "empty_provider_image": 1,
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "CP022026",
+      "expected": 163,
+      "ready": 163,
+      "gaps": {}
+    },
+    {
+      "storm_id": "EP012026",
+      "expected": 181,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 179,
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP022026",
+      "expected": 91,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 90,
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP032026",
+      "expected": 103,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 102,
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP042026",
+      "expected": 109,
+      "ready": 0,
+      "gaps": {
+        "empty_provider_image": 107,
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP052026",
+      "expected": 193,
+      "ready": 192,
+      "gaps": {
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP062026",
+      "expected": 307,
+      "ready": 306,
+      "gaps": {
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP072026",
+      "expected": 307,
+      "ready": 302,
+      "gaps": {
+        "no_reported_frame": 5
+      }
+    },
+    {
+      "storm_id": "EP082026",
+      "expected": 121,
+      "ready": 119,
+      "gaps": {
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP092026",
+      "expected": 133,
+      "ready": 133,
+      "gaps": {}
+    },
+    {
+      "storm_id": "EP102026",
+      "expected": 139,
+      "ready": 139,
+      "gaps": {}
+    },
+    {
+      "storm_id": "EP112026",
+      "expected": 313,
+      "ready": 313,
+      "gaps": {}
+    },
+    {
+      "storm_id": "EP122026",
+      "expected": 391,
+      "ready": 389,
+      "gaps": {
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP132026",
+      "expected": 235,
+      "ready": 234,
+      "gaps": {
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP142026",
+      "expected": 187,
+      "ready": 185,
+      "gaps": {
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP162026",
+      "expected": 265,
+      "ready": 264,
+      "gaps": {
+        "no_reported_frame": 1
+      }
+    },
+    {
+      "storm_id": "EP172026",
+      "expected": 301,
+      "ready": 299,
+      "gaps": {
+        "no_reported_frame": 2
+      }
+    },
+    {
+      "storm_id": "EP192026",
+      "expected": 127,
+      "ready": 127,
+      "gaps": {}
+    },
+    {
+      "storm_id": "EP182026",
+      "expected": 185,
+      "ready": 184,
+      "gaps": {
+        "no_center": 1
+      }
+    },
+    {
+      "storm_id": "EP152026",
+      "expected": 533,
+      "ready": 531,
+      "gaps": {
+        "no_reported_frame": 1,
+        "no_center": 1
+      }
+    }
+  ],
+  "website": "https://stormsense.hyperalislabs.com",
+  "release": "20261002T174218736546Z",
+  "worker_version": "c406c0a3-f3a5-4bb6-af7d-c5304640995b",
+  "source_policy": "NASA GIBS only; missing imagery remains an explicit gap, without ABI reconstruction",
+  "image_settings": {
+    "full_pixels": 768,
+    "preview_pixels": 256,
+    "webp_quality": 75,
+    "crop_km": 1800
+  },
+  "playback": {
+    "rates_hours_per_second": [
+      2,
+      4,
+      8
+    ],
+    "concurrent_fetches": 8,
+    "decoded_memory_limit_bytes": 50331648,
+    "cold_jump": "clears the previous-hour image and loads the selected hour first",
+    "manual_scrubbing_pauses": true,
+    "background_tab_pauses": true,
+    "hosted_input_latency": {
+      "desktop": {
+        "storm_id": "EP152026",
+        "records": 533,
+        "project": "desktop",
+        "p95_ms": 24.600000023841858,
+        "max_ms": 33.200000047683716,
+        "synchronized": true,
+        "positionShift": 0,
+        "sameTrack": true
+      },
+      "mobile": {
+        "storm_id": "EP152026",
+        "records": 533,
+        "project": "mobile",
+        "p95_ms": 28.199999928474426,
+        "max_ms": 31.700000047683716,
+        "synchronized": true,
+        "positionShift": 0,
+        "sameTrack": true
+      },
+      "note": "Input-to-next-frame timing on this workstation, not a physical-phone or uncached image-download benchmark."
+    },
+    "decoded_preview_window_hours": 25,
+    "decoded_full_window_hours": 9,
+    "timeline_slider_count": 1,
+    "preload_scope": "Entire open storm: all available previews and full images",
+    "concurrent_decodes": 4,
+    "compressed_bytes_retained_for_open_storm": true,
+    "selected_hour_download_priority": true,
+    "download_progress_visible": true
+  },
+  "validation": {
+    "python_passed": 232,
+    "web_unit_passed": 26,
+    "hosted_browser_passed": 36,
+    "devices": [
+      "desktop",
+      "mobile emulation"
+    ],
+    "stac_schema": [
+      {
+        "storm": "EP152026",
+        "time": "2026-10-02T16:00:00Z",
+        "stac": true,
+        "projection_extension": true
+      },
+      {
+        "storm": "EP182026",
+        "time": "2026-10-01T03:00:00Z",
+        "stac": true,
+        "projection_extension": true
+      }
+    ],
+    "interrupted_then_resumed": true,
+    "completed_frames_reused": true,
+    "georeferencing_dateline_tests": true,
+    "source_gaps_do_not_replace_numerical_predictions": true,
+    "actual_remote_retention_preview_passed": true,
+    "remote_retention_deleted_files": 0,
+    "retention_uses_upload_times": true
+  },
+  "publication": {
+    "remote": "r2:tcd/explorer/stormsense",
+    "pointer_advanced_last_with": "rclone copyto",
+    "independent_checksum_check": {
+      "imagery_files": 27431,
+      "object_files": 215,
+      "release_files": 3,
+      "differences": 0
+    },
+    "endpoint_compatibility": "--s3-no-head avoids unsupported version-specific HEAD after PUT; independent checksum checks run before pointer advancement"
+  },
+  "hosted_api": {
+    "checked_at": "2026-10-02T17:47:09.730Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "release": "20261002T174218736546Z",
+    "storms_loaded": 38,
+    "numerical_coverage": {
+      "expected": 7068,
+      "gaps": 17,
+      "pending": 0,
+      "predictions": 7051
+    },
+    "imagery_coverage": {
+      "expected": 7068,
+      "gaps": 1733,
+      "pending": 0,
+      "ready": 5335
+    },
+    "frames": [
+      {
+        "kind": "West",
+        "storm_id": "EP152026",
+        "time": "2026-09-10T12:00:00Z",
+        "metadata": "imagery/6e859f2fcdcd4f55c21025d5fbf917543395f6f58986faa9e30a9b6c92da01ed.json",
+        "crs": 3857,
+        "parts": [
+          {
+            "image": "imagery/c16162224018c56758d0d935e5e39a313353f750e1cea4a23c658b26667d8771.webp",
+            "sha256_verified": true,
+            "head": 200,
+            "conditional_get": 304,
+            "sidecar": 200
+          }
+        ]
+      },
+      {
+        "kind": "East",
+        "storm_id": "EP182026",
+        "time": "2026-09-25T00:00:00Z",
+        "metadata": "imagery/cc1e24105ebf7e1ddb4eff6c8885b80c11f0583f66f8101cb59bad9e46b27a36.json",
+        "crs": 3857,
+        "parts": [
+          {
+            "image": "imagery/9604232ade5fdf322510964c7ec2f3252c22e356c6a5d1ca2062ede03df73698.webp",
+            "sha256_verified": true,
+            "head": 200,
+            "conditional_get": 304,
+            "sidecar": 200
+          }
+        ]
+      },
+      {
+        "kind": "dateline",
+        "storm_id": "CP012026",
+        "time": "2026-08-20T00:00:00Z",
+        "metadata": "imagery/2b5fa50d261f13457c29c816f3321b3fae981877bcce8223ab44c81fb47cd273.json",
+        "crs": 3857,
+        "parts": [
+          {
+            "image": "imagery/71b337a6dc461d054e36c6e3ee3e96f39b8c1751501e7c3a66d01f645ebd9fe2.webp",
+            "sha256_verified": true,
+            "head": 200,
+            "conditional_get": 304,
+            "sidecar": 200
+          },
+          {
+            "image": "imagery/fc7d9e10de13b953f8f0b31b1e2a1ddd593c4469358d581466b112aee2873747.webp",
+            "sha256_verified": true,
+            "head": 200,
+            "conditional_get": 304,
+            "sidecar": 200
+          }
+        ]
+      }
+    ]
+  },
+  "continuous_scheduling_active": false,
+  "frontend_update_report": "image-preloading.json"
+}
