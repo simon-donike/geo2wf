@@ -15,6 +15,22 @@ from geo2wf.models.base import (
 )
 
 
+def test_package_training_exports_remain_available() -> None:
+    import geo2wf
+    from geo2wf.data.contracts import WindFieldBatch
+
+    for expected in (
+        DataSpec,
+        WindFieldBatch,
+        LossOutput,
+        PredictionBatch,
+        PredictionRequest,
+        WindFieldLightningModule,
+    ):
+        assert getattr(geo2wf, expected.__name__) is expected
+        assert expected.__name__ in dir(geo2wf)
+
+
 class _DummyWindFieldModel(WindFieldLightningModule):
     condition_channels = 2
 

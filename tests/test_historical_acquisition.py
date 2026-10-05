@@ -1,7 +1,27 @@
 import os
+import subprocess
+import sys
 import time
 
 from geo2wf.historical.acquisition import acquire_rows
+
+
+def test_acquisition_import_does_not_load_training_stack():
+    # Use a fresh interpreter: other tests import the training modules during
+    # collection, hiding the dependency cost paid by every spawned worker.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import geo2wf.historical.acquisition; "
+            "assert not {'torch', 'pytorch_lightning', 'matplotlib', 'rasterio'} "
+            "& sys.modules.keys()",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def fake_acquire(root, row):
