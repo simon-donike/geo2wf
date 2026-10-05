@@ -1,0 +1,137 @@
+name: geo2wf
+
+x-stack: &stack
+  image: geo2wf:cpu
+  build:
+    context: .
+    dockerfile: apps/stormsense/runner/Dockerfile
+    target: full-stack
+    args:
+      TORCH_BACKEND: cpu
+      LOCAL_UID: ${LOCAL_UID:-1000}
+      LOCAL_GID: ${LOCAL_GID:-1000}
+  platform: linux/amd64
+  working_dir: /app
+  volumes:
+    - ./downloads:/app/downloads
+    - ./data:/app/data
+    - ./logs:/app/logs
+    - ./inference:/app/inference
+    - ./var/stormsense:/app/var/stormsense
+    - ./var/docker-artifacts:/app/artifacts
+    - tool-cache:/home/geo2wf/.cache
+  shm_size: 2gb
+  stop_grace_period: 2m
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  tools:
+    <<: *stack
+    profiles: [tools]
+    command: [help]
+
+  runner:
+    <<: *stack
+    profiles: [runner]
+    command: [schedule]
+    restart: unless-stopped
+    cpus: ${RUNNER_CPUS:-2}
+    mem_limit: ${RUNNER_MEMORY:-4g}
+    environment:
+      STORMSENSE_PUBLISH: ${STORMSENSE_PUBLISH:-0}
+      STORMSENSE_WORKERS: ${STORMSENSE_WORKERS:-2}
+      STORMSENSE_IMAGERY_WORKERS: ${STORMSENSE_IMAGERY_WORKERS:-2}
+      STORMSENSE_INTERVAL_SECONDS: ${STORMSENSE_INTERVAL_SECONDS:-900}
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
+
+  train-cpu:
+    <<: *stack
+    profiles: [training]
+    command: [train, --help]
+    environment:
+      WANDB_DISABLED: ${WANDB_DISABLED:-true}
+
+  train-gpu:
+    <<: *stack
+    profiles: [gpu]
+    image: geo2wf:cuda
+    build:
+      context: .
+      dockerfile: apps/stormsense/runner/Dockerfile
+      target: full-stack
+      args:
+        TORCH_BACKEND: cuda
+        LOCAL_UID: ${LOCAL_UID:-1000}
+        LOCAL_GID: ${LOCAL_GID:-1000}
+    command: [train, --help]
+    environment:
+      WANDB_DISABLED: ${WANDB_DISABLED:-true}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  deploy:
+    <<: *stack
+    profiles: [deploy]
+    command: [deploy-check]
+
+  browser-tests:
+    <<: *stack
+    profiles: [test]
+    image: geo2wf:browser-tests
+    build:
+      context: .
+      dockerfile: apps/stormsense/runner/Dockerfile
+      target: browser-tests
+      args:
+        LOCAL_UID: ${LOCAL_UID:-1000}
+        LOCAL_GID: ${LOCAL_GID:-1000}
+    command: [bash, -c, "cd apps/stormsense && npm run test:e2e"]
+    volumes:
+      - ./var/stormsense/export:/app/apps/stormsense/public/data:ro
+      - ./var/docker-artifacts/browser:/app/apps/stormsense/test-results
+
+  web-dev:
+    <<: *stack
+    profiles: [dev]
+    command: [web-dev]
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./var/stormsense/export:/app/apps/stormsense/public/data:ro
+
+  web:
+    profiles: [web]
+    image: geo2wf:web
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: apps/stormsense/runner/Dockerfile
+      target: web
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    volumes:
+      - ./var/stormsense/export:/usr/share/nginx/html/data:ro
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  tool-cache:

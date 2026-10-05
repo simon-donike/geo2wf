@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { rmSync } from "node:fs";
+import { cpSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 export default defineConfig({
@@ -22,7 +22,7 @@ export default defineConfig({
           }
           const key = (request.url || "").split("?")[0].replace(/^\//, "");
           if (
-            !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json|imagery\/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?))$/.test(
+            !/^(latest\.json|releases\/[A-Za-z0-9_-]+\/(catalog|coverage|evaluation)\.json|objects\/[a-f0-9]{64}\.json|imagery\/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?)|bundles\/[a-f0-9]{64}\.zip)$/.test(
               key,
             )
           ) {
@@ -36,9 +36,11 @@ export default defineConfig({
               "Content-Type",
               key.endsWith(".webp")
                 ? "image/webp"
-                : key.endsWith(".xml")
-                  ? "application/xml"
-                  : "application/json",
+                : key.endsWith(".zip")
+                  ? "application/zip"
+                  : key.endsWith(".xml")
+                    ? "application/xml"
+                    : "application/json",
             );
             response.setHeader(
               "Cache-Control",
@@ -56,13 +58,24 @@ export default defineConfig({
           }
         });
       },
-      closeBundle() {
-        rmSync("dist/data.publish.lock", { force: true });
-        if (process.env.STORMSENSE_PRODUCTION === "1")
-          rmSync("dist/data", { recursive: true, force: true });
+      writeBundle(options) {
+        const out = options.dir || "dist";
+        if (process.env.STORMSENSE_PRODUCTION === "1") {
+          // Public data is served from R2. Do not copy the archive just to
+          // delete it later, and respect isolated --outDir deployment builds.
+          for (const name of ["brand", "land.geojson"]) {
+            cpSync(resolve("public", name), resolve(out, name), {
+              recursive: true,
+            });
+          }
+        }
+        rmSync(resolve(out, "data.publish.lock"), { force: true });
       },
     },
   ],
   server: { port: 5173, watch: { ignored: ["**/public/data/**"] } },
-  build: { sourcemap: true },
+  build: {
+    sourcemap: true,
+    copyPublicDir: process.env.STORMSENSE_PRODUCTION !== "1",
+  },
 });

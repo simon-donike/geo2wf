@@ -435,21 +435,20 @@ def backfill_images(
             max(utc(start), utc(storm["start"])),
             min(end, end if storm.get("active") else utc(storm["end"])),
         ):
+            if at.hour % 2:
+                continue
             previous = saved.get(iso(at))
+            sample = samples.get(iso(at))
+            center = sample.get("center") if sample else None
+            center = center or historical_center(storm.get("track", []), at)
             if previous:
                 if previous["status"] == "ready":
                     if all(
                         (asset_root(store) / f).is_file() for f in frame_files(previous)
                     ):
                         continue
-                elif not retry_gaps and not (
-                    at >= utc() - timedelta(hours=6)
-                    and utc(previous["checked_at"]) < utc() - timedelta(minutes=10)
-                ):
+                elif not retry_gaps:
                     continue
-            sample = samples.get(iso(at))
-            center = sample.get("center") if sample else None
-            center = center or historical_center(storm.get("track", []), at)
             jobs.append(
                 {
                     "storm_id": storm["id"],

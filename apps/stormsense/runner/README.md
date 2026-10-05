@@ -1,5 +1,10 @@
 # Hosted CPU runner
 
+For Docker, use the [full-stack container guide](DOCKER.md) and root
+`compose.yaml`. It includes training, model downloads, inference scheduling,
+website serving, deployment tools and persistent mounts. The instructions below
+describe the alternative native Python/systemd installation; use one scheduler.
+
 The website is deployed independently at https://stormsense.hyperalislabs.com/.
 This runner needs an existing Linux host or a selected cloud account and budget.
 No service is installed on the development machine.
@@ -56,10 +61,20 @@ sudo systemctl list-timers stormsense.timer
 sudo journalctl -u stormsense.service --since today
 ```
 
-The timer polls every 15 minutes in UTC. Each invocation is finite and only
-computes missing current-hour predictions. It also attempts GeoColor crops for the most recent 48 active-storm hours, retrying recent gaps as the provider catches up. Image-source gaps do not block numerical publication. systemd prevents overlapping runs of
-the same service; interrupted numerical work resumes through SQLite. Backfill
-remains a separate finite job and yields to live updates.
+The timer polls every 15 minutes in UTC. Each invocation is finite. It updates
+current live predictions, refreshes historical tracks, and reconciles every
+expected numerical hour in the rolling year plus twelve hours of forecast
+context. It fills interior holes and includes storms that ended while the runner
+was offline, leaving successful records and previously attempted gaps alone. Display imagery is reconciled across
+the rolling year at the existing two-hour cadence, including missing local
+assets. Only never-attempted slots are queued; recorded source and center gaps
+are retried only with an explicit `--retry-gaps` command. Image-source gaps do
+not block numerical publication. Evaluation, export and verified pointer-last
+publication follow catch-up, even when no new inference was needed.
+
+systemd prevents overlapping runs of the same service; interrupted work resumes
+through SQLite. An explicit backfill remains available for selected ranges and
+yields to updates. The default update performs its own catch-up automatically.
 
 Record the first successful scheduled run and its public release before marking
 the deployment complete. Remove the site's "scheduling not activated" statement

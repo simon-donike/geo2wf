@@ -17,6 +17,9 @@ Use Python 3.10 or 3.11:
 uv sync --frozen
 ```
 
+For the complete container workflow (CPU/GPU training, inference, data downloads,
+website hosting and deployment), see the [Docker guide](apps/stormsense/runner/DOCKER.md).
+
 ## Download data and models
 
 Both releases are public on Hugging Face; no login is required. The

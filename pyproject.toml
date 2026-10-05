@@ -25,6 +25,31 @@ dependencies = [
     "xarray>=2023.1,<2026.0",
 ]
 
+[project.optional-dependencies]
+# Containers explicitly select their compute backend.
+cpu = ["torch==2.1.2"]
+cuda = ["torch==2.1.2"]
+
+[tool.uv]
+cache-dir = ".uv-cache"
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+    { index = "pytorch-cu121", extra = "cuda", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
 [project.scripts]
 geo2wf-train = "geo2wf.cli.train:main"
 geo2wf-evaluate = "geo2wf.cli.evaluate:main"
@@ -44,6 +69,9 @@ include = ["geo2wf*"]
 "geo2wf.operational" = ["models.json"]
 
 [dependency-groups]
+artifacts = [
+    "huggingface-hub==2.1.1",
+]
 operational = [
     "fsspec[http]>=2024.6,<2026",
     "pyproj>=3.6,<3.8",

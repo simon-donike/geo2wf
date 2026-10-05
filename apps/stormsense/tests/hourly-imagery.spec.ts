@@ -2,6 +2,10 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Catalog, Series } from "../src/types";
 import { preferredRecords } from "../src/data";
 import { writeFile } from "node:fs/promises";
+const imageSlot = (time: string) =>
+  new Date(Math.floor(Date.parse(time) / 7200000) * 7200000)
+    .toISOString()
+    .replace(".000Z", "Z");
 
 async function archive(request: APIRequestContext) {
   const pointer = await (await request.get("/data/latest.json")).json();
@@ -93,7 +97,7 @@ test("playback buffers images, synchronizes time, and pauses for manual scrubbin
   const current = Number(await slider.inputValue());
   await expect(page.locator(".hourly-satellite-crop").first()).toHaveAttribute(
     "data-slot-time",
-    records[current].time,
+    imageSlot(records[current].time),
   );
   await expect
     .poll(() => new URL(page.url()).searchParams.get("time"))
@@ -114,7 +118,7 @@ test("playback buffers images, synchronizes time, and pauses for manual scrubbin
   const selected = Number(await slider.inputValue());
   await expect(page.locator(".hourly-satellite-crop").first()).toHaveAttribute(
     "data-slot-time",
-    records[selected].time,
+    imageSlot(records[selected].time),
   );
 });
 
@@ -163,7 +167,7 @@ test("image download failure can be retried without disabling the timeline", asy
 }) => {
   const { storm, frames } = await archive(request);
   const frame = frames.at(-15)!;
-  await page.route("**/data/imagery/*.webp", (route) =>
+  await page.route("**/data/bundles/*.zip", (route) =>
     route.fulfill({ status: 503, body: "Unavailable" }),
   );
   await page.goto(`/storms/${storm.id}?time=${encodeURIComponent(frame.time)}`);
@@ -173,7 +177,7 @@ test("image download failure can be retried without disabling the timeline", asy
   await expect(
     page.getByRole("slider", { name: "Storm timeline", exact: true }),
   ).toBeEnabled();
-  await page.unroute("**/data/imagery/*.webp");
+  await page.unroute("**/data/bundles/*.zip");
   await page.getByRole("button", { name: "Retry image", exact: true }).click();
   await expect(page.locator(".hourly-satellite-crop").first()).toHaveAttribute(
     "data-slot-time",

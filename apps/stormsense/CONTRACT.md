@@ -10,11 +10,14 @@ releases/<UTC version>/catalog.json  immutable summary
 releases/<UTC version>/coverage.json immutable accounting report
 releases/<UTC version>/evaluation.json  optional immutable validation report
 objects/<sha256>.json                immutable storm series, shared across releases
+bundles/<sha256>.zip                 immutable daily display-image package
 ```
 
 `latest.json` contains `version` and `manifest` (`releases/<version>/catalog.json`). The pointer is advanced only after all referenced objects and the catalog upload successfully. Browser selections use storm IDs and timestamps, never array indices or object hashes.
 
 ## Catalog
+
+Storm summaries include `peak_official_wind_ms` (maximum available NHC/CPHC reference wind over the storm's lifetime), `peak_category`, and `has_ri`. `has_ri` is true when official tropical-phase fixes show a gain of at least 30 kt over an exact, continuously observed 24-hour window, false when evaluated windows show no qualifying increase, and null when no complete window can be evaluated. Fixes may be at most six hours apart. These fields never use StormSense estimates. Lifetime summaries are saved before local track retention removes older fixes; revised source tracks recalculate them.
 
 | Field | Meaning |
 | --- | --- |
@@ -74,7 +77,13 @@ Keep the rolling 12-calendar-month public window and at least 12 preceding hours
 
 Read-only Worker methods are GET/HEAD. It returns 404 for absent/disallowed objects, 405 for writes, 503 for source errors, and ETag-based 304 responses. Only the new StormSense prefix is accessible.
 
-## Optional hourly display imagery (gibs-geocolor-webp-v1)
+## Optional display imagery (gibs-geocolor-webp-v1)
+
+New exports and acquisition jobs use even UTC hours. The numerical records and forecast inputs retain their hourly cadence. At an intervening selected hour, the map uses the immediately preceding display slot and labels its actual provider time. A gap at that slot stays a gap; images are never extrapolated from a future frame. Historical releases remain readable.
+
+`series.imagery_bundles[]` adds `{schema_version:1, date, path, sha256, bytes, images}`. Each `path` is a content-addressed `bundles/<sha256>.zip` containing one storm's UTC day; `images` lists its full/preview WebP member paths. The stored ZIP format `geocolor-daily-zip-v1` needs no image decompression: it contains the original WebPs, matching GDAL sidecars, STAC Items, and a `manifest.json` with the storm, date, CRS and complete frame descriptors. Extracting it preserves the original relative paths and GIS metadata. ZIP timestamps and ordering are deterministic. Completed days reuse identical objects; updates create a new immutable current-day object.
+
+The browser preloads each referenced daily package once, validates its SHA-256 and extracts only its WebPs in memory. The existing decoded-image budget still applies. Bundle failures are retryable and do not fall back to hundreds of individual requests. Older releases without bundle descriptors retain individual-image loading.
 
 `series.imagery[]` is independent of `records[].imagery` (the numerical model's original input provenance). Display images never enter inference. The catalog's `imagery` contains a version, source status, coverage counts (`expected`, `ready`, `gaps`, `pending`) and an immutable `objects/<digest>.json` manifest of every referenced display asset. Storm summaries include `imagery_coverage`. Old releases without these fields remain readable.
 
@@ -108,6 +117,6 @@ STAC `datetime` is the product timestamp; `stormsense:slot_time` is the hourly s
 
 ### Publication and retention
 
-Publish `imagery/*.webp`, `*.webp.aux.xml` and STAC `*.json` before the immutable numerical/index objects and release metadata. Advance `latest.json` last using `rclone copyto`. The read-only Worker serves correct image/XML/JSON MIME types and public CORS for GIS clients. Source processing state lives beside SQLite in `var/stormsense/geocolor/imagery`; no original PNG responses are retained.
+Publish `imagery/*.webp`, `*.webp.aux.xml`, STAC `*.json` and `bundles/*.zip` before the immutable numerical/index objects and release metadata. Advance `latest.json` last using `rclone copyto`. The read-only Worker serves correct image/XML/JSON MIME types and public CORS for GIS clients. Source processing state lives beside SQLite in `var/stormsense/geocolor/imagery`; no original PNG responses are retained.
 
-Release retention follows the imagery manifest as well as storm-series references. An image and all its sidecars survive while referenced by any retained release; remote deletion also observes the existing 24-hour grace period. Local processing asset cleanup follows retained SQLite visual rows. Never apply a blanket age-based R2 lifecycle to content-addressed images.
+Release retention follows the imagery manifest as well as storm-series references. An image, its sidecars and its daily bundle survive while referenced by any retained release; remote deletion also observes the existing 24-hour grace period. Local processing asset cleanup follows retained SQLite visual rows. Never apply a blanket age-based R2 lifecycle to content-addressed images.

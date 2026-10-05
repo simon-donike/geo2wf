@@ -12,9 +12,7 @@ import subprocess
 
 from . import SCHEMA_VERSION
 from .common import (
-    category,
     digest,
-    encoded,
     hour,
     hours,
     iso,
@@ -24,9 +22,13 @@ from .common import (
 )
 from .models import MANIFEST, version
 from .geocolor import VERSION as IMAGE_VERSION, asset_root, frame_files
+from .image_bundles import daily_bundles, display_slot
+from .intensification import official_summary
 
 REMOTE = "r2:tcd/explorer/stormsense"
 IMAGE_PATH = r"imagery/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?)"
+BUNDLE_PATH = r"bundles/[a-f0-9]{64}\.zip"
+ASSET_PATH = rf"(?:{IMAGE_PATH}|{BUNDLE_PATH})"
 
 
 def image_references(catalog, read):
@@ -37,7 +39,7 @@ def image_references(catalog, read):
     if not re.fullmatch(r"objects/[a-f0-9]{64}\.json", manifest):
         raise ValueError("invalid imagery manifest")
     paths = read(manifest)["files"]
-    if any(not re.fullmatch(IMAGE_PATH, path) for path in paths):
+    if any(not re.fullmatch(ASSET_PATH, path) for path in paths):
         raise ValueError("invalid imagery asset path")
     return {manifest, *paths}
 
@@ -138,7 +140,7 @@ def _export_release(store, output, start=None, end=None, release=None):
         visuals = [
             v
             for v in store.visuals(storm["id"], IMAGE_VERSION)
-            if start <= utc(v["time"]) <= end
+            if start <= utc(v["time"]) <= end and display_slot(v["time"])
         ]
         visual_counts = {
             "ready": sum(v["status"] == "ready" for v in visuals),
@@ -182,6 +184,8 @@ def _export_release(store, output, start=None, end=None, release=None):
             series["imagery"] = [
                 {k: v for k, v in frame.items() if k != "files"} for frame in visuals
             ]
+            series["imagery_bundles"] = daily_bundles(storm["id"], visuals, output)
+            image_files.update(b["path"] for b in series["imagery_bundles"])
         object_path = f"objects/{digest(series)}.json"
         if not (output / object_path).exists():
             write_json(output / object_path, series)
@@ -210,7 +214,13 @@ def _export_release(store, output, start=None, end=None, release=None):
             ):
                 unique[row["time"]] = row
         counts = accounted.get(storm["id"], {})
-        visual_counts["expected"] = counts.get("expected", 0)
+        visual_counts["expected"] = sum(
+            display_slot(t)
+            for t in hours(
+                max(start, utc(storm["start"])),
+                min(end, end if storm.get("active") else utc(storm["end"])),
+            )
+        )
         visual_counts["pending"] = max(0, visual_counts["expected"] - len(visuals))
         image_counts.update(visual_counts)
         advisory = storm.get("advisory")
@@ -218,11 +228,9 @@ def _export_release(store, output, start=None, end=None, release=None):
         latest_fix = (
             max(references, key=lambda fix: fix["time"]) if references else None
         )
-        levels = [
-            category(f["wind_ms"])
-            for f in storm.get("track", [])
-            if f.get("wind_ms") is not None
-        ]
+        official = storm.get("official_summary") or official_summary(
+            storm.get("track", []), advisory
+        )
         summaries.append(
             {
                 "id": storm["id"],
@@ -233,9 +241,19 @@ def _export_release(store, output, start=None, end=None, release=None):
                 "end": storm["end"],
                 "advisory": advisory,
                 "latest_fix": latest_fix,
-                "peak_category": storm.get(
-                    "peak_official_category", max(levels) if levels else None
+                "peak_category": max(
+                    [
+                        v
+                        for v in [
+                            storm.get("peak_official_category"),
+                            official["peak_category"],
+                        ]
+                        if v is not None
+                    ],
+                    default=None,
                 ),
+                "peak_official_wind_ms": official["peak_wind_ms"],
+                "has_ri": official["has_ri"],
                 "latest_prediction": latest,
                 "metrics": metrics,
                 "change_24h_ms": (
@@ -305,7 +323,7 @@ def _export_release(store, output, start=None, end=None, release=None):
     return catalog
 
 
-def publish(output, remote=REMOTE, run=subprocess.run):
+def publish(output, remote=REMOTE, run=subprocess.run, advance_pointer=True):
     if remote != REMOTE:
         raise ValueError(f"Publication is restricted to {REMOTE}")
     output = Path(output)
@@ -348,6 +366,21 @@ def publish(output, remote=REMOTE, run=subprocess.run):
             ],
             check=True,
         )
+    if any(key.startswith("bundles/") for key in assets):
+        run(
+            [
+                "rclone",
+                "copy",
+                str(output / "bundles"),
+                remote + "/bundles",
+                "--immutable",
+                "--checksum",
+                "--s3-no-head",
+                "--include",
+                "*.zip",
+            ],
+            check=True,
+        )
     # Restored exports can have different mtimes but identical bytes. Compare
     # hashes so repeated publication neither rejects nor rewrites R2 metadata.
     run(
@@ -385,6 +418,8 @@ def publish(output, remote=REMOTE, run=subprocess.run):
     directories = ["objects", "releases/" + release]
     if any(key.startswith("imagery/") for key in assets):
         directories.insert(0, "imagery")
+    if any(key.startswith("bundles/") for key in assets):
+        directories.insert(0, "bundles")
     for directory in directories:
         run(
             [
@@ -398,17 +433,18 @@ def publish(output, remote=REMOTE, run=subprocess.run):
             ],
             check=True,
         )
-    run(
-        [
-            "rclone",
-            "copyto",
-            "--checksum",
-            "--s3-no-head",
-            str(output / "latest.json"),
-            remote + "/latest.json",
-        ],
-        check=True,
-    )
+    if advance_pointer:
+        run(
+            [
+                "rclone",
+                "copyto",
+                "--checksum",
+                "--s3-no-head",
+                str(output / "latest.json"),
+                remote + "/latest.json",
+            ],
+            check=True,
+        )
 
 
 def prune_local(output, keep=7, apply=False):
@@ -442,6 +478,12 @@ def prune_local(output, keep=7, apply=False):
         p
         for p in (output / "imagery").glob("*")
         if re.fullmatch(IMAGE_PATH, str(p.relative_to(output)))
+        and str(p.relative_to(output)) not in references
+    ]
+    obsolete += [
+        p
+        for p in (output / "bundles").glob("*.zip")
+        if re.fullmatch(BUNDLE_PATH, str(p.relative_to(output)))
         and str(p.relative_to(output)) not in references
     ]
     if apply:
@@ -543,7 +585,7 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
         unused_object = (
             bool(
                 re.fullmatch(r"objects/[a-f0-9]{64}\.json", key)
-                or re.fullmatch(IMAGE_PATH, key)
+                or re.fullmatch(ASSET_PATH, key)
             )
             and key not in references
         )

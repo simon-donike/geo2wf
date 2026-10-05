@@ -3,7 +3,7 @@
   "provider": "Cloudflare Workers Static Assets",
   "account": "Hyperalis Labs",
   "worker": "stormsense",
-  "version_id": "c406c0a3-f3a5-4bb6-af7d-c5304640995b",
+  "version_id": "986abea6-cc03-470f-baf9-8c626ebc86b7",
   "data_bucket": "tcd",
   "data_prefix": "explorer/stormsense/",
   "verification": {
@@ -51,16 +51,16 @@
     }
   },
   "browser_tests": {
-    "passed": 36,
+    "passed": 48,
     "targets": [
       "desktop",
       "mobile"
     ],
     "scope": "deployed custom-domain HTTPS website",
-    "checked_at": "2026-10-02T20:44:54.135572+00:00"
+    "checked_at": "2026-10-03T18:19:11.023201+00:00"
   },
   "web_unit_tests": {
-    "passed": 26
+    "passed": 41
   },
   "continuous_inference_scheduling_active": false,
   "verification_note": "A default Python urllib request was rejected by Cloudflare with error 1010; the browser suite and API checks using the Desktop Chrome HTTP profile passed.",
@@ -92,5 +92,8 @@
   },
   "satellite_imagery_report": "geocolor.json",
   "hourly_imagery_report": "hourly-imagery.json",
-  "image_preloading_report": "image-preloading.json"
+  "image_preloading_report": "image-preloading.json",
+  "rapid_intensification_and_caching_report": "rapid-intensification-caching.json",
+  "current_release": "20261003T175702414184Z",
+  "daily_bundles_report": "daily-bundles.json"
 }

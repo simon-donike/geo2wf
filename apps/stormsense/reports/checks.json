@@ -1,19 +1,22 @@
 {
   "python": {
-    "passed": 232,
-    "command": ".venv/bin/pytest -q"
+    "passed": 235,
+    "command": ".venv/bin/pytest -q",
+    "checked_at": "2026-10-03T18:19:11.023201+00:00"
   },
   "web_unit": {
-    "passed": 26,
-    "command": "npm test"
+    "passed": 41,
+    "command": "npm test",
+    "checked_at": "2026-10-03T18:19:11.023201+00:00"
   },
   "browser": {
-    "passed": 36,
+    "passed": 46,
     "command": "npm run test:e2e",
     "devices": [
       "desktop",
       "mobile"
-    ]
+    ],
+    "checked_at": "2026-10-03T18:19:11.023201+00:00"
   },
   "real_export_refresh": {
     "passed": true,
@@ -55,12 +58,13 @@
   "website_deployed": true,
   "website_url": "https://stormsense.hyperalislabs.com",
   "hosted_browser": {
-    "passed": 36,
+    "passed": 48,
     "targets": [
       "desktop",
       "mobile"
     ],
-    "scope": "deployed custom-domain HTTPS website"
+    "scope": "deployed custom-domain HTTPS website",
+    "checked_at": "2026-10-03T18:19:11.023201+00:00"
   },
   "publication_repeated": {
     "passed": true,
@@ -87,5 +91,13 @@
     "report": "image-preloading.json",
     "verified_offline_scrubbing": true,
     "original_single_timeline": true
+  },
+  "rapid_intensification_and_edge_cache": {
+    "report": "rapid-intensification-caching.json",
+    "passed": true
+  },
+  "daily_bundles": {
+    "report": "daily-bundles.json",
+    "passed": true
   }
 }

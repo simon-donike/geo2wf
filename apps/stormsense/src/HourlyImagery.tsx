@@ -1,18 +1,25 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
-import type { ImageHour } from "./types";
+import type { ImageHour, ImageBundle } from "./types";
 import { dataUrl, stamp } from "./data";
 import { ImageCache, decodeBlob } from "./imageCache";
 import { ImageArchive } from "./imageArchive";
+const NO_BUNDLES: ImageBundle[] = [];
+export const imageSlot = (time: string) =>
+  new Date(Math.floor(Date.parse(time) / 7200000) * 7200000)
+    .toISOString()
+    .replace(".000Z", "Z");
 
 export function HourlyImagery({
   map,
   frames,
+  bundles = NO_BUNDLES,
   time,
   onReady,
 }: {
   map: L.Map | null;
   frames: ImageHour[];
+  bundles?: ImageBundle[];
   time?: string;
   onReady?: (ready: boolean) => void;
 }) {
@@ -25,14 +32,17 @@ export function HourlyImagery({
   const archive = useRef<ImageArchive | null>(null);
   const group = useRef<L.LayerGroup | null>(null);
   const readyFrames = useMemo(
-    () => frames.filter((f) => f.status === "ready"),
+    () =>
+      frames.filter(
+        (f) => f.status === "ready" && f.time === imageSlot(f.time),
+      ),
     [frames],
   );
   const lookup = useMemo(
     () => new Map(frames.map((f) => [f.time, f])),
     [frames],
   );
-  const frame = time ? lookup.get(time) : undefined;
+  const frame = time ? lookup.get(imageSlot(time)) : undefined;
   useEffect(() => {
     let update: number | null = null;
     const notify = () => {
@@ -86,9 +96,18 @@ export function HourlyImagery({
     );
   }, [readyFrames, time, enabled]);
   useEffect(() => {
-    archive.current?.set(allImages, wanted, !enabled);
-    cache.current?.window(wanted);
-  }, [allImages, wanted, enabled]);
+    // React's development lifecycle can mount and immediately discard an
+    // effect. Avoid starting (then aborting) the selected day's download twice.
+    let disposed = false;
+    queueMicrotask(() => {
+      if (disposed) return;
+      archive.current?.set(allImages, wanted, !enabled, bundles);
+      cache.current?.window(wanted);
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [allImages, wanted, enabled, bundles]);
   const preloaded = readyFrames.filter((f) =>
     f.parts.every((p) => archive.current?.state(dataUrl(p.image)) === "ready"),
   ).length;
@@ -206,6 +225,7 @@ export function HourlyImagery({
           />
         </label>
       </div>
+      <div className="imagery-details">
       <div className="satellite-focus">
         <button
           onClick={focus}
@@ -239,7 +259,7 @@ export function HourlyImagery({
                     ? fullFailed
                       ? "Preview · full resolution unavailable"
                       : "Preview · sharpening…"
-                    : "Hourly image · full resolution"}
+                    : "Full resolution"}
             </span>
             {(failed || fullFailed) && (
               <button
@@ -270,6 +290,7 @@ export function HourlyImagery({
         <br />
         NASA GIBS / NOAA / CIRA · Colour by day, infrared blend at night.
       </p>
+      </div>
     </div>
   );
 }

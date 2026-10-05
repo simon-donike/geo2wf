@@ -1,0 +1,15 @@
+# Opt-in publication credentials. Build and local operation need no secrets.
+# RCLONE_CONFIG_FILE must point to the authenticated config on this host.
+services:
+  runner:
+    environment:
+      RCLONE_CONFIG: /run/secrets/rclone_config
+    secrets: [rclone_config]
+  tools:
+    environment:
+      RCLONE_CONFIG: /run/secrets/rclone_config
+    secrets: [rclone_config]
+
+secrets:
+  rclone_config:
+    file: ${RCLONE_CONFIG_FILE:?Set RCLONE_CONFIG_FILE to the existing authenticated rclone.conf}

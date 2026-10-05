@@ -73,6 +73,9 @@ test("rings follow selected raw radii and geographic zoom; thresholds and smooth
       String(record.metrics![metric.key]),
     );
   }
+  // Center the selected hour before measuring zoom. With the full track in
+  // view, zooming its midpoint can legitimately clip an early storm position.
+  await page.getByRole("button", { name: "Focus image", exact: true }).click();
   const ring = page.locator(".radius-r34_km");
   const before = await ring.evaluate(
     (element) => (element as SVGGraphicsElement).getBBox().width,
@@ -102,7 +105,7 @@ test("rings follow selected raw radii and geographic zoom; thresholds and smooth
   const smoothed = await modelPath.getAttribute("d");
   const metrics = await page.locator(".metric-strip").allTextContents();
   const smoothing = page.getByRole("checkbox", {
-    name: "Light smoothing · 3 hours",
+    name: "Smooth estimates",
   });
   await smoothing.uncheck();
   await expect(modelPath).not.toHaveAttribute("d", smoothed!);

@@ -1,4 +1,6 @@
 import { memo, useEffect, useId, useMemo, useRef } from "react";
+import { KNOT, stamp } from "./data";
+import type { RIInterval } from "./rapidIntensification";
 export interface Point {
   time: string;
   value: number | null;
@@ -74,6 +76,7 @@ export const Chart = memo(function Chart({
   unit,
   title,
   thresholds = [],
+  rapidIntervals = [],
 }: {
   lines: Line[];
   selected?: string;
@@ -82,6 +85,7 @@ export const Chart = memo(function Chart({
   unit: string;
   title: string;
   thresholds?: { value: number; label: string; color: string }[];
+  rapidIntervals?: RIInterval[];
 }) {
   const clip = useId().replaceAll(":", "");
   const geometry = useMemo(() => prepare(lines), [lines]);
@@ -99,6 +103,14 @@ export const Chart = memo(function Chart({
     );
   const { start, end, top, x, y, paths, dots } = geometry;
   const cursor = selected ? x(selected) : null;
+  const visibleIntervals = rapidIntervals.filter(
+    (interval) =>
+      interval.source === "official" &&
+      Date.parse(interval.end) > start &&
+      Date.parse(interval.start) < end,
+  );
+  const intervalDescription = (interval: RIInterval) =>
+    `${interval.source === "official" ? "NHC/CPHC reference" : "StormSense estimate"}: ${stamp(interval.start)} to ${stamp(interval.end)}. Largest 24-hour increase: +${(interval.maxChangeMs / (unit === "m/s" ? 1 : KNOT)).toFixed(1)} ${unit === "m/s" ? "m/s" : "kt"}. ${interval.windows} qualifying 24-hour window${interval.windows === 1 ? "" : "s"}.`;
   return (
     <div className="chart-wrap">
       <svg
@@ -140,7 +152,46 @@ export const Chart = memo(function Chart({
           <clipPath id={clip}>
             <rect x="49" y="25" width="673" height="185" />
           </clipPath>
+          <pattern
+            id={`${clip}-ri`}
+            width="7"
+            height="7"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(35)"
+          >
+            <rect width="7" height="7" fill="#40c7bd" fillOpacity="0.07" />
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="7"
+              stroke="#40c7bd"
+              strokeOpacity="0.25"
+              strokeWidth="2"
+            />
+          </pattern>
         </defs>
+        <g clipPath={`url(#${clip})`} className="ri-bands">
+          {visibleIntervals.map((interval) => (
+            <rect
+              key={`${interval.source}-${interval.start}`}
+              className="ri-band"
+              data-source={interval.source}
+              data-start={interval.start}
+              data-end={interval.end}
+              x={x(interval.start)}
+              y="27"
+              width={x(interval.end) - x(interval.start)}
+              height="181"
+              fill={
+                interval.source === "official" ? "#e9ac7a" : `url(#${clip}-ri)`
+              }
+              fillOpacity={interval.source === "official" ? 0.16 : 1}
+            >
+              <title>{intervalDescription(interval)}</title>
+            </rect>
+          ))}
+        </g>
         {[0, 1, 2, 3, 4].map((i) => (
           <g key={i}>
             <line
@@ -261,6 +312,44 @@ export const Chart = memo(function Chart({
                 {t.label}
               </span>
             ))}
+        </div>
+      )}
+      {visibleIntervals.length > 0 && (
+        <div className="ri-key" aria-label="Rapid intensification shading">
+          <details>
+            <summary>
+              <span className="ri-definition">
+                Rapid intensification · ≥30 kt / 24 h
+              </span>
+              {(["official", "model"] as const)
+                .filter((source) =>
+                  visibleIntervals.some((interval) => interval.source === source),
+                )
+                .map((source) => (
+                  <span key={source}>
+                    <i className={`ri-swatch ri-${source}`} />
+                    {source === "official"
+                      ? "NHC/CPHC winds"
+                      : "StormSense estimate"}
+                  </span>
+                ))}
+              <span className="ri-toggle">Shaded periods</span>
+            </summary>
+            <div className="ri-details">
+              <p>
+                Overlapping qualifying 24-hour windows are joined. Calculated from
+                original winds; forecasts and incomplete windows are excluded.
+                Shading on the radii chart marks the same intensity events.
+              </p>
+              <ul>
+                {visibleIntervals.map((interval) => (
+                  <li key={`${interval.source}-${interval.start}`}>
+                    {intervalDescription(interval)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </details>
         </div>
       )}
     </div>

@@ -1,0 +1,41 @@
+{
+  "url": "https://stormsense.hyperalislabs.com",
+  "version_id": "f8b6ce1f-e65c-47fd-a680-3d0750604fa0",
+  "verified_at": "2026-10-03T18:00:58.416907+00:00",
+  "wind_filter": {
+    "style": "ema",
+    "alpha": 0.5
+  },
+  "interpolation": "Linear bounded gaps, no extrapolation; both smoothing on and off",
+  "evaluation_script": "playground/evaluate-smoothing.mjs",
+  "evaluation_report": "playground/smoothing-results.json",
+  "metrics": {
+    "style": "ema",
+    "parameter": 0.5,
+    "nominal_delay_hours": 1,
+    "change_6h": {
+      "samples": 1170,
+      "mae_ms": 3.9122825108720556,
+      "rmse_ms": 5.331026407944025,
+      "bias_ms": -0.25844526793774475
+    },
+    "strengthening": {
+      "samples": 296,
+      "mae_ms": 7.13353854022837,
+      "rmse_ms": 8.76831282332641,
+      "bias_ms": 5.81706930864492
+    },
+    "samples": 1212,
+    "mae_ms": 7.869028396263129,
+    "rmse_ms": 9.648649512626571,
+    "bias_ms": 6.278955280974455,
+    "storm_macro_mae_ms": 8.167476273727152,
+    "storms": 38
+  },
+  "validation": {
+    "unit_tests": 41,
+    "production_build": "passed",
+    "local_browser_checks": 2,
+    "hosted_browser_checks": 2
+  }
+}

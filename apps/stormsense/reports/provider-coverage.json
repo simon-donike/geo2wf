@@ -1,0 +1,18 @@
+{
+  "url": "https://stormsense.hyperalislabs.com",
+  "version_id": "8c7b238d-2fdd-46e0-b467-11a1e910a104",
+  "verified_at": "2026-10-03T18:08:30.400014+00:00",
+  "source": "https://www.weather.gov/media/nws/IHC2023/2023_nhop.pdf#page=192",
+  "definition": "NHC/CPHC ATCF basins AL, EP and CP; north of equator, Pacific east of 180 degrees, internal division at 140W. Simplified straight ocean limits from Figure O-1, completed by basemap coastlines; no artificial northern cutoff.",
+  "appearance": "1px dashed lines, 0.5 outer opacity / 0.3 internal opacity, unfilled, noninteractive, above imagery and below storm overlays",
+  "maps": [
+    "overview",
+    "storm detail"
+  ],
+  "validation": {
+    "production_build": "passed",
+    "local_browser_checks": 2,
+    "hosted_browser_checks": 2,
+    "desktop_screenshot": "visually inspected"
+  }
+}

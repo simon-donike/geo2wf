@@ -42,7 +42,10 @@ def parser():
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("bootstrap")
     sub.add_parser("discover")
-    sub.add_parser("update")
+    cmd = sub.add_parser(
+        "update", help="Update live estimates and reconcile missed archive hours"
+    )
+    cmd.add_argument("--workers", type=int, default=4)
     sub.add_parser("verify")
     for name in ("discover-history", "backfill", "coverage"):
         cmd = sub.add_parser(name)
@@ -78,6 +81,11 @@ def parser():
     cmd.add_argument("--end")
     cmd = sub.add_parser("publish")
     cmd.add_argument("--output", type=Path, default=Path("var/stormsense/export"))
+    cmd.add_argument(
+        "--stage-only",
+        action="store_true",
+        help="Upload and verify immutable assets without advancing latest.json",
+    )
     cmd = sub.add_parser("retain")
     cmd.add_argument("--apply", action="store_true")
     cmd.add_argument(
@@ -117,13 +125,25 @@ def main(argv=None):
         elif args.command == "discover-history":
             discover_history(store, start, end)
         elif args.command == "update":
+            if not 1 <= args.workers <= 32:
+                raise ValueError("workers must be between 1 and 32")
             request = Path(str(args.db) + ".update-requested")
             request.touch()
+            acquired = False
             try:
                 with lock(str(args.db) + ".lock", wait_seconds=180):
-                    result = update(store, Models(args.model_root, args.device))
+                    # Our own priority marker must not stop our catch-up job.
+                    request.unlink(missing_ok=True)
+                    acquired = True
+                    result = update(
+                        store,
+                        Models(args.model_root, args.device),
+                        workers=args.workers,
+                        model_root=args.model_root,
+                    )
             finally:
-                request.unlink(missing_ok=True)
+                if not acquired:
+                    request.unlink(missing_ok=True)
         elif args.command == "backfill":
             if not 1 <= args.workers <= 32:
                 raise ValueError("workers must be between 1 and 32")
@@ -186,7 +206,7 @@ def main(argv=None):
             }
         elif args.command == "publish":
             with lock(str(args.output) + ".publish.lock"):
-                publish(args.output)
+                publish(args.output, advance_pointer=not args.stage_only)
         elif args.command == "retain":
             cutoff = hour(year_before()) - timedelta(hours=12)
             result = {"cutoff": iso(cutoff), "apply": args.apply}

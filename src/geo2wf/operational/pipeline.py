@@ -261,7 +261,7 @@ def forecast_rows(samples, models, existing=None, issued_at=None):
             kinds = (
                 ("live", "hindcast")
                 if row["kind"] == "live" and offset
-                else (row["kind"],)
+                else (("hindcast", "live") if offset else (row["kind"],))
             )
             for kind in kinds:
                 candidate = lookup.get(
@@ -319,21 +319,49 @@ def generate_forecasts(store, models, sid, live_anchor=None):
         store.put_forecast(row)
 
 
-def update(store, models, now=None):
+def update(store, models, now=None, workers=4, model_root="downloads/models"):
     now = utc(now)
     active = discover(store, now)
     results = []
     for item in active:
         storm = store.storm(item["id"])
         at = hour(now)
-        previous = store.sample(storm["id"], at, "live", version("nowcast"))
-        if previous and previous["status"] == "ready":
+        previous = store.sample(
+            storm["id"], at, "live", version("nowcast")
+        ) or store.sample(storm["id"], at, "hindcast", version("nowcast"))
+        if previous:
             generate_forecasts(store, models, storm["id"], live_anchor=iso(at))
             continue
         result = process(storm, at, "live", models, now)
         store.put_sample(result, retry=True)
         generate_forecasts(store, models, storm["id"], live_anchor=iso(at))
         results.append(result)
+    # Scan the entire retained window, rather than a high-water mark: a newer
+    # live result must never conceal interior holes or storms ended while offline.
+    start = hour(year_before(now)) - timedelta(hours=12)
+    discover_history(store, start, now)
+    caught_up = backfill(
+        store,
+        models,
+        start,
+        now,
+        workers=workers,
+        model_root=model_root,
+        reconcile=True,
+    )
+    if not store.get_status("backfill")["complete"]:
+        raise RuntimeError(
+            "Update catch-up interrupted; committed work will resume next update"
+        )
+    # Catch-up may have supplied missing forecast context, including after a
+    # restart between committing a prediction and its forecast.
+    for storm in store.storms():
+        generate_forecasts(
+            store,
+            models,
+            storm["id"],
+            live_anchor=iso(hour(now)) if storm.get("active") else None,
+        )
     store.put_status(
         "update",
         {
@@ -341,6 +369,9 @@ def update(store, models, now=None):
             "requested_at": iso(now),
             "results": len(results),
             "ready": sum(r["status"] == "ready" for r in results),
+            "catchup": caught_up,
+            "catchup_start": iso(start),
+            "catchup_end": iso(hour(now)),
         },
     )
     return results
@@ -356,6 +387,7 @@ def backfill(
     retry_gaps=False,
     storm_ids=None,
     model_root="downloads/models",
+    reconcile=False,
 ):
     end = min(utc(end), utc())
     tasks = []
@@ -367,9 +399,16 @@ def backfill(
             utc(end), utc(end) if storm.get("active") else utc(storm["end"])
         )
         for at in hours(first, last):
+            if reconcile:
+                live = store.sample(storm["id"], at, "live", version("nowcast"))
+                if live:
+                    continue
             previous = store.sample(storm["id"], at, "hindcast", version("nowcast"))
-            if previous and (previous["status"] == "ready" or not retry_gaps):
-                continue
+            if previous:
+                if previous["status"] == "ready":
+                    continue
+                if not retry_gaps:
+                    continue
             tasks.append((storm, at))
     tasks.sort(key=lambda item: item[1], reverse=True)
     if limit is not None:

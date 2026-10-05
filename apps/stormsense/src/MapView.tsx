@@ -2,8 +2,9 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { GeoJsonObject } from "geojson";
-import type { Fix, Metrics, Storm, ImageHour } from "./types";
+import type { Fix, Metrics, Storm, ImageHour, ImageBundle } from "./types";
 import { RADII } from "./presentation";
+import { COVERAGE_LIMITS, COVERAGE_SOURCE } from "./coverage";
 import { SatelliteOverlay } from "./SatelliteOverlay";
 import { HourlyImagery } from "./HourlyImagery";
 
@@ -74,6 +75,7 @@ export const MapView = memo(function MapView({
   liveStorm,
   latestImagery = true,
   imagery,
+  imageryBundles,
   imageryTime,
   onImageryReady,
 }: {
@@ -87,6 +89,7 @@ export const MapView = memo(function MapView({
   liveStorm?: Storm;
   latestImagery?: boolean;
   imagery?: ImageHour[];
+  imageryBundles?: ImageBundle[];
   imageryTime?: string;
   onImageryReady?: (ready: boolean) => void;
 }) {
@@ -118,7 +121,7 @@ export const MapView = memo(function MapView({
       attributionControl: false,
       minZoom: 2,
       maxZoom: 9,
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
     }).setView([23, -112], 3);
     map.current = instance;
     fit.current = "";
@@ -135,6 +138,34 @@ export const MapView = memo(function MapView({
     instance.createPane("satellite");
     instance.getPane("satellite")!.style.zIndex = "300";
     instance.getPane("satellite")!.style.pointerEvents = "none";
+    instance.createPane("coverage");
+    instance.getPane("coverage")!.style.zIndex = "350";
+    instance.getPane("coverage")!.style.pointerEvents = "none";
+    for (const boundary of COVERAGE_LIMITS) {
+      const line = L.polyline(boundary.points, {
+        pane: "coverage",
+        color: "#b9c8ce",
+        weight: 1,
+        opacity: 0.5,
+        dashArray: "5 7",
+        interactive: false,
+        className: "provider-coverage-boundary",
+      }).addTo(instance);
+      line.getElement()?.setAttribute("data-boundary", boundary.name);
+    }
+    const coverageKey = new L.Control({ position: "bottomleft" });
+    coverageKey.onAdd = () => {
+      const key = L.DomUtil.create("a", "provider-coverage-key");
+      key.href = COVERAGE_SOURCE;
+      key.target = "_blank";
+      key.rel = "noopener noreferrer";
+      key.textContent = "NHC/CPHC coverage outline";
+      key.title = "Combined Atlantic, eastern and central North Pacific coverage · outer ocean boundaries from NOAA; coastlines complete the edges";
+      L.DomEvent.disableClickPropagation(key);
+      L.DomEvent.disableScrollPropagation(key);
+      return key;
+    };
+    coverageKey.addTo(instance);
     setMapInstance(instance);
     const background = L.layerGroup().addTo(instance);
     for (let lon = -180; lon <= 180; lon += 20)
@@ -316,6 +347,7 @@ export const MapView = memo(function MapView({
         <HourlyImagery
           map={mapInstance}
           frames={imagery}
+          bundles={imageryBundles}
           time={imageryTime}
           onReady={onImageryReady}
         />

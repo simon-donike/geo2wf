@@ -1,6 +1,5 @@
 import { className, KNOT } from "./data";
 import type { Fix, Metrics } from "./types";
-import type { Point } from "./Chart";
 
 // NHC Saffir–Simpson thresholds, in knots; canonical values remain in m/s.
 export const WIND_BANDS = [
@@ -46,36 +45,7 @@ export const RADII: {
   { key: "rmw_km", label: "RMW", color: "#e8e2d7", dashed: true },
 ];
 
-/** Light causal display filter: 60% current, 30% previous, 10% two hours ago.
- * Gaps reset the window; no future values or missing estimates are introduced.
- */
-export function smoothPoints(points: Point[]): Point[] {
-  let history: Point[] = [];
-  return points.map((point) => {
-    if (point.value == null || !Number.isFinite(point.value)) {
-      history = [];
-      return point;
-    }
-    if (
-      history.length &&
-      Date.parse(point.time) - Date.parse(history.at(-1)!.time) > 1.5 * 3600000
-    )
-      history = [];
-    history.push(point);
-    history = history.slice(-3);
-    let sum = 0,
-      weight = 0;
-    history
-      .slice()
-      .reverse()
-      .forEach((p, i) => {
-        const w = [0.6, 0.3, 0.1][i];
-        sum += p.value! * w;
-        weight += w;
-      });
-    return { time: point.time, value: sum / weight };
-  });
-}
+export { smoothPoints, interpolatePoints, STRUCTURE_SMOOTHING } from "./smoothing";
 
 export function nearestIndex(times: number[], requested?: string | null) {
   if (!times.length) return 0;

@@ -4,6 +4,7 @@ import {
   nearestIndex,
   officialCategory,
   smoothPoints,
+  interpolatePoints,
   stormAge,
   windCategory,
 } from "./presentation";
@@ -38,26 +39,35 @@ describe("storm presentation", () => {
       stormAge("2026-09-01T00:00:00Z", Date.parse("2026-09-02T01:00:00Z")),
     ).toBe("1 day 1 hour");
   });
-  it("smooths lightly without using future values or changing the original records", () => {
+  it("uses exponential smoothing without using future values or changing the original records", () => {
     const points = [10, 20, 40, 100].map((value, i) => ({
       time: `2026-09-01T0${i}:00:00Z`,
       value,
     }));
     const result = smoothPoints(points);
     expect(result[0].value).toBe(10);
-    expect(result[1].value).toBeCloseTo(16.6666667);
-    expect(result[2].value).toBeCloseTo(31);
+    expect(result[1].value).toBe(15);
+    expect(result[2].value).toBe(27.5);
+    expect(result[3].value).toBe(63.75);
     expect(smoothPoints(points.slice(0, 3))).toEqual(result.slice(0, 3));
     expect(points.map((p) => p.value)).toEqual([10, 20, 40, 100]);
   });
-  it("leaves gaps intact and restarts smoothing after missing hours", () => {
-    const result = smoothPoints([
+  it("interpolates bounded gaps without extrapolating", () => {
+    const result = interpolatePoints([
       { time: "2026-09-01T00:00:00Z", value: 10 },
       { time: "2026-09-01T01:00:00Z", value: null },
       { time: "2026-09-01T02:00:00Z", value: 80 },
       { time: "2026-09-01T04:00:00Z", value: 40 },
     ]);
-    expect(result.map((p) => p.value)).toEqual([10, null, 80, 40]);
+    expect(result.map((p) => p.value)).toEqual([10, 45, 80, 60, 40]);
+  });
+  it("preserves unbounded gaps and follows a rising wind with about one hour of lag", () => {
+    const points = Array.from({ length: 20 }, (_, i) => ({
+      time: new Date(Date.UTC(2026, 8, 1, i)).toISOString(), value: i,
+    }));
+    expect(smoothPoints(points).at(-1)!.value).toBeCloseTo(18, 4);
+    const missing = [{ ...points[0], value: null }, points[1], { ...points[2], value: null }];
+    expect(interpolatePoints(missing).map(p => p.value)).toEqual([null, 1, null]);
   });
   it("finds the nearest hour at boundaries and defaults to the latest observation", () => {
     const times = [0, 3600000, 7200000];

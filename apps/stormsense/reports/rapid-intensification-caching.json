@@ -1,0 +1,144 @@
+{
+  "checked_at": "2026-10-03T09:12:37.265016+00:00",
+  "url": "https://stormsense.hyperalislabs.com",
+  "worker_version": "68230aa5-2949-4c2f-ab71-5edd638ddf43",
+  "data_release_unchanged": "20261002T174218736546Z",
+  "rapid_intensification": {
+    "wind_change_knots": 30,
+    "period_hours": 24,
+    "source_definition": "https://prod-west-nhc.woc.noaa.gov/aboutgloss.shtml",
+    "graphs": [
+      "intensity",
+      "wind radii (same intensity periods)"
+    ],
+    "official": "amber; original NHC/CPHC winds during TD/TS/HU phases",
+    "model": "teal hatching; original StormSense estimates",
+    "continuous_windows_required": true,
+    "reference_max_gap_hours": 6,
+    "model_max_gap_hours": 1,
+    "exact_24_hour_endpoints_required": true,
+    "model_version_changes_break_windows": true,
+    "overlapping_windows_merged": true,
+    "forecast_points_excluded": true,
+    "smoothing_and_units_do_not_change_periods": true,
+    "accessible_period_details": true,
+    "verified_real_example": {
+      "storm_id": "EP172026",
+      "official_start": "2026-09-20T18:00:00Z",
+      "official_end": "2026-09-23T00:00:00Z",
+      "qualifying_windows": 6,
+      "max_24h_increase_knots": 85
+    }
+  },
+  "edge_cache": {
+    "checked_at": "2026-10-03T09:10:17.021Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "release": "20261002T174218736546Z",
+    "image": "/data/imagery/c16162224018c56758d0d935e5e39a313353f750e1cea4a23c658b26667d8771.webp",
+    "bytes": 54806,
+    "cache_statuses": [
+      "MISS",
+      "HIT"
+    ],
+    "query_strings_share_cache": true,
+    "head_cache": "HIT",
+    "conditional_status": 304,
+    "conditional_cache": "HIT",
+    "latest_pointer_cache": "BYPASS",
+    "writes_rejected": true
+  },
+  "cache_policy": {
+    "scope": "immutable published images, metadata, storm series and releases",
+    "max_object_bytes": 8388608,
+    "latest_pointer": "always bypass",
+    "errors": "never stored by Cache API",
+    "HEAD": "reuse full cached object; otherwise R2 head without cache population",
+    "cache_failure": "fall back to R2; cache-write failures do not block delivery",
+    "region_scope": "each Cloudflare data center; eviction possible",
+    "worker_invocations": "still apply"
+  },
+  "sizing": {
+    "pricing_checked": "2026-10-03",
+    "storage_class_assumed": "Standard",
+    "source": "https://developers.cloudflare.com/r2/pricing/",
+    "account_bill_inspected": false,
+    "free_class_b_per_month_account_wide": 10000000,
+    "usd_per_million_class_b": 0.36,
+    "billing_unit_rounding": "up to next million operations",
+    "egress_fee": 0,
+    "storm": "EP152026",
+    "frames": 531,
+    "unique_full_and_preview_webps": 1062,
+    "bytes": 50043866,
+    "1000_cold_preloads_reads": 1062000,
+    "1000_cold_preloads_usd_at_marginal_read_rate_before_allowance_and_rounding": 0.38232,
+    "excludes": "JSON, retries, other account usage, Worker plan charges; actual cache hits reduce R2 reads",
+    "bundles_implemented": false,
+    "recommendation": "Shared edge cache now. Consider immutable daily image packs for fewer requests if traffic or latency warrants; retain georeferencing. Packaging alone does not materially shrink WebP data."
+  },
+  "checks": {
+    "web_unit": 37,
+    "worker_types": true,
+    "production_build_and_deploy_dry_run": true,
+    "browser_local": 40,
+    "browser_hosted": 40,
+    "devices": [
+      "desktop",
+      "mobile"
+    ],
+    "hosted_edge_probe": true,
+    "single_timeline_preserved": true
+  },
+  "hosted_interaction": {
+    "desktop": {
+      "timeline_p95_ms": 29,
+      "offline_preloaded_images": {
+        "storm_id": "EP152026",
+        "images": 531,
+        "project": "desktop",
+        "offline": true,
+        "p95_ms": 57,
+        "samples": [
+          46,
+          33.10000002384186,
+          32.90000009536743,
+          36.39999997615814,
+          35.799999952316284,
+          57,
+          44.800000071525574,
+          43.89999997615814,
+          42.60000002384186,
+          35.39999997615814,
+          30.699999928474426,
+          48.90000009536743
+        ]
+      }
+    },
+    "mobile": {
+      "timeline_p95_ms": 28.700000047683716,
+      "offline_preloaded_images": {
+        "storm_id": "EP152026",
+        "images": 531,
+        "project": "mobile",
+        "offline": true,
+        "p95_ms": 70.5,
+        "samples": [
+          51.800000071525574,
+          49.39999997615814,
+          32.10000002384186,
+          51.39999997615814,
+          49.199999928474426,
+          49.5,
+          56.90000009536743,
+          50.799999952316284,
+          66.70000004768372,
+          70.5,
+          49.5,
+          41.800000071525574
+        ]
+      }
+    }
+  },
+  "performance_note": "Chrome desktop and mobile emulation on this workstation; not a physical-phone or slow-network benchmark.",
+  "continuous_inference_scheduling_active": false
+}

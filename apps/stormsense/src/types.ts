@@ -62,6 +62,8 @@ export interface Storm {
   start: string;
   end: string;
   peak_category: number | null;
+  peak_official_wind_ms?: number | null;
+  has_ri?: boolean | null;
   advisory: Fix | null;
   latest_fix: Fix | null;
   latest_prediction: RecordHour | null;
@@ -82,6 +84,15 @@ export interface Series {
   records: RecordHour[];
   forecasts: Forecast[];
   imagery?: ImageHour[];
+  imagery_bundles?: ImageBundle[];
+}
+export interface ImageBundle {
+  schema_version: 1;
+  date: string;
+  path: string;
+  sha256: string;
+  bytes: number;
+  images: string[];
 }
 export interface ImageHour {
   storm_id: string;

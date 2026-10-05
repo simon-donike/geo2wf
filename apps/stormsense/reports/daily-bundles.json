@@ -1,0 +1,172 @@
+{
+  "checked_at": "2026-10-03T18:19:11.023201+00:00",
+  "url": "https://stormsense.hyperalislabs.com",
+  "worker_version": "986abea6-cc03-470f-baf9-8c626ebc86b7",
+  "release": "20261003T175702414184Z",
+  "bundle_format": "geocolor-daily-zip-v1",
+  "bundles": 248,
+  "bundle_bytes": 271595691,
+  "max_bundle_bytes": 1487564,
+  "image_coverage": {
+    "expected": 3552,
+    "gaps": 872,
+    "pending": 0,
+    "ready": 2680
+  },
+  "image_interval_hours": 2,
+  "display": "Previous even-UTC display slot at intervening numerical hours; actual provider time shown. No cadence label added to the UI.",
+  "numerical_records_forecasts_and_tracks_unchanged": true,
+  "numerical_coverage": {
+    "expected": 7068,
+    "gaps": 17,
+    "pending": 0,
+    "predictions": 7051
+  },
+  "portable_georeferencing": {
+    "zip_contains": [
+      "manifest.json",
+      "original full and preview WebPs",
+      "matching GDAL PAM sidecars",
+      "original STAC Items"
+    ],
+    "crs": "EPSG:3857",
+    "all_13780_source_assets_compared_byte_for_byte": true,
+    "all_zip_sha256_and_member_frames_validated": true
+  },
+  "publication": {
+    "immutable_assets_staged_and_checked": true,
+    "remote_bundle_matches": 248,
+    "remote_imagery_matches": 27431,
+    "remote_object_matches": 254,
+    "differences": 0,
+    "pointer_advanced_last_with": "rclone copyto",
+    "pointer_read_back": true,
+    "original_explorer_pointer_unchanged": true
+  },
+  "archive_columns": {
+    "latest_estimate_retained": true,
+    "added": [
+      "maximum official wind",
+      "maximum official category",
+      "RI yes/no/unknown"
+    ],
+    "sources": "NHC/CPHC reference tracks and latest advisory",
+    "has_ri_true_storms": 10,
+    "missing_reference_history": "unknown, not false"
+  },
+  "rapid_intensification": {
+    "source": "NHC/CPHC reference winds only",
+    "model_signals_displayed": false,
+    "threshold_knots_in_24h": 30,
+    "complete_windows_only": true,
+    "plots": [
+      "intensity",
+      "wind radii"
+    ]
+  },
+  "map": {
+    "implementation": "existing Leaflet map",
+    "scroll_wheel_zoom": true,
+    "existing_base_styling_preserved": true,
+    "keyboard_and_touch_navigation_preserved": true
+  },
+  "checks": {
+    "python_full_suite": 235,
+    "focused_publication_checks_after_stage_option": 30,
+    "web_unit": 41,
+    "browser_local_full": 46,
+    "browser_final_local_bundle_and_columns": 6,
+    "browser_hosted_full": 48,
+    "typescript": true,
+    "production_build": true,
+    "worker_dry_run": true
+  },
+  "edge_cache": {
+    "checked_at": "2026-10-03T18:15:31.390Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "release": "20261003T175702414184Z",
+    "asset": "/data/bundles/e4304b81858c06a569364cf2103aa53e81a8c9677073c5b6c95037fd51ffc939.zip",
+    "daily_bundle": true,
+    "bytes": 754783,
+    "cache_statuses": [
+      "MISS",
+      "HIT"
+    ],
+    "query_strings_share_cache": true,
+    "head_cache": "HIT",
+    "conditional_status": 304,
+    "conditional_cache": "HIT",
+    "latest_pointer_cache": "BYPASS",
+    "writes_rejected": true
+  },
+  "hosted_measurements": {
+    "desktop": {
+      "downloads": {
+        "storm_id": "EP152026",
+        "project": "desktop",
+        "frames": 267,
+        "bundle_requests": 23,
+        "individual_image_requests": 0,
+        "bundle_bytes": 28422791,
+        "preload_elapsed_ms": 7908
+      },
+      "offline_scrubbing": {
+        "storm_id": "EP152026",
+        "images": 267,
+        "project": "desktop",
+        "offline": true,
+        "p95_ms": 57.699999928474426,
+        "samples": [
+          50.09999990463257,
+          45.90000009536743,
+          36.5,
+          52.5,
+          28.899999976158142,
+          51,
+          38.10000002384186,
+          44.699999928474426,
+          45.800000071525574,
+          57.699999928474426,
+          47.700000047683716,
+          47.60000002384186
+        ]
+      },
+      "timeline_p95_ms": 36
+    },
+    "mobile": {
+      "downloads": {
+        "storm_id": "EP152026",
+        "project": "mobile",
+        "frames": 267,
+        "bundle_requests": 23,
+        "individual_image_requests": 0,
+        "bundle_bytes": 28422791,
+        "preload_elapsed_ms": 3660
+      },
+      "offline_scrubbing": {
+        "storm_id": "EP152026",
+        "images": 267,
+        "project": "mobile",
+        "offline": true,
+        "p95_ms": 50.700000047683716,
+        "samples": [
+          44.299999952316284,
+          47.5,
+          50.700000047683716,
+          34.5,
+          30.300000071525574,
+          33.39999997615814,
+          33.299999952316284,
+          33.90000009536743,
+          33.199999928474426,
+          32.800000071525574,
+          34.09999990463257,
+          34.10000002384186
+        ]
+      },
+      "timeline_p95_ms": 33.09999990463257
+    }
+  },
+  "measurement_note": "Desktop Chrome and mobile emulation on this workstation; not a physical-phone or slow-network benchmark.",
+  "continuous_inference_scheduling_active": false
+}

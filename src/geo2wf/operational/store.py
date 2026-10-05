@@ -85,6 +85,14 @@ class Store:
         ]
 
     def put_storm(self, body):
+        from .intensification import official_summary
+
+        body = {
+            **body,
+            "official_summary": official_summary(
+                body.get("track", []), body.get("advisory")
+            ),
+        }
         levels = [
             category(f["wind_ms"])
             for f in body.get("track", [])
@@ -183,6 +191,12 @@ class Store:
                     self.db.execute("DELETE FROM storms WHERE id=?", (storm["id"],))
                 else:
                     track = storm.get("track", [])
+                    if "official_summary" not in storm:
+                        from .intensification import official_summary
+
+                        storm["official_summary"] = official_summary(
+                            track, storm.get("advisory")
+                        )
                     earlier = [fix for fix in track if fix["time"] < iso(cutoff)]
                     storm["track"] = earlier[-1:] + [
                         fix for fix in track if fix["time"] >= iso(cutoff)

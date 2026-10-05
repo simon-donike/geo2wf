@@ -19,6 +19,7 @@ import {
 } from "react-router-dom";
 import { MapView, RadiusLegend } from "./MapView";
 import { Chart, type Line } from "./Chart";
+import { rapidIntensification } from "./rapidIntensification";
 import {
   age,
   BASINS,
@@ -39,6 +40,8 @@ import {
   officialCategory,
   RADII,
   smoothPoints,
+  interpolatePoints,
+  STRUCTURE_SMOOTHING,
   stormAge,
   windCategory,
   WIND_BANDS,
@@ -479,12 +482,19 @@ function Archive({ catalog }: { catalog: Catalog }) {
         {storms.length} storms · Historical estimates use retrospective track
         centers.
       </p>
-      <div className="archive-table">
+      <div
+        className="archive-table"
+        tabIndex={0}
+        aria-label="Storm archive table"
+      >
         <div className="archive-row table-heading">
           <span>Storm</span>
           <span>Basin</span>
           <span>Period · UTC</span>
           <span>Latest estimate</span>
+          <span>Max wind · NHC/CPHC</span>
+          <span>Max category</span>
+          <span>Rapid intensification</span>
           <span>Available / gaps</span>
           <span />
         </div>
@@ -506,6 +516,31 @@ function Archive({ catalog }: { catalog: Catalog }) {
             </span>
             <span>
               {wind(s.metrics?.vmax_ms, unit)} <small>{unit}</small>
+            </span>
+            <span className="archive-peak-wind" data-label="Max wind">
+              {wind(s.peak_official_wind_ms, unit)} <small>{unit}</small>
+            </span>
+            <span className="archive-peak-category" data-label="Max category">
+              {s.peak_category == null
+                ? "—"
+                : s.peak_category > 0
+                  ? `Category ${s.peak_category}`
+                  : s.peak_category === 0
+                    ? "Tropical storm"
+                    : "Tropical depression"}
+            </span>
+            <span
+              className="archive-ri"
+              data-label="RI"
+              title={
+                s.has_ri == null
+                  ? "Insufficient official reference history"
+                  : s.has_ri
+                    ? "Rapid intensification detected in NHC/CPHC winds"
+                    : "No rapid intensification detected in available NHC/CPHC winds"
+              }
+            >
+              {s.has_ri == null ? "—" : s.has_ri ? "Yes" : "No"}
             </span>
             <span className="coverage-cell">
               <span>
@@ -599,14 +634,6 @@ function Detail({ catalog }: { catalog: Catalog }) {
     ? recordLookup.get(`${selection.kind}|${records[index]?.time}`)
     : undefined;
   const selected = alternate?.status === "ready" ? alternate : records[index];
-  const forecastLookup = useMemo(
-    () =>
-      new Map(series?.forecasts.map((f) => [`${f.kind}|${f.anchor_time}`, f])),
-    [series],
-  );
-  const selectedForecast = forecastLookup.get(
-    `${selection.kind || selected?.kind}|${selection.issue || selected?.time}`,
-  );
   const commitTime = useCallback(
     (time: string) => {
       if (
@@ -685,6 +712,21 @@ function Detail({ catalog }: { catalog: Catalog }) {
       document.removeEventListener("visibilitychange", pauseWhenHidden);
   }, [selected, commitTime]);
   const factor = unit === "kt" ? 1 / KNOT : 1;
+  const rapidIntervals = useMemo(
+    () => [
+      ...rapidIntensification(
+        references.map((fix) => ({
+          time: fix.time,
+          value: ["TD", "TS", "HU"].includes(fix.classification)
+            ? fix.wind_ms
+            : null,
+        })),
+        "official",
+        6,
+      ),
+    ],
+    [references],
+  );
   const intensity = useMemo(() => {
     const points = records.map((r) => ({
       time: r.time,
@@ -692,11 +734,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
     }));
     const lines: Line[] = [
       {
-        label: smoothing
-          ? "StormSense · lightly smoothed"
-          : "StormSense estimate",
+        label: smoothing ? "StormSense · smoothed" : "StormSense estimate",
         color: "#40c7bd",
-        points: smoothing ? smoothPoints(points) : points,
+        points: smoothing ? smoothPoints(points) : interpolatePoints(points),
       },
       {
         label: "NHC/CPHC reference",
@@ -709,25 +749,8 @@ function Detail({ catalog }: { catalog: Catalog }) {
         })),
       },
     ];
-    if (selectedForecast)
-      lines.push({
-        label: "Experimental forecast",
-        color: "#e9ac7a",
-        dashed: true,
-        gapHours: 6,
-        points: [
-          {
-            time: selectedForecast.anchor_time,
-            value: selectedForecast.input_vmax_ms[0] * factor,
-          },
-          ...selectedForecast.predictions.map((p) => ({
-            time: p.valid_time,
-            value: p.vmax_ms * factor,
-          })),
-        ],
-      });
     return lines;
-  }, [records, references, factor, smoothing, selectedForecast]);
+  }, [records, references, factor, smoothing]);
   const structure = useMemo(
     () =>
       RADII.map(({ key, label, color }) => {
@@ -738,7 +761,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
         return {
           label,
           color,
-          points: smoothing ? smoothPoints(points) : points,
+          points: smoothing
+            ? smoothPoints(points, STRUCTURE_SMOOTHING)
+            : interpolatePoints(points),
         };
       }),
     [records, smoothing],
@@ -751,22 +776,6 @@ function Detail({ catalog }: { catalog: Catalog }) {
         label: `${b.short} · ${unit === "kt" ? b.knots : (b.knots * KNOT).toFixed(1)} ${unit}`,
       })),
     [factor, unit],
-  );
-  const forecastOptions = useMemo(
-    () =>
-      series?.forecasts
-        .slice()
-        .reverse()
-        .map((f) => (
-          <option
-            key={f.anchor_time + f.kind}
-            value={`${f.kind}|${f.anchor_time}`}
-          >
-            {stamp(f.anchor_time)} ·{" "}
-            {f.kind === "live" ? "Live" : "Retrospective"}
-          </option>
-        )),
-    [series],
   );
   const official = references
     .filter((f) => f.time <= (selected?.time || storm?.end || ""))
@@ -879,163 +888,6 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <em>Equivalent-area radius</em>
             </div>
           </div>
-          <div className="detail-grid">
-            <section className="map-shell detail-map-shell">
-              <div className="map-top">
-                <span>
-                  <Icon name="map" /> The storm’s path
-                </span>
-                <span>
-                  {selected?.center?.method === "motion_estimate"
-                    ? "Estimated center"
-                    : "Track history"}
-                </span>
-              </div>
-              <MapView
-                detail
-                track={references}
-                selected={selected ? selected.center : storm.latest_fix}
-                radii={metrics}
-                liveStorm={storm.active ? storm : undefined}
-                latestImagery={selected?.time === storm.latest_prediction?.time}
-                imagery={series.imagery}
-                imageryTime={selected?.time}
-                onImageryReady={setImageReady}
-              />
-              <RadiusLegend />
-              <div className="track-context">
-                <span>Selected position</span>
-                <strong>
-                  {selected?.center
-                    ? `${selected.center.lat.toFixed(1)}° N · ${Math.abs(selected.center.lon).toFixed(1)}° ${selected.center.lon < 0 ? "W" : "E"}`
-                    : "Unavailable"}
-                </strong>
-                <small>
-                  {selected?.imagery
-                    ? `GOES-${selected.imagery.satellite} · ${stamp(selected.imagery.end)}`
-                    : "Satellite scan unavailable"}
-                </small>
-              </div>
-            </section>
-            <section className="chart-panel">
-              <div className="panel-heading">
-                <div className="eyebrow">Intensity through time</div>
-                <h2>Following the wind</h2>
-                <p>
-                  {hover
-                    ? stamp(hover)
-                    : selected
-                      ? stamp(selected.time)
-                      : "No predictions yet"}
-                </p>
-              </div>
-              <Chart
-                title="Maximum sustained wind"
-                unit={unit}
-                lines={intensity}
-                thresholds={thresholds}
-                selected={hover || selected?.time}
-                onTime={setHover}
-                onSelect={selectTime}
-              />
-              <label
-                className="smoothing-control"
-                title="A trailing three-hour display filter. Original estimates remain in downloads and forecast inputs."
-              >
-                <input
-                  type="checkbox"
-                  checked={smoothing}
-                  onChange={(e) => {
-                    setSmoothing(e.target.checked);
-                    localStorage.setItem(
-                      "stormsense-smoothing",
-                      e.target.checked ? "on" : "off",
-                    );
-                  }}
-                />{" "}
-                Light smoothing · 3 hours
-              </label>
-              <div className="forecast-controls">
-                <label>
-                  Forecast issue
-                  <select
-                    aria-label="Forecast issue"
-                    value={
-                      selectedForecast
-                        ? `${selectedForecast.kind}|${selectedForecast.anchor_time}`
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const [kind, time] = e.target.value.split("|");
-                      setSelection({
-                        time: time || selected?.time || null,
-                        issue: time,
-                        kind,
-                      });
-                      setHover(null);
-                      setParams(
-                        (prior) => {
-                          const next = new URLSearchParams(prior);
-                          if (time) {
-                            next.set("time", time);
-                            next.set("issue", time);
-                            next.set("issue_kind", kind);
-                          } else {
-                            next.delete("issue");
-                            next.delete("issue_kind");
-                          }
-                          return next;
-                        },
-                        { replace: true, preventScrollReset: true },
-                      );
-                    }}
-                  >
-                    <option value="">Select an available issue</option>
-                    {forecastOptions}
-                  </select>
-                </label>
-                <span className="experimental">Experimental</span>
-              </div>
-              <div className="forecast-slot">
-                {selectedForecast ? (
-                  <div>
-                    <p className="forecast-explanation">
-                      {selectedForecast.kind === "live"
-                        ? "Live issue"
-                        : "Retrospective issue"}{" "}
-                      · {stamp(selectedForecast.anchor_time)}
-                      <br />
-                      Generated {stamp(selectedForecast.generated_at)}
-                      {selectedForecast.kind === "live" &&
-                        selectedForecast.input_kinds?.includes("hindcast") && (
-                          <>
-                            <br />
-                            Includes retrospective estimates already available
-                            at issue time.
-                          </>
-                        )}
-                    </p>
-                    <div className="forecast-values">
-                      {selectedForecast.predictions.map((p) => (
-                        <div key={p.lead_hours}>
-                          <span>+{p.lead_hours} hours</span>
-                          <strong>
-                            {wind(p.vmax_ms, unit)} <small>{unit}</small>
-                          </strong>
-                          <small>Valid {stamp(p.valid_time)}</small>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="forecast-explanation">
-                    Forecasts need available StormSense estimates at the issue
-                    time, six hours earlier, and twelve hours earlier.
-                  </p>
-                )}
-              </div>
-            </section>
-          </div>
           <section className="timeline-panel">
             <div>
               <span className="eyebrow">Explore the timeline</span>
@@ -1110,14 +962,96 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <span>{stamp(storm.end, true)}</span>
             </footer>
           </section>
-          <section className="structure-panel">
+          <div className="detail-grid">
+            <div className="dashboard-column">
+            <section className="map-shell detail-map-shell">
+              <div className="map-top">
+                <span>
+                  <Icon name="map" /> The storm’s path
+                </span>
+                <span>
+                  {selected?.center?.method === "motion_estimate"
+                    ? "Estimated center"
+                    : "Track history"}
+                </span>
+              </div>
+              <MapView
+                detail
+                track={references}
+                selected={selected ? selected.center : storm.latest_fix}
+                radii={metrics}
+                liveStorm={storm.active ? storm : undefined}
+                latestImagery={selected?.time === storm.latest_prediction?.time}
+                imagery={series.imagery}
+                imageryBundles={series.imagery_bundles}
+                imageryTime={selected?.time}
+                onImageryReady={setImageReady}
+              />
+              <RadiusLegend />
+              <div className="track-context">
+                <span>Selected position</span>
+                <strong>
+                  {selected?.center
+                    ? `${selected.center.lat.toFixed(1)}° N · ${Math.abs(selected.center.lon).toFixed(1)}° ${selected.center.lon < 0 ? "W" : "E"}`
+                    : "Unavailable"}
+                </strong>
+                <small>
+                  {selected?.imagery
+                    ? `GOES-${selected.imagery.satellite} · ${stamp(selected.imagery.end)}`
+                    : "Satellite scan unavailable"}
+                </small>
+              </div>
+            </section>
+            </div>
+            <div className="dashboard-column">
+            <section className="chart-panel">
+              <div className="panel-heading">
+                <div className="eyebrow">Intensity through time</div>
+                <h2>Following the wind</h2>
+                <p>
+                  {hover
+                    ? stamp(hover)
+                    : selected
+                      ? stamp(selected.time)
+                      : "No predictions yet"}
+                </p>
+              </div>
+              <Chart
+                title="Maximum sustained wind"
+                unit={unit}
+                lines={intensity}
+                thresholds={thresholds}
+                rapidIntervals={rapidIntervals}
+                selected={hover || selected?.time}
+                onTime={setHover}
+                onSelect={selectTime}
+              />
+              <label
+                className="smoothing-control"
+                title="A trailing three-hour display filter. Original estimates remain in downloads."
+              >
+                <input
+                  type="checkbox"
+                  checked={smoothing}
+                  onChange={(e) => {
+                    setSmoothing(e.target.checked);
+                    localStorage.setItem(
+                      "stormsense-smoothing",
+                      e.target.checked ? "on" : "off",
+                    );
+                  }}
+                />{" "}
+                Smooth estimates
+              </label>
+
+            </section>          <section className="structure-panel">
             <div className="panel-heading">
               <div className="eyebrow">Storm structure</div>
               <h2>How far the winds reach</h2>
               <p>
                 Model estimates of equivalent-area wind radii
-                {smoothing ? ", lightly smoothed" : ""}. Missing hours remain
-                gaps.
+                {smoothing ? ", lightly smoothed" : ""}. Interior gaps are
+                linearly interpolated.
               </p>
             </div>
             <Chart
@@ -1125,9 +1059,12 @@ function Detail({ catalog }: { catalog: Catalog }) {
               unit="km"
               selected={selected?.time}
               lines={structure}
+              rapidIntervals={rapidIntervals}
               onSelect={selectTime}
             />
           </section>
+            </div>
+          </div>
           <details className="provenance">
             <summary>About this observation & data quality</summary>
             <p>
@@ -1161,7 +1098,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
             {selected?.kind === "live"
               ? "This estimate was generated during a live update."
               : "This is a historical hindcast using retrospective storm centers."}{" "}
-            Model estimates and experimental forecasts are distinct from
+            Model estimates are distinct from
             NHC/CPHC advisories. <Link to="/about">Read the methods ↗</Link>
           </p>
         </>
@@ -1236,18 +1173,32 @@ function About({ catalog }: { catalog: Catalog }) {
           Storm age starts at the first recorded NHC/CPHC track fix.
         </p>
         <p>
-          Light smoothing is enabled for estimate charts: a trailing three-hour
-          average weighted 60% to the current hour, 30% to the previous hour,
-          and 10% to two hours earlier. Missing hours reset the filter. Turn it
-          off above the intensity chart to see the original estimates. Metric
-          tiles, map rings, downloads, official observations, and issued
-          forecasts use the original values.
+          Wind charts use exponential smoothing: 50% of the newest estimate and
+          50% of the previous smoothed value. This reduces wiggles with
+          approximately one hour of lag. Radii retain the three-hour 60/30/10%
+          weighted average. Interior gaps are linearly interpolated between
+          available estimates before filtering; leading and trailing gaps remain
+          empty. Historical interpolation uses both endpoints. Turn smoothing
+          off above the intensity chart to see the unfiltered, interpolated
+          curves. Metric tiles, map rings, downloads, official observations, and
+          issued forecasts use the original values.
         </p>
         <p>
-          Storm pages show saved hourly GeoColor images from GOES-East or
-          GOES-West through NASA GIBS, covering roughly 1,800 km around each
-          recorded position. Play or drag either timeline to explore them.
-          Nearby images are buffered, and small previews sharpen as full images
+          Rapid-intensification shading marks a wind increase of at least 30 kt
+          (15.4 m/s) over exactly 24 hours. Amber uses NHC/CPHC reference winds
+          during tropical phases. These are calculated indicators, not issued
+          NHC event labels. Overlapping qualifying windows are joined. Original,
+          unsmoothed values are used, with no interpolation across missing fixes
+          and no model or forecast inputs. Reference fixes must be at most six
+          hours apart. The radii chart repeats these intensity periods for
+          context.
+        </p>
+        <p>
+          Storm pages show saved GeoColor images from GOES-East or GOES-West
+          through NASA GIBS, covering roughly 1,800 km around each recorded
+          position. Play or drag the timeline to explore them. All available
+          images for the open storm preload in the background, with the selected
+          hour and nearby frames first. Small previews sharpen as full images
           arrive. Missing imagery remains an explicit gap; predictions are
           independent. The view uses colour by day and an infrared blend at
           night. Its displayed provider product time is separate from the scan

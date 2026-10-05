@@ -1,6 +1,26 @@
-# StormSense implementation evidence — 2 October 2026
+# StormSense implementation evidence — 3 October 2026
 
 The standalone application is hosted at **https://stormsense.hyperalislabs.com/**. It has its own React/Vite build and read-only Worker in the Hyperalis Labs Cloudflare account. The existing documentation and explorer remain independent. See the [runbook](../README.md), [versioned contracts](../CONTRACT.md), and [website deployment verification](website-deployment.json). Local development remains available at http://127.0.0.1:5173/.
+
+## Daily bundles and official archive metrics — current delivery
+
+Release **`20261003T175702414184Z`** and Worker **`986abea6-cc03-470f-baf9-8c626ebc86b7`** are deployed. The image archive contains **248 daily ZIPs (271.6 MB)**, with **2,680 available frames, 872 explained gaps and zero pending slots**. All 13,780 bundled image and metadata members were checked against their originals; georeferencing, STAC metadata and individual downloadable files are preserved. Numerical records, forecasts and tracks are unchanged.
+
+Nolo's whole-storm preload now makes **23 bundle requests totaling 28.4 MB**, compared with the earlier 1,062 image requests totaling 50.0 MB. Hosted checks verified ZIP checksums, cache misses followed by hits, conditional requests and smooth offline scrubbing after preload. These are measured results, not guaranteed network performance.
+
+Rapid-intensification shading now uses **only official NHC/CPHC winds**. The archive retains its existing columns and adds peak official wind, peak official category and RI status; incomplete reference history is shown as unknown. Scroll-to-zoom is enabled on the existing Leaflet map, with its styling and the single numerical timeline retained.
+
+**235 Python tests, 41 web unit tests and 48 hosted desktop/mobile browser tests passed.** Local verification included 46 browser checks and six final bundle/layout checks. Immutable assets were staged and checked before deployment; `rclone copyto` advanced the StormSense pointer last. See [daily-bundle delivery evidence](daily-bundles.json). Continuous inference scheduling remains inactive.
+
+## Earlier rapid intensification and image caching delivery — 3 October
+
+This section records the previous delivery. The daily-bundle delivery above supersedes its request counts and removes the separate model-derived RI shading.
+
+Both storm graphs now shade complete 24-hour windows with a maximum-wind increase of at least 30 kt. Amber identifies the calculation from NHC/CPHC reference winds; teal hatching identifies a separate StormSense estimate. Detection uses original values, excludes forecasts and incomplete windows, and remains fixed when smoothing, units or selected time change. Overlapping windows are merged; keyboard-accessible details list the UTC periods and largest qualifying wind increases. Polo's official interval was verified against its recorded fixes: 20 September 18:00 through 23 September 00:00 UTC, six overlapping windows, maximum increase 85 kt in 24 hours.
+
+Immutable data and image responses now use Cloudflare's Cache API. The hosted probe observed an image `MISS` followed by `HIT`; HEAD and conditional GET also hit cache. The latest-data pointer remains `BYPASS`. Cache hits avoid R2 reads but still invoke the Worker. Whole-storm preloading, individual georeferenced files and the existing numerical release are preserved. Nolo's complete preload contains 1,062 image objects totaling 50.0 MB; shared caching addresses repeat reads without bundling or republishing the archive.
+
+**37 unit tests and 40 desktop/mobile browser tests passed**, with the full browser suite passing locally and on the deployed website. Worker types, the production build and deployment dry run passed. Existing zoom verification now explicitly focuses the selected storm position before measuring scale, avoiding legitimate clipping of track endpoints. See [RI, caching, cost assumptions and current performance evidence](rapid-intensification-caching.json). Earlier delivery results below retain their original measurements.
 
 ## Delivered archive
 
