@@ -43,9 +43,10 @@ media can also shorten validation.
 Set `WANDB_DISABLED=true` or `logging.wandb.enabled=false`. Offline mode stores
 W&B activity locally rather than disabling it.
 
-## Dashboard model has no training config
+## Legacy comparison model has no training config
 
-The ViT and ConvLSTM layers are imported comparison artifacts. Use the retained
-[model inventory](../models/index.md) for trainable implementations and read
-[StormSense](../explorer.md) for the distinction between its U-Net+MLP label
-and the paper's joint latent model.
+The earlier viewer's ViT and ConvLSTM layers are imported comparison artifacts.
+Its **U-Net+MLP** label means post-hoc correction of a frozen field. Current
+[StormSense](https://stormsense.hyperalislabs.com/) uses the released joint
+GEO-only latent model and scalar forecast MLP. See the
+[model inventory](../models/index.md) for checkpoints and trainable implementations.

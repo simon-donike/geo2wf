@@ -1,0 +1,99 @@
+{
+  "verified_at": "2026-10-05T13:02:12.400743Z",
+  "website": "https://stormsense.hyperalislabs.com",
+  "hosting": "temporary local host, native existing Python environment",
+  "scheduler": {
+    "type": "systemd user timer",
+    "service": "stormsense-local.service",
+    "timer": "stormsense-local.timer",
+    "enabled": true,
+    "lingering_enabled": true,
+    "calendar": "*-*-* *:05:00 UTC",
+    "persistent": true,
+    "first_run_after_activation_seconds": 10,
+    "next_calendar_run_at": "2026-10-05T13:05:00Z"
+  },
+  "resources": {
+    "device": "cpu",
+    "inference_workers": 1,
+    "imagery_workers": 1,
+    "cpu_quota_cores": 1,
+    "memory_high_bytes": 1610612736,
+    "memory_max_bytes": 2147483648,
+    "swap_max_bytes": 268435456,
+    "nice": 10,
+    "idle_python_process": false
+  },
+  "initial_catchup": {
+    "started_at": "2026-10-05T12:46:37.708012Z",
+    "finished_at": "2026-10-05T12:55:08.878719Z",
+    "wall_seconds": 511.171,
+    "result": "done",
+    "cpu_seconds": 82.34308,
+    "memory_peak_bytes": 1636757504,
+    "swap_peak_bytes": 0,
+    "release": "20261005T125402800486Z",
+    "new_live_predictions": 1,
+    "catchup": {
+      "gap": 0,
+      "ready": 31
+    },
+    "imagery": {
+      "ready": 17
+    },
+    "measurement_memory_max_bytes": 3221225472
+  },
+  "first_timer_triggered_run": {
+    "started_at": "2026-10-05T12:56:26.469997Z",
+    "finished_at": "2026-10-05T12:58:17.419534Z",
+    "wall_seconds": 110.95,
+    "result": "done",
+    "cpu_seconds": 22.551787,
+    "memory_peak_bytes": 493776896,
+    "swap_peak_bytes": 0,
+    "release": "20261005T125717217922Z",
+    "public_pointer_matches_local": true,
+    "public_source_last_success": "2026-10-05T12:56:29Z",
+    "coverage": {
+      "expected": 7025,
+      "gaps": 23,
+      "pending": 0,
+      "predictions": 7002
+    },
+    "exit_code": 0,
+    "new_live_predictions": 0,
+    "catchup": {
+      "gap": 0,
+      "ready": 0
+    }
+  },
+  "publication": {
+    "remote": "r2:tcd/explorer/stormsense",
+    "uploader": "rclone",
+    "verified_before_pointer_advance": true,
+    "pointer_method": "rclone copyto"
+  },
+  "backup": "var/stormsense/backups/before-local-hourly.sqlite",
+  "backup_note": "One consistent pre-activation snapshot; no periodic backup or remote cleanup schedule added.",
+  "availability": "Runs after logout and restarts after reboot; requires the host to be awake and online.",
+  "website_status_deployment": {
+    "worker_version": "3261b77a-eb80-42dc-9d21-748b36c51dc8",
+    "browser_verification": {
+      "checked_at": "2026-10-05T13:00:50.800Z",
+      "url": "https://stormsense.hyperalislabs.com",
+      "routes": [
+        {
+          "path": "/",
+          "status": 200,
+          "hourly_status_visible": true
+        },
+        {
+          "path": "/about",
+          "status": 200,
+          "hourly_status_visible": true
+        }
+      ],
+      "page_errors": []
+    }
+  }
+}

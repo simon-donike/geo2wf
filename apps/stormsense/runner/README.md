@@ -6,8 +6,10 @@ website serving, deployment tools and persistent mounts. The instructions below
 describe the alternative native Python/systemd installation; use one scheduler.
 
 The website is deployed independently at https://stormsense.hyperalislabs.com/.
-This runner needs an existing Linux host or a selected cloud account and budget.
-No service is installed on the development machine.
+An hourly user timer is active on the temporary local host, using the existing
+Python environment, one worker per processing stage and CPU only. See the
+[local runbook](LOCAL.md) for its resource limits, status and stop commands.
+Permanent hosting still needs a selected Linux server or cloud account/budget.
 
 ## Prepared handoff
 
@@ -49,6 +51,9 @@ STORMSENSE_PUBLISH=1 apps/stormsense/runner/cycle.sh
 ```
 
 ## Activate only on the selected host
+
+These are the permanent-host instructions. Stop `stormsense-local.timer` and
+`stormsense-local.service` on the temporary host before activating a replacement.
 
 After the finite cycle passes, install `stormsense.service.example` and
 `stormsense.timer.example` into `/etc/systemd/system/` without the `.example`

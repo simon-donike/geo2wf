@@ -1,0 +1,14 @@
+[Unit]
+Description=StormSense hourly updates on the temporary local host
+
+[Timer]
+# Allow the preceding satellite scan to finish becoming available.
+OnCalendar=*-*-* *:05:00 UTC
+# A newly enabled timer also proves its first scheduled run immediately.
+OnActiveSec=10s
+Persistent=true
+AccuracySec=1s
+Unit=stormsense-local.service
+
+[Install]
+WantedBy=timers.target

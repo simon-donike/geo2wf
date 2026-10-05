@@ -63,7 +63,7 @@ nav:
       - Code map: reference/index.md
   - StormSense:
       - Viewer guide: explorer.md
-      - Observation manifest: data/storm-manifest.md
+      - Paper case-study manifest: data/storm-manifest.md
 
 # Keep local, ignored research renders out of documentation builds.
 exclude_docs: |

@@ -391,8 +391,8 @@ function Overview({ catalog }: { catalog: Catalog }) {
         </div>
       </section>
       <div className="subtle-note">
-        <Icon name="clock" /> Continuous scheduling awaits a hosting choice.
-        This preview shows the latest completed runs, with actual source times.
+        <Icon name="clock" /> Updates run hourly while the temporary runner is
+        online. Source times show the freshness of the latest completed runs.
       </div>
       {catalog.coverage.pending > 0 && (
         <p className="notice">
@@ -1209,9 +1209,9 @@ function About({ catalog }: { catalog: Catalog }) {
           the latest available image every five minutes while visible.
         </p>
         <p>
-          Continuous scheduling has not been activated. The interface reports
-          the actual age of each completed run and source observation. Hourly
-          updates are the intended operating cadence once a runner is hosted.
+          Updates run hourly while the temporary runner is online. The interface
+          reports the actual age of each completed run and source observation;
+          interruptions remain visible through those timestamps.
         </p>
         <dl>
           <dt>Nowcast</dt>

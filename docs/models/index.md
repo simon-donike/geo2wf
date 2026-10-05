@@ -47,8 +47,12 @@ data downloads, and [using the matching source](../data/index.md#use-the-downloa
 | `code/conference-source.tar.gz` | Matching implementation, catalog loaders, reproduction scripts, and dependency lock |
 
 The [model card](https://huggingface.co/simon-donike/geo2wf-models) lists the
-checkpoint groups and validation limits. External dashboard ViT and ConvLSTM
-weights are not included; their available exported results are in the dataset.
+checkpoint groups and validation limits. The earlier viewer's external ViT and
+ConvLSTM weights are not included; their available exported results are in the
+dataset. Current [StormSense](https://stormsense.hyperalislabs.com/) uses the
+released `latent_sar_no_era5_max_wind_radii` nowcast and `dashboard-mlp`
+forecast checkpoints, pinned with configuration and asset hashes in
+[`models.json`](https://github.com/simon-donike/geo2wf/blob/main/src/geo2wf/operational/models.json).
 
 Use each checkpoint with its matching resolved configuration, channel order,
 normalization statistics, and data cohort. Current presets are starting points

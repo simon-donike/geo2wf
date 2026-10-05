@@ -168,7 +168,7 @@ The paper reports 841/232/212 train/validation/test samples from 115/34/38
 storms before the additional center-valid restriction described for its
 supervision ablation. These counts describe the paper's processing cohort.
 The [1,205-row website inventory](full-dataset.md) describes a different paired
-export, and the [StormSense manifest](storm-manifest.md) describes dense
+export, and the [paper case-study manifest](storm-manifest.md) describes dense
 case-study observations. Neither is the complete Hugging Face catalog.
 
 The release preserves actual experiment membership in `effective-cohorts/`.

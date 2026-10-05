@@ -30,4 +30,4 @@ recorded separately in the Hub release's `effective-cohorts/`.
 </div>
 
 For dense Humberto, Kiko, and Otis observations, use the
-[StormSense case-study manifest](storm-manifest.md).
+[paper case-study manifest](storm-manifest.md).

@@ -42,11 +42,20 @@ Use `geo2wf-infer intensity-forecast` with the same inputs and a CSV output
 path for per-record predictions. State whether evaluation uses historical
 IBTrACS anchors or matched correction-model anchors.
 
-## StormSense rollout
+## StormSense forecasts
 
-The dashboard uses an IBTrACS-pretrained checkpoint recursively: the +6 h
-prediction becomes an input to the next step, producing +12 h without the
-observed +6 h wind. This is not a separately trained 12-hour model. Best-track
-inputs make the displayed results retrospective; real-time advisory inputs
-would require separate evaluation. The dashboard's external ConvLSTM layer is
-a different model whose implementation is outside this package.
+[StormSense](https://stormsense.hyperalislabs.com/) uses the pinned
+`dashboard-mlp` checkpoint and its saved feature scaler. Although pretrained
+on IBTrACS, its current pipeline takes **StormSense intensity estimates** at
+the current hour, −6 h, and −12 h. The +6 h prediction becomes an input to the
+next step, producing +12 h without the observed +6 h wind. This is not a
+separately trained twelve-hour model. Missing input history withholds a forecast.
+
+Live issues and retrospective hindcasts retain separate provenance. The
+[methods page](https://stormsense.hyperalislabs.com/about) links evaluation
+against persistence and recent-trend baselines, including training-excluded
+storms. These results do not establish operational forecast skill.
+
+The earlier Humberto/Kiko/Otis viewer used IBTrACS anchors and included an
+external ConvLSTM comparison. Those are legacy case-study artifacts, distinct
+from the current StormSense pipeline; see the [viewer guide](../explorer.md).

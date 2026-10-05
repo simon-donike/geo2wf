@@ -24,7 +24,7 @@ GEO imagery and deterministic context, with ERA5 as an optional input.
 [Results](results.md){ .md-button }
 [Dataset on Hugging Face](https://huggingface.co/datasets/simon-donike/geo2wf-data){ .md-button }
 [Models on Hugging Face](https://huggingface.co/simon-donike/geo2wf-models){ .md-button }
-[Open StormSense](explorer/dashboard.html){ .md-button }
+[Open StormSense](https://stormsense.hyperalislabs.com/){ .md-button }
 </div>
 </div>
 
@@ -42,7 +42,16 @@ GEO imagery and deterministic context, with ERA5 as an optional input.
 ## Scope
 
 Field models reconstruct the observation time. The separate scalar forecast
-predicts six-hour intensity change. [StormSense](explorer.md) provides
-retrospective case studies of Humberto, Kiko, and Otis. The
-[paper discussion](concepts/problem.md) explains the observational limits and
-why this is a research workflow rather than a validated operational product.
+predicts six-hour intensity change. [StormSense](https://stormsense.hyperalislabs.com/)
+shows active and archived NHC/CPHC storms with satellite imagery, tracks, and
+hourly GEO-only estimates of intensity and wind radii. Its rolling archive is
+separate from the paper's fixed Humberto, Kiko, and Otis case studies.
+See the [viewer guide](explorer.md) for the live/hindcast distinction and the
+[paper discussion](concepts/problem.md) for observational limits.
+
+## Reproduce the research
+
+Use the matching Hugging Face data/model commits, original configurations and
+statistics, and source archive distributed with the model release. The
+[reproduction guide](data/index.md#use-the-downloads) gives the commands and
+keeps architecture test results separate from latent-ablation validation results.

@@ -52,5 +52,6 @@ uv run geo2wf-evaluate intensity-correction \
 `geo2wf-infer intensity-correction` accepts the same cache/checkpoint/split
 arguments and writes prediction CSV via `--output`. Its outputs include
 `raw_unet_max_wind_ms`, `correction_ms`, `output_msw_ms`, and `output_category`.
-[StormSense](../explorer.md) calls this post-hoc product **U-Net+MLP**; it is
-separate from the jointly trained latent model.
+The earlier three-storm viewer labels this post-hoc product **U-Net+MLP**.
+The current [StormSense app](https://stormsense.hyperalislabs.com/) instead
+uses the [jointly trained GEO-only latent model](bottleneck-unet-mlp.md).

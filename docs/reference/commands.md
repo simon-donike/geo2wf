@@ -59,6 +59,21 @@ uv run python scripts/run_intensity_correction_inference.py --help
 uv run python scripts/run_intensity_forecast_inference.py --help
 ```
 
+## StormSense pipeline
+
+The current [StormSense app](https://stormsense.hyperalislabs.com/) uses a
+separate hourly inference and archive pipeline:
+
+```bash
+uv sync --frozen --group operational
+uv run --group operational geo2wf-operational --help
+```
+
+Its commands cover model bootstrap, discovery, updates, historical backfill,
+imagery, evaluation, export, and publication. See the
+[application setup guide](https://github.com/simon-donike/geo2wf/tree/main/apps/stormsense)
+for the complete local workflow and runner configuration.
+
 ## Check docs
 
 ```bash

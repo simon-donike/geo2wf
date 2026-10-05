@@ -1,16 +1,17 @@
-# StormSense case-study manifest
+# Paper case-study manifest
 
-This is the dashboard's three-storm case-study manifest, not the model-training
-corpus. It contains dense geostationary observations for `AL082025`, `EP112025`,
-and `EP182023`, plus IBTrACS intensity, sparse SAR matches, and paths to image
-overlays. Model predictions remain available in the dashboard and source JSON,
-but are intentionally excluded from the CSV.
+This is the earlier viewer's fixed three-storm case-study manifest, separate
+from the model-training corpus and the current StormSense rolling archive.
+It contains dense geostationary observations for Humberto (`AL082025`),
+Kiko (`EP112025`), and Otis (`EP182023`), plus IBTrACS intensity, sparse SAR
+matches, and paths to image overlays. Model predictions remain in the source
+JSON and [paper results](../results.md); they are excluded from the CSV.
 
 [Browse the scientific dataset](index.md){ .md-button .md-button--primary }
 
 [Download the case-study CSV](../explorer/storm-data.csv){ .md-button download }
 [View the source JSON](../explorer/storm-data.json){ .md-button }
-[Open StormSense](../explorer/dashboard.html){ .md-button }
+[Open StormSense](https://stormsense.hyperalislabs.com/){ .md-button }
 
 ## Browse observations
 

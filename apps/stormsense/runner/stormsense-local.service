@@ -1,0 +1,31 @@
+[Unit]
+Description=StormSense temporary local hourly update and publication
+
+[Service]
+Type=oneshot
+WorkingDirectory=/work/code/geo2wf
+Environment=STORMSENSE_ROOT=/work/code/geo2wf
+Environment=STORMSENSE_DEVICE=cpu
+Environment=STORMSENSE_WORKERS=1
+Environment=STORMSENSE_IMAGERY_WORKERS=1
+Environment=STORMSENSE_PUBLISH=1
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+Environment=NUMEXPR_NUM_THREADS=1
+Environment=MPLCONFIGDIR=/work/code/geo2wf/var/stormsense/matplotlib
+ExecStart=/work/code/geo2wf/apps/stormsense/runner/cycle.sh
+TimeoutStartSec=55min
+TimeoutStopSec=90s
+KillMode=control-group
+Nice=10
+CPUWeight=10
+CPUQuota=100%
+IOWeight=10
+IOSchedulingClass=idle
+MemoryAccounting=true
+MemoryHigh=1536M
+MemoryMax=2G
+MemorySwapMax=256M
+# This user unit is specific to the temporary host. No Docker daemon or GPU.

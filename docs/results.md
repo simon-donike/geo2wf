@@ -77,7 +77,10 @@ nearest analysis time. Two invalid GEO observations are excluded consistently.
 
 [Download figure PDF](assets/images/final-results/current-three-storm-compact-nowcasts.pdf){ .md-button download }
 [Download full case-study metrics](assets/data/final-results/current-three-storm-metrics.csv){ .md-button download }
-[Open StormSense](explorer/dashboard.html){ .md-button }
+[Open StormSense](https://stormsense.hyperalislabs.com/){ .md-button }
+
+StormSense's rolling archive is separate from these fixed paper case studies;
+their figures and numerical exports remain available here and on Hugging Face.
 
 ## Wind-field reconstruction
 

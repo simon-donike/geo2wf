@@ -1,8 +1,28 @@
-# StormSense implementation evidence — 3 October 2026
+# StormSense implementation evidence — 5 October 2026
 
 The standalone application is hosted at **https://stormsense.hyperalislabs.com/**. It has its own React/Vite build and read-only Worker in the Hyperalis Labs Cloudflare account. The existing documentation and explorer remain independent. See the [runbook](../README.md), [versioned contracts](../CONTRACT.md), and [website deployment verification](website-deployment.json). Local development remains available at http://127.0.0.1:5173/.
 
-## Daily bundles and official archive metrics — current delivery
+## Temporary hourly inference runner — 5 October 2026
+
+The local user timer `stormsense-local.timer` is enabled and publishes at five
+minutes past every hour. It reuses the existing Python environment and pinned
+models, uses one CPU worker per processing stage, and exits between cycles.
+The first full cycle filled 31 missing numerical hours and 17 display-image
+slots. Its peak memory was 1.52 GiB. The first timer-triggered cycle completed
+successfully in 111 seconds with a 470.9 MiB memory peak and no swap use; this
+immediate repeat had no new numerical hours to compute. Its
+published release is **`20261005T125717217922Z`**. The final unit has a one-core
+CPU quota, a 2 GiB hard memory limit and low CPU/I/O priority.
+
+Hosted checks confirmed that the public pointer matches the local export, with
+7,002 predictions, 23 explained gaps and zero pending numerical hours. The user
+manager already has lingering enabled, so it survives logout and returns after
+reboot; updates still depend on this machine being awake and online. See the
+[activation evidence](local-runner.json) and [local runbook](../runner/LOCAL.md).
+Permanent hosting remains to be selected. Stop this publisher before enabling
+a replacement host or Docker scheduler.
+
+## Daily bundles and official archive metrics — 3 October 2026
 
 Release **`20261003T175702414184Z`** and Worker **`986abea6-cc03-470f-baf9-8c626ebc86b7`** are deployed. The image archive contains **248 daily ZIPs (271.6 MB)**, with **2,680 available frames, 872 explained gaps and zero pending slots**. All 13,780 bundled image and metadata members were checked against their originals; georeferencing, STAC metadata and individual downloadable files are preserved. Numerical records, forecasts and tracks are unchanged.
 
@@ -10,7 +30,7 @@ Nolo's whole-storm preload now makes **23 bundle requests totaling 28.4 MB**, co
 
 Rapid-intensification shading now uses **only official NHC/CPHC winds**. The archive retains its existing columns and adds peak official wind, peak official category and RI status; incomplete reference history is shown as unknown. Scroll-to-zoom is enabled on the existing Leaflet map, with its styling and the single numerical timeline retained.
 
-**235 Python tests, 41 web unit tests and 48 hosted desktop/mobile browser tests passed.** Local verification included 46 browser checks and six final bundle/layout checks. Immutable assets were staged and checked before deployment; `rclone copyto` advanced the StormSense pointer last. See [daily-bundle delivery evidence](daily-bundles.json). Continuous inference scheduling remains inactive.
+**235 Python tests, 41 web unit tests and 48 hosted desktop/mobile browser tests passed.** Local verification included 46 browser checks and six final bundle/layout checks. Immutable assets were staged and checked before deployment; `rclone copyto` advanced the StormSense pointer last. See [daily-bundle delivery evidence](daily-bundles.json). Scheduling was inactive at that delivery; the temporary hourly runner is now active as recorded above.
 
 ## Earlier rapid intensification and image caching delivery — 3 October
 
@@ -95,6 +115,6 @@ The active overview still checks NASA GIBS directly every five minutes. The nume
 
 An **82.9 MB** [runner handoff bundle](../../../var/stormsense/runner.tar.gz) contains source, pinned models and a SQLite snapshot with a successful integrity check. [Its manifest](runner-bundle.json) confirms that credentials and imagery are excluded. The [activation runbook](../runner/README.md) is ready for the selected Linux host.
 
-**The website is deployed. Pending hosting selection:** the portable inference runner and activation of its 15-minute schedule. The Worker has no cron trigger, and the example systemd units have not been installed or enabled. The hosted website and archive remain available independently of the local machine; its catalog will truthfully age until another finite cycle publishes data or continuous inference hosting is selected.
+**The website is deployed; permanent inference hosting remains to be selected.** The temporary local hourly runner is active. The Worker has no cron trigger, and the permanent-host example units remain inactive. The website and published archive remain available independently of the local machine; source timestamps show any interruption in updates.
 
 The restored **single timeline** and whole-storm image preloader are deployed and verified. All 531 available frames for Nolo loaded before an offline test of distant slider jumps; full-resolution frames followed in p95 **75.5 ms desktop / 58.1 ms mobile emulation**. The 26 unit tests and 36 hosted browser checks passed. See [image-preloading verification](image-preloading.json).

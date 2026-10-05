@@ -40,6 +40,15 @@ Once data are available locally, run the [first experiment](first-experiment.md)
 or select a [model preset](../models/index.md). Inference requires a compatible
 checkpoint, its resolved configuration, and the original normalization statistics.
 
+## StormSense and containers
+
+The hosted [StormSense app](https://stormsense.hyperalislabs.com/) requires no
+local installation. See the [viewer guide](../explorer.md) for its maps,
+imagery, and predictions. To run the app or its hourly inference pipeline,
+follow the [application setup guide](https://github.com/simon-donike/geo2wf/tree/main/apps/stormsense).
+The [Docker guide](https://github.com/simon-donike/geo2wf/blob/main/apps/stormsense/runner/DOCKER.md)
+covers CPU/GPU research workflows, data downloads, and website hosting.
+
 ## Local paths and logging
 
 Pass data paths explicitly in commands. Optional machine defaults can be kept

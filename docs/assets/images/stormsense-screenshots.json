@@ -1,0 +1,29 @@
+{
+  "captured_on": "2026-10-05",
+  "source_url": "https://stormsense.hyperalislabs.com/storms/EP152026?time=2026-09-28T20%3A00%3A00Z",
+  "storm_id": "EP152026",
+  "storm_name": "Nolo",
+  "selected_time": "2026-09-28T20:00:00Z",
+  "browser": "Chromium (Playwright)",
+  "viewport": {
+    "width": 1600,
+    "height": 1100,
+    "device_scale_factor": 2
+  },
+  "screenshots": [
+    {
+      "path": "stormsense-nolo-track.png",
+      "selector": ".detail-map-shell",
+      "actions": [
+        "Wait for full-resolution image and archive preload",
+        "Click Focus image"
+      ]
+    },
+    {
+      "path": "stormsense-nolo-predictions.png",
+      "selector": ".chart-panel",
+      "smoothing": true
+    }
+  ],
+  "imagery_attribution": "NASA GIBS / NOAA / CIRA; basemap: Natural Earth; track/reference winds: NHC/CPHC"
+}

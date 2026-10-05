@@ -3,7 +3,7 @@
   "provider": "Cloudflare Workers Static Assets",
   "account": "Hyperalis Labs",
   "worker": "stormsense",
-  "version_id": "986abea6-cc03-470f-baf9-8c626ebc86b7",
+  "version_id": "3261b77a-eb80-42dc-9d21-748b36c51dc8",
   "data_bucket": "tcd",
   "data_prefix": "explorer/stormsense/",
   "verification": {
@@ -62,7 +62,7 @@
   "web_unit_tests": {
     "passed": 41
   },
-  "continuous_inference_scheduling_active": false,
+  "continuous_inference_scheduling_active": true,
   "verification_note": "A default Python urllib request was rejected by Cloudflare with error 1010; the browser suite and API checks using the Desktop Chrome HTTP profile passed.",
   "workers_dev_url": "https://stormsense.hyperalislabs.workers.dev",
   "custom_domain_verification": {
@@ -94,6 +94,24 @@
   "hourly_imagery_report": "hourly-imagery.json",
   "image_preloading_report": "image-preloading.json",
   "rapid_intensification_and_caching_report": "rapid-intensification-caching.json",
-  "current_release": "20261003T175702414184Z",
-  "daily_bundles_report": "daily-bundles.json"
+  "current_release": "20261005T125717217922Z",
+  "daily_bundles_report": "daily-bundles.json",
+  "local_runner_report": "local-runner.json",
+  "hourly_status_verification": {
+    "checked_at": "2026-10-05T13:00:50.800Z",
+    "url": "https://stormsense.hyperalislabs.com",
+    "routes": [
+      {
+        "path": "/",
+        "status": 200,
+        "hourly_status_visible": true
+      },
+      {
+        "path": "/about",
+        "status": 200,
+        "hourly_status_visible": true
+      }
+    ],
+    "page_errors": []
+  }
 }

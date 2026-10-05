@@ -653,6 +653,7 @@ input {
 .geo-intro {
   position: relative;
   isolation: isolate;
+  clear: both;
   margin-bottom: 3rem;
   padding: clamp(2.5rem, 7vw, 5.25rem) clamp(1.5rem, 6vw, 4.5rem);
   overflow: hidden;
@@ -698,12 +699,20 @@ input {
   font-size: 1rem;
 }
 
-.geo-actions {
+.geo-actions,
+.geo-actions > p {
   display: flex;
   justify-content: center;
   gap: 0.75rem;
-  margin-top: 1.7rem;
   flex-wrap: wrap;
+}
+
+.geo-actions {
+  margin-top: 1.7rem;
+}
+
+.geo-actions > p {
+  margin: 0;
 }
 
 .stage-flow {
@@ -1033,6 +1042,14 @@ input {
 
   .geo-intro {
     padding: 2.5rem 1.25rem;
+  }
+
+  .geo-intro h1 {
+    font-size: clamp(1.6rem, 8vw, 2.2rem);
+  }
+
+  .geo-intro p {
+    font-size: 0.9rem;
   }
 }
 
