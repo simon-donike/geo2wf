@@ -3,6 +3,7 @@ import exampleData from "../public/method/example.json";
 import type { MethodExample, MethodMode } from "./methodExample";
 import { stamp, wind } from "./data";
 import "./method.css";
+import MethodTraining from "./MethodTraining";
 
 const example: MethodExample = exampleData;
 const vars = (values: Record<string, string | number>) =>
@@ -139,7 +140,9 @@ function ImageStack({
               "--layer": i === selected ? layers.length : i,
               "--depth": i === selected ? 0 : layers.length - i,
               "--offset":
-                (i === selected ? 0 : layers.length - i - (i < selected ? 1 : 0)) /
+                (i === selected
+                  ? 0
+                  : layers.length - i - (i < selected ? 1 : 0)) /
                 (layers.length - 1),
             })}
           />
@@ -218,10 +221,37 @@ function FeatureBlock({
   );
 }
 
-function Network({ mode }: { mode: MethodMode }) {
+function GradientFlow({ d, skip = false }: { d: string; skip?: boolean }) {
+  return (
+    <g
+      className={`method-backward-flow ${skip ? "is-skip" : ""}`}
+      aria-hidden="true"
+    >
+      <path
+        d={d}
+        className="method-backward-base"
+        markerEnd="url(#method-gradient-arrow)"
+      />
+      <path
+        d={d}
+        className="method-backward-pulse"
+        pathLength={1}
+        strokeDasharray=".06 .19"
+      />
+    </g>
+  );
+}
+
+function Network({
+  mode,
+  training = false,
+}: {
+  mode: MethodMode;
+  training?: boolean;
+}) {
   return (
     <svg
-      className="method-network"
+      className={`method-network ${training ? "is-training" : ""}`}
       viewBox="0 0 510 420"
       role="img"
       aria-label={
@@ -230,6 +260,21 @@ function Network({ mode }: { mode: MethodMode }) {
           : "Encoder-only architecture sends pooled features directly to the scalar MLP"
       }
     >
+      {training && (
+        <defs>
+          <marker
+            id="method-gradient-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 0 L10 5 L0 10Z" fill="#f1ad80" />
+          </marker>
+        </defs>
+      )}
       <text x="25" y="36" className="method-svg-heading">
         SHARED ENCODER
       </text>
@@ -286,9 +331,6 @@ function Network({ mode }: { mode: MethodMode }) {
       </g>
       {mode === "encoder" && (
         <g className="method-encoder-note">
-          <text x="376" y="140" textAnchor="middle">
-            A lighter path.
-          </text>
           <text x="376" y="163" textAnchor="middle" className="method-svg-note">
             The scalar variant omits
           </text>
@@ -335,6 +377,23 @@ function Network({ mode }: { mode: MethodMode }) {
         ))}
       </g>
       <Flow d="M460 340 H510" delay={1.8} />
+      {training && (
+        <g
+          className="method-backpropagation"
+          aria-label="Gradients flow from losses through the output branches back into the shared encoder"
+        >
+          {mode === "joint" && (
+            <>
+              <GradientFlow d="M508 120 H467 V123 C440 123 440 177 399 177 C366 177 366 217 332 217 C295 217 295 247 257 247" />
+              <GradientFlow d="M454 85 C364 -5 170 -5 58 89" skip />
+              <GradientFlow d="M386 149 C324 85 208 85 130 153" skip />
+              <GradientFlow d="M322 198 C306 164 248 164 206 200" skip />
+            </>
+          )}
+          <GradientFlow d="M508 340 H382 L359 339 H279 Q257 339 257 321 V263" />
+          <GradientFlow d="M257 247 H243 C225 247 225 222 203 222 H178 C151 222 155 182 126 182 H102 C80 182 83 126 56 126 H42" />
+        </g>
+      )}
       <text x="420" y="391" textAnchor="middle" className="method-svg-heading">
         SCALAR MLP
       </text>
@@ -455,6 +514,7 @@ function Track() {
 export default function Method({ unit }: { unit: "kt" | "m/s" }) {
   const { container, reduced, paused, setPaused, motion } = useFlowMotion();
   const [mode, setMode] = useState<MethodMode>("joint");
+  const [view, setView] = useState<"inference" | "training">("inference");
   const output = example.models[mode].scalars;
   return (
     <div className="method-page">
@@ -468,13 +528,33 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
             <br />
             to <em>surface winds.</em>
           </h1>
-          <p>One observation. Two views of the storm.</p>
+          <p>
+            {view === "inference"
+              ? "One observation. Two views of the storm."
+              : "Two architectures. Learning from observed winds."}
+          </p>
         </div>
         <div className="method-example-label">
-          <span className="method-live-dot" /> A REAL WORKED EXAMPLE
-          <strong>Hurricane {example.storm.name}</strong>
-          <span>{stamp(example.time)}</span>
-          <small>GOES ABI · North Atlantic</small>
+          <span className="method-live-dot" />
+          {view === "inference" ? (
+            <>
+              A REAL WORKED EXAMPLE
+              <strong>Hurricane {example.storm.name}</strong>
+              <span>{stamp(example.time)}</span>
+              <small>GOES ABI · North Atlantic</small>
+            </>
+          ) : (
+            <>
+              SUPERVISED LEARNING
+              <strong>Observed winds as targets</strong>
+              <span>
+                {mode === "joint"
+                  ? "SAR + IBTrACS best track"
+                  : "ATCF best-track fine-tuning"}
+              </span>
+              <small>Objectives for the example checkpoints</small>
+            </>
+          )}
         </div>
       </header>
       <section
@@ -484,9 +564,43 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
         data-motion={motion}
       >
         <div className="method-theater-top">
-          <div className="method-theater-label">
-            <span className="method-cross">+</span> THE OBSERVATION → THE
-            ESTIMATE
+          <div
+            className="method-view-tabs"
+            role="tablist"
+            aria-label="Method view"
+          >
+            {(["inference", "training"] as const).map((item, index) => (
+              <button
+                key={item}
+                id={`method-tab-${item}`}
+                role="tab"
+                aria-selected={view === item}
+                aria-controls={`method-panel-${item}`}
+                tabIndex={view === item ? 0 : -1}
+                onClick={() => setView(item)}
+                onKeyDown={(event) => {
+                  if (
+                    ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                      event.key,
+                    )
+                  ) {
+                    event.preventDefault();
+                    const next =
+                      event.key === "Home"
+                        ? "inference"
+                        : event.key === "End"
+                          ? "training"
+                          : index === 0
+                            ? "training"
+                            : "inference";
+                    setView(next);
+                    document.getElementById(`method-tab-${next}`)?.focus();
+                  }
+                }}
+              >
+                {item === "inference" ? "Inference" : "Training"}
+              </button>
+            ))}
           </div>
           <div className="method-theater-actions">
             <div
@@ -519,123 +633,145 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
             )}
           </div>
         </div>
-        <div className="method-scene">
-          <div className="method-input">
-            <div className="method-part-label">
-              <span>01</span> THE INPUTS
+        <div
+          id="method-panel-inference"
+          role="tabpanel"
+          aria-labelledby="method-tab-inference"
+          hidden={view !== "inference"}
+        >
+          <div className="method-scene">
+            <div className="method-input">
+              <div className="method-part-label">
+                <span>01</span> THE INPUTS
+              </div>
+              <div className="method-input-stacks">
+                <ImageStack
+                  label="Satellite bands"
+                  initial={6}
+                  layers={example.channels.map((c) => ({
+                    ...c,
+                    label: c.id,
+                    short: c.id.slice(-2),
+                  }))}
+                />
+                <ImageStack
+                  label="Extra tensors"
+                  context
+                  layers={example.context_channels.map((c) => ({
+                    ...c,
+                    short: c.short_label,
+                  }))}
+                />
+              </div>
+              <Track />
             </div>
-            <div className="method-input-stacks">
-              <ImageStack
-                label="Satellite bands"
-                initial={6}
-                layers={example.channels.map((c) => ({
-                  ...c,
-                  label: c.id,
-                  short: c.id.slice(-2),
-                }))}
-              />
-              <ImageStack
-                label="Extra tensors"
-                context
-                layers={example.context_channels.map((c) => ({
-                  ...c,
-                  short: c.short_label,
-                }))}
-              />
+            <div className="method-model">
+              <div className="method-part-label">
+                <span>02</span> THE MODEL{" "}
+                <span className="method-model-kind">
+                  {mode === "joint" ? "U-NET + MLP" : "ENCODER + MLP"}
+                </span>
+              </div>
+              <Network mode={mode} />
+              <div className="method-model-foot">
+                <span className="method-small-dot" /> 10 satellite + 4 context
+                channels + validity mask
+              </div>
             </div>
-            <Track />
-          </div>
-          <div className="method-model">
-            <div className="method-part-label">
-              <span>02</span> THE MODEL{" "}
-              <span className="method-model-kind">
-                {mode === "joint" ? "U-NET + MLP" : "ENCODER + MLP"}
-              </span>
-            </div>
-            <Network mode={mode} />
-            <div className="method-model-foot">
-              <span className="method-small-dot" /> 10 satellite + 4 context
-              channels + validity mask
-            </div>
-          </div>
-          <div className="method-outputs">
-            <div className="method-part-label">
-              <span>03</span> THE PREDICTIONS
-            </div>
-            <div
-              className={`method-field ${mode === "encoder" ? "is-omitted" : ""}`}
-            >
-              {mode === "joint" ? (
-                <>
-                  <div className="method-field-image">
-                    <img
-                      src={example.field.image}
-                      alt="Actual dense surface wind-speed prediction for Ian from the joint model"
+            <div className="method-outputs">
+              <div className="method-part-label">
+                <span>03</span> THE PREDICTIONS
+              </div>
+              <div
+                className={`method-field ${mode === "encoder" ? "is-omitted" : ""}`}
+              >
+                {mode === "joint" ? (
+                  <>
+                    <div className="method-field-image">
+                      <img
+                        src={example.field.image}
+                        alt="Actual dense surface wind-speed prediction for Ian from the joint model"
+                      />
+                      <div className="method-field-grid" />
+                      <span className="method-image-tag">DENSE WIND FIELD</span>
+                    </div>
+                    <div
+                      className="method-colorbar"
+                      style={{
+                        background: `linear-gradient(to right, ${example.field.palette.join(",")})`,
+                      }}
                     />
-                    <div className="method-field-grid" />
-                    <span className="method-image-tag">DENSE WIND FIELD</span>
+                    <div className="method-scale">
+                      <span>0</span>
+                      <span>Wind speed · {unit}</span>
+                      <span>{wind(example.field.max_ms, unit)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="method-no-field">
+                    <span aria-hidden="true">↳</span>
+                    <h3>Scalars, directly.</h3>
+                    <p>This variant omits the field decoder.</p>
                   </div>
-                  <div
-                    className="method-colorbar"
-                    style={{
-                      background: `linear-gradient(to right, ${example.field.palette.join(",")})`,
-                    }}
-                  />
-                  <div className="method-scale">
-                    <span>0</span>
-                    <span>Wind speed · {unit}</span>
-                    <span>{wind(example.field.max_ms, unit)}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="method-no-field">
-                  <span aria-hidden="true">↳</span>
-                  <h3>Scalars, directly.</h3>
-                  <p>This variant omits the field decoder.</p>
+                )}
+              </div>
+              <div
+                className="method-scalars"
+                aria-label={`${mode === "joint" ? "Joint model" : "Encoder-only model"} scalar predictions`}
+              >
+                <div className="method-scalar-title">
+                  MAXIMUM SUSTAINED WIND <span>Vmax</span>
                 </div>
-              )}
-            </div>
-            <div
-              className="method-scalars"
-              aria-label={`${mode === "joint" ? "Joint model" : "Encoder-only model"} scalar predictions`}
-            >
-              <div className="method-scalar-title">
-                MAXIMUM SUSTAINED WIND <span>Vmax</span>
-              </div>
-              <div className="method-vmax">
-                <strong data-testid="method-vmax">
-                  {wind(output.vmax_ms, unit)}
-                </strong>
-                <span>{unit}</span>
-                <small>Direct MLP estimate</small>
-              </div>
-              <div className="method-radii">
-                {(
-                  [
-                    ["RMW", output.rmw_km],
-                    ["R34", output.r34_km],
-                    ["R50", output.r50_km],
-                    ["R64", output.r64_km],
-                  ] as const
-                ).map(([name, value]) => (
-                  <div key={name}>
-                    <span>{name}</span>
-                    <strong>
-                      {value.toFixed(0)}
-                      <small> km</small>
-                    </strong>
-                  </div>
-                ))}
+                <div className="method-vmax">
+                  <strong data-testid="method-vmax">
+                    {wind(output.vmax_ms, unit)}
+                  </strong>
+                  <span>{unit}</span>
+                  <small>Direct MLP estimate</small>
+                </div>
+                <div className="method-radii">
+                  {(
+                    [
+                      ["RMW", output.rmw_km],
+                      ["R34", output.r34_km],
+                      ["R50", output.r50_km],
+                      ["R64", output.r64_km],
+                    ] as const
+                  ).map(([name, value]) => (
+                    <div key={name}>
+                      <span>{name}</span>
+                      <strong>
+                        {value.toFixed(0)}
+                        <small> km</small>
+                      </strong>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+          <p className="method-accessible-summary">
+            Satellite channels and storm-center/time context feed the encoder.
+            Shared features branch into a wind-field decoder and a pooled scalar
+            MLP. The encoder-only variant retains the scalar branch. Real inputs
+            and predictions are fixed; animated signals illustrate data flow.
+          </p>
         </div>
-        <p className="method-accessible-summary">
-          Satellite channels and storm-center/time context feed the encoder.
-          Shared features branch into a wind-field decoder and a pooled scalar
-          MLP. The encoder-only variant retains the scalar branch. Real inputs
-          and predictions are fixed; animated signals illustrate data flow.
-        </p>
+        <div
+          id="method-panel-training"
+          role="tabpanel"
+          aria-labelledby="method-tab-training"
+          hidden={view !== "training"}
+        >
+          {view === "training" && (
+            <MethodTraining
+              mode={mode}
+              network={<Network mode={mode} training />}
+              example={example}
+              unit={unit}
+            />
+          )}
+        </div>
       </section>
     </div>
   );

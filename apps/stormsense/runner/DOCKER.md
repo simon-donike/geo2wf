@@ -22,7 +22,7 @@ not claimed. Run all commands below from the repository root.
 
 ```bash
 # Do this before Compose creates bind mounts, to preserve your ownership.
-mkdir -p downloads data logs inference var/stormsense/export var/docker-artifacts/browser
+mkdir -p downloads data logs inference release var/stormsense/export var/stormsense-migration var/docker-artifacts/browser
 export LOCAL_UID="$(id -u)"
 export LOCAL_GID="$(id -g)"
 docker compose build tools web
@@ -101,6 +101,44 @@ docker compose run --rm tools operational retain --output var/stormsense/export
 Use `operational export/evaluate` for StormSense. The short `export/evaluate`
 container commands dispatch the research CLI. Other legacy operational commands
 such as `bootstrap` and `--device cpu update` are still accepted directly.
+
+## Finetuned model and migration state
+
+Compose passes `STORMSENSE_MODEL_MANIFEST` to `tools` and `runner`, and
+`STORMSENSE_DB` to the runner's cycle and scheduler. Set these in `.env` using
+container paths. Defaults retain the original model and database. Finite
+`tools operational` commands select their database explicitly with `--db`.
+
+The shared mounts include `var/stormsense-migration` for persistent staging
+state and read-only `release` for the model manifest's provenance files. Keep
+the pinned finetuned checkpoint/config under `downloads/models/finetuned` and
+the required provenance under `release/provenance` on the host. These assets
+are mounted, not baked into the image. A host-prepared migration may contain
+an absolute `geocolor` symlink; make it portable (target
+`../stormsense/geocolor`) before using it in the container, since host paths
+such as `/work/code/geo2wf` do not exist there.
+
+Follow the comparison and cutover gates in [FINETUNING.md](FINETUNING.md) before
+changing the publishing runner. After they pass, use these `.env` values:
+
+```dotenv
+STORMSENSE_DB=/app/var/stormsense-migration/state.sqlite
+STORMSENSE_MODEL_MANIFEST=/app/src/geo2wf/operational/models-finetuned.json
+```
+
+Exports continue to use `var/stormsense/export`, shared with the web service.
+For example, inspect candidate coverage with:
+
+```bash
+docker compose run --rm tools operational --db /app/var/stormsense-migration/state.sqlite coverage
+```
+
+Rebuild `tools` and `web` after source changes with
+`docker compose build --pull tools web`; rebuild `train-gpu` and `browser-tests`
+as well if used. Existing containers keep their old image/configuration until
+recreated. At the approved cutover, stop the old publisher before starting its
+replacement with the new settings. The automated migration job in
+`FINETUNING.md` manages host systemd units; use the manual sequence for Compose.
 
 ## R2 publication
 

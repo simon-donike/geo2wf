@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "storm": {
     "id": "AL092022",
     "name": "Ian"
@@ -275,6 +275,51 @@
         "r64_km": 48.15851593017578
       }
     }
+  },
+  "training": {
+    "sar_image": "/method/sar-target.webp",
+    "prediction_image": "/method/training-prediction.webp",
+    "gradient_image": "/method/field-gradient.webp",
+    "sar_values": "/method/sar-target.npy",
+    "mask_values": "/method/field-loss-mask.npy",
+    "gradient_values": "/method/field-gradient.npy",
+    "sar_time": "2022-09-27T11:34:18+00:00",
+    "sar_sensor": "RADARSAT Constellation 1",
+    "source": "test/AL092022_sar_geo_20220927113418_a706a282_sar.tif",
+    "source_sha256": "d9b265cc547e75ba959240e4ea038c8e919a104255cb96f4b507493b5d425a58",
+    "sha256": {
+      "sar-target.webp": "c5d70ef1dab0c316a3f23ffa34365d6c07ecaa3017a34cb5c422852833f5df6e",
+      "training-prediction.webp": "a5f2b4e494e4b2cc7f79b6ea0f88430198439ac3cb0a225d413b515bd2901c84",
+      "field-gradient.webp": "99c352f0c25d4f90f58a280b185448f0cf6cae2d926ca505ad7498b58d8c40c8",
+      "sar-target.npy": "a90215caba5a1335dc4fea6f80174c82173c072d61c61c23fe027868299b456f",
+      "field-loss-mask.npy": "dd36ac4ab1e3de4e7860b26a144a46a3ae7362e462151c3ba72ec4f52a89aa0d",
+      "field-gradient.npy": "915a8247d9e853e744817d97c252ae9de3cc5f537669181b1bc58447bc5ee14c"
+    },
+    "min_ms": 0,
+    "max_ms": 50,
+    "palette": [
+      "#13233c",
+      "#245e86",
+      "#32a6ab",
+      "#a3d9b1",
+      "#efce7a",
+      "#eb895c",
+      "#b54961"
+    ],
+    "valid_pixels": 17837,
+    "total_pixels": 36864,
+    "field_loss": 2.1904258728027344,
+    "huber_delta_ms": 2.0,
+    "gradient_display_limit": 0.00011212647866793743,
+    "gradient_palette": [
+      "#63d8d2",
+      "#182437",
+      "#f1ad80"
+    ],
+    "alignment": "Nearest-neighbor SAR reprojection to the example's 192x192 EPSG:4326 grid. Pixel-center lookup independently verified. North up; exact same extent as predicted field.",
+    "mask": "Finite SAR target intersected with satellite condition mask. Transparent comparison/gradient pixels are excluded from field loss.",
+    "gradient": "Actual autograd derivative of the masked mean physical-space Huber field loss with respect to predicted wind speed: clip(prediction-target, -delta, delta) / valid_pixel_count; zero outside mask. Display uses symmetric +/- delta / valid_pixel_count.",
+    "usage": "Held-out test observation used to illustrate the training objective, not to update model weights."
   },
   "field": {
     "image": "/method/wind-field.webp",

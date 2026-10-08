@@ -18,6 +18,8 @@ x-stack: &stack
     - ./logs:/app/logs
     - ./inference:/app/inference
     - ./var/stormsense:/app/var/stormsense
+    - ./var/stormsense-migration:/app/var/stormsense-migration
+    - ./release:/app/release:ro
     - ./var/docker-artifacts:/app/artifacts
     - tool-cache:/home/geo2wf/.cache
   shm_size: 2gb
@@ -33,6 +35,8 @@ services:
     <<: *stack
     profiles: [tools]
     command: [help]
+    environment:
+      STORMSENSE_MODEL_MANIFEST: ${STORMSENSE_MODEL_MANIFEST:-/app/src/geo2wf/operational/models.json}
 
   runner:
     <<: *stack
@@ -42,6 +46,8 @@ services:
     cpus: ${RUNNER_CPUS:-2}
     mem_limit: ${RUNNER_MEMORY:-4g}
     environment:
+      STORMSENSE_DB: ${STORMSENSE_DB:-/app/var/stormsense/state.sqlite}
+      STORMSENSE_MODEL_MANIFEST: ${STORMSENSE_MODEL_MANIFEST:-/app/src/geo2wf/operational/models.json}
       STORMSENSE_PUBLISH: ${STORMSENSE_PUBLISH:-0}
       STORMSENSE_WORKERS: ${STORMSENSE_WORKERS:-2}
       STORMSENSE_IMAGERY_WORKERS: ${STORMSENSE_IMAGERY_WORKERS:-2}

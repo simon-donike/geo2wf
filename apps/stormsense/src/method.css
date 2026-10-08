@@ -1033,3 +1033,395 @@
     font-size: 6px;
   }
 }
+
+.method-view-tabs {
+  display: flex;
+  gap: 6px;
+  align-self: stretch;
+}
+.method-view-tabs button {
+  color: #9da9b9;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.method-view-tabs button[aria-selected="true"] {
+  color: #b8f2df;
+  border-bottom-color: #82d7ca;
+}
+.method-training {
+  padding: 32px 30px;
+}
+.method-training-intro h2 {
+  font-size: clamp(26px, 3vw, 38px);
+}
+.method-training-intro p {
+  margin-top: 10px;
+  color: #b5c8cc;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.method-training-intro > span {
+  display: block;
+  margin-top: 16px;
+  color: #839baa;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+}
+.method-training-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 45px;
+  margin-top: 35px;
+}
+.method-training-model {
+  min-width: 0;
+}
+.method-training-input {
+  padding: 13px 15px;
+  border: 1px solid #43615f;
+  border-radius: 5px;
+  color: #b8f2df;
+  background: #283d4440;
+  font-size: 12px;
+}
+.method-training-input > span {
+  float: right;
+}
+.method-training-model .method-network {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 25px 0 0;
+}
+.method-training-model > p,
+.method-training-update > p {
+  color: #a3b4bd;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.method-loss-card {
+  padding: 17px 18px;
+  margin-bottom: 12px;
+  border: 1px solid #42615f;
+  border-radius: 6px;
+  background: linear-gradient(125deg, #24403f55, #131a2900);
+  animation: method-loss-pulse 5s ease-in-out infinite;
+}
+.method-loss-card.field-loss {
+  border-color: #806d51;
+  background: linear-gradient(125deg, #56432b40, #131a2900);
+}
+.method-loss-pair {
+  display: grid;
+  grid-template-columns: 1fr 22px 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #c7d8dc;
+}
+.method-loss-pair > span:last-child {
+  border-left: 1px solid #64777766;
+  padding-left: 12px;
+}
+.method-loss-pair b {
+  color: #82d7ca;
+  font-size: 20px;
+  font-weight: 400;
+}
+.method-loss-result {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin-top: 14px;
+  color: #9ce2d1;
+}
+.method-loss-result strong {
+  font: 24px var(--serif);
+}
+.method-loss-result span {
+  font-size: 11px;
+}
+.method-loss-card p {
+  margin-top: 10px;
+  color: #a3b4bd;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.method-training-source {
+  color: #839baa;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.method-training-update {
+  position: relative;
+  border-top: 1px solid #3a4656;
+  margin-top: 28px;
+  padding-top: 25px;
+}
+.method-training-equation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #b8f2df;
+  font: clamp(23px, 3vw, 36px) var(--serif);
+}
+.method-training-equation .field-term {
+  color: #e6be81;
+}
+.method-training sub {
+  font-size: 60%;
+}
+.method-gradient-return {
+  position: relative;
+  overflow: hidden;
+  height: 32px;
+  margin: 18px 0 12px;
+  display: flex;
+  align-items: center;
+}
+.method-gradient-return::before {
+  content: "";
+  height: 1px;
+  background: #42615f;
+  position: absolute;
+  width: 100%;
+}
+.method-gradient-return i {
+  position: absolute;
+  width: 20%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #f1ad80, transparent);
+  animation: method-gradient 5s linear infinite;
+}
+.method-gradient-return span {
+  position: relative;
+  padding-right: 16px;
+  background: #151e2e;
+  color: #82d7ca;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+.method-training-details {
+  margin-top: 24px;
+  border-top: 1px solid #313b4b;
+  font-size: 12px;
+  color: #a3b4bd;
+}
+.method-training-details summary {
+  cursor: pointer;
+  padding: 18px 0 0;
+  color: #c7d8dc;
+}
+.method-training-details p {
+  margin-top: 14px;
+  max-width: 900px;
+  line-height: 1.8;
+}
+@keyframes method-gradient {
+  from {
+    left: 100%;
+  }
+  to {
+    left: -20%;
+  }
+}
+@keyframes method-loss-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 22px #82d7ca15;
+  }
+}
+.method-theater:not([data-motion="running"]) .method-loss-card,
+.method-theater:not([data-motion="running"]) .method-gradient-return i {
+  animation-play-state: paused;
+}
+.method-theater[data-motion="reduced"] .method-loss-card,
+.method-theater[data-motion="reduced"] .method-gradient-return i {
+  animation: none;
+}
+@media (max-width: 800px) {
+  .method-training {
+    padding: 25px 18px;
+  }
+  .method-training-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .method-training-model .method-network {
+    max-height: 420px;
+  }
+  .method-view-tabs {
+    align-self: auto;
+  }
+}
+
+.method-training-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.method-training-fields figure {
+  margin: 0;
+  min-width: 0;
+}
+.method-training-fields figcaption {
+  color: #d2e4df;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 9px;
+}
+.method-training-fields figcaption small {
+  display: block;
+  color: #839baa;
+  font-size: 10px;
+}
+.method-training-raster {
+  overflow: hidden;
+  aspect-ratio: 1;
+  border: 1px solid #617e8144;
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, #162132 0 4px, #233045 4px 5px);
+}
+.method-training-raster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.method-training-gradient-map {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 15px;
+  align-items: center;
+  margin-top: 15px;
+}
+.method-training-gradient-map strong {
+  font-size: 12px;
+  color: #d2e4df;
+  font-weight: 500;
+}
+.method-training-gradient-map p {
+  margin-top: 6px;
+}
+.method-gradient-signs {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 9px;
+  line-height: 1.5;
+  color: #63d8d2;
+}
+.method-gradient-signs span:last-child {
+  color: #f1ad80;
+}
+.method-training-flow-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 20px;
+  color: #a3b4bd;
+  font-size: 10px;
+}
+.method-training-flow-key span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.method-training-flow-key i {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  background: #82d7ca;
+}
+.method-training-flow-key span:last-child i {
+  background: #f1ad80;
+}
+.method-backward-flow {
+  fill: none;
+  stroke: #f1ad80;
+  stroke-linecap: round;
+}
+.method-backward-base {
+  stroke-width: 1;
+  opacity: 0.5;
+}
+.method-backward-pulse {
+  stroke-width: 2.8;
+  filter: drop-shadow(0 0 3px #f1ad8080);
+  animation: method-backward-travel 2.8s linear infinite;
+}
+.method-backward-flow.is-skip .method-backward-pulse {
+  stroke-width: 1.5;
+  opacity: 0.65;
+}
+.method-backpropagation {
+  animation: method-backward-phase 6s ease-in-out infinite;
+}
+.method-network.is-training .method-flow {
+  animation: method-forward-phase 6s ease-in-out infinite;
+}
+@keyframes method-backward-travel {
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+@keyframes method-backward-phase {
+  0%,
+  35%,
+  100% {
+    opacity: 0.12;
+  }
+  48%,
+  85% {
+    opacity: 1;
+  }
+}
+@keyframes method-forward-phase {
+  0%,
+  35%,
+  100% {
+    opacity: 1;
+  }
+  48%,
+  85% {
+    opacity: 0.15;
+  }
+}
+.method-theater:not([data-motion="running"]) .method-backward-pulse,
+.method-theater:not([data-motion="running"]) .method-backpropagation,
+.method-theater:not([data-motion="running"])
+  .method-network.is-training
+  .method-flow {
+  animation-play-state: paused;
+}
+.method-theater[data-motion="reduced"] .method-backward-pulse,
+.method-theater[data-motion="reduced"] .method-backpropagation,
+.method-theater[data-motion="reduced"]
+  .method-network.is-training
+  .method-flow {
+  animation: none;
+}
+.method-theater[data-motion="reduced"] .method-backward-pulse {
+  stroke-dasharray: 0.02 0.025;
+}
+@media (max-width: 480px) {
+  .method-training-fields {
+    gap: 9px;
+  }
+  .method-training-fields figcaption {
+    font-size: 11px;
+  }
+  .method-training-gradient-map {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+  }
+}

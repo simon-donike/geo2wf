@@ -35,6 +35,24 @@ export interface MethodExample {
     max_ms: number;
     palette: string[];
   };
+  training: {
+    sar_image: string;
+    prediction_image: string;
+    gradient_image: string;
+    sar_time: string;
+    sar_sensor: string;
+    source: string;
+    source_sha256: string;
+    min_ms: number;
+    max_ms: number;
+    palette: string[];
+    valid_pixels: number;
+    total_pixels: number;
+    field_loss: number;
+    huber_delta_ms: number;
+    gradient_display_limit: number;
+    gradient_palette: string[];
+  };
   grid: {
     width: number;
     height: number;

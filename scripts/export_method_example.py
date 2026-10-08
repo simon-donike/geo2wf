@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from geo2wf.data.joint_intensity import _interpolate_ibtracs_wind, _load_ibtracs_tracks
 from geo2wf.historical.training import ScalarAdapter
 from geo2wf.models.bottleneck_unet_mlp import BottleneckUNetMLPRegressor
+from geo2wf.models.bottleneck_unet_mlp.module import _masked_huber_loss
 from geo2wf.operational.models import prepare
 from geo2wf.operational.satellite import BANDS
 
@@ -158,6 +159,98 @@ def scalars(intensity, structure):
     if not all(math.isfinite(v) and v >= 0 for v in result.values()):
         raise ValueError("Invalid scalar output")
     return result
+
+
+def export_training_pair(output, root, row, field, condition_mask, lat, lon, delta):
+    """Align the matched SAR target to the exact inference grid; no model update."""
+    source_path = root / row["sar_path"]
+    transform = from_origin(lon - 96 * 0.027, lat + 96 * 0.027, 0.027, 0.027)
+    sar = np.full((192, 192), np.nan, dtype=np.float32)
+    with rasterio.open(source_path) as ds:
+        assert ds.count == 1 and ds.descriptions == ("wind_speed",)
+        source = ds.read(1, masked=True).filled(np.nan)
+        source[~np.isfinite(source)] = np.nan
+        reproject(
+            source,
+            sar,
+            src_transform=ds.transform,
+            src_crs=ds.crs,
+            dst_transform=transform,
+            dst_crs="EPSG:4326",
+            src_nodata=np.nan,
+            dst_nodata=np.nan,
+            resampling=Resampling.nearest,
+        )
+        # Independent pixel-center lookup verifies orientation, location and mask.
+        yy, xx = np.indices(sar.shape)
+        xs, ys = rasterio.transform.xy(transform, yy.ravel(), xx.ravel())
+        sr, sc = rasterio.transform.rowcol(ds.transform, xs, ys)
+        sr, sc = np.asarray(sr), np.asarray(sc)
+        inside = (sr >= 0) & (sr < ds.height) & (sc >= 0) & (sc < ds.width)
+        check = np.full(sar.size, np.nan, dtype=np.float32)
+        check[inside] = source[sr[inside], sc[inside]]
+        np.testing.assert_allclose(sar, check.reshape(sar.shape), equal_nan=True)
+    mask = np.isfinite(sar) & condition_mask.astype(bool)
+    assert mask.any() and (sar[mask] >= 0).all()
+    predicted = torch.tensor(field, requires_grad=True)
+    target = torch.from_numpy(np.nan_to_num(sar, nan=0.0))
+    loss = _masked_huber_loss(predicted, target, torch.from_numpy(mask), delta)
+    gradient = torch.autograd.grad(loss, predicted)[0].numpy()
+    expected = np.where(
+        mask, np.clip(field - np.nan_to_num(sar), -delta, delta) / mask.sum(), 0
+    )
+    np.testing.assert_allclose(gradient, expected, rtol=1e-6, atol=1e-10)
+    assert not gradient[~mask].any()
+    high = math.ceil(max(float(field.max()), float(sar[mask].max())) / 10) * 10
+    alpha = mask.astype(np.uint8) * 255
+    Image.fromarray(np.dstack([colorize(sar, 0, high, PALETTE), alpha])).save(
+        output / "sar-target.webp", lossless=True
+    )
+    Image.fromarray(colorize(field, 0, high, PALETTE)).save(
+        output / "training-prediction.webp", lossless=True
+    )
+    limit = delta / int(mask.sum())
+    gradient_palette = ["#63d8d2", "#182437", "#f1ad80"]
+    Image.fromarray(
+        np.dstack([colorize(gradient, -limit, limit, gradient_palette), alpha])
+    ).save(output / "field-gradient.webp", lossless=True)
+    np.save(output / "sar-target.npy", sar, allow_pickle=False)
+    np.save(output / "field-loss-mask.npy", mask, allow_pickle=False)
+    np.save(output / "field-gradient.npy", gradient, allow_pickle=False)
+    files = [
+        "sar-target.webp",
+        "training-prediction.webp",
+        "field-gradient.webp",
+        "sar-target.npy",
+        "field-loss-mask.npy",
+        "field-gradient.npy",
+    ]
+    return {
+        "sar_image": "/method/sar-target.webp",
+        "prediction_image": "/method/training-prediction.webp",
+        "gradient_image": "/method/field-gradient.webp",
+        "sar_values": "/method/sar-target.npy",
+        "mask_values": "/method/field-loss-mask.npy",
+        "gradient_values": "/method/field-gradient.npy",
+        "sar_time": row["sar_timestamp"],
+        "sar_sensor": row["sar_sensor"],
+        "source": row["sar_path"],
+        "source_sha256": digest(source_path),
+        "sha256": {name: digest(output / name) for name in files},
+        "min_ms": 0,
+        "max_ms": high,
+        "palette": PALETTE,
+        "valid_pixels": int(mask.sum()),
+        "total_pixels": int(mask.size),
+        "field_loss": float(loss.detach()),
+        "huber_delta_ms": delta,
+        "gradient_display_limit": limit,
+        "gradient_palette": gradient_palette,
+        "alignment": "Nearest-neighbor SAR reprojection to the example's 192x192 EPSG:4326 grid. Pixel-center lookup independently verified. North up; exact same extent as predicted field.",
+        "mask": "Finite SAR target intersected with satellite condition mask. Transparent comparison/gradient pixels are excluded from field loss.",
+        "gradient": "Actual autograd derivative of the masked mean physical-space Huber field loss with respect to predicted wind speed: clip(prediction-target, -delta, delta) / valid_pixel_count; zero outside mask. Display uses symmetric +/- delta / valid_pixel_count.",
+        "usage": "Held-out test observation used to illustrate the training objective, not to update model weights.",
+    }
 
 
 def export(output):
@@ -320,6 +413,16 @@ def export(output):
     )
     # Preserve physical values for reproducibility; the UI only requests the WebP.
     np.save(output / "wind-field.npy", field, allow_pickle=False)
+    training = export_training_pair(
+        output,
+        root,
+        row,
+        field,
+        batch["condition_mask"][0, 0].numpy(),
+        lat,
+        lon,
+        joint.image_huber_delta_ms,
+    )
     models = {
         key: {"id": item["id"], "sha256": item["sha256"], "scalars": values}
         for (key, item), values in zip(
@@ -334,7 +437,7 @@ def export(output):
         )
     }
     example = {
-        "schema_version": 1,
+        "schema_version": 2,
         "storm": {"id": "AL092022", "name": "Ian"},
         "time": at.isoformat(),
         "sample_id": sample_id,
@@ -349,6 +452,7 @@ def export(output):
             "display": "Per-channel color scaling on valid pixels; masked pixels are dark. Values are the exact normalized network inputs.",
         },
         "models": models,
+        "training": training,
         "field": {
             "image": "/method/wind-field.webp",
             "values": "/method/wind-field.npy",
