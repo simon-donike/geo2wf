@@ -176,6 +176,60 @@ def test_identical_pixels_on_different_grids_get_distinct_asset_names(tmp_path):
     assert a["sha256"] == b["sha256"] and a["path"] != b["path"]
 
 
+@pytest.mark.parametrize(
+    "now,early,due",
+    [
+        ("2026-09-01T12:05:00Z", "2026-09-01T13:04:59Z", "2026-09-01T13:05:00Z"),
+        ("2026-09-04T12:00:00Z", "2026-09-05T11:59:59Z", "2026-09-05T12:00:00Z"),
+    ],
+)
+@pytest.mark.parametrize("force", [False, True])
+def test_source_gaps_retry_after_cooldown_or_explicit_retry(
+    tmp_path, now, early, due, force
+):
+    store = Store(tmp_path / "state.sqlite")
+    store.put_storm(
+        {
+            "id": job()["storm_id"],
+            "name": "Test",
+            "basin": "EP",
+            "active": False,
+            "start": job()["time"],
+            "end": job()["time"],
+            "track": [{"time": job()["time"], **job()["center"], "wind_ms": 30}],
+        }
+    )
+    offline, _ = source(fail=True)
+    args = (store, "2026-09-01", "2026-09-02")
+    assert geo.backfill_images(*args, client=offline, now=now)["results"] == {"gap": 1}
+    client, calls = source()
+    assert geo.backfill_images(*args, client=client, now=early)["processed"] == 0
+    assert calls == []
+    assert geo.backfill_images(
+        *args, client=client, now=early if force else due, retry_gaps=force
+    )["results"] == {"ready": 1}
+    assert geo.backfill_images(*args, client=client, now=due)["processed"] == 0
+    frame = store.visuals(job()["storm_id"], geo.VERSION)[0]
+    assert all((geo.asset_root(store) / path).is_file() for path in frame["files"])
+    store.close()
+
+
+def test_missing_center_waits_for_track_and_legacy_gaps_retry():
+    frame = {
+        **job(),
+        "status": "gap",
+        "reason": "source_unavailable",
+        "checked_at": "2026-09-01T12:05:00Z",
+    }
+    assert not geo.retry_due(frame, job()["center"], utc("2026-09-01T12:10:00Z"))
+    frame["reason"] = "no_center"
+    assert not geo.retry_due(frame, None, utc("2026-10-01"))
+    assert geo.retry_due(frame, job()["center"], utc("2026-09-01T12:10:00Z"))
+    frame.pop("checked_at")
+    frame["reason"] = "no_reported_frame"
+    assert geo.retry_due(frame, job()["center"], utc("2026-10-01"))
+
+
 def test_storage_failure_is_not_reported_as_a_provider_gap(tmp_path, monkeypatch):
     client, _ = source()
 

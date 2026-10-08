@@ -404,6 +404,21 @@ def frame_files(frame):
     return frame.get("files", []) if frame.get("status") == "ready" else []
 
 
+def retry_due(frame, center, now):
+    """Retry delayed tiles hourly and older source gaps daily, not every poll."""
+    if frame.get("reason") == "no_center":
+        return bool(center)
+    checked = frame.get("checked_at") or frame.get("generated_at")
+    if not checked:
+        return True
+    delay = (
+        timedelta(hours=1)
+        if now - utc(frame["time"]) < timedelta(hours=48)
+        else timedelta(days=1)
+    )
+    return now - utc(checked) >= delay
+
+
 def backfill_images(
     store,
     start,
@@ -414,8 +429,10 @@ def backfill_images(
     storm_ids=None,
     active_only=False,
     client=None,
+    now=None,
 ):
-    end = min(utc(end), utc())
+    now = utc(now)
+    end = min(utc(end), now)
     jobs = []
     for storm in store.storms():
         if (storm_ids and storm["id"] not in storm_ids) or (
@@ -447,7 +464,7 @@ def backfill_images(
                         (asset_root(store) / f).is_file() for f in frame_files(previous)
                     ):
                         continue
-                elif not retry_gaps:
+                elif not retry_gaps and not retry_due(previous, center, now):
                     continue
             jobs.append(
                 {
@@ -464,6 +481,7 @@ def backfill_images(
     jobs.sort(key=lambda j: (j["time"], j["storm_id"]), reverse=True)
     if limit is not None:
         jobs = jobs[:limit]
+    LOG.info("GeoColor queued %d frames (%d workers)", len(jobs), workers)
     client = client or Client()
     counts = Counter()
     iterator = iter(jobs)
@@ -480,7 +498,9 @@ def backfill_images(
                 job = next(iterator, None)
                 if job is None:
                     break
-                pending[executor.submit(acquire, job, client, asset_root(store))] = job
+                pending[
+                    executor.submit(acquire, job, client, asset_root(store), now)
+                ] = job
             if not pending:
                 break
             finished, _ = wait(pending, return_when=FIRST_COMPLETED)
@@ -507,6 +527,12 @@ def backfill_images(
         "interrupted": stopped,
     }
     store.put_status("geocolor", result)
+    LOG.info(
+        "GeoColor processed %d/%d frames: %s",
+        result["processed"],
+        len(jobs),
+        dict(counts),
+    )
     return result
 
 

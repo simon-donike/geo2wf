@@ -8,6 +8,7 @@ from datetime import timedelta
 import fcntl
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -39,13 +40,15 @@ def parser():
     p.add_argument("--db", type=Path, default=Path("var/stormsense/state.sqlite"))
     p.add_argument("--model-root", type=Path, default=Path("downloads/models"))
     p.add_argument("--device", default=None)
+    p.add_argument("--model-manifest", type=Path, default=None)
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("bootstrap")
     sub.add_parser("discover")
     cmd = sub.add_parser(
-        "update", help="Update live estimates and reconcile missed archive hours"
+        "update", help="Update predictions and website images, including archive gaps"
     )
     cmd.add_argument("--workers", type=int, default=4)
+    cmd.add_argument("--imagery-workers", type=int, default=2)
     sub.add_parser("verify")
     for name in ("discover-history", "backfill", "coverage"):
         cmd = sub.add_parser(name)
@@ -99,11 +102,16 @@ def parser():
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.model_manifest:
+        os.environ["STORMSENSE_MODEL_MANIFEST"] = str(args.model_manifest.resolve())
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
     logging.getLogger("fsspec").setLevel(logging.WARNING)
-    from .models import Models, bootstrap
+    from .models import Models, bootstrap, select_manifest
+
+    if args.model_manifest:
+        select_manifest(args.model_manifest)
     from .pipeline import discover, discover_history, update, backfill
     from .export import export_release, publish, coverage, prune_local, prune_remote
     from .evaluate import evaluate
@@ -125,8 +133,12 @@ def main(argv=None):
         elif args.command == "discover-history":
             discover_history(store, start, end)
         elif args.command == "update":
+            from .geocolor import backfill_images
+
             if not 1 <= args.workers <= 32:
                 raise ValueError("workers must be between 1 and 32")
+            if not 1 <= args.imagery_workers <= 8:
+                raise ValueError("imagery-workers must be between 1 and 8")
             request = Path(str(args.db) + ".update-requested")
             request.touch()
             acquired = False
@@ -135,12 +147,29 @@ def main(argv=None):
                     # Our own priority marker must not stop our catch-up job.
                     request.unlink(missing_ok=True)
                     acquired = True
-                    result = update(
-                        store,
-                        Models(args.model_root, args.device),
-                        workers=args.workers,
-                        model_root=args.model_root,
-                    )
+                    try:
+                        result = update(
+                            store,
+                            Models(args.model_root, args.device),
+                            workers=args.workers,
+                            model_root=args.model_root,
+                        )
+                    finally:
+                        # Display frames are independent of model success. Repair
+                        # the retained archive even when discovery/inference fails
+                        # or every numerical slot was already attempted.
+                        image_end = utc()
+                        imagery = backfill_images(
+                            store,
+                            year_before(image_end),
+                            image_end,
+                            workers=args.imagery_workers,
+                            now=image_end,
+                        )
+                        if imagery["interrupted"]:
+                            raise RuntimeError(
+                                "Image catch-up interrupted; committed frames will resume next update"
+                            )
             finally:
                 if not acquired:
                     request.unlink(missing_ok=True)

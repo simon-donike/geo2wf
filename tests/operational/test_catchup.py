@@ -150,12 +150,64 @@ def test_cli_clears_own_priority_marker_before_catchup(tmp_path, monkeypatch):
         calls.append(kwargs)
 
     monkeypatch.setattr(pipeline, "update", update)
+    monkeypatch.setattr(
+        geocolor, "backfill_images", lambda *args, **kwargs: {"interrupted": False}
+    )
     cli.main(["--db", str(db), "update", "--workers", "2"])
     assert calls[0]["workers"] == 2
     assert not marker.exists()
 
 
-def test_runner_reconciles_imagery_and_publishes_even_without_new_predictions(tmp_path):
+@pytest.mark.parametrize("prediction_fails", [False, True])
+def test_python_update_builds_and_exports_frames_even_without_predictions(
+    tmp_path, monkeypatch, prediction_fails
+):
+    from test_geocolor import source
+    from geo2wf.operational.export import export_release
+    import json
+
+    db = tmp_path / "state.sqlite"
+    store = Store(db)
+    store.put_storm({**storm(), "active": False, "start": sample(12)["time"]})
+    store.close()
+    client, requests = source()
+    monkeypatch.setattr(geocolor, "Client", lambda: client)
+    monkeypatch.setattr(models, "Models", lambda *args: object())
+    monkeypatch.setattr(cli, "utc", lambda value=None: utc(value or "2026-09-02"))
+
+    def predict(*args, **kwargs):
+        if prediction_fails:
+            raise RuntimeError("prediction source offline")
+        return []  # No new predictions must still create missing website images.
+
+    monkeypatch.setattr(pipeline, "update", predict)
+    command = ["--db", str(db), "update", "--imagery-workers", "1"]
+    if prediction_fails:
+        with pytest.raises(RuntimeError, match="prediction source offline"):
+            cli.main(command)
+    else:
+        cli.main(command)
+        request_count = len(requests)
+        cli.main(command)
+        assert len(requests) == request_count  # Successful frames are reused.
+    store = Store(db)
+    frames = store.visuals("EP012026", geocolor.VERSION)
+    assert len(frames) == 1 and frames[0]["status"] == "ready"
+    output = tmp_path / "export"
+    catalog = export_release(store, output, "2026-09-01", "2026-09-02")
+    series = json.loads((output / catalog["storms"][0]["series"]).read_text())
+    image = series["imagery"][0]["parts"][0]["image"]
+    assert (output / image).is_file()
+    assert all(
+        (output / bundle["path"]).is_file() for bundle in series["imagery_bundles"]
+    )
+    store.close()
+
+
+@pytest.mark.parametrize("update_status", [0, 7])
+def test_runner_exports_and_publishes_even_after_update_failure(
+    tmp_path, update_status
+):
     import json
     import os
     import subprocess
@@ -167,18 +219,20 @@ def test_runner_reconciles_imagery_and_publishes_even_without_new_predictions(tm
         "#!/usr/bin/env python3\n"
         "import json,os,sys\n"
         "with open(os.environ['STORMSENSE_TEST_CALLS'],'a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')\n"
+        f"sys.exit({update_status} if 'update' in sys.argv else 0)\n"
     )
     stub.chmod(0o755)
-    subprocess.run(
+    result = subprocess.run(
         ["bash", str(runner)],
         env={
             **os.environ,
             "STORMSENSE_PYTHON": str(stub),
             "STORMSENSE_TEST_CALLS": str(calls),
             "STORMSENSE_PUBLISH": "1",
+            "STORMSENSE_DB": str(tmp_path / "state.sqlite"),
         },
-        check=True,
     )
+    assert result.returncode == update_status
     commands = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [
         next(
@@ -187,10 +241,8 @@ def test_runner_reconciles_imagery_and_publishes_even_without_new_predictions(tm
             if arg in {"update", "imagery", "evaluate", "export", "publish"}
         )
         for args in commands
-    ] == ["update", "imagery", "evaluate", "export", "publish"]
-    assert "--retry-gaps" not in commands[1]
-    assert "--active-only" not in commands[1]
-    assert "--recent-hours" not in commands[1]
+    ] == ["update", "evaluate", "export", "publish"]
+    assert "--imagery-workers" in commands[0]
 
 
 def test_imagery_reconciles_old_ended_storm_and_missing_files(tmp_path, monkeypatch):
@@ -214,8 +266,6 @@ def test_imagery_reconciles_old_ended_storm_and_missing_files(tmp_path, monkeypa
     (geocolor.asset_root(store) / frame["files"][0]).unlink()
     assert geocolor.backfill_images(*args, client=client)["results"] == {"ready": 1}
     store.put_visual({**frame, "status": "gap", "reason": "no_center", "center": None})
-    assert geocolor.backfill_images(*args, client=client)["processed"] == 0
-    assert geocolor.backfill_images(*args, client=client, retry_gaps=True)[
-        "results"
-    ] == {"ready": 1}
+    # A newly available track center repairs a former no-center gap immediately.
+    assert geocolor.backfill_images(*args, client=client)["results"] == {"ready": 1}
     store.close()

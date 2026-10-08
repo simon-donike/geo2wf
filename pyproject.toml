@@ -66,7 +66,7 @@ where = ["src"]
 include = ["geo2wf*"]
 
 [tool.setuptools.package-data]
-"geo2wf.operational" = ["models.json"]
+"geo2wf.operational" = ["models.json", "models-finetuned.json"]
 
 [dependency-groups]
 artifacts = [

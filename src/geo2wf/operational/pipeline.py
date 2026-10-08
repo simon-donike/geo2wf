@@ -14,6 +14,7 @@ from urllib.error import URLError
 
 from .common import fetch, hour, hours, iso, utc, year_before
 from .models import version
+from .schedule import slots, qualified
 from .satellite import DataGap, acquire, shared_reads
 from .tracks import (
     CURRENT,
@@ -30,10 +31,12 @@ LOG = logging.getLogger(__name__)
 _worker_models = None
 
 
-def initialize_worker(model_root, device):
-    from .models import Models
+def initialize_worker(model_root, device, manifest_path=None):
+    from .models import Models, select_manifest
     import torch
 
+    if manifest_path:
+        select_manifest(manifest_path)
     if device == "cuda" and torch.cuda.device_count() > 1:
         index = multiprocessing.current_process()._identity[0] - 1
         device = f"cuda:{index % torch.cuda.device_count()}"
@@ -71,6 +74,15 @@ def discover(store, now=None):
             "advisory_snapshot": snapshot,
             "advisory_retrieved_at": iso(now),
         }
+        if (
+            not storm.get("prediction_qualified_at")
+            and qualified(item["advisory"].get("classification"))
+            and utc(item["advisory"]["time"]) <= now
+        ):
+            # Only observed nonfuture advice opens the live gate. Keep its
+            # issue time and the observation time separately for provenance.
+            storm["prediction_qualified_at"] = item["advisory"]["time"]
+            storm["prediction_qualification_observed_at"] = iso(now)
         try:
             url = f"{ATCF}/btk/b{item['id'].lower()}.dat"
             tracks_body = fetch(url)
@@ -180,6 +192,9 @@ def process(storm, at, kind, models, available_at=None):
         if kind == "live"
         else historical_center(storm.get("track", []), at)
     )
+    previous = storm.get("_rebuild_source") if kind == "hindcast" else None
+    if previous:
+        center = previous["center"]
     row = {
         "storm_id": storm["id"],
         "time": iso(at),
@@ -195,6 +210,16 @@ def process(storm, at, kind, models, available_at=None):
             else storm.get("track_snapshot")
         ),
     }
+    if previous:
+        row.update(
+            source_snapshot=previous.get("source_snapshot"),
+            source_snapshots=previous.get("source_snapshots", []),
+            reprocessed_from={
+                "model_version": previous["model_version"],
+                "kind": previous["kind"],
+                "generated_at": previous["generated_at"],
+            },
+        )
     if kind == "live" and center and center.get("position_source") == "track":
         row["source_snapshot"] = storm.get("track_snapshot")
         row["source_snapshots"] = [
@@ -326,6 +351,8 @@ def update(store, models, now=None, workers=4, model_root="downloads/models"):
     for item in active:
         storm = store.storm(item["id"])
         at = hour(now)
+        if not list(slots(storm, at, at, live=True)):
+            continue
         previous = store.sample(
             storm["id"], at, "live", version("nowcast")
         ) or store.sample(storm["id"], at, "hindcast", version("nowcast"))
@@ -398,7 +425,15 @@ def backfill(
         first, last = max(utc(start), utc(storm["start"])), min(
             utc(end), utc(end) if storm.get("active") else utc(storm["end"])
         )
-        for at in hours(first, last):
+        from .models import MANIFEST
+
+        baseline = MANIFEST.get("baseline_model_version")
+        originals = {}
+        if baseline:
+            for row in store.samples(storm["id"], baseline):
+                if row["status"] == "ready" and row.get("center"):
+                    originals[row["time"]] = row
+        for at in slots(storm, first, last):
             if reconcile:
                 live = store.sample(storm["id"], at, "live", version("nowcast"))
                 if live:
@@ -409,7 +444,10 @@ def backfill(
                     continue
                 if not retry_gaps:
                     continue
-            tasks.append((storm, at))
+            source = originals.get(iso(at))
+            tasks.append(
+                ({**storm, "_rebuild_source": source} if source else storm, at)
+            )
     tasks.sort(key=lambda item: item[1], reverse=True)
     if limit is not None:
         tasks = tasks[:limit]
@@ -423,11 +461,13 @@ def backfill(
     iterator = iter(groups)
     touched = set()
     last_forecast_count = 0
+    from .models import MANIFEST_PATH
+
     with ProcessPoolExecutor(
         max_workers=workers,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=initialize_worker,
-        initargs=(str(model_root), models.device),
+        initargs=(str(model_root), models.device, str(MANIFEST_PATH)),
     ) as pool:
         futures = {
             pool.submit(process_group_worker, next(iterator))

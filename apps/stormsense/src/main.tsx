@@ -1,5 +1,7 @@
 import React, {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -14,12 +16,14 @@ import {
   Route,
   Routes,
   useNavigate,
+  useLocation,
   useParams,
   useSearchParams,
 } from "react-router-dom";
 import { MapView, RadiusLegend } from "./MapView";
 import { Chart, type Line } from "./Chart";
 import { rapidIntensification } from "./rapidIntensification";
+import { predictionTimeline } from "./predictionTimeline";
 import {
   age,
   BASINS,
@@ -47,6 +51,8 @@ import {
   WIND_BANDS,
 } from "./presentation";
 import "./styles.css";
+
+const Method = lazy(() => import("./Method"));
 
 const UnitContext = createContext<{ unit: "kt" | "m/s"; toggle: () => void }>({
   unit: "kt",
@@ -374,7 +380,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
           <span className="eyebrow">Every storm has a story</span>
           <h2>Look back. See the evolution.</h2>
           <p>
-            Explore a year of storm tracks, hourly wind estimates, and
+            Explore a year of storm tracks, wind estimates, and
             experimental intensity forecasts.
           </p>
           <Link to="/archive" className="button">
@@ -387,7 +393,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
         </div>
         <div className="archive-stat">
           <strong>{ready.toLocaleString()}</strong>
-          <span>hourly estimates computed</span>
+          <span>estimates computed · every {catalog.prediction_cadence_hours ?? 1} hours</span>
         </div>
       </section>
       <div className="subtle-note">
@@ -597,7 +603,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
     return () => controller.abort();
   }, [storm?.series, retry]);
   const records = useMemo(
-    () => preferredRecords(series?.records ?? []),
+    () => predictionTimeline(series),
     [series],
   );
   const requested = params.get("time");
@@ -689,6 +695,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
   };
   useEffect(() => {
     if (!playing || !imageReady || !records.length) return;
+    const elapsedHours = records[index + 1]
+      ? (Date.parse(records[index + 1].time) - Date.parse(records[index].time)) / 3600000
+      : 1;
     const timer = setTimeout(() => {
       if (index >= records.length - 1) {
         setPlaying(false);
@@ -697,7 +706,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
         setSelection({ time: records[index + 1].time });
         setHover(null);
       }
-    }, 1000 / playbackRate);
+    }, (1000 * elapsedHours) / playbackRate);
     return () => clearTimeout(timer);
   }, [playing, imageReady, index, records, playbackRate, commitTime]);
   useEffect(() => {
@@ -734,7 +743,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
     }));
     const lines: Line[] = [
       {
-        label: smoothing ? "StormSense · smoothed" : "StormSense estimate",
+        label: smoothing ? "StormSense · smoothed / interpolated" : "StormSense · interpolated between estimates",
         color: "#40c7bd",
         points: smoothing ? smoothPoints(points) : interpolatePoints(points),
       },
@@ -809,7 +818,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
           </h1>
           <p>
             {stamp(storm.start, true)} — {stamp(storm.end, true)} ·{" "}
-            {storm.prediction_count.toLocaleString()} hourly estimates
+            {storm.prediction_count.toLocaleString()} estimates · every {storm.prediction_schedule?.cadence_hours ?? 1} hours
           </p>
         </div>
         <div className="download-actions">
@@ -896,7 +905,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
               </strong>
               {selected?.status === "gap" && (
                 <span className="gap-label">
-                  Data gap · {selected.reason?.replaceAll("_", " ")}
+                  {selected.reason === "outside_prediction_scope"
+                    ? "Before tropical/subtropical classification · imagery only"
+                    : `Data gap · ${selected.reason?.replaceAll("_", " ")}`}
                 </span>
               )}
             </div>
@@ -1051,7 +1062,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
               <p>
                 Model estimates of equivalent-area wind radii
                 {smoothing ? ", lightly smoothed" : ""}. Interior gaps are
-                linearly interpolated.
+                linearly interpolated for display; intermediate values are not model predictions.
               </p>
             </div>
             <Chart
@@ -1071,7 +1082,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
               Selected hour: {selected ? stamp(selected.time) : "Unavailable"}
               <br />
               Generated:{" "}
-              {selected ? stamp(selected.generated_at) : "Unavailable"}
+              {selected?.generated_at ? stamp(selected.generated_at) : "Unavailable"}
               <br />
               Center fix:{" "}
               {selected?.center
@@ -1095,7 +1106,9 @@ function Detail({ catalog }: { catalog: Catalog }) {
             <p>Model: {selected?.model_version}</p>
           </details>
           <p className="subtle-note">
-            {selected?.kind === "live"
+            {!selected?.model_version
+              ? "No model prediction is available at this image timestamp."
+              : selected?.kind === "live"
               ? "This estimate was generated during a live update."
               : "This is a historical hindcast using retrospective storm centers."}{" "}
             Model estimates are distinct from
@@ -1116,13 +1129,16 @@ function About({ catalog }: { catalog: Catalog }) {
         observations, translating cloud patterns into estimates of surface wind
         intensity and storm size.
       </p>
+      <Link className="back-link" to="/method">
+        Explore the animated model walkthrough ↗
+      </Link>
       <div className="method-grid">
         <article>
           <span className="method-number">01</span>
           <h2>A satellite view</h2>
           <p>
             Ten infrared GOES ABI channels are sampled around the NHC/CPHC storm
-            center. Each hourly slot uses a complete scan from the preceding 30
+            center. Each prediction slot uses a complete scan from the preceding 30
             minutes. Source imagery is read temporarily and discarded.
           </p>
         </article>
@@ -1261,6 +1277,7 @@ function About({ catalog }: { catalog: Catalog }) {
   );
 }
 function App() {
+  const methodPage = useLocation().pathname.replace(/\/$/, "") === "/method";
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -1269,6 +1286,7 @@ function App() {
     localStorage.getItem("stormsense-unit") === "m/s" ? "m/s" : "kt",
   );
   useEffect(() => {
+    if (methodPage) return;
     const controller = new AbortController();
     let busy = false;
     const refresh = async () => {
@@ -1287,12 +1305,12 @@ function App() {
     void refresh();
     const timer = setInterval(() => {
       if (!document.hidden) void refresh();
-    }, 60000);
+    }, 5 * 60 * 1000);
     return () => {
       controller.abort();
       clearInterval(timer);
     };
-  }, [revision]);
+  }, [revision, methodPage]);
   const toggle = () =>
     setUnit((prior) => {
       const next = prior === "kt" ? "m/s" : "kt";
@@ -1316,7 +1334,8 @@ function App() {
             Active storms
           </NavLink>
           <NavLink to="/archive">Archive</NavLink>
-          <NavLink to="/about">About & methods</NavLink>
+          <NavLink to="/method">Method</NavLink>
+          <NavLink to="/about">About</NavLink>
         </nav>
         <div className="header-tools">
           <button
@@ -1332,13 +1351,25 @@ function App() {
         </div>
       </header>
       <main id="main">
-        {error && (
+        {error && !methodPage && (
           <div className="notice" role="alert">
             {error} {catalog && "Showing the last loaded release."}{" "}
             <button onClick={() => setRevision((n) => n + 1)}>Retry</button>
           </div>
         )}
-        {loading && !catalog ? (
+        {methodPage ? (
+          <Suspense
+            fallback={
+              <div className="loading-state" role="status">
+                Loading the model walkthrough…
+              </div>
+            }
+          >
+            <Routes>
+              <Route path="/method" element={<Method unit={unit} />} />
+            </Routes>
+          </Suspense>
+        ) : loading && !catalog ? (
           <div className="loading-state" role="status">
             <span className="loader" />
             Connecting to the storm record…

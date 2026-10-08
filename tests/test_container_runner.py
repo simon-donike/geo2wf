@@ -78,8 +78,8 @@ def test_cycle_lock_covers_all_steps_and_workers_are_configurable(tmp_path):
         assert not calls.exists()
     subprocess.run(["bash", str(RUNNER / "cycle.sh")], env=env, check=True)
     commands = [json.loads(line) for line in calls.read_text().splitlines()]
-    assert commands[0][-3:] == ["update", "--workers", "1"]
-    assert commands[1][-3:] == ["imagery", "--workers", "3"]
+    assert commands[0][-5:] == ["update", "--workers", "1", "--imagery-workers", "3"]
+    assert not any("imagery" in command for command in commands)
     assert not any("publish" in command for command in commands)
 
 

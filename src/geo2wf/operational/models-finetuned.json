@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "repository": "simon-donike/geo2wf-models",
+  "revision": "b4399d426b80698d4cf73a77c9541071a8ab3d42",
+  "models": {
+    "nowcast": {
+      "id": "historical-encoder-two-hour-v1",
+      "checkpoint": "downloads/models/finetuned/encoder-6bd418773584/model.ckpt",
+      "sha256": "6bd41877358425603a6d4f188e8ca9ebd6e6f8b5a05abace63b8d91eae6770d9",
+      "config": "downloads/models/finetuned/encoder-6bd418773584/config.json",
+      "local_checkpoint": "downloads/models/finetuned/encoder-6bd418773584/model.ckpt",
+      "stats": "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/stats.json",
+      "stats_sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded",
+      "training_manifest": "release/provenance/data/geotiff/geo_sar_10bands_era5_v2_pmw/train/manifest.csv.gz",
+      "config_sha256": "1499c39ff5051a69211d22ee428427d01e7b385346b8aacb546b65c0b954c392",
+      "training_manifest_sha256": "f75fde80b37727f2561ca0e8bdbde3d060e4289ba7d96e21d5156390833b862b",
+      "loader": "scalar_adapter",
+      "bands": [
+        "CMI_C07",
+        "CMI_C08",
+        "CMI_C09",
+        "CMI_C10",
+        "CMI_C11",
+        "CMI_C12",
+        "CMI_C13",
+        "CMI_C14",
+        "CMI_C15",
+        "CMI_C16"
+      ],
+      "architecture": {
+        "in_channels": 15,
+        "base_channels": 32,
+        "channel_mults": [
+          1,
+          2,
+          4,
+          8
+        ],
+        "intensity_hidden_features": 128,
+        "intensity_dropout": 0.1,
+        "initial_intensity_ms": 25.0,
+        "structure_outputs": 5
+      }
+    },
+    "forecast": {
+      "id": "dashboard-mlp",
+      "checkpoint": "checkpoints/dashboard-mlp.ckpt",
+      "sha256": "2aee3963b7714575f9ed7a0bb04cbba014edb2645ad0c1c6dd172a004e5c0129",
+      "config": "release/provenance/logs/20260805-180538_modular/resolved-config.yaml",
+      "local_checkpoint": "logs/20260805-180538_modular/checkpoints/epoch=051-step=14976.ckpt",
+      "config_sha256": "7c4204cb51c7ae0b3417667b93a4deac573b82a61766fb0714bc343bd63496d1"
+    }
+  },
+  "prediction_policy": {
+    "cadence_hours": 2,
+    "classification_start_gate": true
+  },
+  "baseline_model_version": "stormsense-1:latent_sar_no_era5_max_wind_radii:5c6ff493e54e"
+}

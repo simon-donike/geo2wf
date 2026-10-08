@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -16,8 +17,28 @@ from .common import file_hash
 from .satellite import BANDS
 from . import PIPELINE_VERSION
 
-MANIFEST = json.loads(Path(__file__).with_name("models.json").read_text())
+MANIFEST_PATH = Path(
+    os.environ.get("STORMSENSE_MODEL_MANIFEST", Path(__file__).with_name("models.json"))
+).resolve()
+MANIFEST = json.loads(MANIFEST_PATH.read_text())
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def select_manifest(path):
+    """Select once per CLI/worker process, preserving imported manifest references."""
+    global MANIFEST_PATH
+    path = Path(path).resolve()
+    manifest = json.loads(path.read_text())
+    policy = manifest.get("prediction_policy", {})
+    if policy.get("cadence_hours", 1) not in (1, 2):
+        raise ValueError("Prediction cadence must be one or two hours")
+    for role in ("nowcast", "forecast"):
+        if role not in manifest.get("models", {}):
+            raise ValueError(f"Missing model role: {role}")
+    MANIFEST.clear()
+    MANIFEST.update(manifest)
+    MANIFEST_PATH = path
+    os.environ["STORMSENSE_MODEL_MANIFEST"] = str(path)
 
 
 def version(role):
@@ -36,10 +57,17 @@ def resolve_file(name, model_root):
 def bootstrap(model_root):
     names = set()
     for item in MANIFEST["models"].values():
+        if item.get("loader") == "scalar_adapter":
+            # This locally trained checkpoint is not in the pinned upstream
+            # Hub release. Never try to fetch it from that repository.
+            checkpoint("nowcast", model_root)
         names.update(
             item[k]
             for k in ("checkpoint", "config", "stats", "training_manifest")
             if k in item
+            and not (
+                item.get("loader") == "scalar_adapter" and k in ("checkpoint", "config")
+            )
         )
     subprocess.run(
         [
@@ -111,13 +139,34 @@ class Models:
                 != item["config_sha256"]
             ):
                 raise ValueError("Pinned model configuration checksum mismatch")
-        self.nowcast = (
-            BottleneckUNetMLPRegressor.load_from_checkpoint(
-                checkpoint("nowcast", model_root), map_location="cpu"
-            )
-            .eval()
-            .to(self.device)
+        self.scalar_adapter = (
+            MANIFEST["models"]["nowcast"].get("loader") == "scalar_adapter"
         )
+        if self.scalar_adapter:
+            from geo2wf.historical.training import ScalarAdapter
+
+            item = MANIFEST["models"]["nowcast"]
+            if item["bands"] != list(BANDS):
+                raise ValueError(
+                    "Pinned input band order differs from operational inputs"
+                )
+            self.nowcast = (
+                ScalarAdapter.load_from_checkpoint(
+                    checkpoint("nowcast", model_root),
+                    map_location="cpu",
+                    architecture=item["architecture"],
+                )
+                .eval()
+                .to(self.device)
+            )
+        else:
+            self.nowcast = (
+                BottleneckUNetMLPRegressor.load_from_checkpoint(
+                    checkpoint("nowcast", model_root), map_location="cpu"
+                )
+                .eval()
+                .to(self.device)
+            )
         self.forecast = (
             IntensityForecastMLP.load_from_checkpoint(
                 checkpoint("forecast", model_root), map_location="cpu"
@@ -137,10 +186,17 @@ class Models:
             for k, v in prepare(array, valid, lat, lon, at, self.stats).items()
         }
         with torch.inference_mode():
-            prediction = self.nowcast.predict_joint(batch)
-        radii = prediction.structure_prediction_km[0].cpu().tolist()
+            if self.scalar_adapter:
+                intensity, structure = self.nowcast(batch)
+            else:
+                prediction = self.nowcast.predict_joint(batch)
+                intensity, structure = (
+                    prediction.intensity_prediction_ms,
+                    prediction.structure_prediction_km,
+                )
+        radii = structure[0].cpu().tolist()
         values = {
-            "vmax_ms": float(prediction.intensity_prediction_ms[0]),
+            "vmax_ms": float(intensity[0]),
             "rmw_km": radii[1],
             "r34_km": radii[2],
             "r50_km": radii[3],

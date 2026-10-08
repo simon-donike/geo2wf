@@ -215,6 +215,7 @@ def main() -> None:
     wandb_enabled = wandb_cfg.get("enabled", True) and not wandb_disabled
     wandb_logger = (
         WandbLogger(
+            entity=os.environ.get("WANDB_ENTITY", wandb_cfg.get("entity")),
             project=os.environ.get(
                 "WANDB_PROJECT", wandb_cfg.get("project", "dif_img_rec")
             ),

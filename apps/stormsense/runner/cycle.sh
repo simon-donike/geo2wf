@@ -14,12 +14,14 @@ mkdir -p "$(dirname "$runner_db")"
 exec 9>"${runner_db}.cycle.lock"
 flock -n -E 75 9 || exit $?
 command_args=(-m geo2wf.operational.cli --db "$runner_db" --model-root "$runner_models" --device "$runner_device")
+if [[ -n "${STORMSENSE_MODEL_MANIFEST:-}" ]]; then
+  command_args+=(--model-manifest "$STORMSENSE_MODEL_MANIFEST")
+fi
 update_status=0
-"$runner_python" "${command_args[@]}" update --workers "$runner_workers" || update_status=$?
-# Scan the retained archive, including ended storms and outages over 48 hours.
-# Optional imagery never blocks numerical publication; previously attempted gaps are left alone.
-imagery_status=0
-"$runner_python" "${command_args[@]}" imagery --workers "$runner_imagery_workers" || imagery_status=$?
+# Update includes display-image generation and archive repair, even when the
+# numerical stage fails. Source gaps remain publishable, with later retries.
+"$runner_python" "${command_args[@]}" update --workers "$runner_workers" \
+  --imagery-workers "$runner_imagery_workers" || update_status=$?
 # Export the recorded discovery failure as well as successes, preserving the
 # previous numerical data and the last successful source retrieval time.
 "$runner_python" "${command_args[@]}" evaluate
@@ -27,5 +29,4 @@ imagery_status=0
 if [[ "${STORMSENSE_PUBLISH:-0}" == "1" ]]; then
   "$runner_python" "${command_args[@]}" publish --output "$runner_export"
 fi
-if [[ "$update_status" != "0" ]]; then exit "$update_status"; fi
-exit "$imagery_status"
+exit "$update_status"

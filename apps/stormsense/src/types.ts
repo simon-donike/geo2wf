@@ -1,5 +1,10 @@
 export type Basin = "AL" | "EP" | "CP";
 export type Kind = "live" | "hindcast";
+export interface PredictionSchedule {
+  cadence_hours: number;
+  eligible_start: string | null;
+  start_gate: boolean;
+}
 export interface Metrics {
   vmax_ms: number;
   rmw_km: number;
@@ -55,6 +60,7 @@ export interface Forecast {
   predictions: { lead_hours: number; valid_time: string; vmax_ms: number }[];
 }
 export interface Storm {
+  prediction_schedule?: PredictionSchedule;
   id: string;
   name: string;
   basin: Basin;
@@ -78,6 +84,7 @@ export interface Storm {
   series: string;
 }
 export interface Series {
+  prediction_schedule?: PredictionSchedule;
   schema_version: 1;
   storm_id: string;
   track: Fix[];
@@ -117,6 +124,7 @@ export interface ImageHour {
   }[];
 }
 export interface Catalog {
+  prediction_cadence_hours?: number;
   schema_version: 1;
   release: string;
   generated_at: string;

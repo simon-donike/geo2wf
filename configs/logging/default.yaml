@@ -1,5 +1,6 @@
 wandb:
   enabled: true
+  entity: simon-donike
   project: geo2wf
   name: null
   group: null

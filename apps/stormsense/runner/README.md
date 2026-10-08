@@ -70,10 +70,12 @@ The timer polls every 15 minutes in UTC. Each invocation is finite. It updates
 current live predictions, refreshes historical tracks, and reconciles every
 expected numerical hour in the rolling year plus twelve hours of forecast
 context. It fills interior holes and includes storms that ended while the runner
-was offline, leaving successful records and previously attempted gaps alone. Display imagery is reconciled across
-the rolling year at the existing two-hour cadence, including missing local
-assets. Only never-attempted slots are queued; recorded source and center gaps
-are retried only with an explicit `--retry-gaps` command. Image-source gaps do
+was offline, leaving successful numerical records and previously attempted numerical gaps alone.
+The Python `update` command also reconciles display imagery across the rolling
+year at the existing two-hour cadence, including missing local assets. Image
+source gaps retry hourly for frames less than 48 hours old and daily for older
+frames; missing-center gaps retry once a center becomes available. Explicit
+`imagery --retry-gaps` bypasses cooldowns. Image-source gaps do
 not block numerical publication. Evaluation, export and verified pointer-last
 publication follow catch-up, even when no new inference was needed.
 

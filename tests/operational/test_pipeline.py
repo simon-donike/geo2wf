@@ -638,11 +638,12 @@ def test_runner_exports_failure_status_and_preserves_failed_exit_code(tmp_path):
             "STORMSENSE_PYTHON": str(stub),
             "STORMSENSE_TEST_CALLS": str(calls),
             "STORMSENSE_PUBLISH": "0",
+            "STORMSENSE_DB": str(tmp_path / "state.sqlite"),
         },
         check=False,
     )
     assert result.returncode == 7
-    assert calls.read_text().splitlines() == ["update", "imagery", "evaluate", "export"]
+    assert calls.read_text().splitlines() == ["update", "evaluate", "export"]
 
 
 def test_discovery_never_claims_to_cover_future_storms(store, monkeypatch):

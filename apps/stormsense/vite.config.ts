@@ -63,7 +63,7 @@ export default defineConfig({
         if (process.env.STORMSENSE_PRODUCTION === "1") {
           // Public data is served from R2. Do not copy the archive just to
           // delete it later, and respect isolated --outDir deployment builds.
-          for (const name of ["brand", "land.geojson"]) {
+          for (const name of ["brand", "land.geojson", "method"]) {
             cpSync(resolve("public", name), resolve(out, name), {
               recursive: true,
             });

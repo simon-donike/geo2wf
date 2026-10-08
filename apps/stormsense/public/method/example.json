@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "storm": {
+    "id": "AL092022",
+    "name": "Ian"
+  },
+  "time": "2022-09-27T11:30:20+00:00",
+  "sample_id": "AL092022_sar_geo_20220927113418_a706a282",
+  "center": {
+    "lat": 22.550555555555558,
+    "lon": -83.61648148148147
+  },
+  "track": [
+    {
+      "time": "2022-09-24T12:00:00+00:00",
+      "lat": 14.5,
+      "lon": -74.4
+    },
+    {
+      "time": "2022-09-24T15:00:00+00:00",
+      "lat": 14.4,
+      "lon": -75.1
+    },
+    {
+      "time": "2022-09-24T18:00:00+00:00",
+      "lat": 14.4,
+      "lon": -75.8
+    },
+    {
+      "time": "2022-09-24T21:00:00+00:00",
+      "lat": 14.5,
+      "lon": -76.5
+    },
+    {
+      "time": "2022-09-25T00:00:00+00:00",
+      "lat": 14.6,
+      "lon": -77.2
+    },
+    {
+      "time": "2022-09-25T03:00:00+00:00",
+      "lat": 14.6,
+      "lon": -77.8
+    },
+    {
+      "time": "2022-09-25T06:00:00+00:00",
+      "lat": 14.6,
+      "lon": -78.3
+    },
+    {
+      "time": "2022-09-25T09:00:00+00:00",
+      "lat": 14.7,
+      "lon": -78.9
+    },
+    {
+      "time": "2022-09-25T12:00:00+00:00",
+      "lat": 15.0,
+      "lon": -79.4
+    },
+    {
+      "time": "2022-09-25T15:00:00+00:00",
+      "lat": 15.4,
+      "lon": -79.8
+    },
+    {
+      "time": "2022-09-25T18:00:00+00:00",
+      "lat": 15.8,
+      "lon": -80.1
+    },
+    {
+      "time": "2022-09-25T21:00:00+00:00",
+      "lat": 16.3,
+      "lon": -80.5
+    },
+    {
+      "time": "2022-09-26T00:00:00+00:00",
+      "lat": 16.8,
+      "lon": -80.9
+    },
+    {
+      "time": "2022-09-26T03:00:00+00:00",
+      "lat": 17.2,
+      "lon": -81.3
+    },
+    {
+      "time": "2022-09-26T06:00:00+00:00",
+      "lat": 17.7,
+      "lon": -81.7
+    },
+    {
+      "time": "2022-09-26T09:00:00+00:00",
+      "lat": 18.2,
+      "lon": -82.1
+    },
+    {
+      "time": "2022-09-26T12:00:00+00:00",
+      "lat": 18.7,
+      "lon": -82.4
+    },
+    {
+      "time": "2022-09-26T15:00:00+00:00",
+      "lat": 19.2,
+      "lon": -82.7
+    },
+    {
+      "time": "2022-09-26T18:00:00+00:00",
+      "lat": 19.7,
+      "lon": -83.0
+    },
+    {
+      "time": "2022-09-26T21:00:00+00:00",
+      "lat": 20.2,
+      "lon": -83.2
+    },
+    {
+      "time": "2022-09-27T00:00:00+00:00",
+      "lat": 20.8,
+      "lon": -83.3
+    },
+    {
+      "time": "2022-09-27T03:00:00+00:00",
+      "lat": 21.3,
+      "lon": -83.5
+    },
+    {
+      "time": "2022-09-27T06:00:00+00:00",
+      "lat": 21.8,
+      "lon": -83.6
+    },
+    {
+      "time": "2022-09-27T08:30:00+00:00",
+      "lat": 22.2,
+      "lon": -83.7
+    },
+    {
+      "time": "2022-09-27T09:00:00+00:00",
+      "lat": 22.3,
+      "lon": -83.7
+    },
+    {
+      "time": "2022-09-27T11:30:20+00:00",
+      "lat": 22.550555555555558,
+      "lon": -83.61648148148147
+    }
+  ],
+  "map_bounds": [
+    -90.72390504496695,
+    12.4,
+    -67.37609495503307,
+    26.550555555555558
+  ],
+  "channels": [
+    {
+      "id": "CMI_C07",
+      "image": "/method/CMI_C07.webp",
+      "sha256": "0ff63f05f67e087ee86c3f19654a2709cc5e7d3797131c389ddd93cddab10747"
+    },
+    {
+      "id": "CMI_C08",
+      "image": "/method/CMI_C08.webp",
+      "sha256": "e25966eba40c94500bfdddda50ce10418f223826da2de4cb094da424220e1223"
+    },
+    {
+      "id": "CMI_C09",
+      "image": "/method/CMI_C09.webp",
+      "sha256": "a9d2599c3d9c0f7dee0ebb8e62d47a6ab6d8aa5b687acdd2bc48fa3b4ed426c1"
+    },
+    {
+      "id": "CMI_C10",
+      "image": "/method/CMI_C10.webp",
+      "sha256": "10e8638b3fe6abfbd1d50133409c6c980fb47abb48ca148cf29d48f741a15d81"
+    },
+    {
+      "id": "CMI_C11",
+      "image": "/method/CMI_C11.webp",
+      "sha256": "48ec6239e33bdbad51a044ce8cd7c0514c27adef30c85b35c6ce732494a307db"
+    },
+    {
+      "id": "CMI_C12",
+      "image": "/method/CMI_C12.webp",
+      "sha256": "96e23066148026b4433a917eadd22b1310e6454efc9ccd8e979e8eef2f9b05e5"
+    },
+    {
+      "id": "CMI_C13",
+      "image": "/method/CMI_C13.webp",
+      "sha256": "76db8268c3244233cac97080261397f4151fb27b9301efd6a5c149d57cebc903"
+    },
+    {
+      "id": "CMI_C14",
+      "image": "/method/CMI_C14.webp",
+      "sha256": "b6dce64781206a61ab97636ff1e34c00d9728137bf588d969ad5247247ce6c09"
+    },
+    {
+      "id": "CMI_C15",
+      "image": "/method/CMI_C15.webp",
+      "sha256": "ba794af4ee0bd39bb246ef41793a9ebe4197c7b8f7abf3136ff35ea27db401c5"
+    },
+    {
+      "id": "CMI_C16",
+      "image": "/method/CMI_C16.webp",
+      "sha256": "cf422eb2837244207be052cac7643dbe8713aa540529227101a5cb97a83d08ec"
+    }
+  ],
+  "context_channels": [
+    {
+      "id": "distance",
+      "label": "Center distance",
+      "short_label": "Dist",
+      "image": "/method/context-distance.webp",
+      "sha256": "45cbdf203817a2faeabb46c4b49a995f1e42b46150690d505cbd728e9146469b",
+      "display_min": 0.005213181022554636,
+      "display_max": 1.0
+    },
+    {
+      "id": "solar-sin",
+      "label": "Solar time \u00b7 sine",
+      "short_label": "Sin",
+      "image": "/method/context-solar-sin.webp",
+      "sha256": "628623d0eedc1944e4ca985fba71a93e016b5e0e48eeec634ede6ed30395c24d",
+      "display_min": 0.9989684820175171,
+      "display_max": 1.0
+    },
+    {
+      "id": "solar-cos",
+      "label": "Solar time \u00b7 cosine",
+      "short_label": "Cos",
+      "image": "/method/context-solar-cos.webp",
+      "sha256": "398c2d21714c16518ae99d366ce903158a16c76c3b461d483fdc2968caa16518",
+      "display_min": 0.46789976954460144,
+      "display_max": 0.5117018222808838
+    },
+    {
+      "id": "solar-zenith",
+      "label": "Solar zenith angle",
+      "short_label": "Sun",
+      "image": "/method/context-solar-zenith.webp",
+      "sha256": "bd62ca805fcbafad08f748fd4cba5f43e7718bc40ed47ceec158fc2fadc2e906",
+      "display_min": 0.4832589030265808,
+      "display_max": 0.509813129901886
+    },
+    {
+      "id": "validity",
+      "label": "Validity mask",
+      "short_label": "Mask",
+      "image": "/method/context-validity.webp",
+      "sha256": "136a619d0b2c10ea1fc56b457df2390ff1cf2dcae3f2700d0157c289f149a6fa",
+      "display_min": 0.0,
+      "display_max": 1.0
+    }
+  ],
+  "context_tensor": {
+    "values": "/method/context-tensors.npy",
+    "sha256": "2ec87d5717efbb572cfb1dc10bffb80d8db65fb61d9af79b16acaba23a4dc58d",
+    "display": "Per-channel color scaling on valid pixels; masked pixels are dark. Values are the exact normalized network inputs."
+  },
+  "models": {
+    "joint": {
+      "id": "latent_sar_no_era5_max_wind_radii",
+      "sha256": "5c6ff493e54ea4ab4ff3c5e7055998e6a29124f104842b168415144cb3ab358a",
+      "scalars": {
+        "vmax_ms": 64.52565002441406,
+        "rmw_km": 24.44733428955078,
+        "r34_km": 243.74134826660156,
+        "r50_km": 116.22080993652344,
+        "r64_km": 64.59341430664062
+      }
+    },
+    "encoder": {
+      "id": "historical-encoder-two-hour-v1",
+      "sha256": "6bd41877358425603a6d4f188e8ca9ebd6e6f8b5a05abace63b8d91eae6770d9",
+      "scalars": {
+        "vmax_ms": 61.22566223144531,
+        "rmw_km": 28.344379425048828,
+        "r34_km": 260.5489501953125,
+        "r50_km": 111.08209991455078,
+        "r64_km": 48.15851593017578
+      }
+    }
+  },
+  "field": {
+    "image": "/method/wind-field.webp",
+    "values": "/method/wind-field.npy",
+    "sha256": "a5f2b4e494e4b2cc7f79b6ea0f88430198439ac3cb0a225d413b515bd2901c84",
+    "values_sha256": "1ee296d12907aa00cd1479f809112da2389da7dd0228829cd870d12996317d54",
+    "min_ms": 0,
+    "max_ms": 50,
+    "palette": [
+      "#13233c",
+      "#245e86",
+      "#32a6ab",
+      "#a3d9b1",
+      "#efce7a",
+      "#eb895c",
+      "#b54961"
+    ]
+  },
+  "grid": {
+    "width": 192,
+    "height": 192,
+    "resolution_degrees": 0.027,
+    "bounds": [
+      -86.20848148148147,
+      19.95855555555556,
+      -81.02448148148147,
+      25.142555555555557
+    ],
+    "crs": "EPSG:4326",
+    "valid_fraction": 0.9739583333333334
+  },
+  "provenance": {
+    "source": "test/AL092022_sar_geo_20220927113418_a706a282_geo.tif",
+    "source_sha256": "3a3c22d7b7ea244f019eaba02d59a23e5088ad00a3b0e592d2a652ec75f19cd7",
+    "stats_sha256": "d94ffdcbbfd9abd4b4801e31dca3adeb0404458dc87d118b462f22248dac7ded",
+    "ibtracs_sha256": "ad382ca705c7a64d5f224a7e6941f7dcc2a421e0b9fff987ceb63915bfdc25ef",
+    "selection": "Highest matched USA_WIND among ABI Ian test rasters with >=90% valid storm-centered crop and valid central 4x4; ties by earliest scan then sample ID.",
+    "matched_reference_wind_ms": 52.20749193333334,
+    "preprocessing": "Nearest-neighbor reproject to storm-centered 256x256 at 0.027 degrees; operational prepare: central 192x192, robust-zscore clip 4, distance and three solar channels, validity mask.",
+    "units": {
+      "wind": "m/s",
+      "radii": "km",
+      "brightness_temperature": "K"
+    }
+  }
+}

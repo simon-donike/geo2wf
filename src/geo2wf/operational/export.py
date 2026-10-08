@@ -24,6 +24,7 @@ from .models import MANIFEST, version
 from .geocolor import VERSION as IMAGE_VERSION, asset_root, frame_files
 from .image_bundles import daily_bundles, display_slot
 from .intensification import official_summary
+from .schedule import visible_slots, metadata, cadence
 
 REMOTE = "r2:tcd/explorer/stormsense"
 IMAGE_PATH = r"imagery/[a-f0-9]{64}\.(?:json|webp(?:\.aux\.xml)?)"
@@ -50,8 +51,8 @@ def coverage(store, start, end):
         begin, finish = max(utc(start), utc(storm["start"])), min(
             utc(end), utc(end) if storm.get("active") else utc(storm["end"])
         )
-        expected = {iso(t) for t in hours(begin, finish)}
-        if not expected:
+        expected = {iso(t) for t in visible_slots(storm, begin, finish)}
+        if finish < begin:
             continue
         samples = {}
         for sample in store.samples(storm["id"], version("nowcast")):
@@ -72,6 +73,7 @@ def coverage(store, start, end):
         result.append(
             {
                 "storm_id": storm["id"],
+                "prediction_schedule": metadata(storm),
                 "expected": len(expected),
                 "predictions": ready,
                 "gaps": sum(reasons.values()),
@@ -124,10 +126,12 @@ def _export_release(store, output, start=None, end=None, release=None):
     image_files = set()
     image_counts = Counter()
     for storm in store.storms():
+        expected_slots = {iso(t) for t in visible_slots(storm, start, end)}
         records = [
             s
             for s in store.samples(storm["id"], version("nowcast"))
             if start <= utc(s["time"]) <= end
+            and (cadence() == 1 or s["time"] in expected_slots)
         ]
         track = [f for f in storm.get("track", []) if start <= utc(f["time"]) <= end]
         if not track and not records and not storm.get("active"):
@@ -136,6 +140,8 @@ def _export_release(store, output, start=None, end=None, release=None):
             f
             for f in store.forecasts(storm["id"])
             if start <= utc(f["anchor_time"]) <= end
+            and f["model_version"] == version("forecast") + ":" + version("nowcast")
+            and (cadence() == 1 or f["anchor_time"] in expected_slots)
         ]
         visuals = [
             v
@@ -175,6 +181,7 @@ def _export_release(store, output, start=None, end=None, release=None):
         series = {
             "schema_version": SCHEMA_VERSION,
             "storm_id": storm["id"],
+            "prediction_schedule": metadata(storm),
             "track": track,
             "records": records,
             "forecasts": forecasts,
@@ -241,6 +248,7 @@ def _export_release(store, output, start=None, end=None, release=None):
                 "end": storm["end"],
                 "advisory": advisory,
                 "latest_fix": latest_fix,
+                "prediction_schedule": metadata(storm),
                 "peak_category": max(
                     [
                         v
@@ -283,6 +291,8 @@ def _export_release(store, output, start=None, end=None, release=None):
     catalog = {
         "schema_version": SCHEMA_VERSION,
         "release": release,
+        "prediction_cadence_hours": cadence(),
+        "quality_gate": store.get_status("migration_quality"),
         "generated_at": iso(),
         "window": {"start": iso(start), "end": iso(end)},
         "units": {"wind": "m/s", "radius": "km", "time": "UTC"},
@@ -332,6 +342,16 @@ def publish(output, remote=REMOTE, run=subprocess.run, advance_pointer=True):
     if not re.fullmatch(r"[A-Za-z0-9_-]+", release):
         raise ValueError("invalid release version")
     catalog = json.loads((output / "releases" / release / "catalog.json").read_text())
+    if catalog.get("prediction_cadence_hours", 1) == 2:
+        gate = catalog.get("quality_gate") or {}
+        if not (
+            gate.get("passed")
+            and gate.get("phase") == "full"
+            and gate.get("candidate_version") == catalog["models"]["nowcast"]["version"]
+        ):
+            raise ValueError(
+                "Two-hour publication requires a passing full-archive quality gate for this model"
+            )
     for storm in catalog["storms"]:
         if not (output / storm["series"]).is_file():
             raise FileNotFoundError(storm["series"])
@@ -453,6 +473,7 @@ def prune_local(output, keep=7, apply=False):
     latest = json.loads((output / "latest.json").read_text())["version"]
     releases = sorted((output / "releases").glob("*/catalog.json"), reverse=True)
     retained = set(p.parent.name for p in releases[: max(keep, 1)]) | {latest}
+    retained.update(p.parent.name for p in releases if (p.parent / "pin.json").exists())
     references = set()
     for path in releases:
         if path.parent.name in retained:
@@ -553,6 +574,7 @@ def prune_remote(keep=7, apply=False, run=subprocess.run):
         set(catalogs[: max(1, keep)])
         | {latest}
         | {key for key in catalogs if modified(files[key]) >= cutoff}
+        | {key for key in catalogs if key.replace("catalog.json", "pin.json") in files}
     )
     references = set()
     for key in retained:

@@ -313,6 +313,8 @@ def run(args):
                 k: [r["sample_id"] for r in v.rows] for k, v in datasets.items()
             },
         }
+        if args.mode == "encoder":
+            config["deterministic"] = "warn"
         if args.resume and json.loads((output / "config.json").read_text()) != config:
             raise ValueError("Resume configuration/cohort mismatch")
         write_json(output / "config.json", config)
@@ -336,6 +338,26 @@ def run(args):
             save_last=True,
             filename="best-{epoch:03d}",
         )
+        loggers = [pl.loggers.CSVLogger(str(output), name="curves")]
+        wandb_logger = None
+        if not args.no_wandb:
+            wandb_logger = pl.loggers.WandbLogger(
+                entity=args.wandb_entity,
+                project=args.wandb_project,
+                name=f"historical-{args.mode}-{output.name}",
+                group="historical-storms-v1",
+                job_type="finetuning",
+                save_dir=str(output),
+                log_model=True,
+            )
+            wandb_logger.log_hyperparams(config)
+            write_json(output / "wandb-run.json", {
+                "entity": wandb_logger.experiment.entity,
+                "project": wandb_logger.experiment.project,
+                "id": wandb_logger.experiment.id,
+                "url": wandb_logger.experiment.url,
+            })
+            loggers.append(wandb_logger)
         trainer = pl.Trainer(
             accelerator="gpu" if device.startswith("cuda") else "cpu",
             devices=1,
@@ -345,8 +367,9 @@ def run(args):
                 checkpoint_callback,
                 pl.callbacks.EarlyStopping(monitor="val/loss", patience=15, mode="min"),
             ],
-            logger=pl.loggers.CSVLogger(str(output), name="curves"),
-            deterministic=True,
+            logger=loggers,
+            # CUDA reflection-padding backward cannot satisfy strict determinism.
+            deterministic=config.get("deterministic", True),
             enable_progress_bar=False,
             log_every_n_steps=10,
         )
@@ -365,6 +388,11 @@ def run(args):
                 "completed_epochs": trainer.current_epoch,
             },
         )
+        if wandb_logger is not None:
+            wandb_logger.experiment.summary.update(
+                json.loads((output / "result.json").read_text())
+            )
+            wandb_logger.experiment.finish()
     else:
         configs = [
             json.loads((path / "config.json").read_text())
@@ -426,6 +454,9 @@ def main():
     p.add_argument("--workers", type=int, default=2)
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--resume", action="store_true")
+    p.add_argument("--wandb-entity", default="simon-donike")
+    p.add_argument("--wandb-project", default="geo2wf")
+    p.add_argument("--no-wandb", action="store_true", help="Only log locally to CSV")
     p.add_argument("--heads-run", type=Path, default=Path("logs/historical/heads"))
     p.add_argument("--encoder-run", type=Path, default=Path("logs/historical/encoder"))
     args = p.parse_args()
