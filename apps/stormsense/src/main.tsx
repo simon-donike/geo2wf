@@ -11,8 +11,6 @@ import React, {
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
-  Link,
-  NavLink,
   Route,
   Routes,
   useNavigate,
@@ -51,6 +49,10 @@ import {
   WIND_BANDS,
 } from "./presentation";
 import "./styles.css";
+import ShowcaseProvider, { useShowcase, ShowcaseLink as Link, ShowcaseNavLink as NavLink } from "./Showcase";
+import { useDataSource } from "./dataContext";
+import { showcaseAssetUrl, showcaseManifest, SHOWCASE_DATA } from "./showcaseData";
+import referenceImages from "../public/reference/sources.json";
 
 const Method = lazy(() => import("./Method"));
 
@@ -166,7 +168,7 @@ function StormCard({ storm }: { storm: Storm }) {
         <Icon name="arrow" />
       </div>
       <div className="storm-name">
-        <img className="storm-logo" src="/brand/mark.svg" alt="" />
+        <img className="storm-logo" src={showcaseAssetUrl("/brand/mark.svg")} alt="" />
         <h3>{storm.name}</h3>
         <span
           className={`classification ${storm.latest_fix?.classification === "HU" ? "hurricane" : ""}`}
@@ -220,6 +222,8 @@ function StormCard({ storm }: { storm: Storm }) {
   );
 }
 function Overview({ catalog }: { catalog: Catalog }) {
+  const source = useDataSource();
+  const tour = useShowcase();
   const navigate = useNavigate();
   const [basin, setBasin] = useState("all");
   const active = useMemo(
@@ -241,7 +245,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
     setTrackError(false);
     void Promise.allSettled(
       active.map(async (storm) => {
-        const series = await getSeries(storm.series, controller.signal);
+        const series = await getSeries(storm.series, controller.signal, source);
         const fixes = series.track;
         const advisory = storm.advisory;
         return [
@@ -261,10 +265,10 @@ function Overview({ catalog }: { catalog: Catalog }) {
       setTrackError(results.some((r) => r.status === "rejected"));
     });
     return () => controller.abort();
-  }, [trackKey, catalog.release, trackRetry]);
+  }, [trackKey, catalog.release, trackRetry, source]);
   const openStorm = useCallback(
-    (id: string) => navigate(`/storms/${id}`),
-    [navigate],
+    (id: string) => navigate(tour.link(`/storms/${id}`)),
+    [navigate, tour],
   );
   const unconfirmed =
     !catalog.source_status.discovery?.last_success ||
@@ -272,21 +276,19 @@ function Overview({ catalog }: { catalog: Catalog }) {
   const ready = catalog.coverage.predictions;
   return (
     <>
-      <section className="page-heading">
+      <section className="page-heading overview-heading" data-tour="live-overview">
         <div>
           <div className="eyebrow">
             <span className="tiny-line" />
-            Tropical cyclone intelligence
+            Tropical cyclone wind estimation
           </div>
           <h1>
-            A clearer view
+            Satellite-based estimates
             <br />
-            of the storm.
+            of tropical cyclone winds
           </h1>
           <p>
-            From satellite observations to storm-scale understanding.
-            <br className="desktop" /> Follow evolving winds across the Atlantic
-            and Pacific.
+            Explore satellite-based estimates of cyclone intensity and wind radii.
           </p>
         </div>
         <div className="overview-totals">
@@ -313,7 +315,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
       <section className="overview-section">
         <div className="section-heading">
           <h2>
-            Across the basins{" "}
+            Active tropical cyclones{" "}
             <span className="count">
               {unconfirmed ? "Unconfirmed" : `${active.length} active`}
             </span>
@@ -377,8 +379,8 @@ function Overview({ catalog }: { catalog: Catalog }) {
       </section>
       <section className="archive-feature">
         <div>
-          <span className="eyebrow">Every storm has a story</span>
-          <h2>Look back. See the evolution.</h2>
+          <span className="eyebrow">Historical storm data</span>
+          <h2>Storm intensity and structure through time</h2>
           <p>
             Explore a year of storm tracks, wind estimates, and
             experimental intensity forecasts.
@@ -430,8 +432,8 @@ function Archive({ catalog }: { catalog: Catalog }) {
       <section className="page-heading compact">
         <div>
           <div className="eyebrow">The past twelve months</div>
-          <h1>A record of every evolution.</h1>
-          <p>Trace a storm from its first fix to its final chapter.</p>
+          <h1>Tropical cyclone archive</h1>
+          <p>Browse available tracks, wind estimates, and experimental forecasts.</p>
         </div>
         <span className="date-range">
           {stamp(catalog.window.start, true)} —{" "}
@@ -576,6 +578,8 @@ function Archive({ catalog }: { catalog: Catalog }) {
   );
 }
 function Detail({ catalog }: { catalog: Catalog }) {
+  const source = useDataSource();
+  const tour = useShowcase();
   const { id } = useParams();
   const storm = catalog.storms.find((s) => s.id === id);
   const [loadedSeries, setSeries] = useState<Series | null>(null),
@@ -595,13 +599,13 @@ function Detail({ catalog }: { catalog: Catalog }) {
     if (!storm) return;
     const controller = new AbortController();
     setError("");
-    getSeries(storm.series, controller.signal)
+    getSeries(storm.series, controller.signal, source)
       .then(setSeries)
       .catch((e) => {
         if (!controller.signal.aborted) setError(String(e.message));
       });
     return () => controller.abort();
-  }, [storm?.series, retry]);
+  }, [storm?.series, retry, source]);
   const records = useMemo(
     () => predictionTimeline(series),
     [series],
@@ -619,6 +623,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
   }, [requested, issue, issueKind]);
   const [hover, setHover] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { setPlaying(false); }, [tour.entry]);
   const [playbackRate, setPlaybackRate] = useState(4);
   const [imageReady, setImageReady] = useState(true);
   useEffect(() => {
@@ -807,7 +812,7 @@ function Detail({ catalog }: { catalog: Catalog }) {
           <div className="eyebrow">
             {BASINS[storm.basin]} / {storm.id}{" "}
             <span className="status-label">
-              {storm.active ? "ACTIVE SYSTEM" : "ARCHIVED SYSTEM"}
+              {source === SHOWCASE_DATA ? "RECORDED HINDCAST" : storm.active ? "ACTIVE SYSTEM" : "ARCHIVED SYSTEM"}
             </span>
           </div>
           <h1>
@@ -964,7 +969,11 @@ function Detail({ catalog }: { catalog: Catalog }) {
                 onClick={() => {
                   setPlaying(false);
                   setSelection({ time: null });
-                  setParams({}, { replace: true, preventScrollReset: true });
+                  setParams((previous) => {
+                    const next = new URLSearchParams(previous);
+                    for (const key of ["time", "issue", "issue_kind"]) next.delete(key);
+                    return next;
+                  }, { replace: true, preventScrollReset: true });
                   setHover(null);
                 }}
               >
@@ -975,10 +984,10 @@ function Detail({ catalog }: { catalog: Catalog }) {
           </section>
           <div className="detail-grid">
             <div className="dashboard-column">
-            <section className="map-shell detail-map-shell">
+            <section className="map-shell detail-map-shell" data-tour="storm-map">
               <div className="map-top">
                 <span>
-                  <Icon name="map" /> The storm’s path
+                  <Icon name="map" /> Storm track
                 </span>
                 <span>
                   {selected?.center?.method === "motion_estimate"
@@ -1015,10 +1024,10 @@ function Detail({ catalog }: { catalog: Catalog }) {
             </section>
             </div>
             <div className="dashboard-column">
-            <section className="chart-panel">
+            <section className="chart-panel" data-tour="storm-results">
               <div className="panel-heading">
                 <div className="eyebrow">Intensity through time</div>
-                <h2>Following the wind</h2>
+                <h2>Maximum sustained wind</h2>
                 <p>
                   {hover
                     ? stamp(hover)
@@ -1055,10 +1064,51 @@ function Detail({ catalog }: { catalog: Catalog }) {
                 Smooth estimates
               </label>
 
-            </section>          <section className="structure-panel">
+            </section>
+            <details className="reference-method" data-tour="reference-method"
+              open={tour.active && tour.step.id === "reference"}>
+              <summary>Where do the reference winds come from?</summary>
+              <div className="reference-images" aria-label="Examples of observing systems used in reference analysis">
+                {referenceImages.map((item) => (
+                  <a key={item.file} href={item.source} target="_blank" rel="noreferrer"
+                    title={`${item.label} · Photo: ${item.credit}. Open source.`}>
+                    <img src={showcaseAssetUrl(item.url)} alt={item.alt} width="150" height="80" />
+                    <span>{item.label}</span>
+                  </a>
+                ))}
+              </div>
+              <p className="reference-image-credit">Illustrative NOAA images · observing systems used where available.
+                Photos link to sources; dropsondes: Sophie Talbert; satellite: CIRA/RAMMB.</p>
+              <div className="reference-comparison">
+                <article>
+                  <h3>NHC/CPHC reference analysis</h3>
+                  <p>Forecasters assess satellite intensity estimates alongside aircraft
+                    flight-level winds, aircraft microwave wind measurements, dropsondes
+                    (instruments released from aircraft), and buoy, ship or land observations,
+                    where available.</p>
+                  <p>The mix varies by storm and time; many periods rely mainly on satellites.
+                    These are analyzed estimates with uncertainty, not continuous direct measurements.</p>
+                </article>
+                <article>
+                  <h3>StormSense inference</h3>
+                  <p>Ten GOES infrared channels plus storm-center and time context →
+                    estimated wind intensity and radii. No aircraft winds, dropsondes,
+                    surface wind measurements or SAR winds enter the model at inference.</p>
+                  <p>This enables repeated wind estimates from routine satellite scans,
+                    without requiring reconnaissance inputs. Observed storm properties
+                    and SAR winds supply training supervision.</p>
+                </article>
+              </div>
+              <p className="reference-caveat">Compare the curves above to judge this saved
+                example. Agreement in one storm is illustrative, not a measure of overall
+                accuracy or a replacement for official analysis.</p>
+              <a href="https://www.nhc.noaa.gov/pdf/landsea-franklin-mwr2013.pdf"
+                target="_blank" rel="noreferrer">Source: NHC best-track methods and uncertainty ↗</a>
+            </details>
+            <section className="structure-panel">
             <div className="panel-heading">
               <div className="eyebrow">Storm structure</div>
-              <h2>How far the winds reach</h2>
+              <h2>Estimated wind radii</h2>
               <p>
                 Model estimates of equivalent-area wind radii
                 {smoothing ? ", lightly smoothed" : ""}. Interior gaps are
@@ -1120,10 +1170,11 @@ function Detail({ catalog }: { catalog: Catalog }) {
   );
 }
 function About({ catalog }: { catalog: Catalog }) {
+  const source = useDataSource();
   return (
     <div className="about-page">
-      <div className="eyebrow">Observations into understanding</div>
-      <h1>What you’re looking at.</h1>
+      <div className="eyebrow">Data and methods</div>
+      <h1>About StormSense</h1>
       <p className="intro">
         StormSense follows tropical cyclones using geostationary satellite
         observations, translating cloud patterns into estimates of surface wind
@@ -1146,14 +1197,14 @@ function About({ catalog }: { catalog: Catalog }) {
           <span className="method-number">02</span>
           <h2>A model estimate</h2>
           <p>
-            One GEO-only joint model estimates maximum sustained wind, the
-            radius of maximum wind, and equivalent-area radii for 34, 50, and
-            64-knot winds. It does not require SAR or ERA5 during inference.
+            StormSense estimates maximum sustained wind and wind radii from GOES
+            infrared imagery and storm context. Each saved estimate identifies
+            the model checkpoint used. SAR and ERA5 are not required during inference.
           </p>
         </article>
         <article>
           <span className="method-number">03</span>
-          <h2>A look ahead</h2>
+          <h2>Experimental intensity forecasts</h2>
           <p>
             The experimental forecast model uses StormSense intensity at the
             current hour, −6 hours, and −12 hours. It predicts +6 hours
@@ -1164,7 +1215,7 @@ function About({ catalog }: { catalog: Catalog }) {
         </article>
         <article>
           <span className="method-number">04</span>
-          <h2>An honest record</h2>
+          <h2>Provenance and data gaps</h2>
           <p>
             Live centers use the latest position and fresh reported motion, for
             up to six hours. Historical centers are interpolated from
@@ -1250,11 +1301,11 @@ function About({ catalog }: { catalog: Catalog }) {
           implied.
         </p>
         <div className="source-links">
-          <a href={dataUrl(`releases/${catalog.release}/coverage.json`)}>
-            Coverage report ↗
+          <a href={dataUrl(source === SHOWCASE_DATA ? "manifest.json" : `releases/${catalog.release}/coverage.json`, source)}>
+            {source === SHOWCASE_DATA ? "Showcase provenance ↗" : "Coverage report ↗"}
           </a>
           {catalog.reports?.evaluation && (
-            <a href={dataUrl(catalog.reports.evaluation)}>
+            <a href={dataUrl(catalog.reports.evaluation, source)}>
               Forecast evaluation ↗
             </a>
           )}
@@ -1277,7 +1328,10 @@ function About({ catalog }: { catalog: Catalog }) {
   );
 }
 function App() {
-  const methodPage = useLocation().pathname.replace(/\/$/, "") === "/method";
+  const source = useDataSource();
+  const tour = useShowcase();
+  const location = useLocation();
+  const methodPage = location.pathname.replace(/\/$/, "") === "/method";
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -1293,7 +1347,7 @@ function App() {
       if (busy) return;
       busy = true;
       try {
-        setCatalog(await getCatalog(controller.signal));
+        setCatalog(await getCatalog(controller.signal, source));
         setError("");
       } catch (e) {
         if (!controller.signal.aborted) setError((e as Error).message);
@@ -1303,6 +1357,7 @@ function App() {
       }
     };
     void refresh();
+    if (source === SHOWCASE_DATA) return () => controller.abort();
     const timer = setInterval(() => {
       if (!document.hidden) void refresh();
     }, 5 * 60 * 1000);
@@ -1310,7 +1365,7 @@ function App() {
       controller.abort();
       clearInterval(timer);
     };
-  }, [revision, methodPage]);
+  }, [revision, methodPage, source, tour.active]);
   const toggle = () =>
     setUnit((prior) => {
       const next = prior === "kt" ? "m/s" : "kt";
@@ -1324,7 +1379,7 @@ function App() {
       </a>
       <header className="topbar">
         <Link className="brand" to="/">
-          <img className="brand-icon" src="/brand/mark.svg" alt="" />
+          <img className="brand-icon" src={showcaseAssetUrl("/brand/mark.svg")} alt="" />
           <strong>
             StormSense<span>EARTH SYSTEMS LAB</span>
           </strong>
@@ -1338,6 +1393,7 @@ function App() {
           <NavLink to="/about">About</NavLink>
         </nav>
         <div className="header-tools">
+          {!tour.active && <button className="showcase-start" onClick={tour.start}>Start guided tour</button>}
           <button
             onClick={toggle}
             aria-label={`Wind unit: ${unit}. Switch units.`}
@@ -1346,11 +1402,12 @@ function App() {
             <span> ⇄</span>
           </button>
           <a href="https://eslab.ai/" aria-label="Earth Systems Lab">
-            <img src="/brand/esl.png" alt="Earth Systems Lab" />
+            <img src={showcaseAssetUrl("/brand/esl.png")} alt="Earth Systems Lab" />
           </a>
         </div>
       </header>
-      <main id="main">
+      <main id="main" data-tour={tour.active && tour.step.page === "overview" && !catalog ? "live-overview" : undefined}>
+        {tour.active && source === SHOWCASE_DATA && !methodPage && <div className="showcase-record-label">Fixed showcase · Nolo · {stamp(showcaseManifest.window.start, true)}–{stamp(showcaseManifest.window.end, true)} 2026 UTC · Full published storm history. Historical hindcast; wind estimates begin on 13 September.</div>}
         {error && !methodPage && (
           <div className="notice" role="alert">
             {error} {catalog && "Showing the last loaded release."}{" "}
@@ -1401,15 +1458,27 @@ function App() {
       </main>
       <footer className="site-footer">
         <div>
-          <Icon name="storm" />
+          <img className="footer-stormsense-logo" src={showcaseAssetUrl("/brand/mark.svg")} alt="" />
           <span>
-            StormSense <small>Satellite insight. Storm by storm.</small>
+            StormSense
           </span>
         </div>
         <span>NHC / CPHC coverage · All times UTC</span>
         <a href="https://tcd.hyperalis.com/">
           A Tropical Cyclone Dynamics research project ↗
         </a>
+        <section className="project-acknowledgement" aria-label="Project acknowledgement">
+          <a className="project-acknowledgement__badge" href="https://tcd.hyperalis.com/">
+            <img src={showcaseAssetUrl("/brand/team-badge.webp")} alt="Tropical Cyclone Dynamics team badge" width="4689" height="4135" />
+          </a>
+          <div className="project-acknowledgement__copy">
+            <p>The Frontier Development Lab (FDL.AI) is a division of <a href="https://trillium.tech/">Trillium Technologies Inc.</a> in partnership with government agencies and leaders in AI such as Google Cloud and NVIDIA.</p>
+            <small>Copyright Trillium Technologies Inc. (2015–2026). All rights reserved.</small>
+          </div>
+            <a className="project-acknowledgement__label" href="https://fdl.ai/">
+              <img src={showcaseAssetUrl("/brand/FDL_ESL_label.svg")} alt="An Earth Systems Lab research project of Frontier Development Lab" width="678" height="84" />
+            </a>
+        </section>
       </footer>
     </UnitContext.Provider>
   );
@@ -1418,7 +1487,7 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <ShowcaseProvider><App /></ShowcaseProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

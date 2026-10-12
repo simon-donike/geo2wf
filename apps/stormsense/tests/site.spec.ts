@@ -14,7 +14,7 @@ test("real active overview, basin filtering, units, keyboard and responsive layo
   const { catalog } = await data(request);
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A clearer view of the storm." }),
+    page.getByRole("heading", { name: "Satellite-based estimates of tropical cyclone winds" }),
   ).toBeVisible();
   await expect(page.locator(".storm-card")).toHaveCount(
     catalog.storms.filter((s) => s.active).length,

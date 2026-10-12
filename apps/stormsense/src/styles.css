@@ -93,6 +93,7 @@ svg {
   height: 43px;
   display: block;
   flex-shrink: 0;
+  object-fit: contain;
 }
 .brand strong {
   font-family: var(--serif);
@@ -167,7 +168,23 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 40px;
-  padding: 65px 0 48px;
+  padding: 36px 0 28px;
+}
+.page-heading.overview-heading {
+  padding: 22px 0 20px;
+}
+.page-heading.overview-heading h1 {
+  font-size: clamp(28px, 3vw, 42px);
+  letter-spacing: -1.2px;
+  line-height: 1.12;
+  margin: 10px 0;
+}
+.page-heading.overview-heading p {
+  margin: 0;
+  line-height: 1.5;
+}
+.overview-heading .overview-totals {
+  padding-top: 0;
 }
 .eyebrow {
   color: #aaaebe;
@@ -601,6 +618,7 @@ h1 {
   min-height: 125px;
   padding: 30px 4.1%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 25px;
@@ -614,6 +632,10 @@ h1 {
 }
 .site-footer svg {
   color: var(--teal);
+  width: 26px;
+  height: 26px;
+}
+.footer-stormsense-logo {
   width: 26px;
   height: 26px;
 }
@@ -633,6 +655,68 @@ h1 {
 }
 .site-footer a:hover {
   color: var(--teal);
+}
+.project-acknowledgement {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+}
+.project-acknowledgement__badge {
+  flex: 0 0 130px;
+}
+.project-acknowledgement__badge img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.project-acknowledgement__copy {
+  flex: 1;
+  max-width: 700px;
+  min-width: 0;
+}
+.project-acknowledgement__label {
+  display: block;
+  flex: 0 1 340px;
+  margin-left: auto;
+  max-width: 100%;
+}
+.project-acknowledgement__label img {
+  display: block;
+  width: 340px;
+  max-width: 100%;
+  height: auto;
+}
+.project-acknowledgement p {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.project-acknowledgement p a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.project-acknowledgement small {
+  font-size: 10px;
+  line-height: 1.6;
+}
+@media (max-width: 900px) {
+  .project-acknowledgement {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .project-acknowledgement__badge {
+    flex-basis: auto;
+    width: 110px;
+  }
+  .project-acknowledgement__copy {
+    flex-basis: calc(100% - 130px);
+  }
+  .project-acknowledgement__label {
+    flex-basis: 340px;
+  }
 }
 .notice {
   padding: 16px 20px;
@@ -700,7 +784,7 @@ h1 {
   }
 }
 .compact.page-heading {
-  padding: 55px 0 38px;
+  padding: 30px 0 24px;
   align-items: flex-end;
 }
 .compact h1 {
@@ -1080,13 +1164,6 @@ select {
 }
 .satellite-toolbar input {
   accent-color: var(--teal);
-}
-.satellite-opacity {
-  color: var(--muted);
-  font-size: 9px;
-}
-.satellite-opacity input {
-  width: 74px;
 }
 .satellite-focus {
   display: flex;
@@ -1595,7 +1672,7 @@ select {
     font-size: 11px;
   }
   .page-heading {
-    padding: 38px 0 30px;
+    padding: 26px 0 22px;
     gap: 30px;
     align-items: flex-start;
   }
@@ -2140,9 +2217,35 @@ select {
 }
 
 /* Storm dashboard: shared time controls, paired views, then deeper analysis. */
+.back-link { margin-top: 22px; }
+.storm-heading { padding: 16px 0 20px; }
+.storm-heading h1 { font-size: 40px; margin: 8px 0; gap: 14px; }
+.storm-heading p { margin: 0; line-height: 1.5; }
 .metric-strip { margin-bottom: 16px; }
-.metric-strip > div { padding: 16px 20px; }
-.metric-strip span { margin-bottom: 7px; }
+.metric-strip > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  gap: 5px 10px;
+  padding: 12px 16px;
+}
+.metric-strip > div > span:first-child { grid-column: 1 / -1; margin: 0; }
+.metric-strip strong { grid-column: 1; grid-row: 2; font-size: 30px; }
+.metric-strip .wind-category {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+  padding: 3px 5px;
+  font-size: 9px;
+}
+.metric-strip em {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.4;
+}
 .timeline-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2207,7 +2310,10 @@ select {
   .detail-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
-  .metric-strip > div { padding: 14px; }
+  .storm-heading { padding: 14px 0 16px; }
+  .storm-heading h1 { font-size: 34px; }
+  .metric-strip > div { padding: 10px; gap: 5px 7px; }
+  .metric-strip strong { font-size: 27px; }
   .timeline-panel,
   .chart-panel,
   .structure-panel,
@@ -2216,6 +2322,28 @@ select {
 }
 
 /* Keep image actions, acquisition status and source details alongside each other. */
+.reference-method {
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #171c2f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.reference-method summary { cursor: pointer; color: var(--paper); }
+.reference-images { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.reference-images a { min-width: 0; font-size: 10px; line-height: 1.3; }
+.reference-images img { display: block; width: 100%; height: 72px; object-fit: cover; border-radius: 4px; margin-bottom: 5px; }
+.reference-images a:nth-child(3) img { object-fit: contain; background: #243344; }
+.reference-image-credit { font-size: 9px; color: var(--muted); margin: 8px 0 0; }
+.reference-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.reference-comparison h3 { font-size: 14px; margin: 16px 0 8px; }
+.reference-comparison p { margin: 8px 0; color: var(--muted); }
+.reference-caveat { border-top: 1px solid var(--line); padding-top: 10px; }
+.reference-method a { color: var(--teal); }
+@media (max-width: 600px) {
+  .reference-comparison { grid-template-columns: 1fr; gap: 0; }
+}
 .imagery-details {
   display: grid;
   grid-template-columns: 0.9fr 1fr 1.2fr;

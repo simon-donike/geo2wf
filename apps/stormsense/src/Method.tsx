@@ -4,6 +4,12 @@ import type { MethodExample, MethodMode } from "./methodExample";
 import { stamp, wind } from "./data";
 import "./method.css";
 import MethodTraining from "./MethodTraining";
+import MethodPipeline from "./MethodPipeline";
+import { useSearchParams } from "react-router-dom";
+import { useShowcase } from "./Showcase";
+import { showcaseAssetUrl } from "./showcaseData";
+import type { MethodView } from "./showcaseSteps";
+const views: MethodView[] = ["inference", "training", "pipeline"];
 
 const example: MethodExample = exampleData;
 const vars = (values: Record<string, string | number>) =>
@@ -128,7 +134,7 @@ function ImageStack({
         {layers.map((layer, i) => (
           <img
             key={layer.id}
-            src={layer.image}
+            src={showcaseAssetUrl(layer.image)}
             alt={
               i === selected
                 ? `Actual ${layer.label} ${context ? "input tensor" : "infrared crop"} for Hurricane Ian`
@@ -446,7 +452,11 @@ function Track() {
           </pattern>
         </defs>
         <rect width="280" height="180" fill="url(#method-map-grid)" />
-        <image href="/method/coast.svg" width="280" height="180" />
+        <image
+          href={showcaseAssetUrl("/method/coast.svg")}
+          width="280"
+          height="180"
+        />
         {(
           [
             [25.8, -81.5, "FLORIDA"],
@@ -513,8 +523,27 @@ function Track() {
 
 export default function Method({ unit }: { unit: "kt" | "m/s" }) {
   const { container, reduced, paused, setPaused, motion } = useFlowMotion();
-  const [mode, setMode] = useState<MethodMode>("joint");
-  const [view, setView] = useState<"inference" | "training">("inference");
+  const [params, setParams] = useSearchParams();
+  const tour = useShowcase();
+  const mode: MethodMode =
+    params.get("model") === "encoder" ? "encoder" : "joint";
+  const view: MethodView = views.includes(params.get("view") as MethodView)
+    ? (params.get("view") as MethodView)
+    : "inference";
+  const choose = (key: string, value: string) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set(key, value);
+        return next;
+      },
+      { replace: true, preventScrollReset: true },
+    );
+  const setMode = (value: MethodMode) => choose("model", value);
+  const setView = (value: MethodView) => choose("view", value);
+  useEffect(() => {
+    if (tour.active) setPaused(false);
+  }, [tour.entry]);
   const output = example.models[mode].scalars;
   return (
     <div className="method-page">
@@ -524,21 +553,28 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
             <span className="tiny-line" /> Inside StormSense
           </div>
           <h1>
-            From satellite imagery
-            <br />
-            to <em>surface winds.</em>
+            Estimating surface winds
+            <br /> from <em>satellite imagery</em>
           </h1>
           <p>
             {view === "inference"
-              ? "One observation. Two views of the storm."
-              : "Two architectures. Learning from observed winds."}
+              ? "Compare joint and encoder-only model predictions."
+              : view === "training"
+                ? "Two architectures. Learning from observed winds."
+                : "From an observation to the published record."}
           </p>
         </div>
         <div className="method-example-label">
           <span className="method-live-dot" />
-          {view === "inference" ? (
+          {view === "pipeline" ? (
             <>
-              A REAL WORKED EXAMPLE
+              A RECORDED PIPELINE<strong>Nolo · historical hindcast</strong>
+              <span>28 Sept 2026, 06:00 UTC</span>
+              <small>Saved provenance · explanatory flow</small>
+            </>
+          ) : view === "inference" ? (
+            <>
+              SAVED INFERENCE EXAMPLE
               <strong>Hurricane {example.storm.name}</strong>
               <span>{stamp(example.time)}</span>
               <small>GOES ABI · North Atlantic</small>
@@ -569,7 +605,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
             role="tablist"
             aria-label="Method view"
           >
-            {(["inference", "training"] as const).map((item, index) => (
+            {views.map((item, index) => (
               <button
                 key={item}
                 id={`method-tab-${item}`}
@@ -586,19 +622,26 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
                   ) {
                     event.preventDefault();
                     const next =
-                      event.key === "Home"
-                        ? "inference"
-                        : event.key === "End"
-                          ? "training"
-                          : index === 0
-                            ? "training"
-                            : "inference";
+                      views[
+                        event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? views.length - 1
+                            : (index +
+                                (event.key === "ArrowRight" ? 1 : -1) +
+                                views.length) %
+                              views.length
+                      ];
                     setView(next);
                     document.getElementById(`method-tab-${next}`)?.focus();
                   }
                 }}
               >
-                {item === "inference" ? "Inference" : "Training"}
+                {item === "inference"
+                  ? "Inference"
+                  : item === "training"
+                    ? "Training"
+                    : "Pipeline"}
               </button>
             ))}
           </div>
@@ -607,6 +650,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
               className="method-mode"
               role="group"
               aria-label="Model architecture"
+              hidden={view === "pipeline"}
             >
               <button
                 aria-pressed={mode === "joint"}
@@ -639,8 +683,10 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
           aria-labelledby="method-tab-inference"
           hidden={view !== "inference"}
         >
-          <div className="method-scene">
-            <div className="method-input">
+          <div
+            className="method-scene"
+          >
+            <div className="method-input" data-tour="inputs">
               <div className="method-part-label">
                 <span>01</span> THE INPUTS
               </div>
@@ -665,7 +711,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
               </div>
               <Track />
             </div>
-            <div className="method-model">
+            <div className="method-model" data-tour="network">
               <div className="method-part-label">
                 <span>02</span> THE MODEL{" "}
                 <span className="method-model-kind">
@@ -678,7 +724,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
                 channels + validity mask
               </div>
             </div>
-            <div className="method-outputs">
+            <div className="method-outputs" data-tour="outputs">
               <div className="method-part-label">
                 <span>03</span> THE PREDICTIONS
               </div>
@@ -689,7 +735,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
                   <>
                     <div className="method-field-image">
                       <img
-                        src={example.field.image}
+                        src={showcaseAssetUrl(example.field.image)}
                         alt="Actual dense surface wind-speed prediction for Ian from the joint model"
                       />
                       <div className="method-field-grid" />
@@ -710,7 +756,7 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
                 ) : (
                   <div className="method-no-field">
                     <span aria-hidden="true">↳</span>
-                    <h3>Scalars, directly.</h3>
+                    <h3>Direct scalar predictions</h3>
                     <p>This variant omits the field decoder.</p>
                   </div>
                 )}
@@ -771,6 +817,14 @@ export default function Method({ unit }: { unit: "kt" | "m/s" }) {
               unit={unit}
             />
           )}
+        </div>
+        <div
+          id="method-panel-pipeline"
+          role="tabpanel"
+          aria-labelledby="method-tab-pipeline"
+          hidden={view !== "pipeline"}
+        >
+          {view === "pipeline" && <MethodPipeline key={tour.entry} />}
         </div>
       </section>
     </div>

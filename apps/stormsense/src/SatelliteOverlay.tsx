@@ -28,7 +28,6 @@ export function SatelliteOverlay({
   const [enabled, setEnabled] = useState(
     () => localStorage.getItem("stormsense-satellite") !== "off",
   );
-  const [opacity, setOpacity] = useState(0.85);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [fallback, setFallback] = useState<
     Record<string, { frame: string; index: number }>
@@ -230,8 +229,8 @@ export function SatelliteOverlay({
   }, [map, crops, enabled, latest, revision]);
   useEffect(() => {
     if (!map) return;
-    map.getPane("satellite")!.style.opacity = String(opacity);
-  }, [map, opacity]);
+    map.getPane("satellite")!.style.opacity = "1";
+  }, [map]);
   if (!storms.length) return null;
   const failedImages = Object.values(loads).some((s) => s === "error");
   return (
@@ -250,19 +249,6 @@ export function SatelliteOverlay({
             }}
           />{" "}
           Latest GeoColor
-        </label>
-        <label className="satellite-opacity">
-          Opacity
-          <input
-            aria-label="Satellite imagery opacity"
-            type="range"
-            min="0.2"
-            max="1"
-            step="0.05"
-            value={opacity}
-            disabled={!enabled || !latest}
-            onChange={(event) => setOpacity(Number(event.target.value))}
-          />
         </label>
       </div>
       <div className="satellite-focus">

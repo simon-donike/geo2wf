@@ -3,6 +3,7 @@ import L from "leaflet";
 import type { ImageHour, ImageBundle } from "./types";
 import { dataUrl, stamp } from "./data";
 import { ImageCache, decodeBlob } from "./imageCache";
+import { useDataSource } from "./dataContext";
 import { ImageArchive } from "./imageArchive";
 const NO_BUNDLES: ImageBundle[] = [];
 export const imageSlot = (time: string) =>
@@ -23,10 +24,10 @@ export function HourlyImagery({
   time?: string;
   onReady?: (ready: boolean) => void;
 }) {
+  const source = useDataSource();
   const [enabled, setEnabled] = useState(
     () => localStorage.getItem("stormsense-satellite") !== "off",
   );
-  const [opacity, setOpacity] = useState(0.85);
   const [, render] = useState(0);
   const cache = useRef<ImageCache | null>(null);
   const archive = useRef<ImageArchive | null>(null);
@@ -52,7 +53,7 @@ export function HourlyImagery({
           render((n) => n + 1);
         });
     };
-    const downloads = new ImageArchive(notify);
+    const downloads = new ImageArchive(notify, undefined, 8, source);
     const instance = new ImageCache(
       () => render((n) => n + 1),
       async (url, signal) =>
@@ -70,13 +71,13 @@ export function HourlyImagery({
       cache.current = null;
       archive.current = null;
     };
-  }, []);
+  }, [source]);
   const allImages = useMemo(
     () => [
-      ...readyFrames.flatMap((f) => f.parts.map((p) => dataUrl(p.preview))),
-      ...readyFrames.flatMap((f) => f.parts.map((p) => dataUrl(p.image))),
+      ...readyFrames.flatMap((f) => f.parts.map((p) => dataUrl(p.preview, source))),
+      ...readyFrames.flatMap((f) => f.parts.map((p) => dataUrl(p.image, source))),
     ],
-    [readyFrames],
+    [readyFrames, source],
   );
   const wanted = useMemo(() => {
     if (!enabled || !time) return [];
@@ -91,10 +92,10 @@ export function HourlyImagery({
     // the compressed archive, so later jumps need only a small local decode.
     return nearest.flatMap((f, i) =>
       f.parts.flatMap((p) =>
-        i < 9 ? [dataUrl(p.preview), dataUrl(p.image)] : [dataUrl(p.preview)],
+        i < 9 ? [dataUrl(p.preview, source), dataUrl(p.image, source)] : [dataUrl(p.preview, source)],
       ),
     );
-  }, [readyFrames, time, enabled]);
+  }, [readyFrames, time, enabled, source]);
   useEffect(() => {
     // React's development lifecycle can mount and immediately discard an
     // effect. Avoid starting (then aborting) the selected day's download twice.
@@ -109,13 +110,13 @@ export function HourlyImagery({
     };
   }, [allImages, wanted, enabled, bundles]);
   const preloaded = readyFrames.filter((f) =>
-    f.parts.every((p) => archive.current?.state(dataUrl(p.image)) === "ready"),
+    f.parts.every((p) => archive.current?.state(dataUrl(p.image, source)) === "ready"),
   ).length;
   const loaded =
     frame?.status === "ready"
       ? frame.parts.map((part) => {
-          const full = cache.current?.get(dataUrl(part.image));
-          const preview = cache.current?.get(dataUrl(part.preview));
+          const full = cache.current?.get(dataUrl(part.image, source));
+          const preview = cache.current?.get(dataUrl(part.preview, source));
           return {
             part,
             entry: full?.state === "ready" ? full : preview,
@@ -171,8 +172,8 @@ export function HourlyImagery({
     };
   }, [map, displayKey, frame]);
   useEffect(() => {
-    if (map) map.getPane("satellite")!.style.opacity = String(opacity);
-  }, [map, opacity]);
+    if (map) map.getPane("satellite")!.style.opacity = "1";
+  }, [map]);
   const focus = () => {
     if (!frame) return;
     const bounds = L.latLngBounds(
@@ -211,19 +212,6 @@ export function HourlyImagery({
           />
           Satellite imagery
         </label>
-        <label className="satellite-opacity">
-          Opacity
-          <input
-            aria-label="Satellite imagery opacity"
-            type="range"
-            min="0.2"
-            max="1"
-            step="0.05"
-            value={opacity}
-            disabled={!enabled}
-            onChange={(e) => setOpacity(Number(e.target.value))}
-          />
-        </label>
       </div>
       <div className="imagery-details">
       <div className="satellite-focus">
@@ -234,7 +222,7 @@ export function HourlyImagery({
           Focus image
         </button>
         {frame?.metadata && (
-          <a href={dataUrl(frame.metadata)} target="_blank" rel="noreferrer">
+          <a href={dataUrl(frame.metadata, source)} target="_blank" rel="noreferrer">
             Georeferencing & source ↗
           </a>
         )}

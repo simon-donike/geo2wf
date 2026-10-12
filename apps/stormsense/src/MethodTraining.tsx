@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { showcaseAssetUrl } from "./showcaseData";
 import { stamp, wind } from "./data";
 import type { MethodExample, MethodMode } from "./methodExample";
 
@@ -20,7 +21,7 @@ export default function MethodTraining({
   return (
     <div className="method-training">
       <div className="method-training-intro">
-        <h2>Learn from the difference.</h2>
+        <h2>Training objectives and gradient updates</h2>
         <p>
           Predict, compare with observations, then send the error backward to
           update the model.
@@ -57,7 +58,10 @@ export default function MethodTraining({
             <span>02</span> COMPARE WITH OBSERVATIONS
           </div>
           {joint && (
-            <article className="method-loss-card field-loss">
+            <article
+              className="method-loss-card field-loss"
+              data-tour="supervision"
+            >
               <div className="method-training-fields">
                 <figure>
                   <figcaption>
@@ -65,7 +69,7 @@ export default function MethodTraining({
                   </figcaption>
                   <div className="method-training-raster">
                     <img
-                      src={pair.sar_image}
+                      src={showcaseAssetUrl(pair.sar_image)}
                       alt="Real SAR-derived wind-speed field for Hurricane Ian, aligned to the prediction grid"
                     />
                   </div>
@@ -76,7 +80,7 @@ export default function MethodTraining({
                   </figcaption>
                   <div className="method-training-raster">
                     <img
-                      src={pair.prediction_image}
+                      src={showcaseAssetUrl(pair.prediction_image)}
                       alt="Joint model predicted wind-speed field on the same grid and color scale as SAR"
                     />
                   </div>
@@ -107,7 +111,7 @@ export default function MethodTraining({
               <div className="method-training-gradient-map">
                 <div className="method-training-raster">
                   <img
-                    src={pair.gradient_image}
+                    src={showcaseAssetUrl(pair.gradient_image)}
                     alt="Actual field-loss gradient with respect to predicted wind speed; cyan means increase and orange means decrease"
                   />
                 </div>
@@ -172,7 +176,7 @@ export default function MethodTraining({
           </small>
         </div>
       </div>
-      <div className="method-training-update">
+      <div className="method-training-update" data-tour="learning">
         <div className="method-part-label">
           <span>03</span> UPDATE THE WEIGHTS
         </div>

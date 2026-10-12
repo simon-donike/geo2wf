@@ -1,0 +1,129 @@
+.method-pipeline {
+  padding: 28px;
+}
+.method-mode[hidden] {
+  display: none;
+}
+.pipeline-intro h2 {
+  font-size: 29px;
+  margin: 10px 0;
+}
+.pipeline-intro > p,
+.pipeline-footnote {
+  color: #b5c2cd;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pipeline-stages {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+  gap: 10px;
+}
+.pipeline-stages button {
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  padding: 14px 12px;
+  background: #172b36;
+  border: 1px solid #3b5862;
+  border-radius: 5px;
+}
+.pipeline-stages button[aria-pressed="true"] {
+  border-color: #80d4ce;
+  background: #24454c;
+}
+.pipeline-stages strong {
+  display: block;
+  font-size: 13px;
+  margin: 12px 0 7px;
+}
+.pipeline-stages small {
+  display: block;
+  font-size: 11px;
+  color: #bbccd2;
+  line-height: 1.5;
+}
+.pipeline-number {
+  display: flex;
+  justify-content: space-between;
+  color: #8dcfc7;
+  font-size: 12px;
+}
+.pipeline-number i {
+  font-style: normal;
+  animation: pipeline-pulse 2.6s ease-in-out infinite;
+}
+.pipeline-detail {
+  padding: 20px 24px;
+  border-left: 3px solid #80d4ce;
+  background: #1b303a;
+}
+.pipeline-detail h3 {
+  font-size: 24px;
+  margin: 8px 0;
+}
+.pipeline-detail p {
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 1000px;
+}
+.pipeline-detail small {
+  display: block;
+  color: #a9c6cb;
+  font-size: 12px;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.pipeline-display-branch {
+  border: 1px dashed #ae9770;
+  border-radius: 5px;
+  margin: 20px 0;
+  padding: 16px 24px;
+}
+.pipeline-display-branch p {
+  margin: 10px 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.pipeline-display-branch p > span {
+  color: #d7b078;
+  margin: 0 12px;
+}
+.pipeline-display-branch small {
+  color: #bdc4cd;
+  line-height: 1.6;
+}
+@keyframes pipeline-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.method-theater:not([data-motion="running"]) .pipeline-number i {
+  animation-play-state: paused;
+}
+.method-theater[data-motion="reduced"] .pipeline-number i {
+  animation: none;
+}
+@media (max-width: 1000px) {
+  .pipeline-stages {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .method-pipeline {
+    padding: 18px;
+  }
+  .pipeline-intro h2 {
+    font-size: 25px;
+  }
+  .pipeline-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pipeline-detail,
+  .pipeline-display-branch {
+    padding: 16px;
+  }
+}

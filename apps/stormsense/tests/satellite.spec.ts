@@ -71,17 +71,9 @@ test("live overview GeoColor crops are georeferenced, labeled and configurable",
       ),
     )
     .toBeGreaterThan(150);
-  await page
-    .getByRole("slider", { name: "Satellite imagery opacity" })
-    .fill("0.5");
-  await expect(page.locator(".leaflet-satellite-pane")).toHaveCSS(
-    "opacity",
-    "0.5",
-  );
+  await expect(page.getByRole("slider", { name: "Satellite imagery opacity" })).toHaveCount(0);
+  await expect(page.locator(".leaflet-satellite-pane")).toHaveCSS("opacity", "1");
   await expect(page.locator(".wind-radius").first()).toBeAttached();
-  await page
-    .getByRole("slider", { name: "Satellite imagery opacity" })
-    .fill("0.85");
   await page
     .locator(".map-shell")
     .screenshot({ path: `test-results/geocolor-${testInfo.project.name}.png` });

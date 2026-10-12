@@ -22,7 +22,7 @@ async function packed() {
     bytes: zip.length,
     images: ["imagery/a.webp", "imagery/b.webp"],
   };
-  return { bundle, blob: new Blob([zip]), urls: bundle.images.map(dataUrl) };
+  return { bundle, blob: new Blob([zip]), urls: bundle.images.map((path) => dataUrl(path)) };
 }
 
 const flush = async () => {

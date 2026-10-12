@@ -24,7 +24,7 @@ test("predictions are immediate, stable and independent of archive availability"
   await page.goto("/method");
   await expect(
     page.getByRole("heading", {
-      name: "From satellite imagery to surface winds.",
+      name: "Estimating surface winds from satellite imagery",
     }),
   ).toBeVisible();
   await expect(page.getByTestId("method-vmax")).toHaveText(
@@ -208,7 +208,7 @@ test("reduced motion retains predictions and interactive stacks", async ({
   await page.getByRole("link", { name: "Method", exact: true }).click();
   await expect(
     page.getByRole("heading", {
-      name: "From satellite imagery to surface winds.",
+      name: "Estimating surface winds from satellite imagery",
     }),
   ).toBeVisible();
 });

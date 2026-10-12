@@ -371,10 +371,6 @@
   transform: scale(0.65);
   pointer-events: none;
 }
-.method-encoder-note > text:first-child {
-  fill: #b6c8ca;
-  font: italic 22px var(--serif);
-}
 .method-pooling {
   fill: #203d43;
   stroke: #4b7777;

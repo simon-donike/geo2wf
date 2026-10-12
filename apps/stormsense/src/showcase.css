@@ -1,0 +1,194 @@
+.showcase-start {
+  border: 1px solid #426965;
+  background: #1e373b;
+  border-radius: 5px;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+.showcase-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.showcase-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-padding: 20px;
+}
+.showcase-controls {
+  position: fixed;
+  z-index: 30;
+  right: 24px;
+  bottom: 24px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid #557675;
+  border-radius: 12px;
+  background: rgba(25, 30, 50, .96);
+  box-shadow: 0 12px 36px #050b1c66;
+  backdrop-filter: blur(12px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  transition: left 480ms cubic-bezier(.22, 1, .36, 1), top 480ms cubic-bezier(.22, 1, .36, 1);
+}
+.showcase-caption h2 {
+  font-size: 21px;
+  margin: 7px 0;
+  line-height: 1.2;
+}
+.showcase-caption > p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+.showcase-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.showcase-controls button,
+.showcase-preparation button {
+  background: #242e43;
+  border: 1px solid #526071;
+  border-radius: 5px;
+  color: var(--paper);
+  padding: 9px 13px;
+  font-size: 13px;
+}
+.showcase-controls .showcase-primary {
+  background: #295d5b;
+  border-color: #76c9be;
+}
+.showcase-buttons button:last-child {
+  margin-left: auto;
+}
+.showcase-content {
+  padding-bottom: calc(var(--tour-card-space, 180px) + 32px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .showcase-controls { transition: none; }
+}
+.showcase-preparation h1 {
+  font-size: 36px;
+  margin: 22px 0;
+}
+.showcase-preparation p {
+  overflow-wrap: anywhere;
+  margin-bottom: 24px;
+}
+.showcase-shell [data-tour] {
+  scroll-margin: 20px;
+}
+.showcase-highlight-layer {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 20;
+}
+.showcase-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 2px solid #80d4ce;
+  border-radius: 8px;
+  box-sizing: border-box;
+  pointer-events: none;
+  will-change: transform, width, height;
+}
+.showcase-shell .topbar {
+  height: 70px;
+}
+.showcase-shell main {
+  padding-top: 24px;
+}
+.showcase-shell .method-heading {
+  margin-bottom: 24px;
+  padding: 12px 0 18px;
+}
+.showcase-shell .method-heading h1 {
+  font-size: 32px;
+  line-height: 1.2;
+}
+.showcase-shell .method-heading h1 br {
+  display: none;
+}
+.showcase-shell .method-heading p {
+  margin-top: 10px;
+}
+.showcase-shell .method-heading .eyebrow {
+  margin-bottom: 10px;
+}
+.showcase-shell .method-example-label {
+  padding-top: 0;
+}
+.showcase-shell .storm-heading h1 {
+  font-size: 36px;
+}
+.showcase-record-label {
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  border: 1px solid #416061;
+  border-radius: 5px;
+  color: #bbd9d7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+summary:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+@media (min-width: 1001px) {
+  .showcase-shell .method-stack-card {
+    width: min(100%, 132px);
+  }
+  .showcase-shell .method-stack-label {
+    margin-bottom: 12px;
+  }
+  .showcase-shell .method-input-stacks {
+    gap: 12px;
+  }
+  .showcase-shell .method-track > svg {
+    height: 58px;
+  }
+  .showcase-shell .method-band-picker {
+    padding-top: 6px;
+  }
+  .showcase-shell .context-stack .method-band-picker button {
+    padding: 5px 0;
+  }
+}
+@media (max-width: 1100px) {
+  .topbar:has(.showcase-start) {
+    gap: 14px;
+  }
+  .topbar:has(.showcase-start) nav {
+    margin-right: 8px;
+    gap: 18px;
+  }
+}
+@media (max-width: 800px) {
+  .showcase-controls {
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    padding: 14px 16px;
+  }
+  .showcase-caption h2 { font-size: 19px; }
+  .showcase-caption > p { font-size: 12px; }
+  .showcase-buttons { margin-top: 10px; }
+  .showcase-shell .topbar {
+    height: auto;
+  }
+  .showcase-shell .method-heading h1 {
+    font-size: 27px;
+  }
+  .showcase-start {
+    font-size: 11px;
+    padding: 8px;
+  }
+  .showcase-shell [data-tour] {
+    scroll-margin: 14px;
+  }
+}

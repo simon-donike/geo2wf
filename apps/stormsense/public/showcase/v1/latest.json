@@ -1,0 +1,5 @@
+{
+  "manifest": "releases/showcase-v1/catalog.json",
+  "schema_version": 1,
+  "version": "showcase-v1"
+}

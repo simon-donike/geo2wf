@@ -39,10 +39,20 @@ export const className = (value?: string) =>
   })[value || ""] ||
   value ||
   "System";
-const root = (import.meta.env?.VITE_DATA_BASE || "/data/").replace(/\/?$/, "/");
-export const dataUrl = (path: string) => root + path;
-async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(dataUrl(path), {
+export interface DataSource {
+  root: string;
+  fetch?: (url: string, init?: RequestInit) => Promise<Response>;
+}
+export const LIVE_DATA: DataSource = {
+  root: (import.meta.env?.VITE_DATA_BASE || "/data/").replace(/\/?$/, "/"),
+};
+export const dataUrl = (path: string, source = LIVE_DATA) => source.root + path;
+async function read<T>(
+  path: string,
+  signal?: AbortSignal,
+  source = LIVE_DATA,
+): Promise<T> {
+  const response = await (source.fetch ?? fetch)(dataUrl(path, source), {
     signal,
     cache: path === "latest.json" ? "no-store" : "default",
   });
@@ -57,14 +67,15 @@ async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw Error("This data release uses an unsupported format.");
   return value as T;
 }
-export async function getCatalog(signal?: AbortSignal) {
+export async function getCatalog(signal?: AbortSignal, source = LIVE_DATA) {
   const pointer = await read<{ schema_version: 1; manifest: string }>(
     "latest.json",
     signal,
+    source,
   );
   if (!/^releases\/[A-Za-z0-9_-]+\/catalog\.json$/.test(pointer.manifest))
     throw Error("Invalid data release.");
-  const catalog = await read<Catalog>(pointer.manifest, signal);
+  const catalog = await read<Catalog>(pointer.manifest, signal, source);
   if (
     !Array.isArray(catalog.storms) ||
     !catalog.coverage ||
@@ -77,10 +88,14 @@ export async function getCatalog(signal?: AbortSignal) {
     throw Error("Invalid storm catalog.");
   return catalog;
 }
-export async function getSeries(path: string, signal?: AbortSignal) {
+export async function getSeries(
+  path: string,
+  signal?: AbortSignal,
+  source = LIVE_DATA,
+) {
   if (!/^objects\/[a-f0-9]{64}\.json$/.test(path))
     throw Error("Invalid storm series.");
-  const series = await read<Series>(path, signal);
+  const series = await read<Series>(path, signal, source);
   const keys = ["vmax_ms", "rmw_km", "r34_km", "r50_km", "r64_km"] as const;
   if (
     !Array.isArray(series.records) ||

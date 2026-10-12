@@ -6,6 +6,7 @@ import type { Fix, Metrics, Storm, ImageHour, ImageBundle } from "./types";
 import { RADII } from "./presentation";
 import { COVERAGE_LIMITS, COVERAGE_SOURCE } from "./coverage";
 import { SatelliteOverlay } from "./SatelliteOverlay";
+import { useDataSource } from "./dataContext";
 import { HourlyImagery } from "./HourlyImagery";
 
 const NO_STORMS: Storm[] = [],
@@ -93,6 +94,7 @@ export const MapView = memo(function MapView({
   imageryTime?: string;
   onImageryReady?: (ready: boolean) => void;
 }) {
+  const source = useDataSource();
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
@@ -195,7 +197,7 @@ export const MapView = memo(function MapView({
         },
       ).addTo(background);
     const controller = new AbortController();
-    fetch("/land.geojson", { signal: controller.signal })
+    (source.fetch ?? fetch)("/land.geojson", { signal: controller.signal })
       .then((r) => r.json())
       .then((land: GeoJsonObject) =>
         L.geoJSON(land, {
@@ -223,7 +225,7 @@ export const MapView = memo(function MapView({
       dot.current = null;
       circles.current.clear();
     };
-  }, []);
+  }, [source]);
 
   // Track paths persist during scrubbing; only changed track data rebuilds them.
   useEffect(() => {

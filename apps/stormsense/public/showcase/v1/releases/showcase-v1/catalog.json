@@ -1,0 +1,336 @@
+{
+  "coverage": {
+    "expected": 253,
+    "gaps": 1,
+    "pending": 0,
+    "predictions": 252
+  },
+  "generated_at": "2026-10-11T12:06:24Z",
+  "models": {
+    "forecast": {
+      "id": "dashboard-mlp",
+      "sha256": "2aee3963b7714575f9ed7a0bb04cbba014edb2645ad0c1c6dd172a004e5c0129",
+      "version": "stormsense-1:dashboard-mlp:2aee3963b771"
+    },
+    "nowcast": {
+      "id": "historical-encoder-two-hour-v1",
+      "sha256": "6bd41877358425603a6d4f188e8ca9ebd6e6f8b5a05abace63b8d91eae6770d9",
+      "version": "stormsense-1:historical-encoder-two-hour-v1:6bd418773584"
+    }
+  },
+  "prediction_cadence_hours": 2,
+  "quality_gate": {
+    "candidate_source_bytes": 51262914560,
+    "candidate_version": "stormsense-1:historical-encoder-two-hour-v1:6bd418773584",
+    "failures": [],
+    "metrics": {
+      "baseline": {
+        "forecast_12h": {
+          "bias": 0.4584146819742273,
+          "mae": 9.279001235618285,
+          "n": 730
+        },
+        "forecast_6h": {
+          "bias": 2.264100802818947,
+          "mae": 7.694453147375562,
+          "n": 765
+        },
+        "r34_km": {
+          "bias": 31.989278748218624,
+          "mae": 73.15763214452066,
+          "n": 905
+        },
+        "r50_km": {
+          "bias": 35.61978383115217,
+          "mae": 48.53056930193637,
+          "n": 903
+        },
+        "r64_km": {
+          "bias": 41.17736039079307,
+          "mae": 43.92070723829199,
+          "n": 905
+        },
+        "rmw_km": {
+          "bias": -18.353083893707552,
+          "mae": 29.177674517004487,
+          "n": 905
+        },
+        "vmax_ms": {
+          "bias": 4.332697843886208,
+          "mae": 6.803795566943055,
+          "n": 905
+        }
+      },
+      "candidate": {
+        "forecast_12h": {
+          "bias": -3.2545232099989807,
+          "mae": 8.58144380551066,
+          "n": 730
+        },
+        "forecast_6h": {
+          "bias": -1.969972024538929,
+          "mae": 6.6699078617194845,
+          "n": 765
+        },
+        "r34_km": {
+          "bias": -24.81995072718421,
+          "mae": 58.66292157512494,
+          "n": 905
+        },
+        "r50_km": {
+          "bias": -9.017744777643141,
+          "mae": 22.210625754650398,
+          "n": 903
+        },
+        "r64_km": {
+          "bias": -3.2866246061580426,
+          "mae": 9.793174751188422,
+          "n": 905
+        },
+        "rmw_km": {
+          "bias": -4.927027331631514,
+          "mae": 29.530525400340746,
+          "n": 905
+        },
+        "vmax_ms": {
+          "bias": -0.41940784476736537,
+          "mae": 4.6993190232112285,
+          "n": 905
+        }
+      }
+    },
+    "missing": [],
+    "passed": true,
+    "phase": "full",
+    "pretraining_membership": {
+      "seen": 94,
+      "unseen": 811
+    },
+    "quality_policy": "wind-priority",
+    "storms": [
+      "AL012026",
+      "AL022026",
+      "AL032026",
+      "AL042026",
+      "AL052026",
+      "AL062026",
+      "AL072026",
+      "AL082026",
+      "AL092026",
+      "AL102025",
+      "AL112025",
+      "AL122025",
+      "AL132025",
+      "CP012026",
+      "CP022026",
+      "EP012026",
+      "EP022026",
+      "EP032026",
+      "EP042026",
+      "EP052026",
+      "EP062026",
+      "EP072026",
+      "EP082026",
+      "EP092026",
+      "EP102026",
+      "EP112026",
+      "EP122026",
+      "EP132026",
+      "EP142026",
+      "EP152025",
+      "EP152026",
+      "EP162025",
+      "EP162026",
+      "EP172025",
+      "EP172026",
+      "EP182025",
+      "EP182026",
+      "EP192026",
+      "EP202026"
+    ],
+    "warnings": [
+      "MAE regression: rmw_km"
+    ],
+    "window": {
+      "end": "2026-10-08T12:30:36Z",
+      "start": "2025-10-08T12:30:36Z"
+    }
+  },
+  "release": "showcase-v1",
+  "reports": {},
+  "schema_version": 1,
+  "source_status": {
+    "backfill": {
+      "complete": true,
+      "counts": {
+        "gap": 0,
+        "ready": 0
+      },
+      "end": "2026-10-11T12:05:03Z",
+      "last_progress": "2026-10-11T12:06:07Z",
+      "processed": 0,
+      "queued": 0,
+      "start": "2025-10-11T00:00:00Z"
+    },
+    "discovery": {
+      "active_count": 3,
+      "error": null,
+      "last_attempt": "2026-10-11T12:05:03Z",
+      "last_success": "2026-10-11T12:05:03Z",
+      "snapshot": "85f4d9e3aff157ffdf47289177df2886d4b8c96aa07f1cfaf37f43d9232e8f68"
+    },
+    "history": {
+      "end": "2026-10-11T12:05:03Z",
+      "failures": [],
+      "retrieved_at": "2026-10-11T12:06:07Z",
+      "start": "2025-10-11T00:00:00Z"
+    },
+    "update": {
+      "catchup": {
+        "gap": 0,
+        "ready": 0
+      },
+      "catchup_end": "2026-10-11T12:00:00Z",
+      "catchup_start": "2025-10-11T00:00:00Z",
+      "last_completed": "2026-10-11T12:06:07Z",
+      "ready": 3,
+      "requested_at": "2026-10-11T12:05:03Z",
+      "results": 3
+    }
+  },
+  "storms": [
+    {
+      "active": false,
+      "advisory": {
+        "classification": "HU",
+        "lat": 23.6,
+        "lon": -176.7,
+        "motion_direction": 275.0,
+        "motion_speed_kt": 18.0,
+        "source": "NHC/CPHC advisory",
+        "time": "2026-10-04T09:00:00Z",
+        "url": "https://www.nhc.noaa.gov/text/HFOTCPCP2.shtml",
+        "wind_ms": 48.87218
+      },
+      "basin": "CP",
+      "change_24h_ms": -8.393295288085938,
+      "change_24h_reference_kind": "hindcast",
+      "end": "2026-10-04T18:00:00Z",
+      "expected_count": 253,
+      "gap_count": 1,
+      "has_ri": true,
+      "id": "EP152026",
+      "imagery_coverage": {
+        "expected": 292,
+        "gaps": 0,
+        "pending": 0,
+        "ready": 292
+      },
+      "latest_fix": {
+        "classification": "HU",
+        "lat": 24.0,
+        "lon": -179.2,
+        "name": "Nolo",
+        "pressure_hpa": 959.0,
+        "radii_km": {
+          "r34": 211.7687295140621,
+          "r50": 91.20042324463193,
+          "r64": 49.21757511296143,
+          "rmw": 37.04
+        },
+        "source": "NHC/CPHC ATCF BEST",
+        "time": "2026-10-04T18:00:00Z",
+        "wind_ms": 51.4444
+      },
+      "latest_prediction": {
+        "center": {
+          "age_hours": 0.0,
+          "fix_time": "2026-10-04T18:00:00Z",
+          "lat": 24.0,
+          "lon": -179.2,
+          "method": "historical_fix"
+        },
+        "elapsed_seconds": 11.815,
+        "generated_at": "2026-10-08T10:40:39Z",
+        "imagery": {
+          "bands": [
+            "CMI_C07",
+            "CMI_C08",
+            "CMI_C09",
+            "CMI_C10",
+            "CMI_C11",
+            "CMI_C12",
+            "CMI_C13",
+            "CMI_C14",
+            "CMI_C15",
+            "CMI_C16"
+          ],
+          "end": "2026-10-04T17:59:52Z",
+          "etag": "\"d51ccc82f7e8e9ab1d803bd1f496f2f4\"",
+          "grid": {
+            "crop": [
+              32,
+              224
+            ],
+            "height": 256,
+            "resolution_degrees": 0.027,
+            "width": 256
+          },
+          "published_at": "2026-10-04T18:00:56Z",
+          "range_bytes": 19136512,
+          "retrieved_at": "2026-10-08T10:40:39Z",
+          "satellite": 18,
+          "size_bytes": 355088651,
+          "start": "2026-10-04T17:50:21Z",
+          "units": "K",
+          "url": "https://noaa-goes18.s3.amazonaws.com/ABI-L2-MCMIPF/2026/277/17/OR_ABI-L2-MCMIPF-M6_G18_s20262771750214_e20262771759523_c20262771800018.nc",
+          "valid_fraction": 1.0
+        },
+        "kind": "hindcast",
+        "metrics": {
+          "r34_km": 234.28936767578125,
+          "r50_km": 98.375732421875,
+          "r64_km": 43.46744918823242,
+          "rmw_km": 34.27665710449219,
+          "vmax_ms": 54.7579345703125
+        },
+        "model_version": "stormsense-1:historical-encoder-two-hour-v1:6bd418773584",
+        "reason": null,
+        "retryable": false,
+        "source_snapshot": "6e65ba80447fcdffd17d16908a0d2df4f85cfc079f154c9c183d77622149b77b",
+        "status": "ready",
+        "storm_id": "EP152026",
+        "time": "2026-10-04T18:00:00Z"
+      },
+      "metrics": {
+        "r34_km": 234.28936767578125,
+        "r50_km": 98.375732421875,
+        "r64_km": 43.46744918823242,
+        "rmw_km": 34.27665710449219,
+        "vmax_ms": 54.7579345703125
+      },
+      "name": "Nolo",
+      "peak_category": 4,
+      "peak_official_wind_ms": 69.44994,
+      "pending_count": 0,
+      "prediction_count": 252,
+      "prediction_schedule": {
+        "cadence_hours": 2,
+        "eligible_start": "2026-09-13T18:00:00Z",
+        "start_gate": true
+      },
+      "record_count": 253,
+      "series": "objects/5bac02a4c6e7b0dae20e5846d2ae87092abd5cad330e0f8d0e08934b3c0edc19.json",
+      "start": "2026-09-10T12:00:00Z"
+    }
+  ],
+  "units": {
+    "radius": "km",
+    "time": "UTC",
+    "wind": "m/s"
+  },
+  "window": {
+    "end": "2026-10-04T18:00:00Z",
+    "start": "2026-09-10T12:00:00Z"
+  }
+}

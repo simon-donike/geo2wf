@@ -2,7 +2,7 @@
  * the small decoded-image window. Scrubbing never cancels useful downloads.
  */
 import { unzipSync } from "fflate";
-import { dataUrl } from "./data";
+import { dataUrl, LIVE_DATA, type DataSource } from "./data";
 import type { ImageBundle } from "./types";
 type DownloadState = "queued" | "loading" | "ready" | "error";
 type BlobLoader = (url: string, signal: AbortSignal) => Promise<Blob>;
@@ -14,8 +14,12 @@ interface Download {
   reject: (error: unknown) => void;
   bytes: number;
 }
-const fetchBlob: BlobLoader = async (url, signal) => {
-  const response = await fetch(url, {
+const fetchBlob = async (
+  url: string,
+  signal: AbortSignal,
+  source: DataSource,
+) => {
+  const response = await (source.fetch ?? fetch)(url, {
     signal: AbortSignal.any([
       signal,
       AbortSignal.timeout(url.endsWith(".zip") ? 60000 : 15000),
@@ -42,11 +46,15 @@ export class ImageArchive {
     }
   >();
   private bundleControllers = new Set<AbortController>();
+  private loader: BlobLoader;
   constructor(
     private notify: () => void,
-    private loader: BlobLoader = fetchBlob,
+    loader?: BlobLoader,
     private concurrency = 8,
-  ) {}
+    private source = LIVE_DATA,
+  ) {
+    this.loader = loader ?? ((url, signal) => fetchBlob(url, signal, source));
+  }
   state(url: string) {
     return this.entries.get(url)?.state;
   }
@@ -81,7 +89,9 @@ export class ImageArchive {
     const retained = new Set(urls);
     this.bundles = new Map(
       bundles.flatMap((bundle) =>
-        bundle.images.map((path) => [dataUrl(path), bundle] as const),
+        bundle.images.map(
+          (path) => [dataUrl(path, this.source), bundle] as const,
+        ),
       ),
     );
     const bundlePaths = new Set(bundles.map((bundle) => bundle.path));
@@ -118,10 +128,13 @@ export class ImageArchive {
       const entry = {
         controller,
         failed: false,
-        images: bundle.images.map(dataUrl),
+        images: bundle.images.map((path) => dataUrl(path, this.source)),
         promise: Promise.resolve(new Map<string, Blob>()),
       };
-      entry.promise = this.loader(dataUrl(bundle.path), controller.signal)
+      entry.promise = this.loader(
+        dataUrl(bundle.path, this.source),
+        controller.signal,
+      )
         .then(async (blob) => {
           if (blob.size !== bundle.bytes || blob.size > 8 * 1024 * 1024)
             throw Error("Invalid image bundle size");
@@ -143,7 +156,7 @@ export class ImageArchive {
           for (const path of wanted) {
             if (!files[path]) throw Error("Image missing from daily bundle");
             images.set(
-              dataUrl(path),
+              dataUrl(path, this.source),
               new Blob([new Uint8Array(files[path])], { type: "image/webp" }),
             );
           }

@@ -27,7 +27,7 @@ The local database is `var/stormsense/state.sqlite`. Generated data and logs und
 
 The active map includes track history and true-scale R34/R50/R64/RMW rings at the latest estimate. Storm cards show official and model-equivalent wind categories and elapsed days/hours since the first recorded fix. Detail maps update the rings at the selected hour. Intensity charts mark NHC category thresholds in either wind unit. Wind estimate charts default to exponential smoothing with alpha 0.5 (50% newest estimate, 50% previous smoothed value), chosen to reduce wiggles while keeping nominal delay to one hour after comparison against downloaded NHC/CPHC BEST winds across all 38 storms; radii retain the three-hour 60/30/10% filter. Both have an off switch. Interior gaps are linearly interpolated before filtering, with no extrapolation, and original downloads, metric tiles, map radii and issued forecasts remain unchanged. Timeline dragging updates locally and commits its shareable URL on release, keeping track paths and the slider position stable.
 
-Active-storm maps also show approximately **1,800 km GeoColor crops** from [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/access-basics/), choosing GOES-East or GOES-West by viewing geometry. “Focus … image” fits the crop to the map; the checkbox and opacity slider control visibility. Daytime imagery uses a natural-colour composite; nighttime uses an infrared blend. The UI labels the actual reported image time and age separately from prediction times. It checks for new frames every five minutes while visible, tries up to three advertised times if a crop is empty, and retains labeled previous imagery if metadata refresh fails. The active overview fetches these latest images directly into the browser. Storm detail pages instead use the saved hourly image archive described below. WMS crops and Leaflet use the same Web Mercator projection, including split crops across the dateline.
+Active-storm maps also show approximately **1,800 km GeoColor crops** from [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/access-basics/), choosing GOES-East or GOES-West by viewing geometry. “Focus … image” fits the crop to the map; the checkbox controls visibility, and imagery displays at 100% opacity. Daytime imagery uses a natural-colour composite; nighttime uses an infrared blend. The UI labels the actual reported image time and age separately from prediction times. It checks for new frames every five minutes while visible, tries up to three advertised times if a crop is empty, and retains labeled previous imagery if metadata refresh fails. The active overview fetches these latest images directly into the browser. Storm detail pages instead use the saved hourly image archive described below. WMS crops and Leaflet use the same Web Mercator projection, including split crops across the dateline.
 
 After publication, restore the numerical archive into a fresh checkout without rerunning satellite inference:
 
@@ -36,6 +36,80 @@ rclone copy r2:tcd/explorer/stormsense/objects apps/stormsense/public/data/objec
 rclone copy r2:tcd/explorer/stormsense/releases apps/stormsense/public/data/releases --include '*.json'
 rclone copyto r2:tcd/explorer/stormsense/latest.json apps/stormsense/public/data/latest.json
 ```
+
+## Guided scientific showcase
+
+Choose **Start guided tour**, or open `/?showcase=v1&tour=live`.
+Ten manually advanced stops introduce the live overview, Nolo's saved history,
+reference analysis versus satellite inference, Ian's inputs, the shared encoder, outputs, training targets, the encoder-only
+variant, the publication pipeline, and comparison with reference winds. The
+loss/gradient stop is omitted; the Training page still explains the objective.
+
+The first stop reads the actual live catalog and refreshes it every five minutes,
+just like the ordinary homepage. Its caption explains server-side inference and
+the hourly update schedule while the runner is online. Source timestamps and
+availability indicators remain visible; unavailable live data is not replaced
+with a historical example. Next explicitly switches to the bundled Nolo history.
+
+A compact floating card provides a short caption, step count, Back, Next, and
+Exit. It sits away from the highlighted region where space allows; on narrow
+screens the highlighted viewport ends above the card and scroll padding keeps
+content reachable. A single highlight frame moves and resizes between sections,
+scrolling only when needed. Reduced motion skips transitions. Page controls stay
+usable throughout. Stop links survive refresh; old `tour=learning` links open
+the training-targets stop. Exit restores the previous page and saved wind-unit,
+smoothing, and imagery preferences. Direct links return to `/method` on exit.
+
+`public/showcase/v1/` pins the complete published Nolo history from release
+`20261011T120622220077Z`: **10 September 2026 12:00 UTC through 4 October 2026
+18:00 UTC**, with 252 ready hindcast estimates, one recorded gap, 292 GeoColor
+frames, 98 track fixes, and 244 forecast records. Estimates begin on 13 September
+at 18:00 UTC according to the published prediction schedule; the earlier display
+imagery remains navigable. All numerical values, provenance, imagery, and the
+prediction schedule match this source release. The catalog includes Nolo only.
+The manifest retains the original storm metadata, source hashes, a recorded
+prediction, and checksums for the snapshot and shared Method/map assets. The
+existing Ian inputs, outputs, and training comparison are reused. No model is run
+or updated by the tour. Nolo's current historical record uses an encoder-only
+checkpoint; Ian's joint example separately illustrates field prediction.
+
+The snapshot has approximately 27 MB of imagery. Bounded ZIP packs deliver the
+full record in a few downloads instead of over 1,500 individual requests. Both
+packs and every unpacked asset are checksum-verified. Original files remain in
+the bundle for reproducibility and inspection; the browser downloads only the
+packs and shared Method/map assets.
+
+While the live introduction is visible, the browser preloads and verifies all
+listed assets and loads the Method module. Next becomes available when the saved
+examples are ready, avoiding an intermediate loading screen. Missing or changed files stop preparation and expose
+**Retry preparation**. The prepared numerical data, imagery, and Method images
+remain in memory across chapters, including after network loss. A local preview
+can run all saved stops without external access or the operational archive; the
+live introduction shows unavailable data when disconnected. A
+fresh hosted visit or reload still requires access to the website's static assets.
+The optional external web font falls back to the local serif font when offline.
+Production builds include the showcase alongside the Method assets. Only the
+live introduction refreshes the operational catalog and live imagery;
+the saved-example stops never request them.
+
+The **Pipeline** tab is also available directly at `/method?view=pipeline`,
+independent of live archive availability. Its stages explain retrieval,
+preprocessing, inference, SQLite storage, immutable R2 publication, and browser
+delivery, with GeoColor on a separate display path. Saved Nolo provenance is
+labeled as a hindcast; animations explain the process rather than monitor a job.
+
+From the repository root, with the pinned source release restored locally:
+
+```bash
+python3 scripts/export_showcase.py --check  # compare bundle with the source
+python3 scripts/export_showcase.py          # deliberately regenerate the bundle
+```
+
+If shared Method images or the basemap change, regenerate the manifest before
+building. `npm test` checks shipped checksums without requiring the source
+archive. `npx playwright test tests/showcase.spec.ts tests/method.spec.ts` checks
+the route sequence, keyboard access, projector/mobile layouts, recovery,
+preferences, reduced motion, and operation with live/external requests blocked.
 
 ## Animated method walkthrough
 

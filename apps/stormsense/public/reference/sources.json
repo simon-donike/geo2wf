@@ -1,0 +1,46 @@
+[
+  {
+    "file": "aircraft.jpg",
+    "url": "/reference/aircraft.jpg",
+    "source": "https://www.aoml.noaa.gov/observational-instruments/",
+    "credit": "NOAA/AOML",
+    "original_url": "https://www.aoml.noaa.gov/wp-content/uploads/2024/06/NOAA-hurricane-hunter-Kermit-300x169.jpg",
+    "bytes": 5543,
+    "sha256": "25c9d534f8d114770f35b78233152999566a8690dbd20f80618f5408be8577d7",
+    "label": "Aircraft",
+    "alt": "NOAA P-3 Hurricane Hunter aircraft in flight"
+  },
+  {
+    "file": "dropsonde.jpg",
+    "url": "/reference/dropsonde.jpg",
+    "source": "https://www.omao.noaa.gov/aircraft-operations/news-media/image/noaa-electronics-engineer-dropsondes-and-gulfstream-iv-sp",
+    "credit": "NOAA / Sophie Talbert",
+    "original_url": "https://www.omao.noaa.gov/sites/default/files/styles/embedded_landscape/public/2023-10/Electronics%20Engineer%20Steven%20Paul%20holds%20a%20dropsonde%20and%20a%20minisonde%20at%20AOC%20Hangar%20with%20NOAA%20G-IV%20in%20background%20credit%20Sophie%20Talbert%20100423.jpg?itok=pw_duFZe",
+    "bytes": 57849,
+    "sha256": "91f919272cb7b79459f3180655a23d5a9b70ce12f77e13e1d3c070985798aa9b",
+    "label": "Dropsondes",
+    "alt": "NOAA engineer holding a dropsonde and a minisonde"
+  },
+  {
+    "file": "buoy.jpg",
+    "url": "/reference/buoy.jpg",
+    "source": "https://www.ndbc.noaa.gov/station_page.php?station=41001",
+    "credit": "NOAA/NDBC",
+    "original_url": "https://www.ndbc.noaa.gov/images/stations/3mfoam_scoop_mini.jpg",
+    "bytes": 32972,
+    "sha256": "e06a96e1633ce26c53abc6fc709d255fa8a9fa09ed9a25b585e54ab73b372747",
+    "label": "Surface stations",
+    "alt": "NOAA moored buoy with weather instruments"
+  },
+  {
+    "file": "satellite.png",
+    "url": "/reference/satellite.png",
+    "source": "https://www.nesdis.noaa.gov/2022-hurricane-imagery",
+    "credit": "NOAA/NESDIS \u00b7 CIRA/RAMMB",
+    "original_url": "https://www.nesdis.noaa.gov/s3/2023-09/2022_09_26_Hurricane_Ian.PNG",
+    "bytes": 2021483,
+    "sha256": "3e01a3d33e6718c945ed90f2abc055fc2e3b32efc428aa139caa93edbf68aaf1",
+    "label": "Satellite imagery",
+    "alt": "Satellite view of Hurricane Ian on 26 September 2022"
+  }
+]
