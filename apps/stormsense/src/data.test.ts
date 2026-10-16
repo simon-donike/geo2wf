@@ -55,6 +55,25 @@ describe("public data behavior", () => {
     expect(wind(25.7222, "kt")).toBe("50");
     const result = csv({ records: [row("hindcast", "ready")] } as Series);
     expect(result).toContain("vmax_ms");
-    expect(result).toContain('"25"');
+    expect(result).toContain(",25,20,100,40,10,");
+    expect(result).not.toContain('"25"');
+  });
+});
+
+describe("CSV coordinates", () => {
+  it("exports geographic x/y and leaves unavailable centers empty", () => {
+    const result = csv({
+      records: [{ ...row("hindcast", "ready"), center: { lon: -65.5, lat: 0 } }, row("live", "gap")],
+      forecasts: [{ predictions: [{ lead_hours: 6, vmax_ms: 30 }] }],
+      track: [{ lon: -66, lat: 12.5, wind_ms: 25 }],
+    } as Series);
+    const [header, ready, gap, forecast, official] = result.split("\n");
+    expect(header.endsWith(",x,y")).toBe(true);
+    expect(ready.endsWith(",-65.5,0")).toBe(true);
+    expect(gap.endsWith(',"",""')).toBe(true);
+    expect(forecast.endsWith(',"",""')).toBe(true);
+    expect(forecast).toContain(",6,30,");
+    expect(official.endsWith(",-66,12.5")).toBe(true);
+    for (const line of result.split("\n")) expect(line.split(",")).toHaveLength(16);
   });
 });

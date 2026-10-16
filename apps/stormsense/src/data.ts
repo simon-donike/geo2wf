@@ -152,6 +152,8 @@ export function csv(series: Series) {
     "r50_km",
     "r64_km",
     "reason",
+    "x",
+    "y",
   ];
   const rows: (string | number | null | undefined)[][] = series.records.map(
     (r) => [
@@ -169,6 +171,8 @@ export function csv(series: Series) {
       r.metrics?.r50_km,
       r.metrics?.r64_km,
       r.reason,
+      r.center?.lon,
+      r.center?.lat,
     ],
   );
   for (const f of series.forecasts ?? [])
@@ -199,12 +203,15 @@ export function csv(series: Series) {
       f.radii_km?.r34,
       f.radii_km?.r50,
       f.radii_km?.r64,
+      null,
+      f.lon,
+      f.lat,
     ]);
   return [
     fields.join(","),
     ...rows.map((row) =>
       fields
-        .map((_, i) => `"${String(row[i] ?? "").replaceAll('"', '""')}"`)
+        .map((_, i) => typeof row[i] === "number" ? String(row[i]) : `"${String(row[i] ?? "").replaceAll('"', '""')}"`)
         .join(","),
     ),
   ].join("\n");
